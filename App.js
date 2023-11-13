@@ -1,20 +1,18 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
+import Home from './component/home';
+import styles from './styles';
+import BuisnessLogin from './component/BuisnessLogin';
+import BuisnessSignUp from './component/BuisnessSignUp';
+import Tools from './component/tools';
+import LlamaSeo from './component/llamaSeo';
 
 export default function App() {
   return (
     <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
+        <LlamaSeo/>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+
