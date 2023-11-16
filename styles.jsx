@@ -28,8 +28,7 @@ const styles = StyleSheet.create({
   rowItem: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    
+    alignItems: 'center',    
     flexDirection: 'row',
   },
   rowItem1: {
@@ -120,9 +119,9 @@ const styles = StyleSheet.create({
   }
   ,
   AddUrlButton: {
-    flex: 1,
+    flex: .4,
     height: 40,
-    width: 10,
+    width: 100,
     flexDirection:'column',
     borderWidth: 2,
     borderTopRightRadius:5,
@@ -132,7 +131,7 @@ const styles = StyleSheet.create({
   },
   AddUrl: {
     height: 40,
-    width: 800,
+    width: 1000,
     borderColor: 'gray',
     borderWidth: 2,
     borderTopLeftRadius:5,
@@ -145,6 +144,48 @@ const styles = StyleSheet.create({
     alignItems:'center',
     paddingLeft:50,
     paddingTop:7
+  },
+  AddUrlList: {
+    flex:1,
+    borderColor: 'gray',
+    borderWidth: 2,
+    borderRadius:5,
+    flexDirection:'row'
+  },
+  AddUrlRow: {
+    flex:1,
+    borderColor: 'gray',
+  
+    flexDirection:'row'
+  },
+  errorText: {
+    flex:1,
+    borderColor: 'red',
+    fontSize:10
+  },
+  errorViewFlex: {
+    flex:.1,
+    color: 'red',
+    fontSize:10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderColor: 'gray',
+    flexDirection:'row'
+  },
+  AddUrlText: {
+    height: 40,
+    width: 1000,
+    borderColor: 'gray',
+    color:'black',
+    borderWidth: 2,
+    borderTopLeftRadius:5,
+    borderBottomLeftRadius:5,
+  },
+  SeoContentFlex: {
+    flex:1,
+    borderColor: 'gray',
+    paddingTop:10,    
+    flexDirection:'row'
   }
 });
 

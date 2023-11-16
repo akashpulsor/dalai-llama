@@ -6,11 +6,14 @@ import BuisnessLogin from './component/BuisnessLogin';
 import BuisnessSignUp from './component/BuisnessSignUp';
 import Tools from './component/tools';
 import LlamaSeo from './component/llamaSeo';
-
+import {NavigationContainer} from '@react-navigation/native';
+import AppStack from './AppStack';
 export default function App() {
   return (
     <View style={styles.container}>
-        <LlamaSeo/>
+          <NavigationContainer>
+               <AppStack/> 
+          </NavigationContainer>
     </View>
   );
 }

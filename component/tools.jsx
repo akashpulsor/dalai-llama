@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import styles from '../styles';
 
-const Tools = () => {
+const Tools = ({navigation}) => {
   const [data, setData] = useState([]);
 
   useEffect(() => {
@@ -22,7 +22,7 @@ const Tools = () => {
   }, []); // The empty dependency array ensures the effect runs only once, similar to componentDidMount
 
   const renderCard = ({ item }) => (
-    <TouchableOpacity style={styles.card} onPress={() => alert(`Card ${item.id} pressed`)}>
+    <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('LLAMASEO')}>
       <Text style={styles.Text}>{item.name}</Text>
     </TouchableOpacity>
   );
