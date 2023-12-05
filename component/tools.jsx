@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import styles from '../styles';
-
+//TODO We need to add link to link to your cms
 const Tools = ({navigation}) => {
   const [data, setData] = useState([]);
 
@@ -22,7 +22,7 @@ const Tools = ({navigation}) => {
   }, []); // The empty dependency array ensures the effect runs only once, similar to componentDidMount
 
   const renderCard = ({ item }) => (
-    <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('LLAMASEO')}>
+    <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('LLAMACONTENT')}>
       <Text style={styles.Text}>{item.name}</Text>
     </TouchableOpacity>
   );

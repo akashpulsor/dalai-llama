@@ -186,6 +186,108 @@ const styles = StyleSheet.create({
     borderColor: 'gray',
     paddingTop:10,    
     flexDirection:'row'
+  },
+  Title: {
+    flex:1,
+    borderColor: 'gray',
+    borderWidth: 2,
+    borderTopLeftRadius:5,
+    borderBottomLeftRadius:5,
+  },
+  TitleInputBox: {
+    margin:20,
+
+    height: 40,
+    borderColor: 'gray',
+    borderWidth: 1,
+    borderRadius: 5,
+    padding:10
+
+
+  },
+  TitleBodyBox: {
+    margin:20,
+    height: 400,
+    borderColor: 'gray',
+    borderWidth: 1,
+    borderRadius: 5,
+    padding:10
+
+
+  },
+  ContentButtonFlex: {
+    flex:1,
+    marginLeft:400,
+    alignContent:"center",
+    borderColor: 'gray',
+    flexDirection:'row'
+  },
+  ContentButton: {
+    flex: .2,
+    height: 40,
+    width: 20,
+    margin:20,
+    borderWidth: 1,
+    borderRadius:5,
+    alignContent:"center",
+    borderColor: 'gray',
+    backgroundColor:'blue'
+  },
+  ContentButtonText: {
+    margin:5,
+    color: 'white',
+    fontSize: 16,
+    alignContent:'center',
+    alignItems:'center',
+    alignSelf: "center",
+  },
+  keyWordButton:{
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'lightgray',
+      margin:5,
+      padding: 10,
+      borderRadius: 10,
+      borderWidth: 1
+  },
+  keyWordButtonFlex:{
+    flex:1,
+    margin:10,
+    alignContent:"center",
+    borderColor: 'gray',
+    flexDirection:'row'
+  },  tagCloudContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  crossButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    padding: 10,
+  },
+  crossText: {
+    color: '#ffffff',
+    fontSize: 18,
+  },
+  tagContainer: {
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    margin: 5,
+  },
+  tagText: {
+    color: '#ffffff',
+    fontSize: 16,
+  },
+  competitorContainer: {
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    margin: 5,
+    backgroundColor: 'blue'
   }
 });
 

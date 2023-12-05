@@ -32,9 +32,9 @@ const Home = ({navigation}) => {
               setFoldableViewOpen(false);
               setData([]);
               console.log(searchQuestion);  
-              //const response = await fetch('https://ce8ad948-5e94-44f9-b8e1-200cf0387b00.mock.pstmn.io/tools');
-              //const jsonData = await response.json();
-              const jsonData = '{test Data}';
+              const response = await fetch('localhost:8000/search/'+searchQuestion);
+              const jsonData = await response.json();
+              //const jsonData = '{test Data}';
               console.log(jsonData)
               setData(jsonData);
               setSearchQuestion('');

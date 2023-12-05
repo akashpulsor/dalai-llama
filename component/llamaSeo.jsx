@@ -92,7 +92,7 @@ const llamaSeo = () => {
             {urlValidationFailed && (
                 <View style={styles.errorViewFlex}>
                     <Text style={styles.errorText}>URL validation failed. Please enter a valid URL.</Text>
-                    </View>
+                </View>
         )}
         </View>
         
