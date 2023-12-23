@@ -277,6 +277,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 8,
     margin: 5,
+    backgroundColor:'blue'
   },
   tagText: {
     color: '#ffffff',

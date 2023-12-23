@@ -12,11 +12,11 @@ const llamaContent = () => {
   const [data, setData] = useState([]);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [urlValidationFailed, setUrlValidationFailed] = useState(false);
   const [foldableViewOpen, setFoldableViewOpen] = useState(false);
   const [spinner, setSpinner] = useState(false);
   const [tagCloudViewOpen, setTagCloudViewOpen] = useState(false);
-
+  const [competitorAnalysisViewOpen, setCompetitorAnalysisViewOpen] = useState(false);
+  const [competitorAnalysisSpinner, setCompetitorAnalysisSpinner] = useState(false);
 
 
   const seo = async (data) => {
@@ -49,21 +49,40 @@ const llamaContent = () => {
     }
   }
 
+  const getTopPageRanks = async (data) => {
+    try {
+     
+      let temp = JSON.stringify(data)
+      console.log("POST DATA IS" + temp);
+      let headers = {
+        'Content-Type': 'application/json;charset=UTF-8',
 
-  const handleAddUrl = () => {
-    if (url.trim() !== '') {
-      if (isValidHttpUrl(url)) {
-        setData((prevList) => [{ 'url': url }, ...prevList]);
-        setUrl(''); // Clear the input after adding to the list
-        setUrlValidationFailed(false);
-        console.log(data)
-      }
-      else {
-        setUrlValidationFailed(true);
-      }
+        "Accept": "*/*"
+      };
 
+      setCompetitorAnalysisSpinner(true);
+      setCompetitorAnalysisViewOpen(false);
+      let res = await axios
+        .post(BASE_URL + "/getCurrentRanks", data, { "headers": headers });
+      if (res.status == 200) {
+        // test for status you want, etc
+        console.log(res.status)
+      }
+      setCompetitorAnalysisSpinner(false);
+      setCompetitorAnalysisViewOpen(true);
+      // Don't forget to return something
+      console.log(res.data)
+      return res.data
     }
-  };
+    catch (err) {
+      console.error(err);
+    }
+    finally {
+      setCompetitorAnalysisSpinner(false);
+    }
+  }
+
+
 
   function isValidHttpUrl(s) {
     let url;
@@ -73,50 +92,9 @@ const llamaContent = () => {
     return /https?/.test(url.protocol);
   }
 
-  const renderKeywords = () => {
-
-    const uniqueData = [...new Set(data)];
-
-    return (
-      <View style={styles.keyWordButtonFlex}>
-
-        <FlatList
-          data={uniqueData}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.toString()}
-          //horizontal={true}
-          showsHorizontalScrollIndicator={false}
-
-        />
-        <View style={styles.rowContainer}>
-
-          <TouchableOpacity style={styles.ContentButton} onPress={() => alert('Button Pressed')}>
-            <Text style={styles.ContentButtonText}>competitor Analysis</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-  const renderItem = ({ item }) => (
-
-    <View style={{ margin: 5 }}>
-      <TouchableOpacity
-        style={styles.keyWordButton}
-        onPress={() => onDeleteItem(item)}
-      >
-        <Ionicons name="ios-close-circle" size={24} color="red" style={{ marginRight: 5 }} />
-
-        <Text style={{ fontSize: 20, color: 'blue' }}>{item}</Text>
-      </TouchableOpacity>
-    </View>
-
-  );
 
 
-  const onDeleteItem = (itemToRemove) => {
-    // Logic to remove item from the data array
-    // Call a state update to trigger a re-render
-  };
+
 
   const getRandomColor = () => {
     // Generate a random color in hex format
@@ -163,7 +141,7 @@ const llamaContent = () => {
     // Main container with a gray background
     <ScrollView style={styles.container}>
       <Text style={{ fontSize: 30, color: 'blue' }}>LLAMA - CONTENT</Text>
-
+      
       <View style={styles.rowContainer}>
         <View style={styles.Title}>
           <TextInput
@@ -214,11 +192,24 @@ const llamaContent = () => {
       {
           tagCloudViewOpen && (
               <View  style={styles.tagCloudContainer}>
-                  <TouchableOpacity style={styles.tagContainer} onPress={() => alert('Button Pressed')}>
+                  <TouchableOpacity style={styles.tagContainer} onPress={() => getTopPageRanks(data)}>
                         <Text style={styles.tagText}>Competitor Analysis</Text>
                   </TouchableOpacity>
               </View>
           )        
+      }
+
+      {
+          competitorAnalysisSpinner ?  <ActivityIndicator color={'blue'} /> :
+            competitorAnalysisViewOpen  && (
+              <View  style={styles.tagCloudContainer}>
+
+
+              </View>
+
+            )
+          
+          
       }
     </ScrollView>
   );
