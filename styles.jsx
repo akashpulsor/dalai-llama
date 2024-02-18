@@ -6,10 +6,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#d3d3d3',
     padding: 20,
   },
+  Header: {
+    flexDirection: 'row',
+  },
+  titleFlex: {
+    flex:1,
+  },
+  LLMFlex: {
+    flex:1,
+    minHeight:161,  
+    alignItems:'flex-end',
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
+  },
+  LLM: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    width:'50%',
+    position:'absolute',
+    backgroundColor:'#d3d3d3'
   },
   searchBar: {
     height: 40,
@@ -62,28 +80,44 @@ const styles = StyleSheet.create({
     color: 'blue',
     fontSize: 16,
   },
-  LoginInput: {
-    
+  LoginInputFlex: {
     height: 40,
     width: 350,
+    margin:20,
     borderWidth: 2,
     borderColor: 'gray',
     borderRadius: 5,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  LoginInput: {
+    height: 40,
+    width: 350,
+    
+    borderWidth: 2,
+    borderColor: 'gray',
+    borderRadius: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  LoginButtonFlex: {
+    height: 100,
+    flexDirection:'row',
+    margin:50,
+    zIndex : 1
+
   },
   LoginButton: {
-    
     height: 40,
-    width: 350,
+    width: 200,
     borderWidth: 2,
     borderColor: 'gray',
     borderRadius: 5,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex : 1
   },
   TextFlex: {
-    
     height: 40,
     width: 350,
     borderColor: 'gray',
@@ -155,7 +189,6 @@ const styles = StyleSheet.create({
   AddUrlRow: {
     flex:1,
     borderColor: 'gray',
-  
     flexDirection:'row'
   },
   errorText: {
@@ -187,23 +220,13 @@ const styles = StyleSheet.create({
     paddingTop:10,    
     flexDirection:'row'
   },
-  Title: {
-    flex:1,
-    borderColor: 'gray',
-    borderWidth: 2,
-    borderTopLeftRadius:5,
-    borderBottomLeftRadius:5,
-  },
   TitleInputBox: {
     margin:20,
-
     height: 40,
     borderColor: 'gray',
     borderWidth: 1,
     borderRadius: 5,
     padding:10
-
-
   },
   TitleBodyBox: {
     margin:20,
@@ -212,15 +235,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 5,
     padding:10
-
-
   },
   ContentButtonFlex: {
     flex:1,
     marginLeft:400,
     alignContent:"center",
     borderColor: 'gray',
-    flexDirection:'row'
+    flexDirection:'row',
+    backgroundColor:'red'
   },
   ContentButton: {
     flex: .2,
@@ -256,7 +278,8 @@ const styles = StyleSheet.create({
     alignContent:"center",
     borderColor: 'gray',
     flexDirection:'row'
-  },  tagCloudContainer: {
+  },  
+  tagCloudContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
@@ -289,7 +312,318 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     margin: 5,
     backgroundColor: 'blue'
-  }
+  },
+  GenerateStructureFlex: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius:5,
+    alignItems:'center',
+    alignContent:"center",
+    borderColor: 'gray',
+    backgroundColor:'blue'
+  },
+  TopicContainer: {
+    flex: 1,
+    margin:10,
+    flexBasis:200,
+    flexGrow:0,
+    alignContent:"center",
+    padding:10,
+  },
+  StructureContainer: {
+    flex: 1,
+    margin:10,
+    alignContent:"center",
+    padding:10,
+    flexBasis:400,
+    flexGrow:0,
+  },
+  BlogTopicInputBox: {
+    height: 40,
+    width:'60%',
+    borderColor: 'gray',
+    borderWidth: 1,
+    borderRadius: 5,
+    padding:10, 
+  },
+  BlogTopicInputContainer: {
+    flex: 1,
+    height: 40,
+    borderColor: 'gray',
+    alignItems:'center',
+    margin:15,
+  },
+  GenerateStructureButtonFlex: {
+    height: '50',
+    width:'14%',
+    borderWidth: 2,
+    borderRadius:5,
+    margin:20,
+    borderColor: 'gray',
+    backgroundColor:'#d3d3d3'
+  },
+  GenerateButtonText: {
+    color: 'blue',
+    margin:10,
+    fontSize: 15,
+    alignItems:'center',
+    alignSelf:'center'
+  },
+  EditArticleButtonFlex: {
+    height: '50',
+    borderWidth: 2,
+    borderRadius:5,
+    width:'15%',
+    margin:10,
+    borderColor: 'gray',
+    backgroundColor:'#d3d3d3'
+  },
+  EditBoxContainer: {
+    flex: 1,
+    marginTop:40,
+    margin:10,
+    alignContent:"center",
+    padding:10,
+    flexBasis:700,
+    flexGrow:0,
+  },
+  headingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  pointsContainer: {
+    marginLeft: 20,
+  },
+  pointContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  headingLabel: {
+    flex: 1,
+    textAlign: 'left',
+  },
+  pointLabel: {
+    flex: 1,
+    textAlign: 'left',
+  },
+  checkbox: {
+    alignSelf: 'flex-start',
+  },
+  GeneratedArticleText: {
+    color: 'blue',
+    margin:10,
+    fontSize: 30,
+    alignItems:'left',
+    alignSelf:'left'
+  },
+  Title: {
+    flex:1,
+    borderColor: 'gray',
+    borderWidth: 2,
+    borderTopLeftRadius:5,
+    borderBottomLeftRadius:5,
+  },
+  TitleInputBox: {
+    margin:20,
+    height: 40,
+    borderColor: 'gray',
+    borderWidth: 1,
+    borderRadius: 5,
+    padding:10
+  },
+  disabledInput: {
+    backgroundColor: 'gray',
+    borderColor: '#dcdcdc', // Change border color for disabled input
+    borderWidth: 1, // Change background color of disabled TextInput
+  },
+  AutoTitleLabel: {
+    flex: 1,
+    textAlign: 'left',
+    color: 'blue',
+    margin:10,
+    fontSize: 15,
+  },
+  GenerateArticleButton: {
+    height: '50',
+    borderWidth: 2,
+    borderRadius:5,
+    width:'15%',
+    alignSelf:'center',
+    margin:'43%',
+    borderColor: 'gray',
+    backgroundColor:'#d3d3d3'
+  },
+  GenerateArticleButtonFlex: {
+    flex:1,    
+    alignContent:"center",
+    alignItems:'center',
+  
+    borderColor: 'gray',
+    flexDirection:'row'
+  },
+  FinalArticleContainer: {
+    flex: 1,
+    marginTop:40,
+    margin:10,
+    alignContent:"center",
+    flexBasis:1000,
+    
+
+  },
+  FinalArticleFlex: {
+    flex: 1,
+
+    alignContent:"center",
+    height:'100%',
+    backgroundColor: '#f2f2f2', // Background color similar to original blog
+ 
+    borderRadius:5
+  },
+  content: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 10,
+    elevation: 3,
+  },
+  label: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  article: {
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  TagsButton: {
+    height: '50',
+    borderWidth: 2,
+    borderRadius:5,
+    width:'50%',
+    alignSelf:'center',
+    borderColor: 'gray',
+    backgroundColor:'#d3d3d3'
+  },
+  SaveButton: {
+    height: '50',
+    borderWidth: 2,
+    borderRadius:5,
+    width:'50%',
+    alignSelf:'center',
+    borderColor: 'gray',
+    backgroundColor:'#d3d3d3'
+  },
+  PublishButton: {
+    height: '50',
+    borderWidth: 2,
+    borderRadius:5,
+    width:'50%',
+    alignSelf:'center',
+    borderColor: 'gray',
+    backgroundColor:'#d3d3d3'
+  },
+  ButtonFlex: {
+    margin:30,
+    flexDirection:'row',
+    
+  },
+  TagsButtonFlex: {
+    flex:.4,
+    flexDirection:'column',
+    borderColor: 'gray',
+    backgroundColor:'#d3d3d3',
+    alignItems:'flex-end',
+    alignContent:'flex-end',
+    alignItems:'flex-end'
+  },
+  SaveButtonFlex: {
+    flex:.4,
+    flexDirection:'column',
+    borderColor: 'gray',
+    backgroundColor:'#d3d3d3',
+
+  },
+  PublishButtonFlex: {
+    flex:.4,
+    flexDirection:'column',
+    borderColor: 'gray',
+    backgroundColor:'#d3d3d3',
+    alignItems:'flex-start',
+    alignContent:'flex-start',
+    alignItems:'flex-start'
+  },
+  centeredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 22,
+  },
+  modalView: {
+    margin: 20,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 35,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalText: {
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  input: {
+    width: '100%',
+    height: 40,
+    marginBottom: 10,
+    borderColor: 'gray',
+    borderWidth: 1,
+    borderRadius: 5,
+    padding: 10,
+  },
+  logo: {
+    width: 150,
+    height: 150,
+    marginBottom: 20,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  checkboxLabel: {
+    marginLeft: 8,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    height: 60,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
+  },
+  menuButton: {
+    marginRight: 10,
+  },
+  buttonsContainer: {
+    flexDirection: 'row',
+  },
+  button: {
+    marginLeft: 10,
+  },
+  drawerStyle: {
+    backgroundColor: 'transparent',
+  },
+  headerStyle: {
+    backgroundColor: '#333',
+  },
 });
 
 export default styles;

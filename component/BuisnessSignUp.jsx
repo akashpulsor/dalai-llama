@@ -4,7 +4,7 @@ import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import styles from '../styles';
 
 // Create your functional component
-const BuisnessSignUp = () => {
+const BuisnessSignUp = ({navigation}) => {
   return (
     // Main container with a gray background
     <View style={styles.container}>
