@@ -6,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Home from './component/home';
 import Tools from './component/tools';
 import llamaSeo from './component/llamaSeo';
-import llamaContent from './component/llamaContent';
+import LlamaContent from './component/llamaContent';
 import BuisnessLogin from './component/BuisnessLogin';
 import Payment from './component/Payment';
 import Account from './component/Account';
@@ -15,10 +15,11 @@ import { NavigationContainer } from "@react-navigation/native";
 import { DrawerItemList } from "@react-navigation/drawer";
 import styles from './styles';
 import User from "./assets/wordpress-logo.png";
+import llamaContent from './component/llamaContent';
 const Auth = createStackNavigator();
 
 // Create stack navigator for cards
-const Stack = createStackNavigator();
+const ToolsStack = createStackNavigator();
 
 
 const Drawer = createDrawerNavigator();
@@ -86,10 +87,9 @@ const HomeStack = () => {
       }
     }}
   >
-          <Drawer.Screen name="Tools" component={Tools} />
+          <Drawer.Screen name="Tools" component={BusinessTools} />
           <Drawer.Screen name="Account" component={Account} />
           <Drawer.Screen name="Payment" component={Payment} />
-
       </Drawer.Navigator>
 
   );
@@ -100,6 +100,20 @@ const AuthStack = () => {
     <Auth.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
       <Auth.Screen name="Login" component={BuisnessLogin} options={{headerShown:false}}/>
     </Auth.Navigator>
+  );
+}
+
+const BusinessTools = () =>{
+  return (
+    <ToolsStack.Navigator>
+      <ToolsStack.Screen name="Tools" component={Tools} options={{headerShown:false}}/>
+      
+     <ToolsStack.Screen name="llamaContent" component={llamaContent}  options={{headerShown:true, title: 'Content',
+            headerStyle: {
+              backgroundColor: 'gray'
+           }
+      }}/>
+    </ToolsStack.Navigator>
   );
 }
 

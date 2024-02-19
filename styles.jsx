@@ -130,8 +130,11 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 10,
     marginBottom: 10,
-    height: 100,
-    width: 150,
+    height: 150,
+    width: 200,
+    alignContent:'center',
+    alignItems:'center',
+    alignSelf:'center'
   },
   title: {
     fontSize: 24,

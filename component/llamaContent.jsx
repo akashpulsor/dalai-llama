@@ -272,7 +272,6 @@ const llamaContent = () => {
   return (
     // Main container with a gray background
     <ScrollView style={styles.container}>
-      <CustomHeader navigation={navigation} title="LLAMA-CONTENT" />
       <View style={styles.TopicContainer}>
         <View style={styles.BlogTopicInputContainer}>
             <TextInput
