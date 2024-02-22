@@ -31,9 +31,10 @@
     "react-native-ionicons": "^4.6.5",
     "react-native-material-dropdown": "^0.11.1",
     "react-native-paper": "^5.12.3",
-    "react-native-razorpay": "^2.3.0",
+    "react-native-razorpay": "^2.2.8",
     "react-native-reanimated": "~3.7.0",
     "react-native-web": "~0.19.6",
+    "react-razorpay": "^2.0.1",
     "yarn": "^1.22.21"
   },
   "devDependencies": {
