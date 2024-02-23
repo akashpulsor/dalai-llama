@@ -8,13 +8,19 @@ import Tools from './component/tools';
 import LlamaSeo from './component/llamaSeo';
 import {NavigationContainer} from '@react-navigation/native';
 import AppStack from './AppStack';
+import { Provider } from 'react-redux';
+import { store } from './component/store';
+
 export default function App() {
   return (
-    <View style={styles.container}>
+    <Provider store={store}>
+        <View style={styles.container}>
           <NavigationContainer>
                <AppStack/> 
           </NavigationContainer>
-    </View>
+      </View>
+    </Provider>
+
   );
 }
 

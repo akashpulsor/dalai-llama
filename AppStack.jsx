@@ -1,7 +1,7 @@
 import React from 'react';
 import {createStackNavigator} from '@react-navigation/stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
-import { View, Text, Image } from "react-native";
+import { View, Text, Image,Button, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Home from './component/home';
 import Tools from './component/tools';
@@ -15,7 +15,11 @@ import { NavigationContainer } from "@react-navigation/native";
 import { DrawerItemList } from "@react-navigation/drawer";
 import styles from './styles';
 import User from "./assets/wordpress-logo.png";
+import Logout from './component/LogOut';
 import llamaContent from './component/llamaContent';
+import { useSelector } from 'react-redux';
+import { selectIsLoggedIn,setSignOut } from './component/authSlice';
+import { useDispatch } from 'react-redux';
 const Auth = createStackNavigator();
 
 // Create stack navigator for cards
@@ -66,6 +70,9 @@ const HomeStack = () => {
               >Product Manager</Text>
             </View>
             <DrawerItemList {...props} />
+            
+            <Logout/>
+            
           </SafeAreaView>
         )
       }
@@ -95,6 +102,8 @@ const HomeStack = () => {
   );
 };
 
+
+
 const AuthStack = () => {
   return (
     <Auth.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
@@ -108,7 +117,7 @@ const BusinessTools = () =>{
     <ToolsStack.Navigator>
       <ToolsStack.Screen name="Tools" component={Tools} options={{headerShown:false}}/>
       
-     <ToolsStack.Screen name="llamaContent" component={llamaContent}  options={{headerShown:true, title: 'Content',
+      <ToolsStack.Screen name="llamaContent" component={llamaContent}  options={{headerShown:true, title: 'Content',
             headerStyle: {
               backgroundColor: 'gray'
            }
@@ -121,7 +130,7 @@ const BusinessTools = () =>{
 
 export default function AppStack() {
 
-    const isLoggedIn = true;
+    const isLoggedIn =  useSelector(selectIsLoggedIn);;
     console.log("Called Auth Stack");
   return (
       !isLoggedIn? <AuthStack/> : <HomeStack/>

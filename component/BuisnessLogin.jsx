@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Button, Modal } from 'react-native';
 import styles from '../styles';
-
+import { useDispatch } from 'react-redux';
+import { setSignIn } from './authSlice';
 // Create your functional component
 const BuisnessLogin = ({navigation}) => {
     const [modalVisible, setModalVisible] = useState(false);
@@ -12,6 +13,7 @@ const BuisnessLogin = ({navigation}) => {
     const [email, setEmail] = useState('');
     const [error, setError] = useState('');
     const [errorFlag, setErrorFlag] = useState(false);
+    const dispatch = useDispatch();     
     const handleLogin = () => {
         // Perform actions with username and password, such as logging in to WordPress
         console.log('Username:', username);
@@ -19,17 +21,43 @@ const BuisnessLogin = ({navigation}) => {
         console.log('Company Name:', companyName);
         console.log('email:', companyName);
         console.log('Password:', password);
-
+        const user = {
+          isLoggedIn: true,
+          email: email,
+          userName: username,
+          password:password,
+          companyName:companyName
+        }
         // Close the modal
         setModalVisible(false);
-      };  
+        dispatch(setSignIn(user));
+      };
+      
+      const sinUp = () => {
+        // Perform actions with username and password, such as logging in to WordPress
+        console.log('Username:', username);
+        console.log('Password:', password);
+        console.log('Company Name:', companyName);
+        console.log('email:', companyName);
+        console.log('Password:', password);
+        const user = {
+          isLoggedIn: true,
+          email: email,
+          userName: username,
+          password:password,
+          companyName:companyName
+        }
+        // Close the modal
+        setModalVisible(false);
+
+      };
   return (
     // Main container with a gray background
     <View style={styles.container}>
         <View style={styles.rowContainer}>
         <View style={[styles.rowItem1,{marginTop:150,marginBottom:150}]}>
                 <Text style={{ fontSize: 50, fontWeight: 'bold', marginBottom: 20 }}>
-                    DALAI LLAMA BUSINESS
+                    DALAI LLAMA BUSINESS 
                 </Text>
             </View>
         </View>
@@ -61,7 +89,7 @@ const BuisnessLogin = ({navigation}) => {
                     <View style={{height: 40,width: 350,
     justifyContent: 'flex-start',
     alignItems: 'flex-start', marginLeft:5}}>
-                        <TouchableOpacity style={styles.LoginButton} onPress={() => navigation.navigate('Tools')}>
+                        <TouchableOpacity style={styles.LoginButton} onPress={() => {handleLogin()}}>
                             <Text style={styles.buttonText}>Login</Text>
                         </TouchableOpacity>
                     </View>
@@ -99,7 +127,7 @@ const BuisnessLogin = ({navigation}) => {
                               secureTextEntry={true}
                             />
 
-                            <Button title="signUp" onPress={handleLogin} />
+                            <Button title="signUp" onPress={sinUp} />
                           </View>
                         </View>
                     </Modal>                  
