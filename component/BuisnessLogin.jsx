@@ -1,9 +1,10 @@
 // Import necessary components from React Native
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Button, Modal } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Button, Modal, ActivityIndicator } from 'react-native';
 import styles from '../styles';
 import { useDispatch } from 'react-redux';
-import { setSignIn } from './authSlice';
+import { setSignIn } from './authApi';
+import { useLoginMutation } from './authApi';
 // Create your functional component
 const BuisnessLogin = ({navigation}) => {
     const [modalVisible, setModalVisible] = useState(false);
@@ -11,26 +12,14 @@ const BuisnessLogin = ({navigation}) => {
     const [password, setPassword] = useState('');
     const [companyName, setCompanyName] = useState('');
     const [email, setEmail] = useState('');
-    const [error, setError] = useState('');
+    
     const [errorFlag, setErrorFlag] = useState(false);
-    const dispatch = useDispatch();     
+    const dispatch = useDispatch();
+    const [loginMutation, { data: posts, isLoading, isSuccess, isError, error }] = useLoginMutation();
+
     const handleLogin = () => {
         // Perform actions with username and password, such as logging in to WordPress
-        console.log('Username:', username);
-        console.log('Password:', password);
-        console.log('Company Name:', companyName);
-        console.log('email:', companyName);
-        console.log('Password:', password);
-        const user = {
-          isLoggedIn: true,
-          email: email,
-          userName: username,
-          password:password,
-          companyName:companyName
-        }
-        // Close the modal
-        setModalVisible(false);
-        dispatch(setSignIn(user));
+        loginMutation({ email, password });
       };
       
       const sinUp = () => {
@@ -62,19 +51,24 @@ const BuisnessLogin = ({navigation}) => {
             </View>
         </View>
         <View style={styles.rowContainer}>
-
+            {
+         
+              isLoading?<ActivityIndicator color={'blue'}/>:isError?<Text>{error.toString()}</Text>:<View/>
+            }
             <View style={[styles.rowItem1,{marginTop:100}]}>
                 <View style={styles.LoginInputFlex}>
                     <TextInput
                         style={styles.LoginInput}
                         placeholder=" Email..."
+                        onChangeText={setEmail}
                     />
                 </View>
-
+                
                 <View style={styles.LoginInput}>
                     <TextInput
                         style={styles.LoginInput}
                         placeholder=" Password..."
+                        onChangeText={setPassword}
                     />                    
                 </View>
 

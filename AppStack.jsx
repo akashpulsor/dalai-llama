@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {createStackNavigator} from '@react-navigation/stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { View, Text, Image,Button, TouchableOpacity } from "react-native";
@@ -18,8 +18,10 @@ import User from "./assets/wordpress-logo.png";
 import Logout from './component/LogOut';
 import llamaContent from './component/llamaContent';
 import { useSelector } from 'react-redux';
-import { selectIsLoggedIn,setSignOut } from './component/authSlice';
+
 import { useDispatch } from 'react-redux';
+import { useLoginMutation } from './component/authApi';
+import { selectIsLoggedIn } from './component/authSlice';
 const Auth = createStackNavigator();
 
 // Create stack navigator for cards
@@ -129,10 +131,11 @@ const BusinessTools = () =>{
 
 
 export default function AppStack() {
-
-    const isLoggedIn =  useSelector(selectIsLoggedIn);;
-    console.log("Called Auth Stack");
+  const [loginMutation, { data: posts, isLoading, isSuccess, isError, error }] = useLoginMutation();
+  const isLoggedIn =  useSelector(selectIsLoggedIn);
+  console.log(isLoggedIn);
+  console.log(isSuccess);
   return (
-      !isLoggedIn? <AuthStack/> : <HomeStack/>
+    isSuccess? <HomeStack/>:<AuthStack/> 
   );
 };

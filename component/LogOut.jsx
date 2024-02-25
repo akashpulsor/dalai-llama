@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Button, Modal } from 'react-native';
 import styles from '../styles';
 import { useDispatch } from 'react-redux';
-import { setSignOut } from './authSlice';
+import { setSignOut } from './authApi';
 // Create your functional component
 const Logout = ({navigation}) => {
     const dispatch = useDispatch();
