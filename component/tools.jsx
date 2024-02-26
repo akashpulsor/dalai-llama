@@ -3,67 +3,44 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, ScrollView, Dimensi
 import CustomHeader from './CustomHeader';
 import DropDownPicker from 'react-native-dropdown-picker';
 import styles from '../styles';
+import { useGetToolsQuery,useGetLlmQuery } from './authApi';
 import { createStackNavigator } from '@react-navigation/stack';
 import llamaContent from './llamaContent';
 import { createContext, useContext } from 'react';
-import { useNavigation } from '@react-navigation/native'; // Import navigation hook from React Navigation
+import { useNavigation } from '@react-navigation/native';
+import {useDispatch} from "react-redux"; // Import navigation hook from React Navigation
 const screenWidth = Dimensions.get('window').width;
 
+import {setToken,setUser,setTools,setLlm} from "./authSlice";
 const Tools = ({ navigation }) => {
+  const { data: toolsData, error: toolsError, isLoading: toolsLoading } = useGetToolsQuery();
+  const { data: llmsData, error: llmsError, isLoading: llmsLoading } = useGetLlmQuery();
+
   const [data, setData] = useState([]);
 
-  const [llm, setLlm] = useState([]);
 
-  const [choosenLlm, setChoosenLlm] = useState(null);
+  const dispatch = useDispatch();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(null);
-  const [items, setItems] = useState([
-    { label: 'GPT4', value: 'GPT4' },
-    { label: 'LLAMA2', value: 'LLAMA2' },
-    { label: 'KRUTRIM', value: 'KRUTRIM' },
-  ]);
+  const [items, setItems] = useState([]);
 
-  const llmData = [
-    { label: 'GPT4', value: 'GPT4' },
-    { label: 'LLAMA2', value: 'LLAMA2' },
-    { label: 'KRUTRIM', value: 'KRUTRIM' },
-  ];
+
 
   const [cards, setCards] = useState([]);
   const [page, setPage] = useState(1); // Initially fetch page 1
-
   useEffect(() => {
-    // Fetch data from the web
-    const fetchData = async () => {
-      try {
-        const response = await fetch('https://63949ed0-1855-4bba-b6fe-be08df3fce3e.mock.pstmn.io/tools');
-        
-        const jsonData = await response.json();
-        console.log(jsonData);
-        setData((prevCards) => [...prevCards, ...jsonData]);
-      } catch (error) {
-        console.error('Error fetching data:', error);
+    if (toolsData) {
+      setData(toolsData);
+      dispatch(setTools(toolsData));
+    }
+  }, [toolsData]);
+  useEffect(() => {
+
+      if (llmsData) {
+          setItems(llmsData);
+          //dispatch(setLlm(items));
       }
-    };
-    const fetchLLM = async () => {
-      try {
-        const llmData =[
-        
-          { label: 'GPT4', value: 'GPT4' },
-          { label: 'LLAMA2', value: 'LLAMA2' },
-          { label: 'KRUTRIM', value: 'KRUTRIM' },
-        ]
-        console.log(llmData)
-        setLlm(llmData);
-        console.log(llm)
-      } catch (error) {
-        console.error('Error fetching LLM data:', error);
-      }
-    };
-    fetchData();
-    fetchLLM();
-    console.log(llm)
-  }, []); // The empty dependency array ensures the effect runs only once, similar to componentDidMount
+  }, [llmsData]); // The empty dependency array ensures the effect runs only once, similar to componentDidMount
 
   const renderCard = ({ item }) =>{
     return (

@@ -136,6 +136,6 @@ export default function AppStack() {
   console.log(isLoggedIn);
   console.log(isSuccess);
   return (
-    isSuccess? <HomeStack/>:<AuthStack/> 
+      isLoggedIn? <HomeStack/>:<AuthStack/>
   );
 };

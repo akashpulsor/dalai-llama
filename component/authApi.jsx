@@ -5,7 +5,9 @@ import { setUser, setToken, clearAuth,setTools,  } from './authSlice'; // Import
 export const authApi = createApi({
   reducerPath: 'authApi',
   //https://api.dalai-llama.com
-  baseQuery: fetchBaseQuery({ baseUrl: 'https://77773396-a77c-4c42-9ffa-fabc627ea6e1.mock.pstmn.io' }),
+  baseQuery: fetchBaseQuery(
+      { baseUrl: 'http://localhost:3000' }),
+  tagTypes: ['Login'],
   prepareHeaders: async (headers, { getState }) => {
     // Get the token from state
     const token = getState().auth.token;
@@ -31,6 +33,7 @@ export const authApi = createApi({
         dispatch(setUser(response.data.user)); // Set user data in state
         dispatch(setToken(response.data.token)); // Set token in state
       },
+      invalidatesTags: ['Login'],
     }),
     register: builder.mutation({
       query: ({ name, email, password }) => ({
@@ -39,7 +42,7 @@ export const authApi = createApi({
         body: { name, email, password },
       }),
       onSuccess: (response, { dispatch }) => {
-        dispatch(setUser(response.data.user)); // Set user data in state
+        //dispatch(setUser(response.data.user)); // Set user data in state
         dispatch(setToken(response.data.token)); // Set token in state
       },
     }),

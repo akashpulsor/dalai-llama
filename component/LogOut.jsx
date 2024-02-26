@@ -3,14 +3,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Button, Modal } from 'react-native';
 import styles from '../styles';
 import { useDispatch } from 'react-redux';
-import { setSignOut } from './authApi';
+import {useLoginMutation, useLogoutMutation} from "./authApi";
 // Create your functional component
+
+
 const Logout = ({navigation}) => {
     const dispatch = useDispatch();
+    const [logoutMutation, { isError, error }] = useLogoutMutation();
+    const handleLogOut = async () =>{
 
-    const handleLogOut = () =>{
-      
-      dispatch(setSignOut()); 
+        await logoutMutation();
     }
       
 

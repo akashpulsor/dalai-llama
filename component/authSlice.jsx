@@ -1,7 +1,10 @@
 // authSlice.js
 
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice,isAnyOf } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
+import {authApi} from "./authApi";
+
+
 
 export const authSlice = createSlice({
   name: 'auth',
@@ -10,8 +13,8 @@ export const authSlice = createSlice({
     token: null,
     loading: 'idle',
     error: null,
-    tools:null,
-    llm:null,
+    tools:[],
+    llm:[],
     isLoggedIn: false,
   },
   reducers: {
@@ -22,22 +25,54 @@ export const authSlice = createSlice({
     },
     setToken: (state, action) => {
       state.token = action.payload;
+      console.log(state);
     },
     clearAuth: (state) => {
       state.user = null;
       state.token = null;
       state.isLoggedIn = false;
+      console.log("AKASH4")
     },
-    setTools: (state) => {
+    setTools: (state, action) => {
       state.tools = action.payload;
     },
-    setLlm: (state) => {
+    setLlm: (state, action) => {
       state.llm = action.payload;
     },
   },
+  extraReducers: (builder) =>{
+    builder.addMatcher(
+        authApi.endpoints.login.matchFulfilled,
+        (state, { payload }) => {
+          console.log("AKASH")
+          state.token = payload.token
+          state.user = payload.user
+          state.isLoggedIn = true;
+        }
+    ),
+        builder.addMatcher(
+            authApi.endpoints.getTools.matchFulfilled,
+            (state, { payload }) => {
+              console.log("AKASH3")
+              state.tools = payload
+    }),
+        builder.addMatcher(
+            authApi.endpoints.getLlm.matchFulfilled,
+            (state, { payload }) => {
+              console.log("AKASH4")
+              state.llm = payload
+            }),
+        builder.addMatcher(
+            authApi.endpoints.logout.matchFulfilled,
+            (state, { payload }) => {
+                clearAuth()
+            })
+  }
+
 });
 
-export const { setUser, setToken, clearAuth } = authSlice.actions;
+export const { setUser, setToken, clearAuth,
+  setTools,setLlm } = authSlice.actions;
 
 // Store token in AsyncStorage
 const storeTokenInAsyncStorage = async (token) => {
@@ -59,3 +94,7 @@ export default authSlice.reducer;
 export const selectIsLoggedIn = (state) => state.auth.isLoggedIn;
 export const selectEmail = (state) => state.auth.email;
 export const selectUser = (state) => state.auth.user;
+
+export const selectTools = (state) => state.auth.tools;
+
+export const selectLlm = (state) => state.auth.llm;

@@ -5,6 +5,7 @@ import styles from '../styles';
 import { useDispatch } from 'react-redux';
 import { setSignIn } from './authApi';
 import { useLoginMutation } from './authApi';
+import {setToken,setUser} from "./authSlice";
 // Create your functional component
 const BuisnessLogin = ({navigation}) => {
     const [modalVisible, setModalVisible] = useState(false);
@@ -15,11 +16,19 @@ const BuisnessLogin = ({navigation}) => {
     
     const [errorFlag, setErrorFlag] = useState(false);
     const dispatch = useDispatch();
-    const [loginMutation, { data: posts, isLoading, isSuccess, isError, error }] = useLoginMutation();
+    const [loginMutation, { data: authData, isLoading, isSuccess, isError, error }] = useLoginMutation();
 
-    const handleLogin = () => {
+
+
+    const handleLogin = async  () => {
         // Perform actions with username and password, such as logging in to WordPress
-        loginMutation({ email, password });
+        await loginMutation({ email, password });
+
+        if (authData) {
+            dispatch(setToken(authData.token));
+            dispatch(setUser(authData.user));
+        }
+
       };
       
       const sinUp = () => {
