@@ -45,12 +45,8 @@ const BuisnessSignUp = ({navigation}) => {
                 
             
                 </View>
-                
-                
             </View>
-        
         </View>
-
     </View>
   );
 };

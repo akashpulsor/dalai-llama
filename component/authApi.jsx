@@ -28,11 +28,6 @@ export const authApi = createApi({
         // Don't include token for login request
         return headers;
       },
-      onSuccess: (response, { dispatch }) => {
-        console.log(response);
-        dispatch(setUser(response.data.user)); // Set user data in state
-        dispatch(setToken(response.data.token)); // Set token in state
-      },
       invalidatesTags: ['Login'],
     }),
     register: builder.mutation({

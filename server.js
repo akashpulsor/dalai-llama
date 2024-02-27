@@ -72,7 +72,7 @@ app.post('/register', (req, res) => {
     // Assuming some registration logic here
     const newUser = { id: users.length + 1, userName, email, password, credit: 234 };
     users.push(newUser);
-    res.json(newUser);
+    res.json({ token: "12345678",user:newUser });
 });
 
 // Get tools endpoint

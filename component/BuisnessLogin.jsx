@@ -4,7 +4,7 @@ import { View, Text, TextInput, TouchableOpacity, Button, Modal, ActivityIndicat
 import styles from '../styles';
 import { useDispatch } from 'react-redux';
 import { setSignIn } from './authApi';
-import { useLoginMutation } from './authApi';
+import { useLoginMutation, useRegisterMutation } from './authApi';
 import {setToken,setUser} from "./authSlice";
 // Create your functional component
 const BuisnessLogin = ({navigation}) => {
@@ -18,36 +18,21 @@ const BuisnessLogin = ({navigation}) => {
     const dispatch = useDispatch();
     const [loginMutation, { data: authData, isLoading, isSuccess, isError, error }] = useLoginMutation();
 
+    const [registerMutation, { data: registerData, isRegistrationLoading, isRegistrationSuccess, isRegistrationError, registrationError }] = useRegisterMutation();
 
 
     const handleLogin = async  () => {
         // Perform actions with username and password, such as logging in to WordPress
         await loginMutation({ email, password });
-
-        if (authData) {
-            dispatch(setToken(authData.token));
-            dispatch(setUser(authData.user));
-        }
-
       };
       
       const sinUp = () => {
         // Perform actions with username and password, such as logging in to WordPress
-        console.log('Username:', username);
-        console.log('Password:', password);
-        console.log('Company Name:', companyName);
-        console.log('email:', companyName);
-        console.log('Password:', password);
-        const user = {
-          isLoggedIn: true,
-          email: email,
-          userName: username,
-          password:password,
-          companyName:companyName
-        }
         // Close the modal
-        setModalVisible(false);
-
+        registerMutation({email: email,
+            userName: username,
+            password:password,
+            companyName:companyName});
       };
   return (
     // Main container with a gray background
@@ -78,6 +63,7 @@ const BuisnessLogin = ({navigation}) => {
                         style={styles.LoginInput}
                         placeholder=" Password..."
                         onChangeText={setPassword}
+                        secureTextEntry={true}
                     />                    
                 </View>
 
@@ -108,6 +94,10 @@ const BuisnessLogin = ({navigation}) => {
                         <View style={styles.centeredView}>
                           <View style={styles.modalView}>
                             <Text style={styles.modalText}>Sign Up</Text>
+                              {
+                                  isRegistrationLoading && <ActivityIndicator color={'blue'}/>
+
+                              }
                             <TextInput
                               style={styles.input}
                               placeholder="Username"
@@ -125,9 +115,9 @@ const BuisnessLogin = ({navigation}) => {
                             <TextInput
                               style={styles.input}
                               placeholder="Email"
-                              value={password}
-                              onChangeText={setPassword}
-                              secureTextEntry={true}
+                              value={email}
+                              onChangeText={setEmail}
+
                             />
 
                             <Button title="signUp" onPress={sinUp} />

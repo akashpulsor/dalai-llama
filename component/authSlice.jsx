@@ -4,8 +4,6 @@ import { createSlice,isAnyOf } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
 import {authApi} from "./authApi";
 
-
-
 export const authSlice = createSlice({
   name: 'auth',
   initialState: {
@@ -20,18 +18,28 @@ export const authSlice = createSlice({
   reducers: {
     setUser: (state, action) => {
       state.user = action.payload;
-      state.isLoggedIn = true;
       console.log(state)
     },
     setToken: (state, action) => {
+
+       storeTokenInAsyncStorage(state.token).then(() => {
+          console.log(state);
+      })
+      .catch(error => {
+          console.error('Error storing token:', error);
+      });
+      state.isLoggedIn = true;
       state.token = action.payload;
-      console.log(state);
+      //console.log(state);
     },
-    clearAuth: (state) => {
-      state.user = null;
-      state.token = null;
-      state.isLoggedIn = false;
-      console.log("AKASH4")
+   clearAuth: (state) => {
+      //TODO add error case
+      removeTokenInAsyncStorage().then(r =>{
+
+      });
+       state.user = null;
+       state.token = null;
+       state.isLoggedIn = false;
     },
     setTools: (state, action) => {
       state.tools = action.payload;
@@ -44,28 +52,29 @@ export const authSlice = createSlice({
     builder.addMatcher(
         authApi.endpoints.login.matchFulfilled,
         (state, { payload }) => {
-          console.log("AKASH")
-          state.token = payload.token
-          state.user = payload.user
-          state.isLoggedIn = true;
+            authSlice.caseReducers.setToken(state,payload);
         }
     ),
         builder.addMatcher(
             authApi.endpoints.getTools.matchFulfilled,
             (state, { payload }) => {
-              console.log("AKASH3")
-              state.tools = payload
+                authSlice.caseReducers.setTools(state, payload)
     }),
         builder.addMatcher(
             authApi.endpoints.getLlm.matchFulfilled,
             (state, { payload }) => {
-              console.log("AKASH4")
-              state.llm = payload
+                authSlice.caseReducers.setLlm(state, payload)
             }),
         builder.addMatcher(
             authApi.endpoints.logout.matchFulfilled,
             (state, { payload }) => {
-                clearAuth()
+                authSlice.caseReducers.clearAuth()
+            }),
+        builder.addMatcher(
+            authApi.endpoints.register.matchFulfilled,
+            (state, { payload }) => {
+                authSlice.caseReducers.setUser(state,payload);
+                authSlice.caseReducers.setToken(state,payload);
             })
   }
 
@@ -76,25 +85,32 @@ export const { setUser, setToken, clearAuth,
 
 // Store token in AsyncStorage
 const storeTokenInAsyncStorage = async (token) => {
+    console.log(token);
   try {
     await AsyncStorage.setItem('authToken', token);
   } catch (error) {
     console.error('Error storing token:', error);
   }
+}
+
+const removeTokenInAsyncStorage = async () => {
+    try {
+        await AsyncStorage.removeItem('authToken');
+    } catch (error) {
+        console.error('Error storing token:', error);
+    }
 };
 
 // Export async action creator to store token in AsyncStorage
-export const storeToken = (token) => async (dispatch) => {
-  dispatch(setToken(token));
-  await storeTokenInAsyncStorage(token);
-};
+
 
 export default authSlice.reducer;
 
 export const selectIsLoggedIn = (state) => state.auth.isLoggedIn;
-export const selectEmail = (state) => state.auth.email;
 export const selectUser = (state) => state.auth.user;
 
 export const selectTools = (state) => state.auth.tools;
 
 export const selectLlm = (state) => state.auth.llm;
+
+export const selectError = (state) => state.auth.error;
