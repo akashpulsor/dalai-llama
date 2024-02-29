@@ -80,24 +80,24 @@ export const authApi = createApi({
       },
     }),
     generateStructure: builder.mutation({
-      query: (topicName) => ({
+      query: (topicName, llmId, userId) => ({
         url: '/generateStructure',
         method: 'POST',
-        body: {"topic":topicName},
+        body: {"topic":topicName,"llmId":llmId, "userId": userId},
       }),
     }),
-    generateArticle: builder.query({
-      query: ({ jsonData, llmId, toolId }) => ({
+    generateArticle: builder.mutation({
+      query: ({ userId,enableTitleGenerationCheck,title,body}) => ({
         url: '/generateArticle',
         method: 'POST',
         body: { jsonData, llmId, toolId },
       }),
     }),
     saveArticle: builder.mutation({
-      query: (articleData) => ({
+      query: ({userId,articleTitle, articleBody}) => ({
         url: '/saveArticle',
         method: 'POST',
-        body: articleData,
+        body: {userId,articleTitle, articleBody},
       }),
     }),
     generateTags: builder.mutation({
@@ -108,17 +108,17 @@ export const authApi = createApi({
       }),
     }),
     publish: builder.mutation({
-      query: (article) => ({
+      query: ({username,password,userId,articleTitle, articleBody,selectedTags}) => ({
         url: '/publish',
         method: 'POST',
-        body: article,
+        body: {username,password,userId,articleTitle, articleBody,selectedTags},
       }),
     }),
     loginWordpress: builder.mutation({
-      query: (parameters) => ({
+      query: ({ email, password, saveCredentials}) => ({
         url: '/loginwordpress',
         method: 'POST',
-        body: parameters,
+        body: { "email": email, "password": password, "saveCredentials":saveCredentials },
       }),
     }),
     getPrice: builder.mutation({
@@ -144,6 +144,6 @@ export const authApi = createApi({
 
 export const { useLoginMutation, useRegisterMutation, 
   useLogoutMutation, useGetHistoryQuery, 
-  useGetUserQuery, useUpdateUserMutation, useGetToolsQuery, useGetLlmQuery, useGenerateStructureQuery, 
+  useGetUserQuery, useUpdateUserMutation, useGetToolsQuery, useGetLlmQuery, useGenerateStructureMutation,
   useGenerateArticleMutation, useSaveArticleMutation, useGenerateTagsMutation, usePublishMutation, 
   useLoginWordpressMutation, useGetPriceMutation,useAddCreditMutation } = authApi;

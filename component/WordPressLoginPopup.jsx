@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Modal, Button, Image, StyleSheet } from 'react-native';
-
+import {View, Text, TextInput, Modal, Button, Image, StyleSheet, CheckBox, ActivityIndicator} from 'react-native';
+import {useLoginWordpressMutation, useRegisterMutation} from './authApi';
 const WordPressLoginPopup = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [saveCredentials, setSaveCredentials] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-
+  const [loginWordPressMutation, { data: loginWordPressData, isWordPressDataLoading, isWordPressDataSuccess, isWordPressDataError, wordPressDataError }] = useLoginWordpressMutation();
   const handleLogin = () => {
     // Perform actions with username and password, such as logging in to WordPress
-    console.log('Username:', username);
-    console.log('Password:', password);
-    // Close the modal
-    setModalVisible(false);
+    loginWordPressMutation({username, password, saveCredentials})
+  };
+
+  const toggleWordPressSaveCredentialsCheckBox = () => {
+    setSaveCredentials(!saveCredentials);
   };
 
   return (
@@ -29,6 +31,8 @@ const WordPressLoginPopup = () => {
           <View style={styles.modalView}>
             <Image source={require('../assets/wordpress-logo.png')} style={styles.logo} />
             <Text style={styles.modalText}>Enter your WordPress credentials:</Text>
+            {isWordPressDataLoading && <ActivityIndicator  color={'blue'}/>}
+            {isWordPressDataSuccess && setModalVisible(false)}
             <TextInput
               style={styles.input}
               placeholder="Username"
@@ -41,6 +45,11 @@ const WordPressLoginPopup = () => {
               value={password}
               onChangeText={setPassword}
               secureTextEntry={true}
+            />
+
+            <CheckBox
+                value={saveCredentials}
+                onValueChange={toggleCheckBox}
             />
             <Button title="Login" onPress={handleLogin} />
           </View>

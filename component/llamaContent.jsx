@@ -9,114 +9,50 @@ import axios from "axios";
 import { BASE_URL } from '../Constants';
 import { Checkbox } from 'react-native-paper';
 import NestedCheckbox from './NestedCheckBox';
-import WordPressLoginPopup from './WordPressLoginPopup';
-import CustomHeader from './CustomHeader';
-
+import {useLoginWordpressMutation,useGenerateArticleMutation,useGenerateStructureMutation,useSaveArticleMutation, useGenerateTagsMutation,usePublishMutation} from './authApi';
+import {useSelector} from "react-redux";
+import {selectedLLm, selectUser} from "./authSlice";
+import DropDownPicker from "react-native-dropdown-picker";
+import ToastNotification from "./ToastNotification";
 const llamaContent = () => {
-  const [data, setData] = useState([]);
+  const user =  useSelector(selectUser);
+  const selectedLlm =  useSelector(selectedLLm);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [foldableViewOpen, setFoldableViewOpen] = useState(false);
-  const [spinner, setSpinner] = useState(false);
   const [tagCloudViewOpen, setTagCloudViewOpen] = useState(false);
-  const [competitorAnalysisViewOpen, setCompetitorAnalysisViewOpen] = useState(false);
-  const [competitorAnalysisSpinner, setCompetitorAnalysisSpinner] = useState(false);
   const [blogTopic, setBlogTopic] = useState('');
-  const [generatedStructureView, setGeneratedStructureView] = useState(false);
   const [editorBoxView, setEditorBoxView] = useState(false);
-  const [generatedStructure, setGeneratedStructure] = useState([]);
-  const [generatedStructureSpinner, setGeneratedStructureSpinner] = useState(false);
-  const [selectedItems, setSelectedItems] = useState([]);
-  const [checkedItems, setCheckedItems] = useState([]);
   const [enableTitleGenerationCheck, setEnableTitleGenerationCheck] = useState(false);
   const [selectedData, setSelectedData] = useState(new Map());
   const [generatedArticleViewOpen, setGeneratedArticleViewOpen] = useState(false);
-  const [generatedArticleViewSpinner, setGeneratedArticleViewSpinner] = useState(false);
   const [articleTitle, setArticleTitle] = useState('');
   const [articleBody, setArticleBody] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [selectedTags, setSelectedTags] = useState(new Set());
   const [saveCredentials, setSaveCredentials] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-    // useEffect to observe changes in selectedData
-  useEffect(() => {
-      console.log("Selected Data AKASH:", selectedData);
-      console.log("Body1:", body);
-  }, [selectedData]);
+  const [generateStructureMutation, { data: structureData, isGenerateStructureLoading, isGenerateStructureSuccess, isGenerateStructureError, generateStructureError }] = useGenerateStructureMutation();
+  const [loginWordPressMutation, { data: loginWordPressData, isWordPressDataLoading, isWordPressDataSuccess, isWordPressDataError, wordPressDataError }] = useLoginWordpressMutation();
+  const [generateArticleMutation, { data: generatedArticleData, isGeneratedArticleDataLoading, isGeneratedArticleDataSuccess, isGeneratedArticleDataError, generatedArticleDataError }]=useGenerateArticleMutation();
+  const [saveArticleMutation, { data: saveArticleData, isSaveArticleDataLoading, isSaveArticleDataSuccess, isSaveArticleDataError, saveArticleError }]=useSaveArticleMutation();
+  const [publishMutation, { data: publishData, isPublishLoading, isPublishSuccess, isPublishError, publishError }]=usePublishMutation();
+  const [generateTagsMutation, { data: generateTagsData, isGenerateTagsLoading, isGenerateTagsSuccess, isGenerateTagsError, generateTagsError }]=useGenerateTagsMutation();
 
-  const seo = async (data) => {
-    try {
-      let temp = JSON.stringify(data)
-      console.log("POST DATA IS" + temp);
-      let headers = {
-        'Content-Type': 'application/json;charset=UTF-8',
 
-        "Accept": "*/*"
-      };
-
-      setSpinner(true);
-      let res = await axios
-        .post(BASE_URL + "/content", data, { "headers": headers });
-      if (res.status == 200) {
-        // test for status you want, etc
-        console.log(res.status)
-      }
-      setSpinner(false);
-      // Don't forget to return something
-      //console.log(res.data.keywords)
-      return res.data.keywords
-    }
-    catch (err) {
-      console.error(err);
-    }
-    finally {
-      setSpinner(false);
-    }
+  const seo = async () => {
+    let userId = user.id;
+    generateTagsMutation({userId,articleTitle,articleBody});
   }
 
-  const handleLogin = () => {
-    // Perform actions with username and password, such as logging in to WordPress
-    console.log('Username:', username);
-    console.log('Password:', password);
-    // Save credentials if checkbox is checked
-    if (saveCredentials) {
-      // Here you can save the credentials securely (e.g., in AsyncStorage)
-      console.log('Credentials saved.');
-    }
-    // Close the modal
-    setModalVisible(false);
+  const handleWordPressLogin = () => {
+    loginWordPressMutation({username, password, saveCredentials})
   };
 
-  const getTopPageRanks = async (data) => {
-    try {
-      let temp = JSON.stringify(data)
-      console.log("POST DATA IS" + temp);
-      let headers = {
-        'Content-Type': 'application/json;charset=UTF-8',
-        "Accept": "*/*"
-      };
+  const toggleWordPressSaveCredentialsCheckBox = () => {
+    setSaveCredentials(!saveCredentials);
+  };
 
-      setCompetitorAnalysisSpinner(true);
-      setCompetitorAnalysisViewOpen(false);
-      let res = await axios
-        .post(BASE_URL + "/getCurrentRanks", data, { "headers": headers });
-      if (res.status == 200) {
-        // test for status you want, etc
-        console.log(res.status)
-      }
-      setCompetitorAnalysisSpinner(false);
-      setCompetitorAnalysisViewOpen(true);
-      // Don't forget to return something
-      console.log(res.data)
-      return res.data
-    }
-    catch (err) {
-      console.error(err);
-    }
-    finally {
-      setCompetitorAnalysisSpinner(false);
-    }
-  }
  
 
   function isValidHttpUrl(s) {
@@ -131,13 +67,10 @@ const llamaContent = () => {
 
 
 
-  const getRandomColor = () => {
-    // Generate a random color in hex format
-    return '#' + Math.floor(Math.random()*16777215).toString(16);
-  };
+
   
   const TagCloud = ({ onTagPress, onCrossPress }) => {
-    const uniqueData = [...new Set(data)];
+    const uniqueData = [...new Set(generateTagsData)];
 
     return (
       <View style={styles.tagCloudContainer}>
@@ -147,8 +80,9 @@ const llamaContent = () => {
         {uniqueData.map((tag, index) => (
           <TouchableOpacity
             key={index}
-            onPress={() => onTagPress(tag)}
-            style={{ ...styles.tagContainer, backgroundColor: getRandomColor() }}
+            onPress={() => handleTagPress(index,tag)}
+            onLongPress={() => handleDoublePress}
+            style={{ ...styles.tagContainer, backgroundColor: selectedTags.has(item) ? 'green' : '#0092ca' }}
           >
             <Text style={styles.tagText}>{tag}</Text>
           </TouchableOpacity>
@@ -164,11 +98,26 @@ const llamaContent = () => {
 
   const handleTagPress = (tag) => {
     console.log(`Tag pressed: ${tag}`);
+    if (selectedTags.has(tag)) {
+      // Remove value from set
+      const newSet = new Set(selectedTags);
+      newSet.delete(tag);
+      setSelectedTags(newSet);
+    } else {
+      // Add value to set
+      setSelectedTags(new Set(selectedTags).add(tag));
+    }
     // Add your custom logic when a tag is pressed
   };
 
-  const handleCrossPress = () => {
+  const handleDoublePress = (tag) => {
     console.log('Cross button pressed');
+    if (selectedTags.has(tag)) {
+      // Remove value from set
+      const newSet = new Set(selectedTags);
+      newSet.delete(tag);
+      setSelectedTags(newSet);
+    }
     // Add your custom logic for the cross button press
   };
 
@@ -187,42 +136,24 @@ const llamaContent = () => {
   };
 
   const handleGenerateStructurePress = () => {
-    setGeneratedStructureSpinner(true);
-    setGeneratedStructureView(true);
-    setGeneratedStructureSpinner(false);
-    //TODO generate this data using api
-    setGeneratedStructure([{heading:"Heading1", points:['point1', 'point2', 'point3']},
-      {heading:"Heading2", points:['point4', 'point5', 'point6']},
-      {heading:"Heading3", points:['point7', 'point8', 'point9']},
-      {heading:"Heading4", points:['point10', 'point11', 'point12']},
-      {heading:"Heading5", points:['point13', 'point14', 'point15']},
-      {heading:"Heading6", points:['point16', 'point17', 'point18']},
-    
-    ]);
-    setEditorBoxView(false);  
+
+    let userId = user.id;
+    let llmId = selectedLlm.llmId;
+    generateStructureMutation({blogTopic,llmId,userId});
+
     console.log(`Cross button pressed : ${blogTopic}`);
     // Add your custom logic for the cross button press
   };
 
   const handleCopyPointPress = () => {
-    setGeneratedStructureSpinner(true);
     setEditorBoxView(true);
     let selectedBody = generateTextFromMap(selectedData);
-    console.log('Body2' + selectedBody);
-    setBody(selectedBody);     
-    setGeneratedStructureSpinner(false);
-    console.log(`Cross button pressed : ${selectedItems}`);
-    // Add your custom logic for the cross button press
+    setBody(selectedBody);
   };
 
   const handleGenerateArticlePress = () => {
-    setGeneratedArticleViewSpinner(true);
-    setGeneratedArticleViewOpen(true);
-    setArticleTitle('Title');
-    setArticleTitle('Body');     
-    setGeneratedArticleViewSpinner(false);
-    console.log(`Cross button pressed : ${selectedItems}`);
-    // Add your custom logic for the cross button press
+    let userId = user.id;
+    generateArticleMutation({userId,enableTitleGenerationCheck,title,body});
   };
 
     // Function to generate text from map
@@ -252,21 +183,21 @@ const llamaContent = () => {
       return map;
     }
 
-    // Function to handle changes in text input
-  const handleInputChange = (text) => {
-    setTextInputValue(text);
-    setSelectedItems(generateMapFromText(text));
-  };
 
-  // Function to add a new point
-  const addPoint = () => {
-    const updatedText = `${textInputValue}\nNewHeading:\n\tNewPoint`;
-    setTextInputValue(updatedText);
-    setSelectedItems(generateMapFromText(updatedText));
-  };
 
   const saveData = () => {
+    let userId = user.id;
+    saveArticleMutation({userId,articleTitle, articleBody});
+  };
 
+  const publishArticle = () => {
+    let userId = user.id;
+    if(!username || !password){
+      setModalVisible(true);
+    }
+    else{
+      publishMutation({username,password,userId,articleTitle, articleBody,selectedTags});
+    }
   };
 
   return (
@@ -288,12 +219,12 @@ const llamaContent = () => {
       </View>
       
       {
-              generatedStructureSpinner ?  <ActivityIndicator color={'blue'} /> :
-                generatedStructureView  && (
+        isGenerateStructureLoading ?  <ActivityIndicator color={'blue'} /> :
+                isGenerateStructureSuccess  ? (
                       <View  style={styles.StructureContainer}>
                         <Text style={styles.GeneratedArticleText}>Select Researched Points To Include In Article </Text>
                         <ScrollView   style={styles.StructureContainer}>
-                            <NestedCheckbox data={generatedStructure} onSelect={handleSelect} />
+                            <NestedCheckbox data={structureData} onSelect={handleSelect} />
                         </ScrollView>                          
                               
                         <View style={styles.BlogTopicInputContainer}>
@@ -303,7 +234,9 @@ const llamaContent = () => {
                             </TouchableOpacity>
                         </View>
                       </View>                 
-                )
+                ): isGenerateStructureError && (<View   style={styles.StructureContainer}>
+                  <Text style={[styles.GeneratedArticleText,{fontSize: 12,color: 'red'}]}>{generateStructureError}</Text>
+                  </View> ) && setEditorBoxView(false)
           }
       {
         editorBoxView && (
@@ -323,7 +256,7 @@ const llamaContent = () => {
               labelStyle={styles.AutoTitleLabel}
               position="leading"
             />
-
+            {isGeneratedArticleDataLoading && <ActivityIndicator color={'blue'} />}
             <TextInput
                       editable = {true}
                       style={styles.TitleBodyBox}
@@ -341,25 +274,29 @@ const llamaContent = () => {
         </View>
         )
       }
-
+      {isGeneratedArticleDataSuccess && ( setArticleTitle(generatedArticleData.title) && setArticleTitle(generatedArticleData.body) && setGeneratedArticleViewOpen(true))}
+      {isGeneratedArticleDataError && <View   style={styles.FinalArticleContainer}>
+        <Text style={[{fontSize: 12,color: 'red'}]}>{generatedArticleDataError}</Text>
+      </View>}
       {
-        generatedArticleViewSpinner ?  <ActivityIndicator color={'blue'} /> : 
         generatedArticleViewOpen && (
           <View style={styles.FinalArticleContainer}>
              <ScrollView contentContainerStyle={styles.FinalArticleFlex}>
               <View style={styles.content}>
                 <Text style={styles.label}>{articleTitle}</Text>
+                {(isSaveArticleDataLoading || isPublishLoading || isGenerateTagsLoading) && <ActivityIndicator color={'blue'} />}
+                {(isSaveArticleDataSuccess ) && <ToastNotification message="Article Saved..." messageStyle={{color:'#0092ca'}}/>}
+                {(isPublishSuccess) && <ToastNotification message="Article Published..." messageStyle={{color:'#0092ca'}} />}
+
+                {(isSaveArticleDataError ) && <ToastNotification message={saveArticleError} messageStyle={{color:'#0092ca'}}/>}
+                {(isPublishError) && <ToastNotification message={publishError} messageStyle={{color:'#0092ca'}} />}
                 <Text style={styles.article}>{articleBody}</Text>
               </View>
             </ScrollView>
             <View style= {styles.ButtonFlex}>
                <View style= {styles.TagsButtonFlex}>
                     <TouchableOpacity style={styles.TagsButton}
-                      onPress={() => {
-                        setFoldableViewOpen(!foldableViewOpen);
-                        //prev => new Map([...prev, [selectedLanguage, data]])
-                        seo({ "title": title, "body": body }).then(res => { setData((prevList) => [...res, ...prevList]); })
-                      }}>
+                      onPress={() => seo()}>
                     <Text style={styles.GenerateButtonText}>TAGS</Text>
                   </TouchableOpacity>
                </View>
@@ -370,7 +307,7 @@ const llamaContent = () => {
                </View>
 
                <View style= {styles.PublishButtonFlex}>
-                  <TouchableOpacity style={styles.PublishButton} onPress={() => setModalVisible(true)}>
+                  <TouchableOpacity style={styles.PublishButton} onPress={() => publishArticle()}>
                     <Text style={styles.GenerateButtonText}>PUBLISH</Text>
                   </TouchableOpacity>
 
@@ -392,6 +329,8 @@ const llamaContent = () => {
                               value={username}
                               onChangeText={setUsername}
                             />
+                            {isWordPressDataLoading && <ActivityIndicator  color={'blue'}/>}
+                            {isWordPressDataSuccess && setModalVisible(false)}
                             <TextInput
                               style={styles.input}
                               placeholder="Password"
@@ -402,11 +341,11 @@ const llamaContent = () => {
                             <View style={styles.checkboxContainer}>
                               <CheckBox
                                 value={saveCredentials}
-                                onValueChange={setSaveCredentials}
+                                onValueChange={toggleWordPressSaveCredentialsCheckBox}
                               />
                               <Text style={styles.checkboxLabel}>Remember Me</Text>
                             </View>
-                            <Button title="Login" onPress={handleLogin} />
+                            <Button title="Login" onPress={()=>{handleWordPressLogin()}} />
                           </View>
                         </View>
                   </Modal>
@@ -415,38 +354,22 @@ const llamaContent = () => {
           </View>
         )
       }
-      {foldableViewOpen && (
-
+      {isGenerateTagsSuccess && (
         <View style={styles.foldableView}>
-          {/* Your content for the foldable view */}
-          {spinner ? <ActivityIndicator color={'blue'} /> :
-
-            <TagCloud onTagPress={handleTagPress} onCrossPress={handleCrossPress} />
-            
-          }
+          { <TagCloud onTagPress={handleTagPress} onCrossPress={handleCrossPress} />}
         </View>
       )}
 
       {
           tagCloudViewOpen && (
               <View  style={styles.tagCloudContainer}>
-                  <TouchableOpacity style={styles.tagContainer} onPress={() => getTopPageRanks(data)}>
-                        <Text style={styles.tagText}>Competitor Analysis</Text>
+                  <TouchableOpacity style={styles.tagContainer} onPress={() => publishArticle()}>
+                        <Text style={styles.tagText}>Publish with Tags</Text>
                   </TouchableOpacity>
               </View>
           )        
       }
 
-      {
-          competitorAnalysisSpinner ?  <ActivityIndicator color={'blue'} /> :
-            competitorAnalysisViewOpen  && (
-              <View  style={styles.tagCloudContainer}>
-
-
-              </View>
-
-            ) 
-      }
     </ScrollView>
   );
 };

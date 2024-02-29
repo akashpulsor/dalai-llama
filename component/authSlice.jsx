@@ -14,6 +14,7 @@ export const authSlice = createSlice({
     tools:[],
     llm:[],
     isLoggedIn: false,
+    selectedLlm: null
   },
   reducers: {
     setUser: (state, action) => {
@@ -47,6 +48,9 @@ export const authSlice = createSlice({
     setLlm: (state, action) => {
       state.llm = action.payload;
     },
+    setSelectedLlm: (state, action) => {
+          state.selectedLlm = action.payload;
+          },
   },
   extraReducers: (builder) =>{
     builder.addMatcher(
@@ -81,7 +85,7 @@ export const authSlice = createSlice({
 });
 
 export const { setUser, setToken, clearAuth,
-  setTools,setLlm } = authSlice.actions;
+  setTools,setLlm,setSelectedLlm } = authSlice.actions;
 
 // Store token in AsyncStorage
 const storeTokenInAsyncStorage = async (token) => {
@@ -111,6 +115,9 @@ export const selectUser = (state) => state.auth.user;
 
 export const selectTools = (state) => state.auth.tools;
 
-export const selectLlm = (state) => state.auth.llm;
+export const selectLlmData = (state) => state.auth.llm;
 
 export const selectError = (state) => state.auth.error;
+
+export const selectedLLm = (state) => state.auth.selectedLlm;
+

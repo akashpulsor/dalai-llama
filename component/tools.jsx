@@ -23,7 +23,7 @@ const Tools = ({ navigation }) => {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(null);
   const [items, setItems] = useState([]);
-
+  const [selectedLlm, setSelectedLlm] = useState([]);
 
 
   const [cards, setCards] = useState([]);
@@ -31,7 +31,6 @@ const Tools = ({ navigation }) => {
   useEffect(() => {
     if (toolsData) {
       setData(toolsData);
-      dispatch(setTools(toolsData));
     }
   }, [toolsData]);
   useEffect(() => {
@@ -92,6 +91,7 @@ const Tools = ({ navigation }) => {
               onChangeItem={(item) =>{
                   console.log('AKASH');
                   console.log(item);
+                  setSelectedLlm(item);
                 }                 
               }
               placeholder={'Choose an llm.'}

@@ -85,6 +85,13 @@ app.get('/getLLm', (req, res) => {
     res.json(llms);
 });
 
+app.post('/loginwordpress', (req, res) => {
+
+    //const {email:"", password:"password", saveCredentials:"true"} = req.body
+    // For simplicity, just return a static token
+    res.json({ token: "12345678",user:{id:1,userName:"Akash"} });
+});
+
 app.listen(PORT, () => {
     console.log(`Mock server is running on port ${PORT}`);
 });

@@ -114,7 +114,7 @@ const BuisnessLogin = ({navigation}) => {
                             
                             <TextInput
                               style={styles.input}
-                              placeholder="Email"
+                              placeholder="Ema:wil"
                               value={email}
                               onChangeText={setEmail}
 
