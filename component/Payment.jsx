@@ -161,8 +161,6 @@ useEffect(() => {
                   value={llmValue}
                   items={items}
                   setOpen={setOpenLlm}
-                  setValue={setLlmValue}
-                  setItems={setItems}
                   dropDownStyle={{backgroundColor: '#fafafa'}}
                   containerStyle={styles.LLM}
                   onChangeItem={(item) =>{

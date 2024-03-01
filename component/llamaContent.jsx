@@ -14,9 +14,9 @@ import {useSelector} from "react-redux";
 import {selectedLLm, selectUser} from "./authSlice";
 import DropDownPicker from "react-native-dropdown-picker";
 import ToastNotification from "./ToastNotification";
-const llamaContent = () => {
+const llamaContent = ({tool}) => {
   const user =  useSelector(selectUser);
-  const selectedLlm =  useSelector(selectedLLm);
+  const llm =  useSelector(selectedLLm);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [tagCloudViewOpen, setTagCloudViewOpen] = useState(false);
@@ -32,12 +32,12 @@ const llamaContent = () => {
   const [selectedTags, setSelectedTags] = useState(new Set());
   const [saveCredentials, setSaveCredentials] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [generateStructureMutation, { data: structureData, isGenerateStructureLoading, isGenerateStructureSuccess, isGenerateStructureError, generateStructureError }] = useGenerateStructureMutation();
-  const [loginWordPressMutation, { data: loginWordPressData, isWordPressDataLoading, isWordPressDataSuccess, isWordPressDataError, wordPressDataError }] = useLoginWordpressMutation();
-  const [generateArticleMutation, { data: generatedArticleData, isGeneratedArticleDataLoading, isGeneratedArticleDataSuccess, isGeneratedArticleDataError, generatedArticleDataError }]=useGenerateArticleMutation();
-  const [saveArticleMutation, { data: saveArticleData, isSaveArticleDataLoading, isSaveArticleDataSuccess, isSaveArticleDataError, saveArticleError }]=useSaveArticleMutation();
-  const [publishMutation, { data: publishData, isPublishLoading, isPublishSuccess, isPublishError, publishError }]=usePublishMutation();
-  const [generateTagsMutation, { data: generateTagsData, isGenerateTagsLoading, isGenerateTagsSuccess, isGenerateTagsError, generateTagsError }]=useGenerateTagsMutation();
+  const [generateStructureMutation, { data: structureData,isLoading :isGenerateStructureLoading, isError :isGenerateStructureError, isSuccess :isGenerateStructureSuccess, error :generateStructureError }] = useGenerateStructureMutation();
+  const [loginWordPressMutation, { data: loginWordPressData, isLoading :isWordPressDataLoading, isSuccess :isWordPressDataSuccess, isError :isWordPressDataError, error :wordPressDataError }] = useLoginWordpressMutation();
+  const [generateArticleMutation, { data: generatedArticleData, isLoading :isGeneratedArticleDataLoading, isSuccess :isGeneratedArticleDataSuccess, isError :isGeneratedArticleDataError, error :generatedArticleDataError }]=useGenerateArticleMutation();
+  const [saveArticleMutation, { data: saveArticleData, isLoading :isSaveArticleDataLoading, isSuccess :isSaveArticleDataSuccess, isError :isSaveArticleDataError, error :saveArticleError }]=useSaveArticleMutation();
+  const [publishMutation, { data: publishData, isLoading :isPublishLoading, isSuccess :isPublishSuccess, isError :isPublishError, error :publishError }]=usePublishMutation();
+  const [generateTagsMutation, { data: generateTagsData, isLoading :isGenerateTagsLoading, isSuccess :isGenerateTagsSuccess, isError :isGenerateTagsError, error :generateTagsError }]=useGenerateTagsMutation();
 
 
   const seo = async () => {
@@ -135,13 +135,15 @@ const llamaContent = () => {
     }
   };
 
-  const handleGenerateStructurePress = () => {
+  const handleGenerateStructurePress =   () => {
 
     let userId = user.id;
-    let llmId = selectedLlm.llmId;
+    let llmId = llm.id;
     generateStructureMutation({blogTopic,llmId,userId});
-
     console.log(`Cross button pressed : ${blogTopic}`);
+
+    console.log("data"+structureData);
+
     // Add your custom logic for the cross button press
   };
 
@@ -153,7 +155,8 @@ const llamaContent = () => {
 
   const handleGenerateArticlePress = () => {
     let userId = user.id;
-    generateArticleMutation({userId,enableTitleGenerationCheck,title,body});
+    let llmId = llm.id;
+    generateArticleMutation({userId,enableTitleGenerationCheck,title,body,llmId});
   };
 
     // Function to generate text from map
@@ -211,33 +214,33 @@ const llamaContent = () => {
                 onChangeText={(text) => setBlogTopic(text)}
                 maxLength={100}
             />
-            <TouchableOpacity style={styles.GenerateStructureButtonFlex}
+          {!llm && <Text style={{fontSize: 12,color: 'red'}}>Select llm</Text>}
+          <TouchableOpacity style={styles.GenerateStructureButtonFlex}
                   onPress={() => {handleGenerateStructurePress()}}>
                   <Text style={styles.GenerateButtonText}>GENERATE STRUCTURE</Text>
             </TouchableOpacity>
         </View>
       </View>
-      
+      {isGenerateStructureLoading &&  <ActivityIndicator color={'blue'} />}
+
+      {isGenerateStructureSuccess && <View  style={styles.StructureContainer}>
+        <Text style={styles.GeneratedArticleText}>Select Researched Points To Include In Article </Text>
+        <ScrollView   style={styles.StructureContainer}>
+          <NestedCheckbox data={structureData} onSelect={handleSelect} />
+        </ScrollView>
+
+        <View style={styles.BlogTopicInputContainer}>
+          <TouchableOpacity style={styles.EditArticleButtonFlex}
+                            onPress={() => {handleCopyPointPress()}}>
+            <Text style={styles.GenerateButtonText}>EDIT POINTS</Text>
+          </TouchableOpacity>
+        </View>
+      </View>}
       {
-        isGenerateStructureLoading ?  <ActivityIndicator color={'blue'} /> :
-                isGenerateStructureSuccess  ? (
-                      <View  style={styles.StructureContainer}>
-                        <Text style={styles.GeneratedArticleText}>Select Researched Points To Include In Article </Text>
-                        <ScrollView   style={styles.StructureContainer}>
-                            <NestedCheckbox data={structureData} onSelect={handleSelect} />
-                        </ScrollView>                          
-                              
-                        <View style={styles.BlogTopicInputContainer}>
-                            <TouchableOpacity style={styles.EditArticleButtonFlex}
-                                onPress={() => {handleCopyPointPress()}}>
-                              <Text style={styles.GenerateButtonText}>EDIT POINTS</Text>
-                            </TouchableOpacity>
-                        </View>
-                      </View>                 
-                ): isGenerateStructureError && (<View   style={styles.StructureContainer}>
+         isGenerateStructureError && (<View   style={styles.StructureContainer}>
                   <Text style={[styles.GeneratedArticleText,{fontSize: 12,color: 'red'}]}>{generateStructureError}</Text>
                   </View> ) && setEditorBoxView(false)
-          }
+      }
       {
         editorBoxView && (
           <View style={styles.EditBoxContainer}>
@@ -274,23 +277,23 @@ const llamaContent = () => {
         </View>
         )
       }
-      {isGeneratedArticleDataSuccess && ( setArticleTitle(generatedArticleData.title) && setArticleTitle(generatedArticleData.body) && setGeneratedArticleViewOpen(true))}
+
       {isGeneratedArticleDataError && <View   style={styles.FinalArticleContainer}>
         <Text style={[{fontSize: 12,color: 'red'}]}>{generatedArticleDataError}</Text>
       </View>}
       {
-        generatedArticleViewOpen && (
+          isGeneratedArticleDataSuccess && (
           <View style={styles.FinalArticleContainer}>
              <ScrollView contentContainerStyle={styles.FinalArticleFlex}>
               <View style={styles.content}>
-                <Text style={styles.label}>{articleTitle}</Text>
+                <Text style={styles.label}>{generatedArticleData.title}</Text>
                 {(isSaveArticleDataLoading || isPublishLoading || isGenerateTagsLoading) && <ActivityIndicator color={'blue'} />}
                 {(isSaveArticleDataSuccess ) && <ToastNotification message="Article Saved..." messageStyle={{color:'#0092ca'}}/>}
                 {(isPublishSuccess) && <ToastNotification message="Article Published..." messageStyle={{color:'#0092ca'}} />}
 
                 {(isSaveArticleDataError ) && <ToastNotification message={saveArticleError} messageStyle={{color:'#0092ca'}}/>}
                 {(isPublishError) && <ToastNotification message={publishError} messageStyle={{color:'#0092ca'}} />}
-                <Text style={styles.article}>{articleBody}</Text>
+                <Text style={styles.article}>{generatedArticleData.body}</Text>
               </View>
             </ScrollView>
             <View style= {styles.ButtonFlex}>

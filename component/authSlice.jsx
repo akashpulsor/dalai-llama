@@ -14,24 +14,19 @@ export const authSlice = createSlice({
     tools:[],
     llm:[],
     isLoggedIn: false,
-    selectedLlm: null
+    selectedLlm: {}
   },
   reducers: {
     setUser: (state, action) => {
-      state.user = action.payload;
-      console.log(state)
+      state.user = action.user;
+      console.log(action);
     },
     setToken: (state, action) => {
 
-       storeTokenInAsyncStorage(state.token).then(() => {
-          console.log(state);
-      })
-      .catch(error => {
-          console.error('Error storing token:', error);
-      });
-      state.isLoggedIn = true;
-      state.token = action.payload;
-      //console.log(state);
+        storeTokenInAsyncStorage(action.token);
+        state.isLoggedIn = true;
+        state.token = action.token;
+        console.log(action);
     },
    clearAuth: (state) => {
       //TODO add error case
@@ -43,20 +38,24 @@ export const authSlice = createSlice({
        state.isLoggedIn = false;
     },
     setTools: (state, action) => {
-      state.tools = action.payload;
+      state.tools = action;
     },
     setLlm: (state, action) => {
-      state.llm = action.payload;
+      state.llm = action;
     },
     setSelectedLlm: (state, action) => {
           state.selectedLlm = action.payload;
-          },
+          console.log(state.selectedLlm);
+
+    },
   },
   extraReducers: (builder) =>{
     builder.addMatcher(
         authApi.endpoints.login.matchFulfilled,
         (state, { payload }) => {
+            console.log(payload);
             authSlice.caseReducers.setToken(state,payload);
+            authSlice.caseReducers.setUser(state,payload);
         }
     ),
         builder.addMatcher(
@@ -79,6 +78,24 @@ export const authSlice = createSlice({
             (state, { payload }) => {
                 authSlice.caseReducers.setUser(state,payload);
                 authSlice.caseReducers.setToken(state,payload);
+            }),
+        builder.addMatcher(
+            authApi.endpoints.getLlm.matchFulfilled,
+            (state, { payload }) => {
+                authSlice.caseReducers.setLlm(state,payload);
+
+            }),
+        builder.addMatcher(
+            authApi.endpoints.getTools.matchFulfilled,
+            (state, { payload }) => {
+                authSlice.caseReducers.setTools(state,payload);
+
+            }),
+        builder.addMatcher(
+            authApi.endpoints.generateStructure.matchFulfilled,
+            (state, { payload }) => {
+                console.log(payload);
+
             })
   }
 

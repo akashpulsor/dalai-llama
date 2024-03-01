@@ -80,17 +80,17 @@ export const authApi = createApi({
       },
     }),
     generateStructure: builder.mutation({
-      query: (topicName, llmId, userId) => ({
+      query: ({topicName, llmId, userId}) => ({
         url: '/generateStructure',
         method: 'POST',
         body: {"topic":topicName,"llmId":llmId, "userId": userId},
       }),
     }),
     generateArticle: builder.mutation({
-      query: ({ userId,enableTitleGenerationCheck,title,body}) => ({
+      query: ({ userId,enableTitleGenerationCheck,title,body,llmId}) => ({
         url: '/generateArticle',
         method: 'POST',
-        body: { jsonData, llmId, toolId },
+        body: { "userId":userId,"titleGenerationCheck":enableTitleGenerationCheck,"title":title,"body": body,"llmId":llmId },
       }),
     }),
     saveArticle: builder.mutation({

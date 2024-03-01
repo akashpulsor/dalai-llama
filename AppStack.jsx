@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {createStackNavigator} from '@react-navigation/stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { View, Text, Image,Button, TouchableOpacity } from "react-native";
@@ -20,8 +20,9 @@ import llamaContent from './component/llamaContent';
 import { useSelector } from 'react-redux';
 
 import { useDispatch } from 'react-redux';
-import { useLoginMutation } from './component/authApi';
-import { selectIsLoggedIn } from './component/authSlice';
+import {useGetLlmQuery, useLoginMutation} from './component/authApi';
+import {selectIsLoggedIn, selectLlmData, selectUser, setLlm, setSelectedLlm} from './component/authSlice';
+import DropDownPicker from "react-native-dropdown-picker";
 const Auth = createStackNavigator();
 
 // Create stack navigator for cards
@@ -31,6 +32,24 @@ const ToolsStack = createStackNavigator();
 const Drawer = createDrawerNavigator();
 
 const HomeStack = () => {
+    const [open, setOpen] = useState(false);
+    const [llmValue, setLlmValue] = useState(null);
+    const user =  useSelector(selectUser);
+    const { data: llmsData, error: llmError, isLoading: llmsLoading } =useGetLlmQuery();
+    const [placeholder, setPlaceholder] = useState('Choose an llm.');
+    useEffect(() => {
+        if (llmsData) {
+            console.log(llmsData);
+
+        }
+    }, [llmsData]);
+    const dispatch = useDispatch();
+    const handleSelectItem = (item) => {
+        setLlmValue(item.value);
+        dispatch(setSelectedLlm(item));
+        setPlaceholder(item.label); // Update the placeholder text
+        setOpen(false); // Close the dropdown after selection
+    };
   return (
 
     <Drawer.Navigator
@@ -63,7 +82,7 @@ const HomeStack = () => {
                   fontWeight: "bold",
                   color: "#111"
                 }}
-              >Isabella Joanna</Text>
+              >{user.userName}</Text>
               <Text
                 style={{
                   fontSize: 16,
@@ -96,7 +115,24 @@ const HomeStack = () => {
       }
     }}
   >
-          <Drawer.Screen name="Tools" component={BusinessTools} />
+          <Drawer.Screen name="Tools" component={Tools} options={
+              {
+                headerTitle:"Tools",
+                headerRight:()=>
+                    <DropDownPicker
+                        open={open}
+                        items={llmsData}
+                        setOpen={setOpen}
+                        value={llmValue}
+                        setValue={setLlmValue}
+                        placeholder={placeholder}
+                        dropDownStyle={{backgroundColor: '#fafafa'}}
+                        containerStyle={styles.LLM}
+                        onSelectItem={(item) => handleSelectItem(item)}
+                    />
+
+              }
+          }/>
           <Drawer.Screen name="Account" component={Account} />
           <Drawer.Screen name="Payment" component={Payment} />
       </Drawer.Navigator>
@@ -115,9 +151,10 @@ const AuthStack = () => {
 }
 
 const BusinessTools = () =>{
+
   return (
     <ToolsStack.Navigator>
-      <ToolsStack.Screen name="Tools" component={Tools} options={{headerShown:false}}/>
+      <ToolsStack.Screen name="Tools" component={Tools}  />
       
       <ToolsStack.Screen name="llamaContent" component={llamaContent}  options={{headerShown:true, title: 'Content',
             headerStyle: {
@@ -131,10 +168,12 @@ const BusinessTools = () =>{
 
 
 export default function AppStack() {
-  const [loginMutation, { data: posts, isLoading, isSuccess, isError, error }] = useLoginMutation();
+
   const isLoggedIn =  useSelector(selectIsLoggedIn);
-  console.log(isLoggedIn);
-  console.log(isSuccess);
+  const user =  useSelector(selectUser);
+
+  console.log(user);
+
   return (
       isLoggedIn? <HomeStack/>:<AuthStack/>
   );
