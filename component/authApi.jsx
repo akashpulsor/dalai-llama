@@ -101,10 +101,10 @@ export const authApi = createApi({
       }),
     }),
     generateTags: builder.mutation({
-      query: (articleData) => ({
+      query: ({userId,enableTitleGenerationCheck,title,body,llmId}) => ({
         url: '/generateTags',
         method: 'POST',
-        body: articleData,
+        body: {"userId":userId,"titleGenerationCheck":enableTitleGenerationCheck,"title":title,"body":body,"llmId":llmId},
       }),
     }),
     publish: builder.mutation({
@@ -115,10 +115,10 @@ export const authApi = createApi({
       }),
     }),
     loginWordpress: builder.mutation({
-      query: ({ email, password, saveCredentials}) => ({
+      query: ({userId,username, password, saveCredentials}) => ({
         url: '/loginwordpress',
         method: 'POST',
-        body: { "email": email, "password": password, "saveCredentials":saveCredentials },
+        body: { "userId":userId,"userName": username, "password": password, "saveCredentials":saveCredentials },
       }),
     }),
     getPrice: builder.mutation({

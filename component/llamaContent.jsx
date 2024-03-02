@@ -39,6 +39,12 @@ const llamaContent = ({tool}) => {
   const [publishMutation, { data: publishData, isLoading :isPublishLoading, isSuccess :isPublishSuccess, isError :isPublishError, error :publishError }]=usePublishMutation();
   const [generateTagsMutation, { data: generateTagsData, isLoading :isGenerateTagsLoading, isSuccess :isGenerateTagsSuccess, isError :isGenerateTagsError, error :generateTagsError }]=useGenerateTagsMutation();
 
+  const successRef = useRef();
+
+  useEffect(() => {
+    successRef.current = isWordPressDataSuccess;
+    wordpressLoginSuccess();
+  }, [isWordPressDataSuccess]);
 
   const seo = async () => {
     let userId = user.id;
@@ -46,7 +52,8 @@ const llamaContent = ({tool}) => {
   }
 
   const handleWordPressLogin = () => {
-    loginWordPressMutation({username, password, saveCredentials})
+    let userId = user.id;
+    loginWordPressMutation({userId,username, password, saveCredentials})
   };
 
   const toggleWordPressSaveCredentialsCheckBox = () => {
@@ -69,20 +76,42 @@ const llamaContent = ({tool}) => {
 
 
   
-  const TagCloud = ({ onTagPress, onCrossPress }) => {
-    const uniqueData = [...new Set(generateTagsData)];
+  const TagCloud = ({ onTagPress }) => {
 
+    const uniqueData = [...new Set(generateTagsData.tags)];
+    const handleTagPress = (tag) => {
+      console.log(`Tag pressed: ${tag}`);
+      console.log(selectedTags);
+      if (selectedTags.has(tag)) {
+        // Remove value from set
+        const newSet = new Set(selectedTags);
+        newSet.delete(tag);
+        setSelectedTags(newSet);
+      } else {
+        setSelectedTags(new Set(selectedTags).add(tag));
+      }
+
+    };
+
+    const handleDoublePress = (tag) => {
+      console.log('Cross button pressed');
+      if (selectedTags.has(tag)) {
+        // Remove value from set
+        const newSet = new Set(selectedTags);
+        newSet.delete(tag);
+        setSelectedTags(newSet);
+      }
+      // Add your custom logic for the cross button press
+    };
     return (
       <View style={styles.tagCloudContainer}>
-        <TouchableOpacity onPress={onCrossPress} style={styles.crossButton}>
-             <Ionicons name="ios-close-circle" size={34} color="red" style={{ marginRight: 5 }} />
-        </TouchableOpacity>
+
         {uniqueData.map((tag, index) => (
           <TouchableOpacity
             key={index}
-            onPress={() => handleTagPress(index,tag)}
-            onLongPress={() => handleDoublePress}
-            style={{ ...styles.tagContainer, backgroundColor: selectedTags.has(item) ? 'green' : '#0092ca' }}
+            onPress={() => handleTagPress(tag)}
+            onLongPress={() => handleDoublePress(tag)}
+            style={{ ...styles.tagContainer, backgroundColor: selectedTags.has(tag) ? 'green' : '#0092ca' }}
           >
             <Text style={styles.tagText}>{tag}</Text>
           </TouchableOpacity>
@@ -96,30 +125,7 @@ const llamaContent = ({tool}) => {
     );
   };
 
-  const handleTagPress = (tag) => {
-    console.log(`Tag pressed: ${tag}`);
-    if (selectedTags.has(tag)) {
-      // Remove value from set
-      const newSet = new Set(selectedTags);
-      newSet.delete(tag);
-      setSelectedTags(newSet);
-    } else {
-      // Add value to set
-      setSelectedTags(new Set(selectedTags).add(tag));
-    }
-    // Add your custom logic when a tag is pressed
-  };
 
-  const handleDoublePress = (tag) => {
-    console.log('Cross button pressed');
-    if (selectedTags.has(tag)) {
-      // Remove value from set
-      const newSet = new Set(selectedTags);
-      newSet.delete(tag);
-      setSelectedTags(newSet);
-    }
-    // Add your custom logic for the cross button press
-  };
 
   
   
@@ -156,6 +162,7 @@ const llamaContent = ({tool}) => {
   const handleGenerateArticlePress = () => {
     let userId = user.id;
     let llmId = llm.id;
+    console.log(enableTitleGenerationCheck);
     generateArticleMutation({userId,enableTitleGenerationCheck,title,body,llmId});
   };
 
@@ -186,8 +193,9 @@ const llamaContent = ({tool}) => {
       return map;
     }
 
-
-
+  const wordpressLoginSuccess =() =>{
+    setModalVisible(false);
+  }
   const saveData = () => {
     let userId = user.id;
     saveArticleMutation({userId,articleTitle, articleBody});
@@ -287,12 +295,7 @@ const llamaContent = ({tool}) => {
              <ScrollView contentContainerStyle={styles.FinalArticleFlex}>
               <View style={styles.content}>
                 <Text style={styles.label}>{generatedArticleData.title}</Text>
-                {(isSaveArticleDataLoading || isPublishLoading || isGenerateTagsLoading) && <ActivityIndicator color={'blue'} />}
-                {(isSaveArticleDataSuccess ) && <ToastNotification message="Article Saved..." messageStyle={{color:'#0092ca'}}/>}
-                {(isPublishSuccess) && <ToastNotification message="Article Published..." messageStyle={{color:'#0092ca'}} />}
 
-                {(isSaveArticleDataError ) && <ToastNotification message={saveArticleError} messageStyle={{color:'#0092ca'}}/>}
-                {(isPublishError) && <ToastNotification message={publishError} messageStyle={{color:'#0092ca'}} />}
                 <Text style={styles.article}>{generatedArticleData.body}</Text>
               </View>
             </ScrollView>
@@ -333,7 +336,7 @@ const llamaContent = ({tool}) => {
                               onChangeText={setUsername}
                             />
                             {isWordPressDataLoading && <ActivityIndicator  color={'blue'}/>}
-                            {isWordPressDataSuccess && setModalVisible(false)}
+
                             <TextInput
                               style={styles.input}
                               placeholder="Password"
@@ -359,7 +362,7 @@ const llamaContent = ({tool}) => {
       }
       {isGenerateTagsSuccess && (
         <View style={styles.foldableView}>
-          { <TagCloud onTagPress={handleTagPress} onCrossPress={handleCrossPress} />}
+          { <TagCloud  />}
         </View>
       )}
 

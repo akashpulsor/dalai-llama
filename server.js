@@ -121,29 +121,25 @@ app.post('/generateArticle', (req, res) => {
             "Talking to The Indian Express, Sharma, who is now a DSP in the Haryana Police, said, “Some people are misinterpreting the video as if we are going to initiate action against the protestors. It is incorrect. We are taking action against those who are indulging in ‘violence’ during the ongoing protests. I am doing my duty as any other police officer. We have initiated action only against those who are indulging in violence and not against other protestors. So far, nearly 100 such people have been identified and action is being initiated against them.","generationId":1 });
 });
 
-app.post('/generateTags', (req, res) => {
-    new Promise(resolve => setTimeout(resolve, 10000));
-);
 
 app.post('/generateTags', (req, res) => {
     new Promise(resolve => setTimeout(resolve, 10000));
-    res.json({"generationId": 1, "tags": ["headline", "good", "modi"]});
+    res.json({"userId":1,"generationId": 1, "tags": ["headline", "good", "modi"]});
 });
 
 app.post('/saveArticle', (req, res) => {
     new Promise(resolve => setTimeout(resolve, 10000));
-    res.json({"articleId": 1, "title":"aaffa","body":"asfasfsava","tags": ["headline", "good", "modi"]});
+    res.json({"userId":1,"articleId": 1, "title":"aaffa","body":"asfasfsava","tags": ["headline", "good", "modi"]});
 });
-
 
 app.post('/publish', (req, res) => {
     new Promise(resolve => setTimeout(resolve, 10000));
-    res.json({articleId:1,partnerId:1,publishId:1});
+    res.json({"userId":1,articleId:1,partnerId:1,publishId:1});
 });
 
 app.post('/loginwordpress', (req, res) => {
     new Promise(resolve => setTimeout(resolve, 10000));
-    res.json({partnerId:1});
+    res.json({"userId":1,partnerId:1});
 });
 
 app.listen(PORT, () => {
