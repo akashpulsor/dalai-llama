@@ -328,8 +328,7 @@ const styles = StyleSheet.create({
   TopicContainer: {
     flex: 1,
     margin:10,
-    flexBasis:200,
-    flexGrow:0,
+
     alignContent:"center",
     padding:10,
   },
@@ -338,8 +337,6 @@ const styles = StyleSheet.create({
     margin:10,
     alignContent:"center",
     padding:10,
-    flexBasis:400,
-    flexGrow:0,
   },
   BlogTopicInputBox: {
     height: 40,
@@ -354,6 +351,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderColor: 'gray',
     alignItems:'center',
+    marginTop:40,
     margin:15,
   },
   GenerateStructureButtonFlex: {
@@ -469,6 +467,7 @@ const styles = StyleSheet.create({
   FinalArticleContainer: {
     flex: 1,
     marginTop:40,
+    width:'100%',
     margin:10,
     alignContent:"center",
     flexBasis:1000,

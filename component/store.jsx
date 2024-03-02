@@ -3,24 +3,14 @@ import { authApi } from './authApi'; // Import authApi
 import authReducer from './authSlice'; // Import authSlice reducer
 
 import { useNavigation } from '@react-navigation/native';
-import { Toast } from 'react-native-toast-message'
+
 
 export const navigate = (routeName, params) => {
     const navigation = useNavigation();
     navigation.navigate(routeName, params);
 };
 
-const showToastError = (message) =>{
-    Toast.show(
-        {
-            Type:"Error",
-            Text1:{message},
-            autoHide:false,
-            visibiliyTime:2500,
-            position: 'top',
-        }
-    )
-}
+
 
 // Combine reducers
 const rootReducer = combineReducers({
