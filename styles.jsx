@@ -327,14 +327,15 @@ const styles = StyleSheet.create({
   },
   TopicContainer: {
     flex: 1,
-    margin:10,
 
+    justifyContent:'center',
     alignContent:"center",
     padding:10,
+    backgroundColor:'red'
   },
   StructureContainer: {
     flex: 1,
-    margin:10,
+
     alignContent:"center",
     padding:10,
   },
@@ -344,18 +345,17 @@ const styles = StyleSheet.create({
     borderColor: 'gray',
     borderWidth: 1,
     borderRadius: 5,
+
     padding:10, 
   },
   BlogTopicInputContainer: {
     flex: 1,
-    height: 40,
     borderColor: 'gray',
     alignItems:'center',
-    marginTop:40,
     margin:15,
   },
   GenerateStructureButtonFlex: {
-    height: '50',
+
     width:'14%',
     borderWidth: 2,
     borderRadius:5,
@@ -371,10 +371,9 @@ const styles = StyleSheet.create({
     alignSelf:'center'
   },
   EditArticleButtonFlex: {
-    height: '50',
+
     borderWidth: 2,
     borderRadius:5,
-    width:'15%',
     margin:10,
     borderColor: 'gray',
     backgroundColor:'#d3d3d3'
@@ -384,9 +383,7 @@ const styles = StyleSheet.create({
     marginTop:40,
     margin:10,
     alignContent:"center",
-    padding:10,
-    flexBasis:700,
-    flexGrow:0,
+    padding:10
   },
   headingContainer: {
     flexDirection: 'row',
@@ -447,7 +444,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   GenerateArticleButton: {
-    height: '50',
+
     borderWidth: 2,
     borderRadius:5,
     width:'15%',
@@ -467,7 +464,7 @@ const styles = StyleSheet.create({
   FinalArticleContainer: {
     flex: 1,
     marginTop:40,
-    width:'100%',
+
     margin:10,
     alignContent:"center",
     flexBasis:1000,
@@ -492,11 +489,10 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
+
   },
   article: {
-    fontSize: 16,
-    lineHeight: 24,
+
   },
   TagsButton: {
     height: '50',
@@ -535,7 +531,6 @@ const styles = StyleSheet.create({
     flexDirection:'column',
     borderColor: 'gray',
     backgroundColor:'#d3d3d3',
-    alignItems:'flex-end',
     alignContent:'flex-end',
     alignItems:'flex-end'
   },
@@ -551,7 +546,6 @@ const styles = StyleSheet.create({
     flexDirection:'column',
     borderColor: 'gray',
     backgroundColor:'#d3d3d3',
-    alignItems:'flex-start',
     alignContent:'flex-start',
     alignItems:'flex-start'
   },

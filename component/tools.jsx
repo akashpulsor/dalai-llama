@@ -81,7 +81,7 @@ const Tools = ({ navigation }) => {
           numColumns={Math.floor(screenWidth / 150)} // Adjust card width as needed
         />
       </ScrollView>}
-        {!toolPage && <View style={{justifyContent:'center'}}>
+        {!toolPage && <View style={{alignContent:'center',justifyContent:'center',height:'100%'}}>
             <TouchableOpacity  style={{justifyContent:'center'}} onPress={() =>  cancelTool()}>
                 <MaterialIcons name="cancel" size={24} color="gray" />
             </TouchableOpacity>

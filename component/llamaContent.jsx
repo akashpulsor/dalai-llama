@@ -35,8 +35,22 @@ const llamaContent = ({tool}) => {
   const [saveArticleMutation, { data: saveArticleData, isLoading :isSaveArticleDataLoading, isSuccess :isSaveArticleDataSuccess, isError :isSaveArticleDataError, error :saveArticleError }]=useSaveArticleMutation();
   const [publishMutation, { data: publishData, isLoading :isPublishLoading, isSuccess :isPublishSuccess, isError :isPublishError, error :publishError }]=usePublishMutation();
   const [generateTagsMutation, { data: generateTagsData, isLoading :isGenerateTagsLoading, isSuccess :isGenerateTagsSuccess, isError :isGenerateTagsError, error :generateTagsError }]=useGenerateTagsMutation();
-  const windowWidth = Dimensions.get('window').width;
-  const windowHeight = Dimensions.get('window').height;
+
+  useEffect(() => {
+    if (!llm) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Select llm to proceed',
+        position: 'bottom',
+        bottomOffset:'80%',
+        backgroundColor: 'red',
+        text1Style: { color: 'black' }, // Change the text color here
+        text2Style: { color: 'black' },// Change the text color here
+      });
+    }
+  }, [llm]);
+
   useEffect(() => {
     if (isWordPressDataSuccess) {
       wordpressLoginSuccess();
@@ -113,7 +127,7 @@ const llamaContent = ({tool}) => {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Article Published successfully!',
+        text2: {publishError},
         position: 'bottom',
         bottomOffset:'80%',
         backgroundColor: 'gray',
@@ -126,7 +140,7 @@ const llamaContent = ({tool}) => {
       Toast.show({
         type: 'success',
         text1: 'Success',
-        text2: {publishError},
+        text2: 'Article Published successfully!',
         position: 'bottom',
         bottomOffset:'80%',
         backgroundColor: 'red',
@@ -200,7 +214,7 @@ const llamaContent = ({tool}) => {
             key={index}
             onPress={() => handleTagPress(tag)}
             onLongPress={() => handleDoublePress(tag)}
-            style={{ ...styles.tagContainer, backgroundColor: selectedTags.has(tag) ? 'green' : '#0092ca' }}
+            style={{ ...styles.tagContainer, backgroundColor: selectedTags.has(tag) ? 'green' : 'gray' }}
           >
             <Text style={styles.tagText}>{tag}</Text>
           </TouchableOpacity>
@@ -302,165 +316,156 @@ const llamaContent = ({tool}) => {
 
   return (
     // Main container with a gray background
-    <ScrollView style={styles.container}>
-      <View style={styles.TopicContainer}>
-        <View style={styles.BlogTopicInputContainer}>
-            <TextInput
-                style={styles.BlogTopicInputBox}
-                placeholder="Enter Topic you want to write.."
-                onChangeText={(text) => setBlogTopic(text)}
-                maxLength={100}
-            />
-          {!llm && <Text style={{fontSize: 12,color: 'red'}}>Select llm</Text>}
-          <TouchableOpacity style={styles.GenerateStructureButtonFlex}
-                  onPress={() => {handleGenerateStructurePress()}}>
-                  <Text style={styles.GenerateButtonText}>GENERATE STRUCTURE</Text>
-            </TouchableOpacity>
-        </View>
-      </View>
-      {isGenerateStructureLoading &&  <ActivityIndicator color={'blue'} />}
+    <ScrollView style={[styles.container]}>
+      <TextInput
+          style={[styles.BlogTopicInputBox,{marginBottom:20,alignSelf:'center'}]}
+          placeholder="Enter Topic you want to write.."
+          onChangeText={(text) => setBlogTopic(text)}
+          maxLength={100}
+      />
 
-      {isGenerateStructureSuccess && <View  style={styles.StructureContainer}>
-        <Text style={styles.GeneratedArticleText}>Select Researched Points To Include In Article </Text>
-        <ScrollView   style={styles.StructureContainer}>
+      <TouchableOpacity onPress={() => {handleGenerateStructurePress()}} style={{ backgroundColor: '#0092ca', padding: 10, borderRadius: 10, height: 40, width:'20%',alignSelf:'center' }}>
+        <Text style={{ color: 'white', textAlign: 'center',fontWeight:'bold' }}>Generate Structure</Text>
+      </TouchableOpacity>
+      {isGenerateStructureLoading &&  <ActivityIndicator color={'blue'} />}
+      {isGenerateStructureSuccess && <View><Text style={styles.GeneratedArticleText}>Select Researched Points To Include In Article </Text></View>}
+      {isGenerateStructureSuccess &&
+        <ScrollView   style={[styles.StructureContainer, {borderRadius:2}]}>
           <NestedCheckbox data={structureData} onSelect={handleSelect} />
         </ScrollView>
+      }
 
-        <TouchableOpacity style={styles.EditArticleButtonFlex}
-                          onPress={() => {handleCopyPointPress()}}>
-          <Text style={styles.GenerateButtonText}>EDIT POINTS</Text>
-        </TouchableOpacity>
-
-        {
-            editorBoxView && (
-                <View style={styles.EditBoxContainer}>
-                  <View style={styles.Title}>
-                    <TextInput
-                        style={[styles.TitleInputBox, enableTitleGenerationCheck && styles.disabledInput]} // Apply different styles based on checked status
-                        placeholder=" Title"
-                        onChangeText={(text) => setTitle(text)}
-                        value={title}
-                        editable={!enableTitleGenerationCheck} // Disable TextInput when checked is true
-                    />
-                    <Checkbox.Item
-                        label="Auto Generate Title"
-                        status={enableTitleGenerationCheck ? 'checked' : 'unchecked'}
-                        onPress={handleSetEnableTitleGenerationCheck}
-                        labelStyle={styles.AutoTitleLabel}
-                        position="leading"
-                    />
-                    {isGeneratedArticleDataLoading && <ActivityIndicator color={'blue'} />}
-                    <TextInput
-                        editable = {true}
-                        style={styles.TitleBodyBox}
-                        value={body}
-                        onChangeText={(text) => setBody(text)}
-                        placeholder=" Body"
-                        multiline
-                    />
-                    <View style={styles.GenerateArticleButtonFlex}>
-                      <TouchableOpacity style={styles.GenerateArticleButton} onPress={() => handleGenerateArticlePress()}>
-                        <Text style={styles.GenerateButtonText}>GENERATE ARTICLE</Text>
-                      </TouchableOpacity>
-                    </View>
+      {isGenerateStructureSuccess && <View><TouchableOpacity onPress={() => {handleCopyPointPress()}} style={{ backgroundColor: '#0092ca', padding: 10, borderRadius: 10, height: 40, width:'20%',alignSelf:'center' }}>
+        <Text style={{ color: 'white', textAlign: 'center',fontWeight:'bold' }}>Edit Points</Text>
+      </TouchableOpacity></View>}
+      {
+          editorBoxView && (
+              <View>
+                  <TextInput
+                      style={[styles.TitleInputBox, enableTitleGenerationCheck && styles.disabledInput]} // Apply different styles based on checked status
+                      placeholder=" Title"
+                      onChangeText={(text) => setTitle(text)}
+                      value={title}
+                      editable={!enableTitleGenerationCheck} // Disable TextInput when checked is true
+                  />
+                  <Checkbox.Item
+                      label="Auto Generate Title"
+                      status={enableTitleGenerationCheck ? 'checked' : 'unchecked'}
+                      onPress={handleSetEnableTitleGenerationCheck}
+                      labelStyle={styles.AutoTitleLabel}
+                      position="leading"
+                  />
+                  {isGeneratedArticleDataLoading && <ActivityIndicator color={'blue'} />}
+                  <TextInput
+                      editable = {true}
+                      style={styles.TitleBodyBox}
+                      value={body}
+                      onChangeText={(text) => setBody(text)}
+                      placeholder=" Body"
+                      multiline
+                  />
+                  <View>
+                    <TouchableOpacity style={{ backgroundColor: '#0092ca', padding: 10, borderRadius: 10, height: 40, width:'20%',alignSelf:'center' }} onPress={() => handleGenerateArticlePress()}>
+                      <Text style={{ color: 'white', textAlign: 'center',fontWeight:'bold' }}>Generate Article</Text>
+                    </TouchableOpacity>
                   </View>
+              </View>
+          )
+      }
+
+
+
+      {
+          isGeneratedArticleDataSuccess && (
+              <View style={{marginTop:40}}>
+                <Text style={[{fontSize: 40,fontWeight: 'bold',backgroundColor: '#f2f2f2'}]}>{generatedArticleData.title} {"\n\n"}</Text>
+
+                <Text style={[{fontSize: 16,backgroundColor: '#f2f2f2'}]}>{generatedArticleData.body}</Text>
+
+                <Toast ref={(ref) => Toast.setRef(ref)} />
+                <View style= {{flexDirection:'row', marginTop:20}}>
+                  <View style={{flex:1}}>
+                    <TouchableOpacity style={{ backgroundColor: '#0092ca', padding: 10, borderRadius: 10, height: 40, width:'50%',alignSelf:'center' }}
+                                      onPress={() => seo()}>
+                      <Text style={{ color: 'white', textAlign: 'center',fontWeight:'bold' }}>Tags</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{flex:1}}>
+                    <TouchableOpacity style={{ backgroundColor: '#0092ca', padding: 10, borderRadius: 10, height: 40, width:'50%',alignSelf:'center' }} onPress={() => {saveData()}}>
+                      <Text style={{ color: 'white', textAlign: 'center',fontWeight:'bold' }}>Save</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{flex:1}}>
+                    <TouchableOpacity style={{ backgroundColor: '#0092ca', padding: 10, borderRadius: 10, height: 40, width:'50%',alignSelf:'center' }} onPress={() => publishArticle()}>
+                      <Text style={{ color: 'white', textAlign: 'center',fontWeight:'bold' }}>Publish</Text>
+                    </TouchableOpacity>
+                  </View>
+
+
                 </View>
-            )
-        }
+
+                <View style= {styles.ButtonFlex}>
 
 
 
-        {
-            isGeneratedArticleDataSuccess && (
-                <View style={styles.FinalArticleContainer}>
-                  <ScrollView contentContainerStyle={styles.FinalArticleFlex}>
+                    <Modal
+                        animationType="slide"
+                        transparent={true}
+                        visible={modalVisible}
+                        onRequestClose={() => {
+                          setModalVisible(false);
+                        }}
+                    >
+                      <View style={styles.centeredView}>
+                        <View style={styles.modalView}>
+                          <Image source={require('../assets/wordpress-logo.png')} style={styles.logo} />
+                          <Text style={styles.modalText}>Enter your WordPress credentials:</Text>
+                          <TextInput
+                              style={styles.input}
+                              placeholder="Username"
+                              value={username}
+                              onChangeText={setUsername}
+                          />
+                          {isWordPressDataLoading && <ActivityIndicator  color={'blue'}/>}
 
-                    <Text style={styles.label}>{generatedArticleData.title}</Text>
-
-                    <Text style={styles.article}>{generatedArticleData.body}</Text>
-
-
-                  </ScrollView>
-
-                  <View style= {styles.ButtonFlex}>
-                    <Toast ref={(ref) => Toast.setRef(ref)} />
-                    <View style= {styles.TagsButtonFlex}>
-                      <TouchableOpacity style={styles.TagsButton}
-                                        onPress={() => seo()}>
-                        <Text style={styles.GenerateButtonText}>TAGS</Text>
-                      </TouchableOpacity>
-                    </View>
-                    <View style= {styles.SaveButtonFlex}>
-                      <TouchableOpacity style={styles.SaveButton} onPress={() => {saveData()}}>
-                        <Text style={styles.GenerateButtonText}>SAVE</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    <View style= {styles.PublishButtonFlex}>
-                      <TouchableOpacity style={styles.PublishButton} onPress={() => publishArticle()}>
-                        <Text style={styles.GenerateButtonText}>PUBLISH</Text>
-                      </TouchableOpacity>
-
-                      <Modal
-                          animationType="slide"
-                          transparent={true}
-                          visible={modalVisible}
-                          onRequestClose={() => {
-                            setModalVisible(false);
-                          }}
-                      >
-                        <View style={styles.centeredView}>
-                          <View style={styles.modalView}>
-                            <Image source={require('../assets/wordpress-logo.png')} style={styles.logo} />
-                            <Text style={styles.modalText}>Enter your WordPress credentials:</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Username"
-                                value={username}
-                                onChangeText={setUsername}
+                          <TextInput
+                              style={styles.input}
+                              placeholder="Password"
+                              value={password}
+                              onChangeText={setPassword}
+                              secureTextEntry={true}
+                          />
+                          <View style={styles.checkboxContainer}>
+                            <CheckBox
+                                value={saveCredentials}
+                                onValueChange={toggleWordPressSaveCredentialsCheckBox}
                             />
-                            {isWordPressDataLoading && <ActivityIndicator  color={'blue'}/>}
-
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Password"
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry={true}
-                            />
-                            <View style={styles.checkboxContainer}>
-                              <CheckBox
-                                  value={saveCredentials}
-                                  onValueChange={toggleWordPressSaveCredentialsCheckBox}
-                              />
-                              <Text style={styles.checkboxLabel}>Remember Me</Text>
-                            </View>
-                            <Button title="Login" onPress={()=>{handleWordPressLogin()}} />
+                            <Text style={styles.checkboxLabel}>Remember Me</Text>
                           </View>
+                          <Button title="Login" onPress={()=>{handleWordPressLogin()}} />
                         </View>
-                      </Modal>
-                    </View>
-                  </View>
-                </View>
-            )
-        }
-        {isGenerateTagsSuccess && (
-            <View style={styles.foldableView}>
-              { <TagCloud  />}
-            </View>
-        )}
+                      </View>
+                    </Modal>
 
-        {
-            tagCloudViewOpen && (
-                <View  style={styles.tagCloudContainer}>
-                  <TouchableOpacity style={styles.tagContainer} onPress={() => publishArticle()}>
-                    <Text style={styles.tagText}>Publish with Tags</Text>
-                  </TouchableOpacity>
                 </View>
-            )
-        }
+              </View>
+          )
+      }
+      {isGenerateTagsSuccess && (
+          <View style={styles.foldableView}>
+            { <TagCloud  />}
+          </View>
+      )}
 
-      </View>}
+      {
+          tagCloudViewOpen && (
+              <View  style={[styles.tagCloudContainer,{marginTop:40}]}>
+                <TouchableOpacity style={{ backgroundColor: '#0092ca', padding: 10, borderRadius: 10, height: 40, width:'18%',alignSelf:'center' }} onPress={() => publishArticle()}>
+                  <Text style={{ color: 'white', textAlign: 'center',fontWeight:'bold' }}>Publish with Tags</Text>
+                </TouchableOpacity>
+              </View>
+          )
+      }
 
 
 
