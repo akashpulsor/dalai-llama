@@ -19,21 +19,98 @@ const BuisnessLogin = ({navigation}) => {
     const [loginMutation, { data: authData, isLoading, isSuccess, isError, error }] = useLoginMutation();
 
     const [registerMutation, { data: registerData, isRegistrationLoading, isRegistrationSuccess, isRegistrationError, registrationError }] = useRegisterMutation();
-
+    const [emailError, setEmailError] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+    const [companyNameError, setCompanyNameError] = useState('');
+    const [usernameError, setUsernameError] = useState('');
 
     const handleLogin = async  () => {
         // Perform actions with username and password, such as logging in to WordPress
+        // Reset errors
+        setEmailError('');
+        setPasswordError('');
+
+        if (!email) {
+            setEmailError('Email is required');
+            return;
+        }
+
+        if (!isValidEmail(email)) {
+            setEmailError('Please enter a valid email');
+            return;
+        }
+
+        if (!password) {
+            setPasswordError('Password is required');
+            return;
+        }
+
+        if (!isValidPassword(password)) {
+            setPasswordError('Password must contain at least 8 characters,\n including at least one letter and one number');
+            return;
+        }
         await loginMutation({ email, password });
       };
       
       const sinUp = () => {
         // Perform actions with username and password, such as logging in to WordPress
         // Close the modal
-        registerMutation({email: email,
-            userName: username,
-            password:password,
-            companyName:companyName});
+          // Reset errors
+          setEmailError('');
+          setPasswordError('');
+          setCompanyNameError('');
+          setUsernameError('');
+
+          let isValid = true;
+
+          if (!username) {
+              setUsernameError('Username is required');
+              isValid = false;
+          }
+
+          if (!password) {
+              setPasswordError('Password is required');
+              isValid = false;
+          }
+
+          if (!isValidEmail(email)) {
+              setEmailError('Please enter a valid email');
+              isValid = false;
+          }
+
+          if (!isValidPassword(password)) {
+              setPasswordError('Password:at least 8 characters, one letter and one number');
+              isValid = false;
+          }
+          if (!email) {
+              setEmailError('Email is required');
+              isValid = false;
+          }
+
+          if (!companyName) {
+              setCompanyNameError('Company name is required');
+              isValid = false;
+          }
+
+          if (!isValid) {
+              return;
+          }
+        registerMutation({email,
+            username,
+            password,
+            companyName});
       };
+    const isValidEmail = (email) => {
+        // Basic email validation regex
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    };
+
+    const isValidPassword = (password) => {
+        // Password must contain at least 8 characters, including at least one letter and one number
+        const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
+        return passwordRegex.test(password);
+    };
   return (
     // Main container with a gray background
     <View style={styles.container}>
@@ -55,17 +132,21 @@ const BuisnessLogin = ({navigation}) => {
                         style={styles.LoginInput}
                         placeholder=" Email..."
                         onChangeText={setEmail}
+                        onFocus={()=>{setEmailError('')}}
                     />
+
                 </View>
-                
+                {!!emailError && <Text style={styles.errorText}>{emailError}</Text>}
                 <View style={styles.LoginInput}>
                     <TextInput
                         style={styles.LoginInput}
                         placeholder=" Password..."
                         onChangeText={setPassword}
                         secureTextEntry={true}
-                    />                    
+                        onFocus={()=>{setPasswordError('')}}
+                    />
                 </View>
+                {!!passwordError && <Text style={styles.errorText}>{passwordError}</Text>}
 
                 <View style={styles.LoginButtonFlex}>
                     <View style={{height: 40,width: 350,
@@ -103,23 +184,34 @@ const BuisnessLogin = ({navigation}) => {
                               placeholder="Username"
                               value={username}
                               onChangeText={setUsername}
+                              onFocus={()=>{setUsernameError('')}}
                             />
+                              {!!usernameError && <Text style={styles.errorText}>{usernameError}</Text>}
                             <TextInput
                               style={styles.input}
                               placeholder="Password"
                               value={password}
                               onChangeText={setPassword}
                               secureTextEntry={true}
+                              onFocus={()=>{setPasswordError('')}}
                             />
-                            
+                              {!!passwordError && <Text style={styles.errorText}>{passwordError}</Text>}
                             <TextInput
                               style={styles.input}
-                              placeholder="Ema:wil"
+                              placeholder="Email"
                               value={email}
                               onChangeText={setEmail}
-
+                              onFocus={()=>{setEmailError('')}}
                             />
-
+                              {!!emailError && <Text style={styles.errorText}>{emailError}</Text>}
+                              <TextInput
+                                  style={styles.input}
+                                  placeholder="Company Name"
+                                  value={companyName}
+                                  onChangeText={setCompanyName}
+                                  onFocus={()=>{setCompanyNameError('')}}
+                              />
+                              {!!companyNameError && <Text style={styles.errorText}>{companyNameError}</Text>}
                             <Button title="signUp" onPress={sinUp} />
                           </View>
                         </View>

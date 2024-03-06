@@ -11,8 +11,8 @@ export const authSlice = createSlice({
     token: null,
     loading: 'idle',
     error: null,
-    tools:[],
-    llm:[],
+    tools:null,
+    llm:null,
     isLoggedIn: false,
     selectedLlm: {}
   },
@@ -38,10 +38,12 @@ export const authSlice = createSlice({
        state.isLoggedIn = false;
     },
     setTools: (state, action) => {
-      state.tools = action;
+      state.tools = action.payload;
+      console.log(action.payload);
     },
     setLlm: (state, action) => {
-      state.llm = action;
+      state.llm = action.payload;
+        console.log(action.payload);
     },
     setSelectedLlm: (state, action) => {
           state.selectedLlm = action.payload;

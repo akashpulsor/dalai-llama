@@ -197,6 +197,7 @@ const styles = StyleSheet.create({
   errorText: {
     flex:1,
     borderColor: 'red',
+    color:'red',
     fontSize:10
   },
   errorViewFlex: {
@@ -569,6 +570,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+    width: '20%'
   },
   modalText: {
     marginBottom: 15,

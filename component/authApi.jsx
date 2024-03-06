@@ -2,6 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { useDispatch } from 'react-redux';
 import { setUser, setToken, clearAuth,setTools,  } from './authSlice'; // Import your action creators from authSlice
 
+
 export const authApi = createApi({
   reducerPath: 'authApi',
   //https://api.dalai-llama.com
@@ -30,14 +31,17 @@ export const authApi = createApi({
       },
       invalidatesTags: ['Login'],
     }),
+    refreshToken: builder.query({
+      query: () => '/refreshToken',
+      method: 'POST', // Adjust this according to your API
+    }),
     register: builder.mutation({
-      query: ({ name, email, password }) => ({
+      query: ({ name, email, password,companyName }) => ({
         url: '/register',
         method: 'POST',
-        body: { name, email, password },
+        body: { "username":name, "email":email, "password":password,"companyName":companyName },
       }),
       onSuccess: (response, { dispatch }) => {
-        //dispatch(setUser(response.data.user)); // Set user data in state
         dispatch(setToken(response.data.token)); // Set token in state
       },
     }),
@@ -97,7 +101,7 @@ export const authApi = createApi({
       query: ({userId,articleTitle, articleBody}) => ({
         url: '/saveArticle',
         method: 'POST',
-        body: {userId,articleTitle, articleBody},
+        body: {"userId":userId,"title":articleTitle, "body":articleBody},
       }),
     }),
     generateTags: builder.mutation({
@@ -111,7 +115,7 @@ export const authApi = createApi({
       query: ({username,password,userId,articleTitle, articleBody,selectedTags}) => ({
         url: '/publish',
         method: 'POST',
-        body: {username,password,userId,articleTitle, articleBody,selectedTags},
+        body: {"username":username,"password":password,"userId":userId,"title":articleTitle, "body":articleBody,"tags":selectedTags},
       }),
     }),
     loginWordpress: builder.mutation({
@@ -126,7 +130,7 @@ export const authApi = createApi({
         {
           url: '/getPrice',
           method: 'POST',
-          body: {llmId, toolId},
+          body: {"llmId":llmId, "toolId":toolId},
         }
       ),
     }),
@@ -135,7 +139,7 @@ export const authApi = createApi({
         {
           url: '/payment',
           method: 'POST',
-          body: {userId, money,currencyId},
+          body: {"userId":userId, "money":money,"currencyId":currencyId},
         }
       ),
     })
@@ -146,4 +150,5 @@ export const { useLoginMutation, useRegisterMutation,
   useLogoutMutation, useGetHistoryQuery, 
   useGetUserQuery, useUpdateUserMutation, useGetToolsQuery, useGetLlmQuery, useGenerateStructureMutation,
   useGenerateArticleMutation, useSaveArticleMutation, useGenerateTagsMutation, usePublishMutation, 
-  useLoginWordpressMutation, useGetPriceMutation,useAddCreditMutation } = authApi;
+  useLoginWordpressMutation, useGetPriceMutation,useAddCreditMutation, useRefreshTokenQuery } = authApi;
+

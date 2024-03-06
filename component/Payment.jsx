@@ -5,57 +5,29 @@ import styles from '../styles';
 import logo from '../assets/logo.png';
 
 import DropDownPicker from 'react-native-dropdown-picker';
+import {useSelector} from "react-redux";
+import {selectedLLm, selectLlmData, selectTools, selectUser} from "./authSlice";
+import {useGetLlmQuery, useGetToolsQuery} from "./authApi";
 
 
 const Payment = () => {
-  const [credits, setCredits] = useState('');
-  const [tools, setTools] = useState([]);
-  const [items, setItems] = useState([
-    { label: 'GPT4', value: 'GPT4' },
-    { label: 'LLAMA2', value: 'LLAMA2' },
-    { label: 'KRUTRIM', value: 'KRUTRIM' },
-  ]);
- 
+  const user =  useSelector(selectUser);
+  const { data: tools, error: toolsError, isLoading: toolsLoading } = useGetToolsQuery();
+  const { data: llmData, error: llmError, isLoading: llmsLoading } =useGetLlmQuery();
   const [openLlm, setOpenLlm] = useState(false);
   const [openTools, setOpenTools] = useState(false);
   const [llmValue, setLlmValue] = useState(null);
   const [toolValue, setToolValue] = useState(null);
   const [selectedOption, setSelectedOption] = useState(null);
   
- 
-  useEffect(() => {
-    // Fetch data from the web
-    const fetchData = async () => {
-      try {
-        const response = await fetch('https://63949ed0-1855-4bba-b6fe-be08df3fce3e.mock.pstmn.io/tools');
-      
-        const data = await response.json();
-        setTools(data);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      }
-    };
-    const fetchLLM = async () => {
-      try {
-        const llmData =[
-        
-          { label: 'GPT4', value: 'GPT4' },
-          { label: 'LLAMA2', value: 'LLAMA2' },
-          { label: 'KRUTRIM', value: 'KRUTRIM', },
-          { label: 'GEMINI', value: 'GEMINI', },
-        ]
+  // The empty dependency array ensures the effect runs only once, similar to componentDidMount
+  const [activeOptions, setActiveOptions] = useState([]);
 
-      } catch (error) {
-        console.error('Error fetching LLM data:', error);
+  useEffect(() => {
+      if(tools) {
+          setActiveOptions(tools.filter(option => option.active));
       }
-    };
-    fetchData();
-    fetchLLM();
-    //console.log('Tools value');
-    
- 
-  }, []); // The empty dependency array ensures the effect runs only once, similar to componentDidMount
-  const activeOptions = tools.filter(option => option.active);
+  }, [tools]);
 
   const loadScript = (src) => {
     return new Promise((resolve) => {
@@ -80,23 +52,9 @@ useEffect(() => {
   }
   const handleRazorpayPayment = async () => {
     const order = await createOrder();
-    var options = {
-      description:'Start your AI journey',
-      currency: 'INR',
-      amount: 100000, // Amount in paisa
-      key: 'rzp_test_UjiXiakaKFNDC2', // Your api key
-      name: 'Dalai Llama test',
-      theme: {color: 'gray'},
-      order_id: order.orderId, //This is a sample Order ID. Pass the `id` obtained in the response of createOrder().
-      handler: function (response) {
-        console.log(response.razorpay_payment_id);
-        console.log(response.razorpay_order_id);
-        console.log(response.razorpay_signature);
-      }
-    }
 
-    options = {
-      "key": "rzp_test_UjiXiakaKFNDC2", // Enter the Key ID generated from the Dashboard
+    var options = {
+      "key": "", // Enter the Key ID generated from the Dashboard
       "amount": "50000", // Amount is in currency subunits. Default currency is INR. Hence, 50000 refers to 50000 paise
       "currency": "INR",
       "name": "Acme Corp", //your business name
@@ -159,7 +117,7 @@ useEffect(() => {
                 <DropDownPicker
                   open={openLlm}
                   value={llmValue}
-                  items={items}
+                  items={llmData}
                   setOpen={setOpenLlm}
                   dropDownStyle={{backgroundColor: '#fafafa'}}
                   containerStyle={styles.LLM}
