@@ -1,5 +1,4 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { useDispatch } from 'react-redux';
 import { setUser, setToken, clearAuth,setTools,  } from './authSlice'; // Import your action creators from authSlice
 
 
@@ -142,6 +141,13 @@ export const authApi = createApi({
           body: {"userId":userId, "money":money,"currencyId":currencyId},
         }
       ),
+    }),
+    search: builder.mutation({
+      query: ({searchQuery, llmId, userId}) => ({
+        url: '/search',
+        method: 'POST',
+        body: {"query":searchQuery,"llmId":llmId, "userId": userId},
+      }),
     })
   }),
 });
@@ -150,5 +156,5 @@ export const { useLoginMutation, useRegisterMutation,
   useLogoutMutation, useGetHistoryQuery, 
   useGetUserQuery, useUpdateUserMutation, useGetToolsQuery, useGetLlmQuery, useGenerateStructureMutation,
   useGenerateArticleMutation, useSaveArticleMutation, useGenerateTagsMutation, usePublishMutation, 
-  useLoginWordpressMutation, useGetPriceMutation,useAddCreditMutation, useRefreshTokenQuery } = authApi;
+  useLoginWordpressMutation, useGetPriceMutation,useAddCreditMutation, useRefreshTokenQuery, useSearchMutation } = authApi;
 
