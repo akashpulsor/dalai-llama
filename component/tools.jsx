@@ -9,12 +9,14 @@ const screenWidth = Dimensions.get('window').width;
 import { MaterialIcons } from '@expo/vector-icons';
 import {setToken, setUser, setTools, setLlm, setSelectedLlm, selectUser, selectedLLm} from "./authSlice";
 import LlamaContent from "./llamaContent";
+import Search from './Search';
 const Tools = ({ navigation }) => {
   const { data: toolsData, error: toolsError, isLoading: toolsLoading } = useGetToolsQuery();
   const selectedLlm =  useSelector(selectedLLm);
   const [data, setData] = useState([]);
   const [toolPage, setToolPage] = useState(true);
   const [contentFlag, setContentFlag] = useState(false);
+  const [searchFlag, setSearchFlag] = useState(false);
   const [currentTool, setCurrentTool] = useState(null);
   const dispatch = useDispatch();
   const [open, setOpen] = useState(false);
@@ -30,19 +32,22 @@ const Tools = ({ navigation }) => {
   }, [toolsData]);
   // The empty dependency array ensures the effect runs only once, similar to componentDidMount
 
-  const renderTool = ({ tool }) =>{
+  const renderTool = ( tool ) =>{
       setToolPage(false);
-      setContentFlag(true);
+      tool=='Search'? setSearchFlag(true) : setContentFlag(true);
+      setCurrentTool(tool);
   }
   const cancelTool = () =>{
         setToolPage(true);
         setContentFlag(false);
+        setSearchFlag(false);
         setCurrentTool(null);
     }
   const renderCard = ({ item }) =>{
+    console.log("AKASH"+item.name);
     return (
       <View style={{margin:10}}>
-          <TouchableOpacity style={styles.card} onPress={() =>  renderTool(item)} disabled={!item.active}>
+          <TouchableOpacity style={styles.card} onPress={() =>  renderTool(item.name)} disabled={!item.active}>
               <View style={{margin:'20%'}}>
                   <Text style={{    fontSize: 24,
     fontWeight: 'bold',color:'white'}}>{item.name}</Text>
@@ -86,6 +91,8 @@ const Tools = ({ navigation }) => {
                 <MaterialIcons name="cancel" size={24} color="gray" />
             </TouchableOpacity>
             {contentFlag && <LlamaContent tool={currentTool}/>}
+
+            {searchFlag && <Search tool={currentTool}/>}
         </View>}
     </View>
   );
