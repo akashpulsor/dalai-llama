@@ -120,7 +120,7 @@ useEffect(() => {
                   items={llmData}
                   setOpen={setOpenLlm}
                   dropDownStyle={{backgroundColor: '#fafafa'}}
-                  containerStyle={styles.LLM}
+                  containerStyle={[styles.LLM,{width:'40%'}]}
                   onChangeItem={(item) =>{
                       console.log('AKASH');
                       console.log(item);
@@ -137,7 +137,7 @@ useEffect(() => {
                   defaultValue={selectedOption}
                   setOpen={setOpenTools}
                   dropDownStyle={{backgroundColor: '#fafafa'}}
-                  containerStyle={styles.LLM}
+                  containerStyle={[styles.LLM,{width:'40%'}]}
                   onChangeItem={item => {setSelectedOption(item.value);
                     setToolValue(item.value);}}
                   placeholder={'Choose Tool'}

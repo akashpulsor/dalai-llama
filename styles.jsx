@@ -4,6 +4,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#d3d3d3',
+    shadowColor:"white",
+    shadowOffset:1,
+    shadowOpacity:4,
     padding: 20,
   },
   Header: {
@@ -25,7 +28,7 @@ const styles = StyleSheet.create({
   LLM: {
     fontSize: 24,
     fontWeight: 'bold',
-    width:'50%',
+    width:'20%',
     position:'absolute',
     backgroundColor:'#d3d3d3'
   },
