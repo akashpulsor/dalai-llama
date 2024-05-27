@@ -1,7 +1,7 @@
 version: '2.4'
 
 services:
-  react_native_app:
+  dalai_llama_app:
     build:
       context: .
       args:
