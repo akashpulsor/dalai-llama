@@ -23,7 +23,7 @@ RUN npm i --unsafe-perm --allow-root -g npm@latest expo-cli@latest
 RUN mkdir /opt/dalai-llama
 WORKDIR /opt/dalai-llama
 ENV PATH /opt/dalai-llama/.bin:$PATH
-COPY ./dalai-llama/package.json ./dalai-llama/package-lock.json ./
+COPY package.json ./dalai-llama/package-lock.json ./
 RUN npm install
 
 # copy in our source code last, as it changes the most
