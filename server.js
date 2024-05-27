@@ -127,170 +127,67 @@ app.post('/search', (req, res) => {
 
 
     res.json({
-        "subject": "bhabhi porn",
-        "topStories": null,
+        "subject": "News on trump today",
+        "topStories": [
+            {
+                "date": "45 minutes ago",
+                "thumbnail": "https://serpapi.com/searches/663e3685ce87f8674b69d572/images/64dae0e4297fda5fa880d4a6f45389883dab98903a1e13a0.jpeg",
+                "link": "https://www.nbcnews.com/politics/donald-trump/live-blog/trump-hush-money-trial-day-15-live-updates-rcna150795",
+                "source": "NBC News",
+                "title": "Live updates: Trump fixer Michael Cohen to testify Monday at hush money trial"
+            },
+            {
+                "date": "1 hour ago",
+                "thumbnail": "https://serpapi.com/searches/663e3685ce87f8674b69d572/images/64dae0e4297fda5fd0afd7176369f3eab286ac38c5437c70.jpeg",
+                "link": "https://apnews.com/article/trump-trial-hush-money-stormy-daniels-cohen-ddef05884265e4d6217b55a89304b878",
+                "source": "AP News",
+                "title": "Trump hush money trial: Michael Cohen awaits turn after graphic Stormy Daniels account"
+            },
+            {
+                "date": "46 minutes ago",
+                "thumbnail": "https://serpapi.com/searches/663e3685ce87f8674b69d572/images/64dae0e4297fda5f025740c03d669c2e735cf228ea59082e.jpeg",
+                "link": "https://www.usatoday.com/story/news/politics/2024/05/10/donald-trump-trial-news-hush-money-case-live-updates/73635879007/",
+                "source": "USA Today",
+                "title": "Trump trial live updates: Ex-Oval Office aide who testified on checks returns to stand"
+            }
+        ],
         "organicResults": [
             {
-                "snippet": "Check out free Bhabhi porn videos on xHamster. Watch all Bhabhi XXX vids right now!",
+                "snippet": "Read the latest news and analysis on President Donald Trump. Follow today's top stories and breaking news from inside Washington D.C. and beyond.",
                 "thumbnail": null,
-                "favicon": "https://serpapi.com/searches/6632510566440ae477bdc65c/images/4e6498d6f7febba740fd47655c09c62ee64324752170c6bf2990ec7df37587a3.png",
-                "link": "https://xhamster.desi/tags/bhabhi",
+                "favicon": "https://serpapi.com/searches/663e3685ce87f8674b69d572/images/46493b5ddc8ac9302f4a430cac31ed35610e59d0a38d710b94957e73fac173ed.png",
+                "link": "https://www.politico.com/news/donald-trump",
                 "sitelinks": null,
                 "position": "1",
-                "source": "xhamster.desi",
-                "title": "Free Bhabhi Porn Videos - xHamster",
-                "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://xhamster.desi/tags/bhabhi&ved=2ahUKEwiqptSm1OyFAxWCr5UCHR2qAbMQFnoECAYQAQ",
-                "displayed_link": "xhamster.desi › tags › bhabhi",
+                "source": "Politico",
+                "title": "Donald Trump: Latest News, Top Stories & Analysis",
+                "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://www.politico.com/news/donald-trump&ved=2ahUKEwj7jNHbrIOGAxXHIkQIHXGeBUUQFnoECBkQAQ&usg=AOvVaw32nxNiMFBtZH_hmpRgGAQy",
+                "displayed_link": "www.politico.com",
                 "snippet_highlighted_words": [
-                    "Bhabhi porn"
+                    "latest news",
+                    "Trump",
+                    "today's",
+                    "news"
                 ]
             },
             {
-                "snippet": "Indian bhabhi porn videos @ DinoTube. We provide you with free porn, so visit now!",
+                "snippet": "News about Donald Trump, the 45th US president, including comment and features from the Guardian.",
                 "thumbnail": null,
-                "favicon": "https://serpapi.com/searches/6632510566440ae477bdc65c/images/4e6498d6f7febba740fd47655c09c62e74ceb6d3a628720b284ddaa139c2f7fa.png",
-                "link": "https://www.dinotube.com/search/a/indian%20bhabhi",
+                "favicon": "https://serpapi.com/searches/663e3685ce87f8674b69d572/images/46493b5ddc8ac9302f4a430cac31ed35a55148f5d309a9602b59e4bac4f45b56.png",
+                "link": "https://www.theguardian.com/us-news/donaldtrump",
                 "sitelinks": null,
                 "position": "2",
-                "source": "dinotube.com",
-                "title": "Indian Bhabhi Porn @ Dino Tube",
-                "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://www.dinotube.com/search/a/indian%2520bhabhi&ved=2ahUKEwiqptSm1OyFAxWCr5UCHR2qAbMQFnoECBEQAQ",
-                "displayed_link": "www.dinotube.com › search › indian bhabhi",
+                "source": "The Guardian",
+                "title": "Donald Trump | US news",
+                "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://www.theguardian.com/us-news/donaldtrump&ved=2ahUKEwj7jNHbrIOGAxXHIkQIHXGeBUUQFnoECCAQAQ&usg=AOvVaw01oO5zt_z8hWqnGYLmuX69",
+                "displayed_link": "www.theguardian.com",
                 "snippet_highlighted_words": [
-                    "bhabhi porn"
-                ]
-            },
-            {
-                "snippet": "Indian hot milf bhabhi and her stepcousin fucking with devar!! 13.1M 99% 21min - 1080p.",
-                "thumbnail": null,
-                "favicon": "https://serpapi.com/searches/6632510566440ae477bdc65c/images/4e6498d6f7febba740fd47655c09c62e8c4bfb873e86045c9f9b645ebe8a5190.png",
-                "link": "https://xnxx.health/search/indian+bhabhi?top",
-                "sitelinks": null,
-                "position": "3",
-                "source": "xnxx.health",
-                "title": "'indian bhabhi' Search - XNXX.COM",
-                "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://xnxx.health/search/indian%2Bbhabhi%3Ftop&ved=2ahUKEwiqptSm1OyFAxWCr5UCHR2qAbMQFnoECB0QAQ",
-                "displayed_link": "xnxx.health › search › indian+bhabhi › top",
-                "snippet_highlighted_words": [
-                    "bhabhi"
-                ]
-            },
-            {
-                "snippet": "Check out free Desi Bhabhi porn videos on xHamster. Watch all Desi Bhabhi XXX vids right now!",
-                "thumbnail": null,
-                "favicon": "https://serpapi.com/searches/6632510566440ae477bdc65c/images/4e6498d6f7febba740fd47655c09c62e0ca12592d3f10a8214dc3d5c6bb2e241.png",
-                "link": "https://xhamster.com/tags/desi-bhabhi",
-                "sitelinks": null,
-                "position": "4",
-                "source": "xhamster.com",
-                "title": "Free Desi Bhabhi Porn Videos - xHamster",
-                "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://xhamster.com/tags/desi-bhabhi&ved=2ahUKEwiqptSm1OyFAxWCr5UCHR2qAbMQFnoECB4QAQ",
-                "displayed_link": "xhamster.com › tags › desi-bhabhi",
-                "snippet_highlighted_words": [
-                    "Bhabhi porn"
-                ]
-            },
-            {
-                "snippet": "The best indian bhabhi xxx videos and pictures in HD quality for free.",
-                "thumbnail": null,
-                "favicon": "https://serpapi.com/searches/6632510566440ae477bdc65c/images/4e6498d6f7febba740fd47655c09c62ef7073813e28e18592cbde4b3703aad1e.png",
-                "link": "https://okxxx2.com/search/indian-bhabhi/",
-                "sitelinks": null,
-                "position": "5",
-                "source": "OK.XXX",
-                "title": "Hot 🌶️ indian bhabhi free porn videos",
-                "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://okxxx2.com/search/indian-bhabhi/&ved=2ahUKEwiqptSm1OyFAxWCr5UCHR2qAbMQFnoECBgQAQ",
-                "displayed_link": "okxxx2.com › search › indian-bhabhi",
-                "snippet_highlighted_words": [
-                    "bhabhi"
-                ]
-            },
-            {
-                "snippet": "Bhabhi Porn Videos! - Desi Bhabhi, Bhabhi Ki Chudai, Indian Bhabhi Porn - SpankBang. ... Bhabhi creampie Bhabhi blowjob Bhabhi indian bhabhi Bhabhi cumshot Bhabhi ...",
-                "thumbnail": null,
-                "favicon": "https://serpapi.com/searches/6632510566440ae477bdc65c/images/4e6498d6f7febba740fd47655c09c62ea37ff6e969065f87c96ae4326989c36b.png",
-                "link": "https://spankbang.party/s/bhabhi/",
-                "sitelinks": null,
-                "position": "6",
-                "source": "SpankBang",
-                "title": "Bhabhi Porn - Desi Bhabhi & Bhabhi Ki Chudai Videos",
-                "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://spankbang.party/s/bhabhi/&ved=2ahUKEwiqptSm1OyFAxWCr5UCHR2qAbMQFnoECBcQAQ",
-                "displayed_link": "spankbang.party › Watch",
-                "snippet_highlighted_words": [
-                    "Bhabhi Porn",
-                    "Bhabhi Porn"
-                ]
-            },
-            {
-                "snippet": "Watch Devar Bhabhi Chudiye tube sex video for free on xHamster, with the superior collection of Asian Indian, Housewife & Beauty HD porn ...",
-                "thumbnail": null,
-                "favicon": "https://serpapi.com/searches/6632510566440ae477bdc65c/images/4e6498d6f7febba740fd47655c09c62e41835364574a2a7c1b19adee5d5b9899.png",
-                "link": "https://xhamster.desi/videos/devar-bhabhi-chudiye-xh1fbMq",
-                "sitelinks": null,
-                "position": "7",
-                "source": "xhamster.desi",
-                "title": "Devar bhabhi chudiye - xHamster",
-                "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://xhamster.desi/videos/devar-bhabhi-chudiye-xh1fbMq&ved=2ahUKEwiqptSm1OyFAxWCr5UCHR2qAbMQFnoECBIQAQ",
-                "displayed_link": "xhamster.desi › videos › devar-bhabhi-chudiye-...",
-                "snippet_highlighted_words": [
-                    "Bhabhi",
-                    "porn"
-                ]
-            },
-            {
-                "snippet": "HELLO PORN - A must see porn tube. OK PORN - The best porn videos. OK XXX - Fast. Simple. HD. MAX PORN - Porn channels. HOMO XXX - GAY Porn Tube ...",
-                "thumbnail": null,
-                "favicon": "https://serpapi.com/searches/6632510566440ae477bdc65c/images/4e6498d6f7febba740fd47655c09c62e8f2613aa2167fba19570bc47d1c38ed4.png",
-                "link": "https://www.pornhat.one/video/verified-amateurs-desi-bhabhi-smut/",
-                "sitelinks": null,
-                "position": "8",
-                "source": "PornHat",
-                "title": "HD ▶️ video Verified Amateurs - desi bhabhi smut",
-                "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://www.pornhat.one/video/verified-amateurs-desi-bhabhi-smut/&ved=2ahUKEwiqptSm1OyFAxWCr5UCHR2qAbMQFnoECCoQAQ",
-                "displayed_link": "www.pornhat.one › video › verified-amateurs-de...",
-                "snippet_highlighted_words": [
-                    "PORN",
-                    "porn",
-                    "PORN",
-                    "porn",
-                    "PORN",
-                    "Porn",
-                    "Porn"
-                ]
-            },
-            {
-                "snippet": "Looking for the hottest Indian Bhabhi sex clips with the most popular porn stars? Then this free XXX tube is exactly what you need!",
-                "thumbnail": null,
-                "favicon": "https://serpapi.com/searches/6632510566440ae477bdc65c/images/4e6498d6f7febba740fd47655c09c62e9ad34f7a5bfe36d8d1a466444d649342.png",
-                "link": "https://zbporn.tv/search/indian+bhabhi/",
-                "sitelinks": null,
-                "position": "9",
-                "source": "ZBPorn",
-                "title": "Indian Bhabhi Porn Videos",
-                "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://zbporn.tv/search/indian%2Bbhabhi/&ved=2ahUKEwiqptSm1OyFAxWCr5UCHR2qAbMQFnoECCQQAQ",
-                "displayed_link": "zbporn.tv › search › indian+bhabhi",
-                "snippet_highlighted_words": [
-                    "Bhabhi",
-                    "porn"
-                ]
-            },
-            {
-                "snippet": "indian bhabhi porn videos - Porn TV is your source for free HQ porn videos. Porn TV offers more quality sex movies and hardcore porno than anyone ...",
-                "thumbnail": null,
-                "favicon": "https://serpapi.com/searches/6632510566440ae477bdc65c/images/4e6498d6f7febba740fd47655c09c62eb6e5f03a6195dd302aeedc2905523a1f.png",
-                "link": "https://www.porntv.com/search/a/indian%20bhabhi",
-                "sitelinks": null,
-                "position": "10",
-                "source": "Porn TV",
-                "title": "Indian Bhabhi Porn Videos",
-                "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://www.porntv.com/search/a/indian%2520bhabhi&ved=2ahUKEwiqptSm1OyFAxWCr5UCHR2qAbMQFnoECCUQAQ",
-                "displayed_link": "www.porntv.com › search › indian bhabhi",
-                "snippet_highlighted_words": [
-                    "bhabhi porn"
+                    "News",
+                    "Trump"
                 ]
             }
         ],
-        "twitterResults": {},
+        "twitterResults": null,
         "summary": null
     });
 }
@@ -305,7 +202,7 @@ app.post('/generateArticle', (req, res) => {
     // For simplicity, just return a static token
     new Promise(resolve => setTimeout(resolve, 10000));
 
-    res.json({ "title": "aaaaaaaaaaaaaaaaaaaaaaaaaf", "body":"Former cricketer Joginder Sharma – who gave a commendable performance against Pakistan in the final of the inaugural edition of the T20 World Cup in 2007 – is back in the news.\n" +
+    res.json({ "title": "Cricketer-turned-cop DSP Joginder Sharma back in news, now for announcing police action against ‘violent protestors", "body":"Former cricketer Joginder Sharma – who gave a commendable performance against Pakistan in the final of the inaugural edition of the T20 World Cup in 2007 – is back in the news.\n" +
             "\n" +
             "He hit the headlines after he was heard announcing that the Haryana Police shall initiate legal action and seek the cancellation of passports of those engaging in violence during the ongoing farmer protest at the Haryana-Punjab border.\n" +
             "\n" +

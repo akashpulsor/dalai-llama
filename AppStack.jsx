@@ -10,6 +10,7 @@ import LlamaContent from './component/llamaContent';
 import BuisnessLogin from './component/BuisnessLogin';
 import Payment from './component/Payment';
 import Account from './component/Account';
+import Search from './component/Search';
 import CustomHeader from './component/CustomHeader';
 import { NavigationContainer } from "@react-navigation/native";
 import { DrawerItemList } from "@react-navigation/drawer";
@@ -110,11 +111,30 @@ const HomeStack = () => {
       headerTitleStyle: {
         fontWeight: "bold"
       },
+      
       drawerLabelStyle: {
         color: "#111"
       }
     }}
-  >
+    >
+         <Drawer.Screen name="Search" component={Search} options={
+              {
+                headerTitle:"Search",
+                headerRight:()=>
+                    <DropDownPicker
+                        open={open}
+                        items={llmsData}
+                        setOpen={setOpen}
+                        value={llmValue}
+                        setValue={setLlmValue}
+                        placeholder={placeholder}
+                        dropDownStyle={{backgroundColor: '#fafafa'}}
+                        containerStyle={styles.LLM}
+                        onSelectItem={(item) => handleSelectItem(item)}
+                    />
+
+              }
+          } />
           <Drawer.Screen name="Tools" component={Tools} options={
               {
                 headerTitle:"Tools",
@@ -135,6 +155,7 @@ const HomeStack = () => {
           }/>
           <Drawer.Screen name="Account" component={Account} />
           <Drawer.Screen name="Payment" component={Payment} />
+          
       </Drawer.Navigator>
 
   );
