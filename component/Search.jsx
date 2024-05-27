@@ -201,18 +201,18 @@ const Search = ({tool}) => {
                                 
             </Modal>
 
-      {secondSearch && <View style={{flexDirection:'row',alignContent:"center",alignItems:"center",justifyContent:"center"}}>
-      <TextInput
-          style={[{height: 40,width:'60%',borderColor: 'gray',borderWidth: 1,padding:10,borderTopLeftRadius: 10,borderBottomLeftRadius: 10,padding:10, alignContent:"center",alignItems:"center"}]}
-          placeholder="Ask me any thing.."
-          onChangeText={(text) => setSearchQuery(text)}
-          maxLength={100}
-      />
+        {secondSearch && <View style={{flexDirection:'row', flexGrow:"1",alignContent:"center",alignItems:"center",justifyContent:"center"}}>
+        <TextInput
+            style={[{height: 40,width:'60%',borderColor: 'gray',borderWidth: 1,padding:10,borderTopLeftRadius: 10,borderBottomLeftRadius: 10, alignContent:"center",alignItems:"center"}]}
+            placeholder="Ask me any thing.."
+            onChangeText={(text) => setSearchQuery(text)}
+            maxLength={100}
+        />
 
-      <TouchableOpacity onPress={() => {handleSearchPress1()}} style={{ backgroundColor: '#0092ca', padding: 10, borderTopRightRadius: 10,borderBottomRightRadius: 10, height: 40, width:'10%',alignSelf:'center' }}>
-        <Text style={{ color: 'white', textAlign: 'center',fontWeight:'bold' }}>Search</Text>
-      </TouchableOpacity>
-      </View>}      
+        <TouchableOpacity onPress={() => {handleSearchPress1()}} style={{ backgroundColor: '#0092ca', padding: 10, borderTopRightRadius: 10,borderBottomRightRadius: 10, height: 40, width:'10%',alignSelf:'center' }}>
+          <Text style={{ color: 'white', textAlign: 'center',fontWeight:'bold' }}>Search</Text>
+        </TouchableOpacity>
+        </View>}      
     </View>
   );
 };
