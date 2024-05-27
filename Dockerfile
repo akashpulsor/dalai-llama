@@ -1,3 +1,5 @@
+
+
 # pull base image
 FROM node:14.13.1-buster-slim
 
@@ -18,16 +20,16 @@ RUN npm i --unsafe-perm --allow-root -g npm@latest expo-cli@latest
 
 # install dependencies first, in a different location for easier app bind mounting for local development
 # due to default /opt permissions we have to create the dir with root and change perms
-RUN mkdir /opt/react_native_app
-WORKDIR /opt/react_native_app
-ENV PATH /opt/react_native_app/.bin:$PATH
-COPY ./react_native_app/package.json ./react_native_app/package-lock.json ./
+RUN mkdir /opt/dalai-llama
+WORKDIR /opt/dalai-llama
+ENV PATH /opt/dalai-llama/.bin:$PATH
+COPY ./dalai-llama/package.json ./dalai-llama/package-lock.json ./
 RUN npm install
 
 # copy in our source code last, as it changes the most
-WORKDIR /opt/react_native_app/app
+WORKDIR /opt/dalai-llama/app
 # for development, we bind mount volumes; comment out for production
-COPY ./react_native_app .
+COPY ./dalai-llama .
 
 ENTRYPOINT ["npm", "run"]
 CMD ["web"]
