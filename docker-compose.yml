@@ -14,9 +14,9 @@ services:
       - '19001:19001'
       - '19002:19002'
     volumes:
-      - ./dalai-llama:/app/dalai-llama:delegated
-      - ./dalai-llama/package.json:/app/dalai-llama/package.json
-      - ./dalai-llama/package-lock.json:/app/dalai-llama/package-lock.json
+      - $(pwd)/dalai-llama:/app/dalai-llama:delegated
+      - $(pwd)/dalai-llama/package.json:/app/dalai-llama/package.json
+      - ($pwd)/dalai-llama/package-lock.json:/app/dalai-llama/package-lock.json
       - notused:/app/dalai-llama/app/node_modules
     healthcheck:
       disable: true
