@@ -17,7 +17,7 @@ RUN npm i --unsafe-perm -g npm@latest expo-cli@latest @expo/webpack-config@lates
 COPY package*.json ./dalai-llama/
 
 WORKDIR /app/dalai-llama
-
+RUN yarn add expo
 RUN npm install
 
 COPY . ./*

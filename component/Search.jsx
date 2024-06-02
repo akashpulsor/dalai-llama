@@ -5,8 +5,6 @@ import styles from '../styles';// Create your functional component
 import { ScrollView } from 'react-native-web';
 import Toast from 'react-native-toast-message';
 import { WebView } from 'react-native-webview';
-import { Checkbox } from 'react-native-paper';
-import NestedCheckbox from './NestedCheckBox';
 import {useSearchMutation} from './authApi';
 import {useSelector} from "react-redux";
 import {selectedLLm, selectUser} from "./authSlice";

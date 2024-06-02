@@ -4,7 +4,7 @@ import { View, Text, TextInput, TouchableOpacity, Dimensions, FlatList, Activity
 import styles from '../styles';// Create your functional component
 import { ScrollView } from 'react-native-web';
 import Toast from 'react-native-toast-message';
-import NestedCheckbox from './NestedCheckBox';
+import NestedCheckbox from './NestedCheckbox';
 import { Checkbox } from 'react-native-paper';
 import {useLoginWordpressMutation,useGenerateArticleMutation,useGenerateStructureMutation,useSaveArticleMutation, useGenerateTagsMutation,usePublishMutation} from './authApi';
 import {useSelector} from "react-redux";
