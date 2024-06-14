@@ -8,6 +8,7 @@ import Tools from './component/tools';
 import llamaSeo from './component/llamaSeo';
 import LlamaContent from './component/llamaContent';
 import BuisnessLogin from './component/BuisnessLogin';
+import DalaiLLamaSearch from './component/DalaiLLamaSearch';
 import Payment from './component/Payment';
 import Account from './component/Account';
 import Search from './component/Search';
@@ -166,7 +167,7 @@ const HomeStack = () => {
 const AuthStack = () => {
   return (
     <Auth.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
-      <Auth.Screen name="Login" component={BuisnessLogin} options={{headerShown:false}}/>
+      <Auth.Screen name="Login" component={DalaiLLamaSearch} options={{headerShown:false}}/>
     </Auth.Navigator>
   );
 }
