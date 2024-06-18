@@ -11,7 +11,8 @@ import BuisnessLogin from './component/BuisnessLogin';
 import DalaiLLamaSearch from './component/DalaiLLamaSearch';
 import Payment from './component/Payment';
 import Account from './component/Account';
-import Search from './component/Search';
+import Search from './component/SearchV2';
+
 import CustomHeader from './component/CustomHeader';
 import { NavigationContainer } from "@react-navigation/native";
 import { DrawerItemList } from "@react-navigation/drawer";
@@ -84,13 +85,13 @@ const HomeStack = () => {
                   fontWeight: "bold",
                   color: "#111"
                 }}
-              >{user.userName}</Text>
+              >{user.name}</Text>
               <Text
                 style={{
                   fontSize: 16,
                   color: "#111"
                 }}
-              >Product Manager</Text>
+              >{user.name}</Text>
             </View>
             <DrawerItemList {...props} />
             

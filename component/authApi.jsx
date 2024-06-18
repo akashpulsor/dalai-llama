@@ -35,10 +35,13 @@ export const authApi = createApi({
       method: 'POST', // Adjust this according to your API
     }),
     register: builder.mutation({
-      query: ({ name, email, password,companyName }) => ({
+      query: ({email,
+        name,
+        phone,
+        password}) => ({
         url: '/register',
         method: 'POST',
-        body: { "username":name, "email":email, "password":password,"companyName":companyName },
+        body: { "name":name, "email":email, "password":password,"phone":phone },
       }),
       onSuccess: (response, { dispatch }) => {
         dispatch(setToken(response.data.token)); // Set token in state
