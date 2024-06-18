@@ -625,6 +625,11 @@ const styles = StyleSheet.create({
   headerStyle: {
     backgroundColor: '#333',
   },
+  Searchlogo: {
+    width: 200,
+    height: 300,
+    alignSelf:'center'
+  }
 });
 
 export default styles;

@@ -10,6 +10,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import {setToken, setUser, setTools, setLlm, setSelectedLlm, selectUser, selectedLLm} from "./authSlice";
 import LlamaContent from "./llamaContent";
 import Search from './Search';
+
+import SearchV2 from './SearchV2';
 const Tools = ({ navigation }) => {
   const { data: toolsData, error: toolsError, isLoading: toolsLoading } = useGetToolsQuery();
   const selectedLlm =  useSelector(selectedLLm);
@@ -44,7 +46,6 @@ const Tools = ({ navigation }) => {
         setCurrentTool(null);
     }
   const renderCard = ({ item }) =>{
-    console.log("AKASH"+item.name);
     return (
       <View style={{margin:10}}>
           <TouchableOpacity style={styles.card} onPress={() =>  renderTool(item.name)} disabled={!item.active}>
@@ -92,7 +93,7 @@ const Tools = ({ navigation }) => {
             </TouchableOpacity>
             {contentFlag && <LlamaContent tool={currentTool}/>}
 
-            {searchFlag && <Search tool={currentTool}/>}
+            {searchFlag && <SearchV2 tool={currentTool}/>}
         </View>}
     </View>
   );
