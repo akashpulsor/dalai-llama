@@ -1,11 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
-import Home from './component/home';
 import styles from './styles';
-import BuisnessLogin from './component/BuisnessLogin';
-import BuisnessSignUp from './component/BuisnessSignUp';
-import Tools from './component/tools';
-import LlamaSeo from './component/llamaSeo';
 import  FlashMessage from "react-native-flash-message";
 import {NavigationContainer} from '@react-navigation/native';
 import AppStack from './AppStack';

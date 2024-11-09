@@ -8,8 +8,8 @@ import {useDispatch, useSelector} from "react-redux"; // Import navigation hook 
 const screenWidth = Dimensions.get('window').width;
 import { MaterialIcons } from '@expo/vector-icons';
 import {setToken, setUser, setTools, setLlm, setSelectedLlm, selectUser, selectedLLm} from "./authSlice";
-import LlamaContent from "./llamaContent";
-import Search from './Search';
+
+
 
 import SearchV2 from './SearchV2';
 const Tools = ({ navigation }) => {

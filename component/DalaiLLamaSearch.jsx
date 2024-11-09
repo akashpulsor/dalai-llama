@@ -141,7 +141,7 @@ const DalaiLLamaSearch = ({navigation}) => {
     shadowRadius: 4,
     elevation: 5,}]} />
             <Text style={{ color:'#ffffff',fontSize: 50, fontWeight: 'bold', alignSelf:'center' }}>
-                    DALAI LLAMA 
+                    DALAI LLAMAAAA
             </Text>
         </View>
         
