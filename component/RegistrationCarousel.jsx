@@ -15,6 +15,7 @@ import PhoneInput from 'react-native-phone-number-input';
 import DropDownPicker from 'react-native-dropdown-picker';
 import CountryCodeDropdownPicker from 'react-native-dropdown-country-picker';
 import Button from './Button';
+import { useGetCompanySizeQuery } from './authApi';
 
 const { width } = Dimensions.get('window');
 
@@ -87,16 +88,10 @@ const RegistrationCarousel = () => {
 
   }
   
-
+  const  { data: companyData, isLoading: isCompanySizeLoading, isSucccess: isCompanySizeSuccess, isError: isCompanySizeError, eror: companySizeerror } = useGetCompanySizeQuery();
   const [showCompanySize, setShowCompanySize] = useState(false);
   const [companySizeValue, setCompanySizeValue] = useState('');
-  const [data, setData] = useState([
-    {label:'0 - 100', value:'1'},
-    {label:'100 - 500', value:'2'},
-    {label:'500 - 1000', value:'3'},
-    {label:'1000 - 5000', value:'4'},
-    {label:'5000 - 10000', value:'5'},
-  ]);
+
   
 
   const handleCompanySizeSelect = (item) => {
@@ -109,7 +104,7 @@ const RegistrationCarousel = () => {
     console.log("Dhanya");
     console.log(companySizeValue);
   };
-
+  const [data, setData] = useState(companyData);
 
 
 
@@ -233,6 +228,7 @@ const RegistrationCarousel = () => {
                 zIndex: 2, // higher than other elements
                 position: 'relative',
             }}>
+
                 <DropDownPicker
                     open={showCompanySize}
                     value={companySizeValue}
@@ -271,6 +267,7 @@ const RegistrationCarousel = () => {
                     placeholderStyle={styles.dropdownPlaceholder}
                 />   
             </View> 
+
           <ProgressBar progress={sectionProgress.section2} />
         </View>
       ),

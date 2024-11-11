@@ -34,27 +34,6 @@ const Home = ({navigation}) => {
     const [email, setEmail] = useState({ value: '', error: '' })
     const [password, setPassword] = useState({ value: '', error: '' })
     const [modalVisible, setModalVisible] = useState(false);
-    const [progress, setProgress] = useState(0);
-    const [formData, setFormData] = useState({
-      name: '',
-      email: '',
-      phone: '',
-      whatsapp: '',
-  
-      countryCode: 'US',
-      countryCallingCode: '1',
-  
-      companyName: '',
-      companySize: '',
-      activityDescription:'',
-  
-      password: '',
-      confirmPassword: '',
-    });
-
-
-
-
     const [showResetPassword, setShowResetPassword] = useState(false);
     const [showVerifyCode, setShowVerifyCode] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);

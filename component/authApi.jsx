@@ -6,7 +6,7 @@ export const authApi = createApi({
   reducerPath: 'authApi',
   //https://api.dalai-llama.com
   baseQuery: fetchBaseQuery(
-      { baseUrl: 'http://localhost:3000' }),
+      { baseUrl: 'http://localhost:8080/api' }),
   tagTypes: ['Login'],
   prepareHeaders: async (headers, { getState }) => {
     // Get the token from state
@@ -20,7 +20,7 @@ export const authApi = createApi({
   endpoints: builder => ({
     login: builder.mutation({
       query: ({ email, password }) => ({
-        url: '/login',
+        url: '/auth/login',
         method: 'POST',
         body: { "email": email, "password": password },
       }),
@@ -30,31 +30,53 @@ export const authApi = createApi({
       },
       invalidatesTags: ['Login'],
     }),
+
+
     refreshToken: builder.query({
-      query: () => '/refreshToken',
+      query: () => '/auth/refreshToken',
       method: 'POST', // Adjust this according to your API
     }),
     register: builder.mutation({
       query: ({email,
         name,
         phone,
-        password}) => ({
-        url: '/register',
+        password,countryCallingCode, countryCode, companySize }) => ({
+        url: '/auth/register',
         method: 'POST',
-        body: { "name":name, "email":email, "password":password,"phone":phone },
+        body: { "name":name, "businessName":businessName, "email": email,"password":password,"mobile": phone,
+          "countryCallingCode": countryCallingCode, "countryCode": countryCode, "companySize":companySize},
       }),
       onSuccess: (response, { dispatch }) => {
-        dispatch(setToken(response.data.token)); // Set token in state
+        dispatch(setToken(response.loginResponseDto.accessToken)); // Set token in state
       },
     }),
+    verificationCode: builder.mutation({
+      query: ({email}) => ({
+        url: '/auth/verification-code',
+        method: 'POST',
+        body: {  "email": email}
+          
+      })
+    }),
+    updatePassword: builder.mutation({
+      query: ({email}) => ({
+        url: '/auth/update-password',
+        method: 'POST',
+        body: {  "email": email,"oldPassword": oldPassword, "newPassword": newPassword}
+      })
+    }),
+
     logout: builder.mutation({
       query: () => ({
-        url: '/logout',
+        url: '/auth/logout',
         method: 'POST',
       }),
       onQueryStarted: (mutation, { dispatch }) => {
         dispatch(clearAuth()); // Clear user data and token from state
       },
+    }),
+    getCompanySize: builder.query({
+      query: () => '/auth/company-size',
     }),
     getHistory: builder.query({
       query: (userId) => `/getHistory/${userId}`,
@@ -155,8 +177,8 @@ export const authApi = createApi({
   }),
 });
 
-export const { useLoginMutation, useRegisterMutation, 
-  useLogoutMutation, useGetHistoryQuery, 
+export const { useLoginMutation, useRegisterMutation, useVerificationCodeMutation,useUpdatePasswordMutation,
+  useLogoutMutation, useGetHistoryQuery, useGetCompanySizeQuery,
   useGetUserQuery, useUpdateUserMutation, useGetToolsQuery, useGetLlmQuery, useGenerateStructureMutation,
   useGenerateArticleMutation, useSaveArticleMutation, useGenerateTagsMutation, usePublishMutation, 
   useLoginWordpressMutation, useGetPriceMutation,useAddCreditMutation, useRefreshTokenQuery, useSearchMutation } = authApi;
