@@ -58,6 +58,14 @@ export const authApi = createApi({
           
       })
     }),
+    validateCode: builder.mutation({
+      query: ({email, verificationCode}) => ({
+        url: '/auth/verify-code',
+        method: 'POST',
+        body: {  "email": email,"verificationCode":verificationCode}
+          
+      })
+    }),
     updatePassword: builder.mutation({
       query: ({email}) => ({
         url: '/auth/update-password',
@@ -177,7 +185,7 @@ export const authApi = createApi({
   }),
 });
 
-export const { useLoginMutation, useRegisterMutation, useVerificationCodeMutation,useUpdatePasswordMutation,
+export const { useLoginMutation, useRegisterMutation, useVerificationCodeMutation,useValidateCodeMutation,useUpdatePasswordMutation,
   useLogoutMutation, useGetHistoryQuery, useGetCompanySizeQuery,
   useGetUserQuery, useUpdateUserMutation, useGetToolsQuery, useGetLlmQuery, useGenerateStructureMutation,
   useGenerateArticleMutation, useSaveArticleMutation, useGenerateTagsMutation, usePublishMutation, 

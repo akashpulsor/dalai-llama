@@ -37,7 +37,7 @@ const Home = ({navigation}) => {
     const [showResetPassword, setShowResetPassword] = useState(false);
     const [showVerifyCode, setShowVerifyCode] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
-
+    const [showVerificationEmail, setShowVerificationEmail] = useState(false);
 
     const onLoginPressed = () => {
       const emailError = emailValidator(email.value)
@@ -171,7 +171,7 @@ const Home = ({navigation}) => {
 
                           <View style={[styles.modalView,{backgroundColor:'#d3d3d3'}]}>
                           <Image source={require('../assets/search-logo.png')} style={styles.Searchlogo} />   
-                              <ResetPassword onClose={handleResetPasswordModalClose} verifyCodeModal={setShowVerifyCode}/>
+                              <ResetPassword onClose={handleResetPasswordModalClose} verificationEmail={setShowVerificationEmail} verifyCodeModal={setShowVerifyCode}/>
                         </View>
                       </View>
                       
