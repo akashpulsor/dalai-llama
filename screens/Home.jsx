@@ -1,6 +1,6 @@
 // Import necessary components from React Native
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity,TouchableWithoutFeedback,  Modal, ActivityIndicator,Image } from 'react-native';
+import { View, Text, TouchableOpacity,TouchableWithoutFeedback, TextInput, Modal, ActivityIndicator,Image } from 'react-native';
 import styles from '../styles';
 import { useDispatch } from 'react-redux';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -12,7 +12,7 @@ import {setToken,setUser} from "../component/authSlice";
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import {selectIsLoggedIn} from '../component/authSlice';
 import Toast from 'react-native-toast-message';
-import TextInput from '../component/TextInput';
+
 import { emailValidator } from '../helper/emailValidator'
 import { passwordValidator } from '../helper/passwordValidator'
 import Button from '../component/Button';
@@ -22,35 +22,42 @@ import PhoneInput from "react-native-phone-number-input";
 import InputCode from '../component/InputCode';
 import NewPassword from '../component/NewPassword';
 
-const ProgressBar = ({ progress }) => (
-  <View style={styles.progressBarContainer}>
-    <View style={[styles.progressBar, { width: `${progress}%`, backgroundColor: progress === 100 ? '#34C759' : '#007AFF' }]} />
-  </View>
-);
+
 
 // Create your functional component
 const Home = ({navigation}) => {
 
-    const [email, setEmail] = useState({ value: '', error: '' })
-    const [password, setPassword] = useState({ value: '', error: '' })
+    const [email, setEmail] = useState('')
+    const [emailError, setEmailError] = useState('')
+    const [password, setPassword] = useState('')
+    const [passwordError, setPasswordError] = useState('');
     const [modalVisible, setModalVisible] = useState(false);
+    const [showError, setShowError] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
     const [showResetPassword, setShowResetPassword] = useState(false);
     const [showVerifyCode, setShowVerifyCode] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showVerificationEmail, setShowVerificationEmail] = useState(false);
+    const [loginMutation, { data: loginData, isLoading:isLoginLoading, isSuccess:isLoginSuccess, isError:isLoginError, error:loginError }] = useLoginMutation();
 
-    const onLoginPressed = () => {
-      const emailError = emailValidator(email.value)
-      const passwordError = passwordValidator(password.value)
-      if (emailError || passwordError) {
-        setEmail({ ...email, error: emailError })
-        setPassword({ ...password, error: passwordError })
+    useEffect(() => {
+     if (isLoginError) {
+        setShowError(true);
+        setErrorMessage(showError || 'Please try again after sometime.');
+      }
+    }, [isLoginLoading, isLoginSuccess, isLoginError,loginError, errorMessage, showError]);
+
+    const onLoginPress = async () => {
+      const emailError = emailValidator(email)
+      if (emailError) {
+        setShowError(true);
+        setErrorMessage(emailError)
         return
       }
-      /**
-       * 
-       * add login mutation
-       */
+      let body = {"userName": email, "password": password};
+      body = JSON.stringify(body);
+      console.log(body);
+      await loginMutation(body);
     }
 
     const handleModalClose = () => {
@@ -99,44 +106,82 @@ const Home = ({navigation}) => {
             <Text style={{ color:'#ffffff',fontSize: 50, fontWeight: 'bold', alignSelf:'center' }}>
                     DALAI LLAMA
             </Text>
-            <View style={{ width:'50%', marginLeft:'25%',}}>
-                  <TextInput
-                      label="Email"
-                      returnKeyType="next"
-                      value={email.value}
-                      onChangeText={(text) => setEmail({ value: text, error: '' })}
-                      error={!!email.error}
-                      errorText={email.error}
-                      autoCapitalize="none"
-                      autoCompleteType="email"
-                      textContentType="emailAddress"
-                      keyboardType="email-address"
-                />
-                <TextInput
-                    label="Password"
-                    returnKeyType="done"
-                    value={password.value}
-                    onChangeText={(text) => setPassword({ value: text, error: '' })}
-                    error={!!password.error}
-                    errorText={password.error}
-                    secureTextEntry
-                /> 
-            </View>    
-            
-        <View style={[{flexDirection:'row', alignItems:'center',marginLeft:'30%'}]}>
-
-           <View style={{ width:'20%',margin:'5%',height:'90%'}}>
-              <Button mode="contained" onPress={onLoginPressed}>
-                Login
-              </Button>
-            </View>          
-
-                
-            <View style={{width:'20%',margin:'5%',height:'90%'}}>
-              <Button mode="contained" onPress={handleRegisterPress}>
-                Register
-              </Button>
+            <View style={{ width:'10%', height:'10%', position:'absolute',marginLeft:'45%', height:'10%'}}>
+                {isLoginLoading ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="large" color="#0000ff" />
+                    </View>
+                  ) : (
+                    <View></View>
+                  )}
             </View>
+
+            <View style={{ width:'50%', height:'30%', marginLeft:'25%',alignItems:'center'}}>
+                  <View style={{ width:'90%', height:'35%', margin:'1%'}}>
+                          <TextInput
+                          style={[styles.input,{width:'100%',height:'100%'}, emailError ? styles.inputError : null]}
+                          value={email}
+                          onChangeText={(text) => {
+                            setEmail(text);
+                          }}
+                          placeholder="Registered Email"
+                          editable={!isLoginLoading}
+                      />
+                      {showError && emailError ? (
+                        <Text style={styles.errorText}>
+                          {emailError.split(' ').reduce((acc, word, index) => {
+                            if (index > 0 && index % 3 === 0) {
+                              acc.push(<Text key={index}>{`${word} `}</Text>);
+                            } else {
+                              acc.push(<Text key={index}>{`${word} `}</Text>);
+                            }
+                            return acc;
+                          }, [])}
+                        </Text>
+                      ) : null}         
+                  </View>
+
+                  <View style={{ width:'90%', height:'35%', margin:'1%'}}>
+                        <TextInput
+                                  style={[styles.input,{width:'100%',height:'100%'}, passwordError ? styles.inputError : null]}
+                                  value={password}
+                                  onChangeText={setPassword}
+                                  placeholder="Password"
+                                  secureTextEntry
+                                  editable={!isLoginLoading}
+                              />
+                  </View>
+                  <View style={[{flexDirection:'row', alignItems:'center',marginRight:'10%'}]}>
+
+                      <View style={{ width:'50%',margin:'5%',height:'90%'}}>
+                        <Button mode="contained" onPress={onLoginPress} disabled={isLoginLoading}>
+                          Login
+                        </Button>
+                      </View>          
+
+                          
+                      <View style={{width:'50%',margin:'5%',height:'90%'}}>
+                        <Button mode="contained" onPress={handleRegisterPress} disabled={isLoginLoading}>
+                          Register
+                        </Button>
+                      </View>
+
+                      <View style={{justifyContent:'center', marginTop:'3%'}}>
+                        <TouchableOpacity onPress={() =>  handleResetPasswordPress()}>
+                            <Text style={{ fontSize: 10, color: 'blue' }}>Reset Password</Text>
+                        </TouchableOpacity>
+                      </View>
+                  </View>
+                     
+            </View>
+
+
+
+      
+            
+        
+           
+            
 
                   <Modal
                         animationType="slide"
@@ -190,7 +235,7 @@ const Home = ({navigation}) => {
 
                           <View style={[styles.modalView,{backgroundColor:'#d3d3d3'}]}>
                           <Image source={require('../assets/search-logo.png')} style={styles.Searchlogo} />   
-                              <InputCode onClose={handleVerifyCodeModalClose} showNewPasswordModal={setShowNewPassword}/>
+                              <InputCode onClose={handleVerifyCodeModalClose} verificationEmail= {showVerificationEmail} showNewPasswordModal={setShowNewPassword}/>
                         </View>
                       </View>
                       
@@ -215,14 +260,9 @@ const Home = ({navigation}) => {
                       </View>
                       
                   </Modal>
-                  <View style={{justifyContent:'center'}}>
-                    <TouchableOpacity onPress={() =>  handleResetPasswordPress()}>
-                        <Text style={{ fontSize: 10, color: 'blue' }}>Reset Password</Text>
-                    </TouchableOpacity>
-                      
-                  </View>
+
                   
-        </View>
+
 
 
                     
@@ -233,3 +273,5 @@ const Home = ({navigation}) => {
 
 // Export the component
 export default Home;
+
+

@@ -5,17 +5,17 @@ import {
   TextInput,
   StyleSheet,
   Dimensions,
-  TouchableOpacity,
+  TouchableOpacity, ActivityIndicator,
   ScrollView,
   Animated,
 } from 'react-native';
-import CountryPicker from 'react-native-country-picker-modal'
-import PhoneInput from 'react-native-phone-number-input';
 
 import DropDownPicker from 'react-native-dropdown-picker';
-import CountryCodeDropdownPicker from 'react-native-dropdown-country-picker';
+import CountryCodeDropdownPicker from './CountryCodeDropdownPicker';
 import Button from './Button';
-import { useGetCompanySizeQuery } from './authApi';
+import { useGetCompanySizeQuery, useRegisterMutation } from './authApi';
+import Error from './Error';
+import countryData from '../helper/countryData';
 
 const { width } = Dimensions.get('window');
 
@@ -48,6 +48,9 @@ const RegistrationCarousel = () => {
   const [countryCallingCode, setCountryCallingCode] = useState('+1');
   const [countryCode, setCountryCode] = useState('US');
   const [phone, setPhone] = useState('');
+  const [showError, setShowError] = useState(false);
+  const [errorText, setErrorText] = useState('');
+
 
   const [sectionProgress, setSectionProgress] = useState({
     section1: 0,
@@ -58,6 +61,9 @@ const RegistrationCarousel = () => {
   const scrollX = useRef(new Animated.Value(0)).current;
   const slidesRef = useRef(null);
 
+  const [registerMutation, { data: registerData, isLoading:isRegistrationLoading, isSuccess:isRegistrationSuccess, isError:isRegistrationError, error:registrationError }] = useRegisterMutation();
+  const  { data: companyData, isLoading: isCompanySizeLoading, isSuccess: isCompanySizeSuccess, isError: isCompanySizeError, error: companySizeerror } = useGetCompanySizeQuery();
+  const [data, setData] = useState(companyData);
   const calculateSectionProgress = () => {
     // Section 1 Progress (Personal Information)
     const section1Fields = ['name','email', 'phone'];
@@ -80,33 +86,63 @@ const RegistrationCarousel = () => {
 
   useEffect(() => {
     calculateSectionProgress();
-  }, [formData]);
+    if(isRegistrationError){
+        console.log(registrationError);
+        setShowError(true);
+        setErrorText(registrationError);
+    }
+
+    if(isCompanySizeSuccess) {
+        setData(companyData);
+    }
+  }, [formData,isRegistrationLoading, isRegistrationSuccess, isRegistrationError, companyData, isCompanySizeLoading, isCompanySizeSuccess, isCompanySizeError,  companySizeerror]);
 
   const totalProgress = (sectionProgress.section1 + sectionProgress.section2 + sectionProgress.section3) / 3;
 
-  const onRegisterationPress =() =>{
+  const onRegisterationPress = async () =>{
+    try {
+        console.log(countryCode);
+        let body = {
+            
+                "name":formData.name,
+                "businessName":formData.companyName,
+                "email": formData.email,
+                "password":formData.password,
+                "mobile": phone,
+                "countryCallingCode": countryCallingCode,
+                "countryCode": countryCode,
+                "companySize":companySizeValue,
+                "basicActivityDescription": formData.activityDescription
+         
+        }
+        
+        body = JSON.stringify(body);
 
+        await registerMutation(body);
+      } catch (e) {
+        setShowError(true);
+        console.log(e);
+        setErrorText('An error occurred. Please try again.');
+      }
   }
+
+
   
-  const  { data: companyData, isLoading: isCompanySizeLoading, isSucccess: isCompanySizeSuccess, isError: isCompanySizeError, eror: companySizeerror } = useGetCompanySizeQuery();
+
   const [showCompanySize, setShowCompanySize] = useState(false);
   const [companySizeValue, setCompanySizeValue] = useState('');
 
-  
 
-  const handleCompanySizeSelect = (item) => {
 
-    setCompanySizeValue(item.value);
-    setFormData((prevFormData) => ({
-      ...prevFormData,
-      companySize: item.value,
-    }));
-    console.log("Dhanya");
-    console.log(companySizeValue);
+  const handleCountrySelect = (selectedCountryCode) => {
+    // Find the selected country from countryData
+    const selectedCountry = countryData.find(item => item.code === selectedCountryCode);
+    if (selectedCountry) {
+        console.log("BBBBBB" + selectedCountry.country);
+      setCountryCode(selectedCountry.country);    // Set the country code (e.g., 'US')
+      setCountryCallingCode(selectedCountry.code);    // Set the calling code (e.g., '+1')
+    }
   };
-  const [data, setData] = useState(companyData);
-
-
 
   
   const slides = [
@@ -114,6 +150,7 @@ const RegistrationCarousel = () => {
       title: 'Personal Information',
       content: (
         <View style={styles.slideContent}>
+            
             <View style={{
     height: 50, 
     width: '120%',
@@ -139,48 +176,23 @@ const RegistrationCarousel = () => {
                 <TextInput
                 style={[styles.input,{width:'100%'}]}
                 value={formData.email}
-                onChangeText={(text) => setFormData({ ...formData, name: text })}
+                onChangeText={(text) => setFormData({ ...formData, email: text })}
                 placeholder="Enter your  email"
             />
             </View>
           
          <View style={{
-    width: '120%',
+    width: '100%',
     height: 50, // same height as other inputs
     marginBottom: 10,
     zIndex: 2, // higher than other elements
     position: 'relative',
-  }}>
-            <CountryCodeDropdownPicker
-                        selected={countryCallingCode} 
-                        setSelected={setCountryCallingCode}
-                        setCountryDetails={setCountryCode}
-                        phone={phone} 
-                        setPhone={setPhone}
-                        countryCodeTextStyles={{fontSize: 13}}
-                        countryCodeContainerStyles={[styles.input,{backgroundColor:'#d3d3d3'}]}
-                        searchStyles={[styles.input,{width:'100%'}]}
-                        phoneStyles={[styles.input,{width:'100%'}]}
-                        searchTextStyles= {[styles.input,{width:'100%'}]}
-             
-                        dropdownStyles={{
-                            width: '100%',
-                            position: 'absolute',
-                            top: '100%', // Position right below the input
-                            left: 0,
-                            backgroundColor: '#d3d3d3',
-                            borderWidth: 1,
-                            borderColor: '#ccc',
-                            zIndex: 999,
-                            maxHeight: '100vh', // This will make it stretch to the bottom of the view
-                            overflow: 'auto'
-                          }}
-            
-            />   
+  }}> 
+                      <CountryCodeDropdownPicker
+                onSelectCountry={handleCountrySelect}
+                value={phone}
+                onChangeText={setPhone}/>
          </View>
-         
-
-                
           <ProgressBar progress={sectionProgress.section1} />
         </View>
       ),
@@ -277,6 +289,8 @@ const RegistrationCarousel = () => {
       title: 'Account Set Up',
       content: (
         <View style={styles.slideContent}>
+            {showError && <Error errorText={errorText}/>}
+            {isRegistrationSuccess && <Text style={{color:"green"}}>Registered SuccessFully</Text> }
             <View style={{
                     width: '160%',
                 height: 50, 
@@ -310,8 +324,15 @@ const RegistrationCarousel = () => {
                 />
             </View>
 
-        
-            <Button mode="contained" onPress={onRegisterationPress}>Register</Button>
+      {isRegistrationLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#0000ff" />
+        </View>
+      ) : (
+        <Button mode="contained" onPress={onRegisterationPress} disabled={isRegistrationLoading}>
+          Register
+        </Button>
+      )}
           
             <ProgressBar progress={sectionProgress.section3} />
         </View>
@@ -325,10 +346,7 @@ const RegistrationCarousel = () => {
     setActiveIndex(index);
   };
 
-  const handleSubmit = () => {
-    console.log('Form submitted:', formData);
-    // Add your form submission logic here
-  };
+
 
   return (
     <View style={styles.centeredView}>
@@ -416,7 +434,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop:8,
     borderColor: 'white',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 12,
     marginBottom: 12,
     fontSize: 16,
@@ -520,6 +538,9 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     zIndex: 999,
   },
+  loadingContainer: {
+    marginVertical: 20,
+  }
 });
 
 export default RegistrationCarousel;

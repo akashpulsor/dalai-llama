@@ -19,10 +19,13 @@ export const authApi = createApi({
   },
   endpoints: builder => ({
     login: builder.mutation({
-      query: ({ email, password }) => ({
+      query: (data) => ({
         url: '/auth/login',
         method: 'POST',
-        body: { "email": email, "password": password },
+        headers: {
+          'Content-Type': 'application/json', // Ensure this is set correctly
+        },
+        body: data,
       }),
       prepareHeaders: (headers, { getState }) => {
         // Don't include token for login request
@@ -37,25 +40,25 @@ export const authApi = createApi({
       method: 'POST', // Adjust this according to your API
     }),
     register: builder.mutation({
-      query: ({email,
-        name,
-        phone,
-        password,countryCallingCode, countryCode, companySize }) => ({
+      query: (data) => ({
         url: '/auth/register',
         method: 'POST',
-        body: { "name":name, "businessName":businessName, "email": email,"password":password,"mobile": phone,
-          "countryCallingCode": countryCallingCode, "countryCode": countryCode, "companySize":companySize},
-      }),
+        headers: {
+          'Content-Type': 'application/json', // Ensure this is set correctly
+        },
+        body: data}),
       onSuccess: (response, { dispatch }) => {
         dispatch(setToken(response.loginResponseDto.accessToken)); // Set token in state
       },
     }),
     verificationCode: builder.mutation({
-      query: ({email}) => ({
+      query: (data) => ({
         url: '/auth/verification-code',
         method: 'POST',
-        body: {  "email": email}
-          
+        body: data,
+        headers: {
+          'Content-Type': 'application/json', // Ensure this is set correctly
+        }  
       })
     }),
     validateCode: builder.mutation({

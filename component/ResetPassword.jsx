@@ -38,7 +38,12 @@ const ResetPassword = ({ onClose, verificationEmail, verifyCodeModal }) => {
     let validEmail = emailValidator(email);
     if (validEmail === '') {
       setEmailError('');
-      await sendVerificationCode({ email });
+              let body = {
+                "email": email,
+        }
+        body = JSON.stringify(body);  
+        console.log("temp" + body);
+      await sendVerificationCode(body);
     } else {
       setEmailError(validEmail);
     }
