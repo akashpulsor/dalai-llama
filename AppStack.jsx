@@ -11,7 +11,15 @@ import { useDispatch } from 'react-redux';
 import {useGetLlmQuery, useLoginMutation} from './component/authApi';
 import {selectIsLoggedIn, selectLlmData, selectUser, setLlm, setSelectedLlm} from './component/authSlice';
 import DropDownPicker from "react-native-dropdown-picker";
+import User from "./assets/wordpress-logo.png";
 import Home from './screens/Home';
+import Dashboard from './screens/Dashboard';
+import Agents from './screens/Agents';
+import Business from './screens/Business';
+import CampaignLogs from './screens/CampaignLogs';
+import Campaigns from './screens/Campaigns';
+import CallLogs from './screens/CallLogs';
+import Logout from './component/LogOut';
 const Auth = createStackNavigator();  
 
 // Create stack navigator for cards
@@ -20,8 +28,112 @@ const ToolsStack = createStackNavigator();
 
 const Drawer = createDrawerNavigator();
 
+
+
 const HomeStack = () => {
-  
+    const user =  useSelector(selectUser);
+    
+  return (
+
+    <Drawer.Navigator
+    drawerContent={
+      (props) => {
+        return (
+          <SafeAreaView>
+            <View
+              style={{
+                height: 200,
+                width: '100%',
+                justifyContent: "center",
+                alignItems: "center",
+                borderBottomColor: "#f4f4f4",
+                borderBottomWidth: 1
+              }}
+            >
+              <Image
+                source={User}
+                style={{
+                  height: 130,
+                  width: 130,
+                  borderRadius: 65
+                }}
+              />
+              <Text
+                style={{
+                  fontSize: 22,
+                  marginVertical: 6,
+                  fontWeight: "bold",
+                  color: "#111"
+                }}
+              >AKASH</Text>
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: "#111"
+                }}
+              >AKASH</Text>
+            </View>
+            <DrawerItemList {...props} />
+            
+            <Logout/>
+            
+          </SafeAreaView>
+        )
+      }
+    }
+    screenOptions={{
+      drawerStyle: {
+        backgroundColor: "#d3d3d3",
+        width: 250
+      },
+      headerStyle: {
+        backgroundColor: "#d3d3d3",
+      },
+      headerTintColor: "black",
+      headerTitleStyle: {
+        fontWeight: "bold"
+      },
+      
+      drawerLabelStyle: {
+        color: "#111"
+      }
+    }}
+    >
+         <Drawer.Screen name="Dashboard" component={Dashboard} options={
+              {
+                headerTitle:"Dashboard"
+              }
+          } />
+          <Drawer.Screen name="Agents" component={Agents} options={
+              {
+                headerTitle:"Agents"
+              }
+          }/>
+          <Drawer.Screen name="Business" component={Business} options={
+              {
+                headerTitle:"Business"
+              }
+          }/>
+          <Drawer.Screen name="Campaigns" component={Campaigns}  options={
+              {
+                headerTitle:"Campaigns"
+              }
+          }/>
+
+          <Drawer.Screen name="Campaign Logs" component={CampaignLogs}  options={
+              {
+                headerTitle:"Campaigns Logs"
+              }
+          }/>
+          <Drawer.Screen name="Call Logs" component={CallLogs}  options={
+              {
+                headerTitle:"Call Logs"
+              }
+          }/>
+          
+      </Drawer.Navigator>
+
+  );
 };
 
 

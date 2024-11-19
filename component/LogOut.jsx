@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Button, Modal } from 'react-native';
 import styles from '../styles';
 import { useDispatch } from 'react-redux';
-import {useLoginMutation, useLogoutMutation} from "./authApi";
+import {useLogoutMutation} from "./authApi";
 // Create your functional component
 
 
