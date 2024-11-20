@@ -35,7 +35,7 @@ const Dashboard = ({navigation}) => {
     const [showCreateCampaignModal, setCreateCampaignModal] = useState(false);
     const [showCreateAgentModal, setShowCreateAgentModal] = useState(false);
     const [showAddLeadModal, setShowAddLeadModal] = useState(false);
-
+    const [editAgent, setEditAgent] = useState(false);
 
     useEffect(() => {
 
@@ -52,7 +52,10 @@ const Dashboard = ({navigation}) => {
 
 
    
-
+  const saveAgent = (agentData) => {
+      // Implement update logic
+      setShowCreateAgentModal(false);
+  };
   return (
     // Main container with a gray background
     <View style={[styles.container]}>
@@ -64,8 +67,13 @@ const Dashboard = ({navigation}) => {
             <View style={{ width:'100%', height:'70%',alignItems:'center'}}>
                     <CallDashBoard  businessId={ 1}/>
             </View>
+            <CreateAgentModal 
+                  openModal={showCreateAgentModal} 
+                  onClose={() => setShowCreateAgentModal(false)}
+                  onSaveAgent={(agentData) => saveAgent(agentData)}
+                  createMode={true}
+              />
 
-            <CreateAgentModal onClose={setShowCreateAgentModal} openModal={showCreateAgentModal} />
             <CreateCampaignModal onClose={setCreateCampaignModal} openModal={showCreateCampaignModal} />
             <AddLeadModal onClose={setShowAddLeadModal} openModal = {showAddLeadModal}/>
 

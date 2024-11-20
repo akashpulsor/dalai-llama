@@ -23,6 +23,8 @@ const BusinessDataSnapShot = ({ businessId }) => {
     
     return (
         <View style={styles.tableContainer}>
+                <View style={styles.cardContainer} />
+                <View style={styles.cardContainer} />
 
         </View>
     );
@@ -37,7 +39,7 @@ BusinessDataSnapShot.propTypes = {
 
 const styles = StyleSheet.create({
     tableContainer :{
-        margin: 2.5,
+        
         height:'90%',
         backgroundColor: 'white',
         borderRadius: 20,
@@ -53,26 +55,31 @@ const styles = StyleSheet.create({
         elevation: 5,
         width: '100%'
     },
-    RowContainer :{
-        flex: 1,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth:1,
-        borderColor:'black'
+    cardsGrid: {
+      flex: 1,
+      flexDirection: 'row',
+      justifyContent: "flex-start",
+      alignItems: 'flex-start',
     },
-    ColumnContainer :{
-        flex: 1,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth:1,
-        borderColor:'black'
+    column: {
+      width: '23%', // Slightly less than 25% to account for spacing
+      alignItems: 'center',
     },
-    label: {
-      fontSize: 16,
-      fontWeight: 'bold',
-      marginBottom: 8,
+    cardContainer: {
+      width: '80%',
+      height:'50%',
+      aspectRatio: 1, // Makes it square
+      backgroundColor: '#f0f0f0',
+      borderRadius: 20,
+      marginVertical: 5,
+      shadowColor: '#000',
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+      elevation: 5,
     }
 
 });

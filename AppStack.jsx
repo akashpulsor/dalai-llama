@@ -125,11 +125,7 @@ const HomeStack = () => {
                 headerTitle:"Campaigns Logs"
               }
           }/>
-          <Drawer.Screen name="Call Logs" component={CallLogs}  options={
-              {
-                headerTitle:"Call Logs"
-              }
-          }/>
+
           
       </Drawer.Navigator>
 
