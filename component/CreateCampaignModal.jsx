@@ -17,8 +17,12 @@ import { Picker } from '@react-native-picker/picker';
 import { useVerificationCodeMutation } from './authApi';
 
 
-const CreateCampaignModal = ({ onClose, openModal }) => {
-  const [isEditable, setIsEditable] = useState(false);  
+const CreateCampaignModal = ({ onClose, openModal, 
+  campaignId = null, 
+  onSaveAgent,
+  createMode = false  }) => {
+  const [isEditable, setIsEditable] = useState(createMode); 
+  const [showEditButton, setShowEditButton] = useState(!createMode); 
   const [formData, setFormData] = useState({
     name: '',
     objective: '',
