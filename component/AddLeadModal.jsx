@@ -14,23 +14,114 @@ import PropTypes from 'prop-types';
 import Button from './Button';
 import { MaterialIcons } from '@expo/vector-icons';
 
-import { useVerificationCodeMutation } from './authApi';
+import { useVerificationCodeMutation, useAddLeadMutation } from './authApi';
 import { Picker } from '@react-native-picker/picker';
+import { useSelector } from 'react-redux';
+import {selectUser } from '../component/authSlice';
+import { useDispatch } from 'react-redux';
+import { showMessage } from './flashMessageSlice';
+import { 
+  isValidEmail, 
+  isValidPhone, 
+  isValidWhatsApp,
+  cleanContactData 
+} from '../helper/utils';
 
 const AddLeadModal = ({ onClose, openModal }) => {
-  const [isEditable, setIsEditable] = useState(false); 
 
-
-
+  const user =  useSelector(selectUser);
+  const [addLead, { data: leadData, isLoading:isLeadDataLoading, isSuccess:isLeadDataSuccess, isError:isLeadDataError, error:LeadDataError }] = useAddLeadMutation();
+  const [errorMessages, setErrorMessages] = useState({});
+  const dispatch = useDispatch();
   useEffect(() => {
+    if (isLeadDataSuccess && leadData) {
+      setFormData(leadData);
+      dispatch(showMessage({
+        message: 'Lead created successfully',
+        type: 'info'
+      }));
+      setFormData({
+          businessId: '',  // Ensure user is never undefined
+          name: '',
+          email: '',
+          phone: '',
+          whatsapp: '',
+          gender: '',
+          address: '',
+          landmark: '' // Initialize with empty string
+      });
+      setErrorMessages({});
+      onClose(false);
+
+  }
 
   }, []);
 
-  const onAddLeadPress = async () => {
-    handleModalClose();
-  };
 
+
+  const onAddLeadPress = async () => {
+    const newFormData = {
+      ...formData,
+      businessId: user?.id
+    };
+  
+    // Validate businessId first
+    if (!newFormData.businessId) {
+      dispatch(showMessage({
+        message: 'Business Id not present',
+        type: 'error'
+      }));
+      return;
+    }
+  
+    const errors = {};
+  
+    // Phone validation
+    if (!newFormData.phone) {
+      errors.phone = 'Phone is required';
+    } else if (!isValidPhone(newFormData.phone)) {
+      errors.phone = 'Please enter a valid phone number (e.g., +1234567890)';
+    }
+  
+    // Email validation
+    if (!newFormData.email) {
+      errors.email = 'Email is required';
+    } else if (!isValidEmail(newFormData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+  
+    // WhatsApp validation (if provided)
+    if (newFormData.whatsapp && !isValidWhatsApp(newFormData.whatsapp)) {
+      errors.whatsapp = 'Please enter a valid WhatsApp number with country code (e.g., +1234567890)';
+    }
+  
+    // Additional validation for empty or whitespace-only values
+    ['phone', 'email', 'whatsapp'].forEach(field => {
+      if (newFormData[field] && newFormData[field].trim() === '') {
+        errors[field] = `${field.charAt(0).toUpperCase() + field.slice(1)} cannot be empty`;
+      }
+    });
+  
+    setErrorMessages(errors);
+  
+    if (Object.keys(errors).length === 0) {
+      // Clean the data before submitting
+      const cleanedFormData = cleanContactData(newFormData);
+      addLead(cleanedFormData);
+    }
+  };
   const handleModalClose = () => {
+    setFormData({
+      businessId: '',  // Ensure user is never undefined
+      name: '',
+      email: '',
+      phone: '',
+      whatsapp: '',
+      gender: '',
+      address: '',
+      landmark: '' // Initialize with empty string
+    });
+    setErrorMessages({});
     onClose(false);
   }
 
@@ -83,7 +174,7 @@ const AddLeadModal = ({ onClose, openModal }) => {
                                                 <View style={styles.inputGroup}>
                                                     <Text style={styles.label}>Email</Text>
                                                     <TextInput
-                                                            style={styles.input}
+                                                            style={[styles.input,errorMessages.email ? styles.inputError : null]}
                                                             placeholder="Email"
                                                             keyboardType="email-address"
                                                             value={formData.email}
@@ -91,11 +182,11 @@ const AddLeadModal = ({ onClose, openModal }) => {
                                                             required
                                                     />
                                                 </View>
-
+                                                
                                                 <View style={styles.inputGroup}>
                                                     <Text style={styles.label}>Phone</Text>
                                                     <TextInput
-                                                            style={styles.input}
+                                                            style={[styles.input,errorMessages.phone ? styles.inputError : null]}
                                                             placeholder="Phone"
                                                             keyboardType="phone-pad"
                                                             value={formData.phone}
@@ -106,7 +197,7 @@ const AddLeadModal = ({ onClose, openModal }) => {
                                                 <View style={styles.inputGroup}>
                                                     <Text style={styles.label}>WhatsApp</Text>
                                                     <TextInput
-                                                            style={styles.input}
+                                                            style={[styles.input,errorMessages.whatsapp ? styles.inputError : null]}
                                                             placeholder="WhatsApp"
                                                             keyboardType="phone-pad"
                                                             value={formData.whatsapp}
@@ -161,12 +252,12 @@ const AddLeadModal = ({ onClose, openModal }) => {
 
                                 <View style={{flexDirection:'row', width:'100%',position: 'absolute' ,zIndex: 1, marginTop:'45%', alignSelf:'flex-end',alignContent:'center', justifyContent:'center'}}>
                                     <View style={{margin:'5%'}}>
-                                        <Button mode="contained" onPress={() => setIsEditable(false)} >
+                                        <Button mode="contained" onPress={() => onAddLeadPress()} >
                                             Add Lead
                                         </Button>
                                     </View>
                                 </View>
-                            </View>
+                            </View> 
                     
                 </View>
   
@@ -278,5 +369,8 @@ const styles = StyleSheet.create({
   picker: {
     height: 50,
     borderRadius: 8,
+  },
+  inputError: {
+    borderColor: 'red',
   }
 });

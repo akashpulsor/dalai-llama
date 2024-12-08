@@ -14,189 +14,223 @@ import PropTypes from 'prop-types';
 import Button from './Button';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
-import { useVerificationCodeMutation } from './authApi'; // Assuming this is your API call hook
+import { useAddAgentMutation } from './authApi';
+import { useDispatch } from 'react-redux';
+import { showMessage } from './flashMessageSlice';
 
 const CreateAgentModal = ({ 
     onClose, 
-    openModal, 
-    agentId = null, 
-    onSaveAgent,
-    createMode = false 
-  }) => {
-    const [formData, setFormData] = useState({
-      name: '',
+    openModal,
+    user
+}) => {
+    // Initialize all form fields with empty strings instead of undefined
+    const initialFormState = {
+      businessId: user || '',  // Ensure user is never undefined
+      agentName: '',
       role: '',
       persona: '',
-      voice: ''
-    });
-    const [loading, setLoading] = useState(false);
-    const [isEditable, setIsEditable] = useState(createMode);
-    const [showEditButton, setShowEditButton] = useState(!createMode);
-    const voices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
-  
-    // Fetch agent data when in edit mode
-    useEffect(() => {
-  
-    }, [agentId]);
-  
-    // Fetch agent data
-    const fetchAgentData = async (id) => {
-      //setLoading(true);
-
+      voice: ''  // Initialize with empty string
     };
-  
-    // Reset form and close modal
+
+    const [formData, setFormData] = useState(initialFormState);
+    const [addAgent, { 
+      data: agentData, 
+      isLoading: isAgentDataLoading, 
+      isSuccess: isAgentDataSuccess, 
+      isError: isAgentDataError, 
+      error: agentDataError 
+    }] = useAddAgentMutation();
+
+    const voices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+    const [errorMessages, setErrorMessages] = useState({});
+    const dispatch = useDispatch();
+    useEffect(() => {
+        if (isAgentDataSuccess && agentData) {
+            setFormData(agentData);
+            dispatch(showMessage({
+              message: 'Agent created successfully',
+              type: 'info'
+            }));
+            setFormData({
+                businessId: '',  // Ensure user is never undefined
+                agentName: '',
+                role: '',
+                persona: '',
+                voice: ''  // Initialize with empty string
+            });
+            onClose(false);
+
+        }
+    }, [isAgentDataSuccess, agentData]);
+
     const handleModalClose = () => {
-      setFormData({
-        name: '',
-        role: '',
-        persona: '',
-        voice: ''
-      });
-      setIsEditable(false);
-      setShowEditButton(true);
+      setFormData(initialFormState);  // Reset to initial state
+      setErrorMessages({});
       onClose(false);
     };
-  
-    // Enable editing
-    const handleEditAgent = () => {
-        setIsEditable(true);
-        if(!createMode){
-            setShowEditButton(false);
-        }
+
+    const handleSaveAgent = async () => {
+        try {
+            const newFormData = { 
+                ...formData, 
+                businessId: user
+              };
+              if (!newFormData.businessId) {
+                dispatch(showMessage({
+                  message: 'Business Id not present',
+                  type: 'error'
+                }));
+                return; // Early return since businessId is critical
+              }
+            const errors = {};
+            if (!newFormData.agentName) {
+                errors.agentName = 'Agent name is required';
+            }
+            if (!newFormData.role) {
+                errors.role = 'Agent Objective is required';
+            }
+            if (!newFormData.persona) {
+                errors.persona = 'Agent Persona is required';
+            }
+            if (!newFormData.voice) {
+                errors.voice = 'Agent voice is required';
+            }
         
+            setErrorMessages(errors);
+            if (Object.keys(errors).length === 0) {
+                await addAgent(newFormData);
+            }
+        } catch(err) {
+            console.error("Agent creation failed:", err);
+        }
     };
-  
-    // Save agent (create or update)
-    const handleSaveAgent = () => {
-        onSaveAgent(formData, agentId!=null ? agentId : null);
-        setIsEditable(false);
-        handleModalClose();
-    };
-  
+
     return (
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={openModal}
-        onRequestClose={handleModalClose}
-      >
-        <View style={styles.centeredView}>
-          <TouchableOpacity
-            style={{ justifyContent: 'center' }}
-            onPress={handleModalClose}
-          >
-            <MaterialIcons name="cancel" size={24} color="gray" />
-          </TouchableOpacity>
-          <View style={styles.modalView}>
-            <Text style={{ fontSize: 34, fontFamily: 'bold' }}>
-              {createMode ? 'Create Agent' : 'Edit Agent'}
-            </Text>
-            <ScrollView style={styles.container}>
-              <View style={styles.formContainer}>
-                {loading ? (
-                  <ActivityIndicator size="large" color="#0000ff" />
-                ) : (
-                  <>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Name of Agent</Text>
-                      <TextInput
-                        style={[styles.input, !isEditable && styles.disabledInput]}
-                        value={formData.name}
-                        onChangeText={(text) =>
-                          setFormData((prev) => ({ ...prev, name: text }))
-                        }
-                        placeholder="Name of Agent"
-                        editable={isEditable}
-                      />
+        <Modal
+            animationType="slide"
+            transparent={true}
+            visible={openModal}
+            onRequestClose={handleModalClose}
+        >
+            <View style={styles.centeredView}>
+                <TouchableOpacity
+                    style={{ justifyContent: 'center' }}
+                    onPress={handleModalClose}
+                >
+                    <MaterialIcons name="cancel" size={24} color="gray" />
+                </TouchableOpacity>
+                <View style={styles.modalView}>
+                    <Text style={{ fontSize: 34, fontFamily: 'bold' }}>
+                        Create Agent
+                    </Text>
+   
+                    {isAgentDataError && (
+                        <Text style={[styles.label, { color: 'red', fontSize: 10 }]}>
+                            {agentDataError}
+                        </Text>
+                    )}
+
+                    {isAgentDataLoading &&  <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="large" color="#0000ff" />
+                    </View>}
+
+
+                    <ScrollView style={styles.container}>
+                        <View style={styles.formContainer}>
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Name of Agent</Text>
+                                <TextInput
+                                    style={[
+                                        styles.input,
+                                        errorMessages.agentName ? styles.inputError : null
+                                    ]}
+                                    value={formData.agentName}
+                                    onChangeText={(text) =>
+                                        setFormData((prev) => ({ ...prev, agentName: text }))
+                                    }
+                                    placeholder="Name of Agent"
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Role</Text>
+                                <TextInput
+                                    style={[
+                                        styles.input,
+                                        errorMessages.role ? styles.inputError : null
+                                    ]}
+                                    value={formData.role}
+                                    onChangeText={(text) =>
+                                        setFormData((prev) => ({ ...prev, role: text }))
+                                    }
+                                    placeholder="Role"
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Persona of Agent</Text>
+                                <TextInput
+                                    style={[
+                                        styles.input,
+                                        errorMessages.persona ? styles.inputError : null
+                                    ]}
+                                    value={formData.persona}
+                                    onChangeText={(text) =>
+                                        setFormData((prev) => ({ ...prev, persona: text }))
+                                    }
+                                    placeholder="Persona of Agent"
+                                    multiline={true}
+                                    numberOfLines={4}
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Voice Type</Text>
+                                <View style={styles.pickerContainer}>
+                                    <Picker
+                                        selectedValue={formData.voice}
+                                        onValueChange={(value) =>
+                                            setFormData((prev) => ({ ...prev, voice: value }))
+                                        }
+                                        style={[
+                                            styles.picker,
+                                            errorMessages.voice ? styles.inputError : null
+                                        ]}
+                                    >
+                                        <Picker.Item label="Select a voice" value="" />
+                                        {voices.map((voice) => (
+                                            <Picker.Item
+                                                key={voice}
+                                                label={voice.charAt(0).toUpperCase() + voice.slice(1)}
+                                                value={voice}
+                                            />
+                                        ))}
+                                    </Picker>
+                                </View>
+                            </View>
+                        </View>
+                    </ScrollView>
+
+                    <View style={styles.buttonContainer}>
+                        <View style={styles.buttonWrapper}>
+                            <Button mode="contained" onPress={handleSaveAgent}>
+                                Save Agent
+                            </Button>
+                        </View>
                     </View>
-  
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Role</Text>
-                      <TextInput
-                        style={[styles.input, !isEditable && styles.disabledInput]}
-                        value={formData.role}
-                        onChangeText={(text) =>
-                          setFormData((prev) => ({ ...prev, role: text }))
-                        }
-                        placeholder="Role"
-                        editable={isEditable}
-                      />
-                    </View>
-  
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Persona of Agent</Text>
-                      <TextInput
-                        style={[styles.input, styles.textArea, !isEditable && styles.disabledInput]}
-                        value={formData.persona}
-                        onChangeText={(text) =>
-                          setFormData((prev) => ({ ...prev, persona: text }))
-                        }
-                        placeholder="Persona of Agent"
-                        multiline={true}
-                        numberOfLines={4}
-                        editable={isEditable}
-                      />
-                    </View>
-  
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Voice Type</Text>
-                      <View style={styles.pickerContainer}>
-                        <Picker
-                          selectedValue={formData.voice}
-                          onValueChange={(value) =>
-                            setFormData((prev) => ({ ...prev, voice: value }))
-                          }
-                          style={styles.picker}
-                          enabled={isEditable}
-                        >
-                          <Picker.Item label="Select a voice" value="" />
-                          {voices.map((voice) => (
-                            <Picker.Item
-                              key={voice}
-                              label={voice.charAt(0).toUpperCase() + voice.slice(1)}
-                              value={voice}
-                            />
-                          ))}
-                        </Picker>
-                      </View>
-                    </View>
-                  </>
-                )}
-              </View>
-            </ScrollView>
-  
-            <View style={styles.buttonContainer}>
-              <View style={styles.buttonWrapper}>
-                {(!createMode) ? (
-                  showEditButton ? <Button mode="contained" onPress={handleEditAgent}>
-                    Edit Agent
-                  </Button> :   <Button mode="contained" onPress={handleSaveAgent}>
-                    Save Agent
-                  </Button>
-                ) : (
-                  <Button mode="contained" onPress={handleSaveAgent}>
-                    Save Agent
-                  </Button>
-                )}
-              </View>
+                </View>
             </View>
-          </View>
-        </View>
-      </Modal>
+        </Modal>
     );
-  };
-  
-  CreateAgentModal.propTypes = {
+};
+
+CreateAgentModal.propTypes = {
     onClose: PropTypes.func.isRequired,
     openModal: PropTypes.bool.isRequired,
-    agentId: PropTypes.string,
-    onSaveAgent: PropTypes.func.isRequired,
-    createMode: PropTypes.bool,
-    
-  };
-  
-  export default CreateAgentModal;
+    user: PropTypes.string.isRequired
+};
+
+export default CreateAgentModal;
   
 const styles = StyleSheet.create({
   centeredView: {
@@ -277,4 +311,7 @@ const styles = StyleSheet.create({
   buttonWrapper: {
     margin: '5%',
   },
+  inputError: {
+    borderColor: 'red',
+  }
 });

@@ -1,90 +1,131 @@
-// Import necessary components from React Native
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity,StyleSheet,  ActivityIndicator ,FlatList } from 'react-native';
-
-import { useDispatch } from 'react-redux';
-import { MaterialIcons } from '@expo/vector-icons';
-import { setSignIn } from '../component/authApi';
-import CountryCodeDropdownPicker from 'react-native-dropdown-country-picker';
-import { useLoginMutation, useRegisterMutation } from '../component/authApi';
-import { useSelector } from 'react-redux';
-import {setToken,setUser} from "../component/authSlice";
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import {selectIsLoggedIn} from '../component/authSlice';
-import Toast from 'react-native-toast-message';
-import CreateCampaignModal from '../component/CreateCampaignModal';
+import React, { useState, useEffect } from 'react';
+import { 
+    View, 
+    Text, 
+    TouchableOpacity, 
+    StyleSheet, 
+    ActivityIndicator, 
+    FlatList,
+    Dimensions
+} from 'react-native';
+import { useLoginMutation, useGetCampaignListQuery } from '../component/authApi';
 import CampaignRun from '../component/CampaignRun';
+import { selectUser } from '../component/authSlice';
+import { useSelector } from 'react-redux';
 
-// Separate component for individual agent item
-const CampaignItem = ({ item , onBlur}) => {
-  const [showCreateAgentModal, setShowCreateAgentModal] = useState(false);
+// Get device height for better layout calculations
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-  useEffect(() => {
-    onBlur(showCreateAgentModal);
-  }, [showCreateAgentModal]);
+const CampaignItem = ({ item, onBlur }) => {
+    const [showCreateAgentModal, setShowCreateAgentModal] = useState(false);
 
-  const handleEditAgent = () => {
-      
-      setShowCreateAgentModal(true);
-      onBlur(true);
-  };
+    useEffect(() => {
+        onBlur(showCreateAgentModal);
+    }, [showCreateAgentModal]);
 
-  const updateAgent = (agentData, agentId) => {
-      // Implement update logic
-      setShowCreateAgentModal(false);
-  };
+    const handleEditAgent = () => {
+        setShowCreateAgentModal(true);
+        onBlur(true);
+    };
 
+    const updateAgent = (agentData, agentId) => {
+        setShowCreateAgentModal(false);
+    };
 
-
-  return (
-      <TouchableOpacity onPress={handleEditAgent}>
-          <View style={styles.cardContainer}>
-              <CampaignRun onClose={setShowCreateAgentModal} openModal={showCreateAgentModal} campaignId={item} />
-          </View>
-      </TouchableOpacity>
-  );
+    return (
+        <TouchableOpacity onPress={handleEditAgent}>
+            <View style={styles.cardContainer}>
+                <View style={{flexDirection:'row',justifyContent:'center',marginTop:'1%'}}>
+                  <Text style={[styles.label,{fontFamily:'bold',fontWeight: "bold",fontSize:16}]}>{item.campaignName} : </Text>
+                  <Text style={[styles.label,{fontFamily:'bold',fontWeight: "bold",fontSize:16}]}>{item.campaignAim}</Text> 
+                </View>
+                <CampaignRun 
+                    onClose={setShowCreateAgentModal} 
+                    openModal={showCreateAgentModal} 
+                    campaignId={item} 
+                />
+            </View>
+        </TouchableOpacity>
+    );
 };
 
-// Create your functional component
-const Campaigns = ({navigation}) => {
-    const [data, setData] = useState([
-        {"campaignId":1},
-        {"campaignId":2},
-        {"campaignId":3}
-    ]);
-
+const Campaigns = ({ navigation }) => {
+    const user = useSelector(selectUser);
+    const { 
+        data, 
+        error, 
+        isSuccess, 
+        isLoading, 
+        isError 
+    } = useGetCampaignListQuery(user?.id);
     const [blur, setBlur] = useState(false);
-    const [loginMutation] = useLoginMutation();
 
     const renderAgentItem = ({ item }) => (
+        
         <CampaignItem 
             item={item} 
             onBlur={setBlur}
         />
     );
 
+    const renderContent = () => {
+        if (isError) {
+            return (
+                <View style={styles.emptyContainer}>
+                    <Text style={styles.errorText}>
+                        Something went wrong
+                    </Text>
+                </View>
+            );
+        }
+
+        if (isLoading) {
+            return (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#0000ff" />
+                </View>
+            );
+        }
+
+        if (isSuccess && (!data || data.length === 0)) {
+            return (
+                <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyText}>
+                        No campaign Created
+                    </Text>
+                </View>
+            );
+        }
+
+        return (
+            <FlatList
+                data={data}
+                renderItem={renderAgentItem}
+                keyExtractor={(item) => item.campaignId.toString()}
+                contentContainerStyle={styles.listContent}
+                ItemSeparatorComponent={() => <View style={styles.separator} />}
+                ListHeaderComponent={<View style={styles.headerSpace} />}
+                ListFooterComponent={<View style={styles.footerSpace} />}
+                showsVerticalScrollIndicator={true}
+                scrollEnabled={true}
+                bounces={true}
+            />
+        );
+    };
+
     return (
-        <View style={[styles.container, {padding: 0}]}>
+        <View style={styles.container}>
             <View style={[
-                styles.listContainer, 
+                styles.listContainer,
                 blur && styles.blurContainer
             ]}>
-                <FlatList
-                    data={data}
-                    renderItem={renderAgentItem}
-                    keyExtractor={(item) => item.campaignId.toString()}
-                    contentContainerStyle={styles.listContent}
-                    ItemSeparatorComponent={() => <View style={styles.separator} />}
-                    ListHeaderComponent={<View style={styles.headerSpace} />}
-                    ListFooterComponent={<View style={styles.footerSpace} />}
-                />
+                {renderContent()}
             </View>
             
-            {/* Optional: Overlay to capture touches when blurred */}
             {blur && (
                 <TouchableOpacity 
-                    style={styles.blurOverlay} 
-                    activeOpacity={1} 
+                    style={styles.blurOverlay}
+                    activeOpacity={1}
                     onPress={() => setBlur(false)}
                 />
             )}
@@ -92,70 +133,96 @@ const Campaigns = ({navigation}) => {
     );
 };
 
-
-// Export the component
-export default Campaigns;
-
-
 const styles = StyleSheet.create({
-  agentText: {
-      fontSize: 16,
-      fontWeight: 'bold',
-  },
-  container: {
-      flex: 1,
-      backgroundColor:'#d3d3d3'
-  },
-  listContainer: {
-      paddingHorizontal: 10, // Minimal horizontal padding
-      paddingVertical: 0, // Remove vertical padding
-  },
-  headerSpace: {
-
-      height: 10, // Minimal top spacing
-  },
-  footerSpace: {
-
-      height: 10, // Minimal bottom spacing
-  },
-  separator: {
-      margin:'1%',
-      height: 5, // Minimal space between items
-  },
-  cardContainer: {
-      width: '100%',
-      height: 50, // Fixed height instead of percentage
-      backgroundColor: 'white',
-      borderRadius: 20,
-      shadowColor: '#000',
-      shadowOffset: {
-          width: 0,
-          height: 4,
-      },
-      shadowOpacity: 0.25,
-      shadowRadius: 3.84,
-      elevation: 10,
-  },
-  absoluteFill: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      bottom: 0,
-      right: 0,
-      zIndex: 999,  // Ensure blur is on top
-  },
-  blurContainer: {
-    opacity: 0.3,  // Reduces opacity to create blur-like effect
-  },
-  blurOverlay: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.3)',  // Semi-transparent overlay
-      zIndex: 10,
-  },
+    container: {
+        flex: 1,
+        backgroundColor: '#d3d3d3',
+    },
+    listContainer: {
+        flex: 1, // Important for scrolling
+        paddingHorizontal: 10,
+    },
+    listContent: {
+        flexGrow: 1, // Important for scrolling
+        paddingBottom: 20, // Add some bottom padding for better scrolling
+    },
+    headerSpace: {
+        height: 10,
+    },
+    footerSpace: {
+        height: 10,
+    },
+    separator: {
+        height: 30,
+    },
+    cardContainer: {
+        width: '100%',
+        height: 50,
+        backgroundColor: 'white',
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 10,
+    },
+    blurContainer: {
+        opacity: 0.3,
+    },
+    blurOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        zIndex: 10,
+    },
+    emptyContainer: {
+        flex: 1,
+        marginTop: '15%',
+        width: '40%',
+        height: SCREEN_HEIGHT * 0.5, // Use screen height for better proportions
+        alignSelf: 'center',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'white',
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 10,
+    },
+    loadingContainer: {
+        flex: 1,
+        marginTop: '15%',
+        width: '40%',
+        height: '50%',
+        alignSelf: 'center',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 20,
+        backgroundColor: '#d3d3d3'
+    },
+    errorText: {
+        margin: '10%',
+        fontFamily: 'bold',
+        fontWeight: 'bold',
+        fontSize: 24
+    },
+    emptyText: {
+        margin: '10%',
+        fontFamily: 'bold',
+        fontWeight: 'bold',
+        fontSize: 24
+    }
 });
 
-
+export default Campaigns;

@@ -1,22 +1,35 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { setUser, setToken, clearAuth,setTools,  } from './authSlice'; // Import your action creators from authSlice
+import { setUser, setToken, clearAuth,setTools, setBusinessData, setOnboardingData, setTwilioData } from './authSlice'; // Import your action creators from authSlice
 
+import { showMessage } from './flashMessageSlice';
+
+const handleError = (error, dispatch) => {
+  dispatch(showMessage({
+    message: error.error?.data?.message || 'Operation failed',
+    type: 'error'
+  }));
+};
 
 export const authApi = createApi({
   reducerPath: 'authApi',
   //https://api.dalai-llama.com
   baseQuery: fetchBaseQuery(
-      { baseUrl: 'http://localhost:8080/api' }),
+      { baseUrl: 'http://localhost:8080/api',
+        prepareHeaders: (headers, { getState }) => {
+          // Get the token from state
+          const token = getState().auth.token;
+          if (token) {
+            // If token exists, set it in the headers
+            headers.set('Authorization', `Bearer ${token}`);
+          }else {
+            console.log("No token found in state"); // Debug log 5
+          }
+          headers.set('Content-Type', 'application/json');
+          return headers;
+        }
+       }),
+  
   tagTypes: ['Login'],
-  prepareHeaders: async (headers, { getState }) => {
-    // Get the token from state
-    const token = getState().auth.token;
-    if (token) {
-      // If token exists, set it in the headers
-      headers.set('Authorization', `Bearer ${token}`);
-    }
-    return headers;
-  },
   endpoints: builder => ({
     login: builder.mutation({
       query: (data) => ({
@@ -27,14 +40,21 @@ export const authApi = createApi({
         },
         body: data,
       }),
-      prepareHeaders: (headers, { getState }) => {
-        // Don't include token for login request
-        return headers;
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(setUser({
+            user: data.userInfoResponse,
+          }));
+          dispatch(setToken({
+            token: data.accessToken
+          }));
+        } catch (error) {
+          console.error('Login failed', error);
+        }
       },
       invalidatesTags: ['Login'],
     }),
-
-
     refreshToken: builder.query({
       query: () => '/auth/refreshToken',
       method: 'POST', // Adjust this according to your API
@@ -86,111 +106,123 @@ export const authApi = createApi({
         dispatch(clearAuth()); // Clear user data and token from state
       },
     }),
+    onBoard: builder.mutation({
+      query: (data) => ({
+        url: '/business/onboard',
+        method: 'POST',
+        body: data
+      }),
+      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+          const { data } = await queryFulfilled;
+          dispatch(setOnboardingData(data));
+      },
+    }),
+    generateNumber: builder.mutation({
+      query: (data) => ({
+        url: '/business/getnerate-number',
+        method: 'POST',
+        body: data
+      }),
+      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+            const { data } = await queryFulfilled;
+            dispatch(setTwilioData(data));
+       },
+    }),
+    addCampaign: builder.mutation({
+      query: (data) => ({
+        url: '/campaign/add',
+        method: 'POST',
+        body: data
+      }),
+      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+        try {
+          const { data } = await queryFulfilled;
+        }
+        catch (error) {
+          dispatch(showMessage({
+            message: error.error?.data?.message || 'Operation failed',
+            type: 'error'
+          }));
+        } 
+      },
+    }),
+    addAgent: builder.mutation({
+      query: (data) => ({
+        url: '/agent/add',
+        method: 'POST',
+        body: data
+      }),
+      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+        try{
+          const { data } = await queryFulfilled;
+        }
+        catch(error) {
+          handleError(error, dispatch)
+        }
+      },
+    }),
+    addLead: builder.mutation({
+      query: (data) => ({
+        url: '/lead/add',
+        method: 'POST',
+        body: data
+      }),
+      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+        try{
+          const { data } = await queryFulfilled;
+        }
+        catch(error) {
+          handleError(error, dispatch)
+        }
+      },
+    }),
+    getBusinessData: builder.query({
+      query: (businessId) => `/business/get?businessId=${businessId}`,
+      onQueryStarted: async (arg, { dispatch, getState, queryFulfilled }) => {
+            const { data } = await queryFulfilled;
+            dispatch(setBusinessData(data));
+       },
+    }),
+    getOnBoardingData: builder.query({
+      query: (businessId) => `/business/onboard?businessId=${businessId}`,
+      onQueryStarted: async (arg, { dispatch, getState, queryFulfilled }) => {
+            const { data } = await queryFulfilled;
+            dispatch(setOnboardingData(data));
+       },
+    }),
     getCompanySize: builder.query({
       query: () => '/auth/company-size',
     }),
-    getHistory: builder.query({
-      query: (userId) => `/getHistory/${userId}`,
-    }),
-    getUser: builder.query({
-      query: (userId) => `/getUser/${userId}`,
-    }),
-    updateUser: builder.mutation({
-      query: (userData) => ({
-        url: '/updateUser',
-        method: 'POST',
-        body: userData,
-      }),
-      onSuccess: (response, { dispatch }) => {
-        dispatch(setUser(response.data.user)); // Set user data in state
-         // Set token in state
-      }
-    }),
-    getTools: builder.query({
-      query: () => '/getTools',
-      onSuccess: (response, { dispatch }) => {
-        dispatch(setTools(response.data.tools)); // Set user data in state // Set token in state
-      },
-    }),
-    getLlm: builder.query({
-      query: () => '/getLlm',
-      onSuccess: (response, { dispatch }) => {
-        dispatch(setLlm(response.data.llm)); // Set user data in state // Set token in state
-      },
-    }),
-    generateStructure: builder.mutation({
-      query: ({topicName, llmId, userId}) => ({
-        url: '/generateStructure',
-        method: 'POST',
-        body: {"topic":topicName,"llmId":llmId, "userId": userId},
-      }),
-    }),
-    generateArticle: builder.mutation({
-      query: ({ userId,enableTitleGenerationCheck,title,body,llmId}) => ({
-        url: '/generateArticle',
-        method: 'POST',
-        body: { "userId":userId,"titleGenerationCheck":enableTitleGenerationCheck,"title":title,"body": body,"llmId":llmId },
-      }),
-    }),
-    saveArticle: builder.mutation({
-      query: ({userId,articleTitle, articleBody}) => ({
-        url: '/saveArticle',
-        method: 'POST',
-        body: {"userId":userId,"title":articleTitle, "body":articleBody},
-      }),
-    }),
-    generateTags: builder.mutation({
-      query: ({userId,enableTitleGenerationCheck,title,body,llmId}) => ({
-        url: '/generateTags',
-        method: 'POST',
-        body: {"userId":userId,"titleGenerationCheck":enableTitleGenerationCheck,"title":title,"body":body,"llmId":llmId},
-      }),
-    }),
-    publish: builder.mutation({
-      query: ({username,password,userId,articleTitle, articleBody,selectedTags}) => ({
-        url: '/publish',
-        method: 'POST',
-        body: {"username":username,"password":password,"userId":userId,"title":articleTitle, "body":articleBody,"tags":selectedTags},
-      }),
-    }),
-    loginWordpress: builder.mutation({
-      query: ({userId,username, password, saveCredentials}) => ({
-        url: '/loginwordpress',
-        method: 'POST',
-        body: { "userId":userId,"userName": username, "password": password, "saveCredentials":saveCredentials },
-      }),
-    }),
-    getPrice: builder.mutation({
-      query: (llmId,toolId) => (
-        {
-          url: '/getPrice',
-          method: 'POST',
-          body: {"llmId":llmId, "toolId":toolId},
+    getAgentList: builder.query({
+      query: (businessId) => `/agent/list?businessId=${businessId}`,
+      onQueryStarted: async (arg, { dispatch, getState, queryFulfilled }) => {
+        try{
+            const { data } = await queryFulfilled;
+        } catch(error) {
+          handleError(error, dispatch)
         }
-      ),
+       
+       },
     }),
-    addCredit: builder.mutation({
-      query: (userId,money,currencyId) => (
-        {
-          url: '/payment',
-          method: 'POST',
-          body: {"userId":userId, "money":money,"currencyId":currencyId},
+    getCampaignList: builder.query({
+      query: (businessId) => `/campaign/list?businessId=${businessId}`,
+      onQueryStarted: async (arg, { dispatch, getState, queryFulfilled }) => {
+        try{
+            const { data } = await queryFulfilled;
+        } catch(error) {
+          handleError(error, dispatch)
         }
-      ),
-    }),
-    search: builder.mutation({
-      query: ({searchQuery, llmId, userId}) => ({
-        url: '/search',
-        method: 'POST',
-        body: {"query":searchQuery,"llmId":llmId, "userId": userId},
-      }),
+       
+       },
     })
   }),
 });
 
+
 export const { useLoginMutation, useRegisterMutation, useVerificationCodeMutation,useValidateCodeMutation,useUpdatePasswordMutation,
-  useLogoutMutation, useGetHistoryQuery, useGetCompanySizeQuery,
-  useGetUserQuery, useUpdateUserMutation, useGetToolsQuery, useGetLlmQuery, useGenerateStructureMutation,
+  useLogoutMutation, useAddCampaignMutation, useGetCompanySizeQuery,
+  useGetAgentListQuery, useGetCampaignListQuery, useGetToolsQuery, useGetLlmQuery, useGenerateStructureMutation,
   useGenerateArticleMutation, useSaveArticleMutation, useGenerateTagsMutation, usePublishMutation, 
-  useLoginWordpressMutation, useGetPriceMutation,useAddCreditMutation, useRefreshTokenQuery, useSearchMutation } = authApi;
+  useLoginWordpressMutation, useAddLeadMutation,useAddAgentMutation, useRefreshTokenQuery,
+ useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery,useGenerateNumberMutation} = authApi;
 

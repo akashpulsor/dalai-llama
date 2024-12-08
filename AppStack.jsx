@@ -109,11 +109,7 @@ const HomeStack = () => {
                 headerTitle:"Agents"
               }
           }/>
-          <Drawer.Screen name="Business" component={Business} options={
-              {
-                headerTitle:"Business"
-              }
-          }/>
+
           <Drawer.Screen name="Campaigns" component={Campaigns}  options={
               {
                 headerTitle:"Campaigns"

@@ -16,6 +16,8 @@ import { Picker } from '@react-native-picker/picker';
 import CheckBox from '@react-native-community/checkbox';
 import Button from './Button';
 import CampaignForm from './CampaignForm';
+import { useSelector } from 'react-redux';
+import {selectUser } from '../component/authSlice';
 
 const CampaignRun = ({ onClose, openModal, campaignId }) => {
   const [formData, setFormData] = useState({

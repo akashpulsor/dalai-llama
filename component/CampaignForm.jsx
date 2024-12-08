@@ -28,6 +28,8 @@ const CampaignForm = ({
         }));
     };
 
+    
+
   return (
                 <View style={[styles.modalView]}>
                     

@@ -1,177 +1,263 @@
-// Import necessary components from React Native
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity,TouchableWithoutFeedback, TextInput, Modal, ActivityIndicator,Image } from 'react-native';
-import styles from '../styles';
-import { useDispatch } from 'react-redux';
-import { MaterialIcons } from '@expo/vector-icons';
-import { setSignIn } from '../component/authApi';
-import CountryCodeDropdownPicker from 'react-native-dropdown-country-picker';
-import { useLoginMutation, useRegisterMutation } from '../component/authApi';
+import React, { useState, useCallback, useEffect } from 'react';
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  Button,
+  Alert,
+  TouchableOpacity,
+  Text
+} from 'react-native';
+import BusinessForm from '../component/BusinessForm';
+import GenerateNumber from '../component/GenerateNumber';
 import { useSelector } from 'react-redux';
-import {setToken,setUser} from "../component/authSlice";
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import {selectIsLoggedIn} from '../component/authSlice';
-import Toast from 'react-native-toast-message';
+import {useOnBoardMutation, useGetOnBoardingDataQuery} from '../component/authApi';
+import {selectUser,selectOnboardingData,selectBusinessData } from '../component/authSlice';
+const Business = () => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [originalFormData, setOriginalFormData] = useState(null);
+  const [onBoard, { data: onBoardData, isLoading:isOnBoardLoading, isSuccess:isOnBoardSuccess, isError:isOnBoardError, error:onBoardError }] = useOnBoardMutation();
+  const user =  useSelector(selectUser);
+  const businessData =  useSelector(selectBusinessData);
+  const [showGenerateNumber, setShowGenerateNumber] = useState(false);
+  const { data: onBoardingData, error,isLoading, isError } = useGetOnBoardingDataQuery(user?.id);
+  const [formData, setFormData] = useState({
+    parentBusinessId:'',
+    businessDetails: {
+      udyamRegistrationNumber: '',
+      pan: '',
+      adhaarNumber: '',
+      gstNumber: '',
+      phone: '',
+      countryCode: 'US'
+    },
+    address: {
+      country: {
+        name: '',
+        isoCode: '',
+        flag: '',
+        phonecode: '',
+        currency: '',
+        latitude: '',
+        longitude: '',
+        timezones: [
+            {
+                zoneName: '',
+                gmtOffset: 0,
+                gmtOffsetName: '',
+                abbreviation: '',
+                tzName: ''
+            }
+        ]
+      },
+      state: {
+        name: '',
+        isoCode: '',
+        countryCode: '',
+        latitude: '',
+        longitude: ''
+      },
+      city: {
+        name: '',
+        countryCode: '',
+        stateCode: '',
+        latitude: '',
+        longitude: ''
+      },
+      streetAddress: '',
+      apartment: '',
+      postalCode: '',
+      formattedAddress: ''
+    },
+    bankDetails: {
+      accountHolderName: '',
+      accountNumber: '',
+      ifscCode: '',
+      bankName: '',
+      branchName: ''
+    },
+    documents: {
+      pan: null,
+      adhaar: null,
+      udyam_certificate: null,
+    },
+    phoneData:{
+      phoneGenerated:false
+    }
+  });
 
-import { emailValidator } from '../helper/emailValidator'
-import { passwordValidator } from '../helper/passwordValidator'
-import Button from '../component/Button';
-import RegistrationCarousel from '../component/RegistrationCarousel';
-import ResetPassword from '../component/ResetPassword';
-import PhoneInput from "react-native-phone-number-input";
-import InputCode from '../component/InputCode';
-import NewPassword from '../component/NewPassword';
+  // Load initial data
+  useEffect(() => {
+        setFormData(onBoardingData);
+        if(isOnBoardSuccess) {
+          setIsEditing(false);
+        }
+      
+  }, [businessData,user,onBoardingData,isOnBoardSuccess, isOnBoardLoading, isOnBoardError, onBoardError]);
 
+  const validateForm = useCallback((data) => {
+    const errors = [];
 
+    // Business Details Validation
+    if (!data.businessDetails.pan) {
+      errors.push('PAN is required');
+    }
+    if (!data.businessDetails.phone) {
+      errors.push('Phone number is required');
+    }
 
-// Create your functional component
-const Business = ({navigation}) => {
+    // Address Validation
+    const address = data.address;
+    if (!address.country) {
+      errors.push('Country is required');
+    }
+    if (!address.streetAddress) {
+      errors.push('Street address is required');
+    }
+    if (!address.postalCode) {
+      errors.push('Postal code is required');
+    }
 
-    const [email, setEmail] = useState('')
-    const [emailError, setEmailError] = useState('')
-    const [password, setPassword] = useState('')
-    const [passwordError, setPasswordError] = useState('');
-    const [modalVisible, setModalVisible] = useState(false);
-    const [showError, setShowError] = useState(false);
-    const [errorMessage, setErrorMessage] = useState('');
-    const [showResetPassword, setShowResetPassword] = useState(false);
-    const [showVerifyCode, setShowVerifyCode] = useState(false);
-    const [showNewPassword, setShowNewPassword] = useState(false);
-    const [showVerificationEmail, setShowVerificationEmail] = useState(false);
-    const [loginMutation, { data: loginData, isLoading:isLoginLoading, isSuccess:isLoginSuccess, isError:isLoginError, error:loginError }] = useLoginMutation();
+    if (errors.length > 0) {
 
-    useEffect(() => {
-     if (isLoginError) {
-        setShowError(true);
-        setErrorMessage(showError || 'Please try again after sometime.');
+      return false;
+    }
+
+    return true;
+  }, []);
+
+  const handleFormUpdate = useCallback((updatedData) => {
+    setFormData(prevData => ({
+      ...prevData,
+      ...updatedData
+    }));
+  }, []);
+
+  const handleEdit = useCallback(() => {
+    setIsEditing(true);
+  }, []);
+
+  const handleSubmit = async () => {
+      if (!validateForm(formData)) {
+        return;
       }
-    }, [isLoginLoading, isLoginSuccess, isLoginError,loginError, errorMessage, showError]);
+      onBoard(formData);
+  };
 
-    const onLoginPress = async () => {
-      const emailError = emailValidator(email)
-      if (emailError) {
-        setShowError(true);
-        setErrorMessage(emailError)
-        return
-      }
-      let body = {"userName": email, "password": password};
-      body = JSON.stringify(body);
-      console.log(body);
-      await loginMutation(body);
+  const handleCancel = useCallback(() => {
+    // Reset to original data
+    if (originalFormData) {
+      setFormData(originalFormData);
     }
-
-    const handleModalClose = () => {
-      setModalVisible(false);
-    }
-
-    const handleRegisterPress = () => {
-      setModalVisible(true);
-    }
-
-    const handleResetPasswordPress = () => {
-      setShowResetPassword(true);
-    }
-
-    const handleResetPasswordModalClose = () => {
-      setShowResetPassword(false);
-    }
-
-    const handleVerifyCodeModalClose = () => {
-      setShowVerifyCode(false);
-    }
-
-    const handleNewPasswordModalClose = () => {
-      setShowNewPassword(false);
-    }
+    setIsEditing(false);
+  }, [originalFormData]);
 
 
 
-
-   
+  const handleModalClose = () => {
+    setShowGenerateNumber(false);
+  }
+  if (!formData) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
-    // Main container with a gray background
-    <View style={[styles.container,{padding: 0,}]}>
-       
-
-
-            <View style={{ width:'50%', height:'30%', marginLeft:'25%',alignItems:'center'}}>
-                  <View style={{ width:'90%', height:'35%', margin:'1%'}}>
-                          <TextInput
-                          style={[styles.input,{width:'100%',height:'100%'}, emailError ? styles.inputError : null]}
-                          value={email}
-                          onChangeText={(text) => {
-                            setEmail(text);
-                          }}
-                          placeholder="Registered Email"
-                          editable={!isLoginLoading}
-                      />
-                      {showError && emailError ? (
-                        <Text style={styles.errorText}>
-                          {emailError.split(' ').reduce((acc, word, index) => {
-                            if (index > 0 && index % 3 === 0) {
-                              acc.push(<Text key={index}>{`${word} `}</Text>);
-                            } else {
-                              acc.push(<Text key={index}>{`${word} `}</Text>);
-                            }
-                            return acc;
-                          }, [])}
-                        </Text>
-                      ) : null}         
-                  </View>
-
-                  <View style={{ width:'90%', height:'35%', margin:'1%'}}>
-                        <TextInput
-                                  style={[styles.input,{width:'100%',height:'100%'}, passwordError ? styles.inputError : null]}
-                                  value={password}
-                                  onChangeText={setPassword}
-                                  placeholder="Password"
-                                  secureTextEntry
-                                  editable={!isLoginLoading}
-                              />
-                  </View>
-                  <View style={[{flexDirection:'row', alignItems:'center',marginRight:'10%'}]}>
-
-                      <View style={{ width:'50%',margin:'5%',height:'90%'}}>
-                        <Button mode="contained" onPress={onLoginPress} disabled={isLoginLoading}>
-                          Create
-                        </Button>
-                      </View>          
-
-                          
-                      <View style={{width:'50%',margin:'5%',height:'90%'}}>
-                        <Button mode="contained" onPress={handleRegisterPress} disabled={isLoginLoading}>
-                          Register
-                        </Button>
-                      </View>
-
-                      <View style={{justifyContent:'center', marginTop:'3%'}}>
-  
-                      </View>
-                  </View>
-                     
+    <View style={styles.screenContainer}>
+      <View style={styles.header}>
+        <View style={styles.buttonContainer}>
+          {isEditing ? (
+            <View style={{
+              borderRadius: 8,
+              overflow: 'hidden'  // This is important to make border radius visible
+            }}>
+              <Button
+                title="Cancel"
+                onPress={handleCancel}
+                color="#666"
+              />
+              <View style={styles.buttonSpacer} />
+              <Button
+                title="Submit"
+                onPress={handleSubmit}
+                color="#007AFF"
+              />
             </View>
+          ) : (
+            <View style={{
+              borderRadius: 8,
+              overflow: 'hidden'  // This is important to make border radius visible
+            }}>
+                <Button
+                  title="Edit"
+                  onPress={handleEdit}
+                  color="#007AFF"
+                />
+            </View>
+          )}
+        </View>
 
+        <View style={styles.buttonContainer}>
 
+              <GenerateNumber onClose={()=>setShowGenerateNumber(false)} openModal={showGenerateNumber} businessId={businessData.parentBusinessId}/>
 
-      
-            
-        
-           
-            
+              <Button
+                title="Generate Number"
+                onPress={()=>setShowGenerateNumber(true)}
+                color="#007AFF"
+              />
 
+        </View>
+      </View>
 
-                  
-
-
-
-                    
+      <ScrollView style={styles.scrollContainer}>
+        <BusinessForm 
+          enabled={isEditing}
+          formData={formData}
+          onUpdateForm={handleFormUpdate}
+        />
+      </ScrollView>
     </View>
   );
 };
 
+const styles = StyleSheet.create({
+  screenContainer: {
+    flex: 1,
+    backgroundColor: '#d3d3d3',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+   
+  },
+  buttonSpacer: {
+    width: 10,
+    margin:'1%'
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  }
+});
 
-// Export the component
 export default Business;
-
-
