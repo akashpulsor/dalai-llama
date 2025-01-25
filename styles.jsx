@@ -554,13 +554,13 @@ const styles = StyleSheet.create({
     alignItems:'flex-start'
   },
   centeredView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 22,
+      flex: 1,
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center'
   },
   modalView: {
-    margin: 20,
+    margin: 2.5,
     backgroundColor: 'white',
     borderRadius: 20,
     padding: 35,
@@ -573,7 +573,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    width: '20%'
+    width: '30%'
   },
   modalText: {
     marginBottom: 15,
@@ -582,11 +582,11 @@ const styles = StyleSheet.create({
   input: {
     width: '100%',
     height: 40,
-    marginBottom: 10,
+
     borderColor: 'gray',
     borderWidth: 1,
     borderRadius: 5,
-    padding: 10,
+
   },
   logo: {
     width: 150,
@@ -629,7 +629,30 @@ const styles = StyleSheet.create({
     width: 200,
     height: 300,
     alignSelf:'center'
-  }
+  },
+  input: {
+    width: '150%',
+    borderWidth: 1,
+    marginTop: 15,
+    borderColor: 'white',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+    fontSize: 16,
+  },
+  inputError: {
+    borderColor: 'red',
+  },
+  errorText: {
+    color: 'red',
+    marginBottom: 10,
+  },
+  loadingContainer: {
+    marginVertical: 20,
+  },
+  errorContainer: {
+    marginVertical: 20,
+  },
 });
 
 export default styles;

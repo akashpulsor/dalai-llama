@@ -13,20 +13,22 @@ export const authSlice = createSlice({
     error: null,
     tools:null,
     llm:null,
+    onboardingData:null,
+    businessData: null,
     isLoggedIn: false,
+    twiliodata:null,
     selectedLlm: {}
   },
   reducers: {
     setUser: (state, action) => {
-      state.user = action.user;
-      console.log(action);
+      state.user = action.payload.user;
+      console.log(state);
     },
     setToken: (state, action) => {
-
-        storeTokenInAsyncStorage(action.token);
+        storeTokenInAsyncStorage(action.payload.token);
         state.isLoggedIn = true;
-        state.token = action.token;
-        console.log(action);
+        state.token = action.payload.token;
+        
     },
    clearAuth: (state) => {
       //TODO add error case
@@ -37,78 +39,25 @@ export const authSlice = createSlice({
        state.token = null;
        state.isLoggedIn = false;
     },
-    setTools: (state, action) => {
-      state.tools = action.payload;
-      console.log(action.payload);
+
+    setOnboardingData: (state, action) => {
+      state.onboardingData = action.payload;
+      
     },
-    setLlm: (state, action) => {
-      state.llm = action.payload;
-        console.log(action.payload);
+    setBusinessData: (state, action) => {
+      state.businessData = action.payload;
     },
-    setSelectedLlm: (state, action) => {
-          state.selectedLlm = action.payload;
-          console.log(state.selectedLlm);
-
-    },
-  },
-  extraReducers: (builder) =>{
-    builder.addMatcher(
-        authApi.endpoints.login.matchFulfilled,
-        (state, { payload }) => {
-            console.log(payload);
-            authSlice.caseReducers.setToken(state,payload);
-            authSlice.caseReducers.setUser(state,payload);
-        }
-    ),
-        builder.addMatcher(
-            authApi.endpoints.getTools.matchFulfilled,
-            (state, { payload }) => {
-                authSlice.caseReducers.setTools(state, payload)
-    }),
-        builder.addMatcher(
-            authApi.endpoints.getLlm.matchFulfilled,
-            (state, { payload }) => {
-                authSlice.caseReducers.setLlm(state, payload)
-            }),
-        builder.addMatcher(
-            authApi.endpoints.logout.matchFulfilled,
-            (state, { payload }) => {
-                authSlice.caseReducers.clearAuth()
-            }),
-        builder.addMatcher(
-            authApi.endpoints.register.matchFulfilled,
-            (state, { payload }) => {
-                authSlice.caseReducers.setUser(state,payload);
-                authSlice.caseReducers.setToken(state,payload);
-            }),
-        builder.addMatcher(
-            authApi.endpoints.getLlm.matchFulfilled,
-            (state, { payload }) => {
-                authSlice.caseReducers.setLlm(state,payload);
-
-            }),
-        builder.addMatcher(
-            authApi.endpoints.getTools.matchFulfilled,
-            (state, { payload }) => {
-                authSlice.caseReducers.setTools(state,payload);
-
-            }),
-        builder.addMatcher(
-            authApi.endpoints.generateStructure.matchFulfilled,
-            (state, { payload }) => {
-                console.log(payload);
-
-            })
+    setTwilioData: (state, action) => {
+      state.twiliodata = action.payload;
+    }
   }
-
 });
 
 export const { setUser, setToken, clearAuth,
-  setTools,setLlm,setSelectedLlm } = authSlice.actions;
+  setOnboardingData, setBusinessData,setTwilioData  } = authSlice.actions;
 
 // Store token in AsyncStorage
 const storeTokenInAsyncStorage = async (token) => {
-    console.log(token);
   try {
     await AsyncStorage.setItem('authToken', token);
   } catch (error) {
@@ -132,11 +81,12 @@ export default authSlice.reducer;
 export const selectIsLoggedIn = (state) => state.auth.isLoggedIn;
 export const selectUser = (state) => state.auth.user;
 
-export const selectTools = (state) => state.auth.tools;
 
-export const selectLlmData = (state) => state.auth.llm;
 
 export const selectError = (state) => state.auth.error;
 
-export const selectedLLm = (state) => state.auth.selectedLlm;
+export const selectOnboardingData = (state) => state.auth.onboardingData;
+export const selectBusinessData = (state) => state.auth.businessData;
+
+export const selectTwilioData = (state) => state.auth.TwilioData;
 
