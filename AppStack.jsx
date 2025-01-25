@@ -18,6 +18,8 @@ import Agents from './screens/Agents';
 import Business from './screens/Business';
 import CampaignLogs from './screens/CampaignLogs';
 import Campaigns from './screens/Campaigns';
+
+import LandingPage from './screens/LandingPage';
 import CallLogs from './screens/CallLogs';
 import Logout from './component/LogOut';
 const Auth = createStackNavigator();  
@@ -116,12 +118,6 @@ const HomeStack = () => {
               }
           }/>
 
-          <Drawer.Screen name="Campaign Logs" component={CampaignLogs}  options={
-              {
-                headerTitle:"Campaigns Logs"
-              }
-          }/>
-
           
       </Drawer.Navigator>
 
@@ -132,7 +128,8 @@ const HomeStack = () => {
 
 const AuthStack = () => {
   return (
-    <Auth.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
+    <Auth.Navigator initialRouteName="LandingPage" screenOptions={{ headerShown: false }}>
+      <Auth.Screen name="LandingPage" component={LandingPage} options={{headerShown:false}}/>
       <Auth.Screen name="Login" component={Home} options={{headerShown:false}}/>
     </Auth.Navigator>
   );

@@ -67,6 +67,14 @@ export const authApi = createApi({
           'Content-Type': 'application/json', // Ensure this is set correctly
         },
         body: data}),
+        onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+          try{
+            const { data } = await queryFulfilled;
+          }
+          catch(error) {
+            handleError(error, dispatch)
+          }
+        },
       onSuccess: (response, { dispatch }) => {
         dispatch(setToken(response.loginResponseDto.accessToken)); // Set token in state
       },
@@ -146,6 +154,41 @@ export const authApi = createApi({
         } 
       },
     }),
+    runCampaign: builder.mutation({
+      query: (data) => ({
+        url: `/campaign/run?businessId=${data.businessId}&campaignRunId=${data.campaignRunId}`,
+        method: 'POST',
+      }),
+      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+        try {
+          const { data } = await queryFulfilled;
+        }
+        catch (error) {
+          dispatch(showMessage({
+            message: error.error?.data?.message || 'Operation failed',
+            type: 'error'
+          }));
+        } 
+      },
+    }),
+    startCampaign: builder.mutation({
+      query: (data) => ({
+        url: '/campaign/start',
+        method: 'POST',
+        body: data
+      }),
+      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+        try {
+          const { data } = await queryFulfilled;
+        }
+        catch (error) {
+          dispatch(showMessage({
+            message: error.error?.data?.message || 'Operation failed',
+            type: 'error'
+          }));
+        } 
+      },
+    }),
     addAgent: builder.mutation({
       query: (data) => ({
         url: '/agent/add',
@@ -182,6 +225,73 @@ export const authApi = createApi({
             const { data } = await queryFulfilled;
             dispatch(setBusinessData(data));
        },
+    }),
+    ///business/get?businessId=${businessId}
+    getLeadData: builder.query({
+      query: (params) => `/lead/${params.businessId}/leads/paginated?page=${params.page}&test=${params.test}&size=${params.size}&sortBy=${params.sortBy}`,
+      onQueryStarted: async (arg, { dispatch, getState, queryFulfilled }) => {
+        try{
+          const { data } = await queryFulfilled;
+        }
+        catch(error) {
+          handleError(error, dispatch)
+        }
+    
+       },
+    }),
+    getLlmDataList: builder.query({
+      query: (params) => `/meta/llm/${params.businessId}/get`,
+      onQueryStarted: async (arg, { dispatch, getState, queryFulfilled }) => {
+        try{
+          const { data } = await queryFulfilled;
+        }
+        catch(error) {
+          handleError(error, dispatch)
+        }
+    
+       },
+    }),
+    getPhoneDataList: builder.query({
+      query: (params) => `/meta/phone/${params.businessId}/get`,
+      onQueryStarted: async (arg, { dispatch, getState, queryFulfilled }) => {
+        try{
+          const { data } = await queryFulfilled;
+        }
+        catch(error) {
+          handleError(error, dispatch)
+        }
+    
+       },
+    }),
+    addPhoneData: builder.mutation({
+      query: (data) => ({
+        url: '/meta/phone/add',
+        method: 'POST',
+        body: data
+      }),
+      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+        try{
+          const { data } = await queryFulfilled;
+        }
+        catch(error) {
+          handleError(error, dispatch)
+        }
+      },
+    }),
+    addLLMData: builder.mutation({
+      query: (data) => ({
+        url: '/meta/llm/add',
+        method: 'POST',
+        body: data
+      }),
+      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+        try{
+          const { data } = await queryFulfilled;
+        }
+        catch(error) {
+          handleError(error, dispatch)
+        }
+      },
     }),
     getOnBoardingData: builder.query({
       query: (businessId) => `/business/onboard?businessId=${businessId}`,
@@ -221,8 +331,8 @@ export const authApi = createApi({
 
 export const { useLoginMutation, useRegisterMutation, useVerificationCodeMutation,useValidateCodeMutation,useUpdatePasswordMutation,
   useLogoutMutation, useAddCampaignMutation, useGetCompanySizeQuery,
-  useGetAgentListQuery, useGetCampaignListQuery, useGetToolsQuery, useGetLlmQuery, useGenerateStructureMutation,
-  useGenerateArticleMutation, useSaveArticleMutation, useGenerateTagsMutation, usePublishMutation, 
+  useGetAgentListQuery, useGetCampaignListQuery, useGetLeadDataQuery, useGetLlmDataListQuery, useGetPhoneDataListQuery, useStartCampaignMutation, useAddPhoneDataMutation,
+  useAddLLMDataMutation, useRunCampaignMutation, useGenerateTagsMutation, usePublishMutation, 
   useLoginWordpressMutation, useAddLeadMutation,useAddAgentMutation, useRefreshTokenQuery,
  useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery,useGenerateNumberMutation} = authApi;
 

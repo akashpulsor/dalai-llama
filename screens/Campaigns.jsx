@@ -39,10 +39,11 @@ const CampaignItem = ({ item, onBlur }) => {
                   <Text style={[styles.label,{fontFamily:'bold',fontWeight: "bold",fontSize:16}]}>{item.campaignName} : </Text>
                   <Text style={[styles.label,{fontFamily:'bold',fontWeight: "bold",fontSize:16}]}>{item.campaignAim}</Text> 
                 </View>
+               
                 <CampaignRun 
                     onClose={setShowCreateAgentModal} 
                     openModal={showCreateAgentModal} 
-                    campaignId={item} 
+                    campaignData={item} 
                 />
             </View>
         </TouchableOpacity>

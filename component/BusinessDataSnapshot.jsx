@@ -16,7 +16,12 @@ import { useSelector } from 'react-redux';
 import {selectUser, selectOnboardingData} from './authSlice';
 import {useGetBusinessDataQuery,useGeneratePhoneMutation} from './authApi';
 
+import PhoneModal from './PhoneModal'
+import LlmModal from './LlmModal';
+
 const BusinessDataSnapShot = ({navigation}) => {
+    const [PhoneDataModal, setPhoneDataModal] = useState(false);
+    const [llmDataModel, setLlmDataModal] = useState(false);
     const user =  useSelector(selectUser);
     const onBoardingData =  useSelector(selectOnboardingData);
     const { data: businessData, error, isLoading, isError } = useGetBusinessDataQuery(
@@ -31,7 +36,14 @@ const BusinessDataSnapShot = ({navigation}) => {
         console.log(onBoardingData);
     }, [onBoardingData]);
 
-
+    const openPhoneModal = () => {
+        setLlmDataModal(false);
+        setPhoneDataModal(true);
+    };
+    const openLlmModal = () => {
+        setPhoneDataModal(false);
+        setLlmDataModal(true);
+    };
     return (
         <View style={[styles.tableContainer,{flexDirection:'column'}]}>
                 {/* Business Name */}
@@ -52,17 +64,27 @@ const BusinessDataSnapShot = ({navigation}) => {
                 </View>
 
                 
-                    <View style={{marginLeft:'90%',flexDirection:'row', marginBottom:'100%'}}>
-                        {!onBoardingData && (
+                    <View style={{flexDirection:'row'}}>
+                                <PhoneModal onClose={setPhoneDataModal} openModal={PhoneDataModal} />
+                                <LlmModal onClose={setLlmDataModal} openModal={llmDataModel} />
                                 <TouchableOpacity 
-                                    style={[styles.generateButton]}
-                                    onPress={() => navigation.navigate('Business')}
+                                    style={[styles.generateButton,{margin:'5%'}]}
+                                    onPress={() => openPhoneModal()}
                                 >
                                     <Text style={styles.generateButtonText}>
-                                        OnBoard Business
+                                        Configure Phone
                                     </Text>
                                 </TouchableOpacity>
-                            )}
+
+                                <TouchableOpacity 
+                                    style={[styles.generateButton,{margin:'5%'}]}
+                                    onPress={() => openLlmModal()}
+                                >
+                                    <Text style={styles.generateButtonText}>
+                                        Configure LLM
+                                    </Text>
+                                </TouchableOpacity>
+                            
                     </View>
 
         </View>
@@ -73,7 +95,7 @@ const BusinessDataSnapShot = ({navigation}) => {
 export default BusinessDataSnapShot;
 
 BusinessDataSnapShot.propTypes = {
-    businessId : PropTypes.number.isRequired
+   
 };
 
 const styles = StyleSheet.create({

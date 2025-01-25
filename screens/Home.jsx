@@ -84,6 +84,9 @@ const Home = ({navigation}) => {
       setShowNewPassword(false);
     }
 
+    const goToHome = () => {
+      navigation.navigate('LandingPage');
+    }
 
 
 
@@ -92,7 +95,11 @@ const Home = ({navigation}) => {
   return (
     // Main container with a gray background
     <View style={[styles.container,{padding: 0,}]}>
-       
+                             <View style={{justifyContent:'center', marginTop:'3%'}}>
+                        <TouchableOpacity onPress={() =>  goToHome()}>
+                            <Text style={{ fontSize: 20, color: 'blue' }}>Home</Text>
+                        </TouchableOpacity>
+                      </View>
       <Image source={require('../assets/search-logo.png')} style={[styles.Searchlogo,{shadowColor:"white",
                 shadowOffset:3,
                 shadowOpacity:10,    shadowColor: '#000',

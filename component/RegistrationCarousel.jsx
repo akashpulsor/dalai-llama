@@ -100,7 +100,6 @@ const RegistrationCarousel = () => {
   const totalProgress = (sectionProgress.section1 + sectionProgress.section2 + sectionProgress.section3) / 3;
 
   const onRegisterationPress = async () =>{
-    try {
         console.log(countryCode);
         let body = {
             
@@ -119,11 +118,7 @@ const RegistrationCarousel = () => {
         body = JSON.stringify(body);
 
         await registerMutation(body);
-      } catch (e) {
-        setShowError(true);
-        console.log(e);
-        setErrorText('An error occurred. Please try again.');
-      }
+     
   }
 
 

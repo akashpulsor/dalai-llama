@@ -28,6 +28,7 @@ const CampaignForm = ({
         }));
     };
 
+    console.log(formData);
     
 
   return (
@@ -40,8 +41,8 @@ const CampaignForm = ({
                                     <TextInput
                                         style={[styles.input, !enabled && styles.disabledInput]}
                                         placeholder="Enter campaign name"
-                                        value={formData.name}
-                                        onChangeText={(text) => handleFormChange('name', text)}
+                                        value={formData.campaignName}
+                                        onChangeText={(text) => handleFormChange('campaignName', text)}
                                         editable={enabled}
                                     />
                                 </View>
@@ -50,8 +51,8 @@ const CampaignForm = ({
                                     <TextInput
                                         style={[styles.input, !enabled && styles.disabledInput]}
                                         placeholder="Enter campaign objective"
-                                        value={formData.objective}
-                                        onChangeText={(text) => handleFormChange('objective', text)}
+                                        value={formData.campaignAim}
+                                        onChangeText={(text) => handleFormChange('campaignAim', text)}
                                         editable={enabled}
                                     />
                                 </View>
@@ -60,8 +61,8 @@ const CampaignForm = ({
 
                                                           <TextInput
                         style={[styles.input, styles.textArea, !enabled && styles.disabledInput]}
-                        value={formData.persona}
-                        onChangeText={(text) => handleFormChange('description', text)}
+                        value={formData.campaignDesc}
+                        onChangeText={(text) => handleFormChange('campaignDesc', text)}
                         placeholder="Enter campaign description"
                         multiline={true}
                         numberOfLines={4}
@@ -78,30 +79,13 @@ const CampaignForm = ({
                                         editable={enabled}
                                     />
                                 </View>
-                                <View style={styles.inputGroup}>
-                                        <Text style={styles.label}>Language</Text>
-                                        <View style={styles.pickerContainer}>
-                                            <Picker
-                                                selectedValue={formData.language}
-                                                onValueChange={(text) => handleFormChange('language', text)}
-                                                style={styles.picker}
-                                                enabled={enabled}
-                                            >
-                                                <Picker.Item label="Select a language" value="" />
-                                                <Picker.Item label="English" value="en" />
-                                                <Picker.Item label="Hindi" value="hn" />
-                                                <Picker.Item label="Spanish" value="es" />
-                                                <Picker.Item label="French" value="fr" />
-                                                <Picker.Item label="German" value="de" />
-                                            </Picker>
-                                        </View>
-                                </View>    
+                                  
                                 <View style={styles.inputGroup}>
                                     <Text style={styles.label}>Duration (minutes)</Text>
                                     <TextInput
                                         style={[styles.input, !enabled && styles.disabledInput]}
                                         placeholder="Enter duration (max 5 minutes)"
-                                        value={formData.duration.toString()}
+                                        value={formData.duration}
                                         onChangeText={(text) =>
                                             setFormData(prev => ({
                                             ...prev,

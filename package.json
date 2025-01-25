@@ -29,6 +29,8 @@
     "expo": "^51.0.0",
     "expo-status-bar": "~1.12.1",
     "expo-web-browser": "~13.0.3",
+    "libphonenumber-js": "^1.11.16",
+    "lucide-react": "^0.474.0",
     "postal-codes-js": "^2.5.2",
     "prop-types": "^15.8.1",
     "react": "18.2.0",
