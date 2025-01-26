@@ -14,7 +14,7 @@ export const authApi = createApi({
   reducerPath: 'authApi',
   //https://api.dalai-llama.com
   baseQuery: fetchBaseQuery(
-      { baseUrl: 'http://localhost:8080/api',
+      { baseUrl: process.env.REACT_APP_API_BASE_URL ||'http://localhost:8080/api',
         prepareHeaders: (headers, { getState }) => {
           // Get the token from state
           const token = getState().auth.token;
@@ -77,6 +77,30 @@ export const authApi = createApi({
         },
       onSuccess: (response, { dispatch }) => {
         dispatch(setToken(response.loginResponseDto.accessToken)); // Set token in state
+      },
+    }),
+    interest: builder.mutation({
+      query: (data) => ({
+        url: '/auth/interest',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json', // Ensure this is set correctly
+        },
+        body: data}),
+        onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+          try{
+            const { response } = await queryFulfilled;
+          }
+          catch(error) {
+            console.log(error);
+            handleError(error, dispatch)
+          }
+        },
+      onSuccess: (response, { dispatch }) => {
+        dispatch(showMessage({
+          message: 'We have recieved your interest, Team will get back to you',
+          type: 'info'
+        })); // Set token in state
       },
     }),
     verificationCode: builder.mutation({
@@ -334,5 +358,5 @@ export const { useLoginMutation, useRegisterMutation, useVerificationCodeMutatio
   useGetAgentListQuery, useGetCampaignListQuery, useGetLeadDataQuery, useGetLlmDataListQuery, useGetPhoneDataListQuery, useStartCampaignMutation, useAddPhoneDataMutation,
   useAddLLMDataMutation, useRunCampaignMutation, useGenerateTagsMutation, usePublishMutation, 
   useLoginWordpressMutation, useAddLeadMutation,useAddAgentMutation, useRefreshTokenQuery,
- useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery,useGenerateNumberMutation} = authApi;
+ useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery,useGenerateNumberMutation, useInterestMutation} = authApi;
 

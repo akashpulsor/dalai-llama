@@ -13,6 +13,8 @@ import {
 
 import Icon from 'react-native-vector-icons/Feather';
 import CountryCodeDropdownPicker from './CountryCodeDropdownPicker';
+import countryData from '../helper/countryData';
+
 const countryCodes = [
     { code: '+1', name: 'United States', flag: '🇺🇸' },
     { code: '+91', name: 'India', flag: '🇮🇳' },
@@ -32,6 +34,7 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
     });
 
     const [errors, setErrors] = useState({});
+    
 
     const [countryCallingCode, setCountryCallingCode] = useState('+1');
     const [countryCode, setCountryCode] = useState('US');
@@ -76,6 +79,7 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
           setCountryCallingCode(selectedCountry.code);    // Set the calling code (e.g., '+1')
         }
       };
+
 
     return (
         <Modal
