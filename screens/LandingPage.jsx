@@ -1,9 +1,11 @@
-import React, { createRef , useState } from 'react';
+import React, { createRef , useState,useEffect } from 'react';
 import { View, ScrollView, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import LeadForm from '../component/LeadForm';
-
+import { useDispatch } from 'react-redux';
+import { useInterestMutation } from '../component/authApi';
+import { showMessage } from '../component/flashMessageSlice';
 const CurvedBackground = () => {
     return (
       <View style={styles.backgroundContainer}>
@@ -20,6 +22,15 @@ const CurvedBackground = () => {
 const LandingPage = ({ navigation }) => {
     const scrollViewRef = createRef();
     const [isLeadFormVisible, setLeadFormVisible] = useState(false);
+    const dispatch = useDispatch();
+
+    const [addInterest, { 
+        data: interestData, 
+        isLoading: isInterestDataLoading, 
+        isSuccess: isInterestDataSuccess, 
+        isError: isInterestDataError, 
+        error: interestDataError 
+      }] = useInterestMutation();
 
     const handleNavClick = (sectionId) => {
         scrollViewRef.current.scrollTo({
@@ -44,12 +55,35 @@ const LandingPage = ({ navigation }) => {
         setLeadFormVisible(true);
     };
 
-    const handleLeadSubmit = (leadData) => {
+    const handleLeadSubmit = async (leadData) => {
         // Implement lead submission logic here
         // This could be an API call to your backend
-        console.log('Lead submitted:', leadData);
+        try{
+            await addInterest(leadData);
+            setLeadFormVisible(false);
+            console.log('interest submitted:', leadData);
+        } 
+        catch(err) {
+            console.error("Interest failed:", err);
+        }
+
         // Optional: Show a success toast or alert
     };
+
+    useEffect(() => {
+        
+        if(isInterestDataSuccess){
+            
+            dispatch(showMessage({
+                message: 'You interest is submitted, Team will contact you',
+                type: 'info'
+              }));
+              
+              setLeadFormVisible(false);
+        }
+    
+      }, [isInterestDataSuccess]);
+
     return (
         <View style={styles.container}>
                 <ScrollView 
