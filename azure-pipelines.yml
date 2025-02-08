@@ -9,6 +9,10 @@ trigger:
 pool:
   vmImage: ubuntu-latest
 
+variables:
+  nodeVersion: '22.x'
+  webBuildOutput: 'web-build'  
+
 steps:
 - task: NodeTool@0
   inputs:
@@ -16,6 +20,29 @@ steps:
   displayName: 'Install Node.js'
 
 - script: |
+    npm install -g expo-cli
     npm install
-    npm run build
-  displayName: 'npm install and build'
+  displayName: 'Install dependencies'
+
+
+- script: |
+    expo install @expo/webpack-config
+    npx expo export:web
+  displayName: 'Build web version'
+
+
+- task: ArchiveFiles@2
+  inputs:
+    rootFolderOrFile: '$(System.DefaultWorkingDirectory)/$(webBuildOutput)'
+    includeRootFolder: false
+    archiveType: 'zip'
+    archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+    replaceExistingArchive: true
+
+- task: AzureWebApp@1
+  inputs:
+    azureSubscription: 'Microsoft Azure Sponsorship'
+    appName: 'dalai-llama'
+    package: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+    deploymentMethod: 'auto'
+
