@@ -30,38 +30,12 @@ jobs:
         run: |
           npm install -g expo-cli
           npm install --legacy-peer-deps
-          npm install crypto-browserify  # Added this line to install crypto polyfill
-
-      - name: Create Webpack Config
-        run: |
-          echo 'const createExpoWebpackConfigAsync = require("@expo/webpack-config");
-          
-          module.exports = async function(env, argv) {
-            const config = await createExpoWebpackConfigAsync(env, argv);
-            
-            if (!config.resolve) {
-              config.resolve = {};
-            }
-            
-            if (!config.resolve.fallback) {
-              config.resolve.fallback = {};
-            }
-            
-            config.resolve.fallback = {
-              ...config.resolve.fallback,
-              "crypto": require.resolve("crypto-browserify")
-            };
-            
-            return config;
-          };' > webpack.config.js
-
         
       - name: Build Web Version
         run: |
           expo install @expo/webpack-config
           npx expo export:web
-
-
+  
       - name: Zip artifact for deployment
         run: zip release.zip ./* -r
 
