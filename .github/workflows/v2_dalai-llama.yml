@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 env:
-  NODE_VERSION: '22.x'  # Keeping Node 22 as per local environment
+  NODE_VERSION: '22.x'
   WEB_BUILD_OUTPUT: 'web-build'
 
 jobs:
@@ -28,11 +28,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Setup Project Dependencies
+      - name: Install Global Dependencies
         run: |
           npm install -g expo-cli
-          npm pkg set scripts.postinstall="patch-package"
-          npm pkg set browser.crypto="crypto-browserify"
+          npm install -g patch-package
+
+      - name: Setup Webpack Config
+        run: |
           echo '{
             "browser": {
               "crypto": "crypto-browserify",
@@ -53,7 +55,9 @@ jobs:
           npm install --legacy-peer-deps
           npm install crypto-browserify stream-browserify buffer --legacy-peer-deps
           npm install @expo/webpack-config@19.0.1 --legacy-peer-deps
-          npm install patch-package --legacy-peer-deps
+
+      - name: Apply Patches
+        run: npx patch-package
 
       - name: Build Web Version
         run: |
