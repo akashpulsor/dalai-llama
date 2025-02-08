@@ -8,15 +8,16 @@ on:
     branches:
       - v2
   workflow_dispatch:
+
 env:
-  NODE_VERSION: '22.x'
-  WEB_BUILD_OUTPUT: 'web-build'  
+  NODE_VERSION: '22.x'  # Keeping Node 22 as per local environment
+  WEB_BUILD_OUTPUT: 'web-build'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read #This is required for actions/checkout
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -24,24 +25,47 @@ jobs:
       - name: Set up Node.js version
         uses: actions/setup-node@v3
         with:
-          node-version: '22.x'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Project Dependencies
+        run: |
+          npm install -g expo-cli
+          npm pkg set scripts.postinstall="patch-package"
+          npm pkg set browser.crypto="crypto-browserify"
+          echo '{
+            "browser": {
+              "crypto": "crypto-browserify",
+              "stream": "stream-browserify",
+              "buffer": "buffer"
+            },
+            "resolve": {
+              "fallback": {
+                "crypto": "crypto-browserify",
+                "stream": "stream-browserify",
+                "buffer": "buffer"
+              }
+            }
+          }' > webpack.config.json
 
       - name: Install Dependencies
         run: |
-          npm install -g expo-cli
-          npm install --legacy-peer-deps expo@~50.0.0
-          npm install --legacy-peer-deps @expo/webpack-config@19.0.1
           npm install --legacy-peer-deps
-          npm install crypto-browserify  # Added this line to install crypto polyfill
+          npm install crypto-browserify stream-browserify buffer --legacy-peer-deps
+          npm install @expo/webpack-config@19.0.1 --legacy-peer-deps
+          npm install patch-package --legacy-peer-deps
 
-        
       - name: Build Web Version
         run: |
-          expo install @expo/webpack-config
+          export NODE_OPTIONS="--max_old_space_size=4096"
           npx expo export:web
-  
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
       - name: Zip artifact for deployment
-        run: zip release.zip ./* -r
+        run: |
+          cd web-build
+          zip -r ../release.zip ./*
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
@@ -56,8 +80,8 @@ jobs:
       name: 'Production'
       url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
     permissions:
-      id-token: write #This is required for requesting the JWT
-      contents: read #This is required for actions/checkout
+      id-token: write
+      contents: read
 
     steps:
       - name: Download artifact from build job
@@ -66,8 +90,11 @@ jobs:
           name: node-app
 
       - name: Unzip artifact for deployment
-        run: unzip release.zip
-      
+        run: |
+          mkdir -p web-build
+          unzip release.zip -d web-build/
+          rm release.zip
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -81,5 +108,4 @@ jobs:
         with:
           app-name: 'dalai-llama'
           slot-name: 'Production'
-          package: .
-          
+          package: web-build
