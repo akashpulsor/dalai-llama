@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginHorizontal: 20,
         padding: 10,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        backgroundColor: '#6b7280',
         borderRadius: 10,
     },
     trustBadgeTitle: {
@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
     featureCard: {
         width: '45%',
         padding: 20,
-        backgroundColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: '#6b7280',
         borderRadius: 10,
         marginHorizontal: 10,
         alignItems: 'center',
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     benefitCard: {
         width: '30%',
         padding: 20,
-        backgroundColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: '#6b7280',
         borderRadius: 10,
         marginHorizontal: 10,
         alignItems: 'center',

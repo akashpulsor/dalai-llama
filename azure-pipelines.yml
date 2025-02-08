@@ -1,21 +1,57 @@
-# Node.js
-# Build a general Node.js project with npm.
-# Add steps that analyze code, save build artifacts, deploy, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
+name: Build and Deploy to Azure
+on:
+  push:
+    branches:
+      - v2
 
-trigger:
-- main
+permissions:
+  id-token: write
+  contents: read
 
-pool:
-  vmImage: ubuntu-latest
+env:
+  NODE_VERSION: '22.x'
+  WEB_BUILD_OUTPUT: 'web-build'
 
-steps:
-- task: NodeTool@0
-  inputs:
-    versionSpec: '10.x'
-  displayName: 'Install Node.js'
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
 
-- script: |
-    npm install
-    npm run build
-  displayName: 'npm install and build'
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Install Dependencies
+      run: |
+        npm install -g expo-cli
+        npm install --legacy-peer-deps
+      
+    - name: Build Web Version
+      run: |
+        expo install @expo/webpack-config
+        npx expo export:web
+
+    - name: Archive Build
+      run: |
+        cd ${{ env.WEB_BUILD_OUTPUT }}
+        zip -r ../build.zip ./*
+
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: 'dalai-llama'
+        package: build.zip
+        
+    - name: Azure Logout
+      run: |
+        az logout
