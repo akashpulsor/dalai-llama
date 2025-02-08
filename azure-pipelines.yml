@@ -1,48 +1,57 @@
-# Node.js
-# Build a general Node.js project with npm.
-# Add steps that analyze code, save build artifacts, deploy, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
+name: Build and Deploy to Azure
+on:
+  push:
+    branches:
+      - main
 
-trigger:
-- main
+permissions:
+  id-token: write
+  contents: read
 
-pool:
-  vmImage: ubuntu-latest
+env:
+  NODE_VERSION: '22.x'
+  WEB_BUILD_OUTPUT: 'web-build'
 
-variables:
-  nodeVersion: '22.x'
-  webBuildOutput: 'web-build'  
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
 
-steps:
-- task: NodeTool@0
-  inputs:
-    versionSpec: '10.x'
-  displayName: 'Install Node.js'
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-- script: |
-    npm install -g expo-cli
-    npm install --legacy-peer-deps
-  displayName: 'Install dependencies'
+    - name: Install Dependencies
+      run: |
+        npm install -g expo-cli
+        npm install --legacy-peer-deps
+      
+    - name: Build Web Version
+      run: |
+        expo install @expo/webpack-config
+        npx expo export:web
 
+    - name: Archive Build
+      run: |
+        cd ${{ env.WEB_BUILD_OUTPUT }}
+        zip -r ../build.zip ./*
 
-- script: |
-    expo install @expo/webpack-config
-    npx expo export:web
-  displayName: 'Build web version'
-
-
-- task: ArchiveFiles@2
-  inputs:
-    rootFolderOrFile: '$(System.DefaultWorkingDirectory)/$(webBuildOutput)'
-    includeRootFolder: false
-    archiveType: 'zip'
-    archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
-    replaceExistingArchive: true
-
-- task: AzureWebApp@1
-  inputs:
-    azureSubscription: 'Microsoft Azure Sponsorship'
-    appName: 'dalai-llama'
-    package: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
-    deploymentMethod: 'auto'
-
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: 'dalai-llama'
+        package: build.zip
+        
+    - name: Azure Logout
+      run: |
+        az logout
