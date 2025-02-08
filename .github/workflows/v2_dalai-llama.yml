@@ -30,6 +30,8 @@ jobs:
         run: |
           npm install -g expo-cli
           npm install --legacy-peer-deps
+          npm install crypto-browserify  # Added this line to install crypto polyfill
+
         
       - name: Build Web Version
         run: |
