@@ -8,6 +8,9 @@ on:
     branches:
       - v2
   workflow_dispatch:
+env:
+  NODE_VERSION: '22.x'
+  WEB_BUILD_OUTPUT: 'web-build'  
 
 jobs:
   build:
