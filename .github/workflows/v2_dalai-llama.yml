@@ -53,9 +53,8 @@ jobs:
       - name: Install Dependencies
         run: |
           npm install --legacy-peer-deps
-          npm install @expo/webpack-config@19.0.1 --legacy-peer-deps
-          npm install crypto-browserify stream-browserify buffer @expo/webpack-config@19.0.1 --legacy-peer-deps
-          npm install webpack@5 --legacy-peer-deps
+
+
 
       - name: Apply Patches
         run: npx patch-package
