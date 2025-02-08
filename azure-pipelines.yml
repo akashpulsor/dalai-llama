@@ -27,6 +27,7 @@ stages:
         versionSpec: '$(nodeVersion)'
       displayName: 'Install Node.js'
 
+<<<<<<< HEAD
     - script: |
         npm install -g expo-cli@4.12.0
       displayName: 'Install Expo CLI'
@@ -73,6 +74,12 @@ stages:
               package: '$(Pipeline.Workspace)/web-app/$(projectName).zip'
               deploymentMethod: 'auto'
             displayName: 'Deploy to Azure Web App'
+=======
+- script: |
+    npm install -g expo-cli
+    npm install --legacy-peer-deps
+  displayName: 'Install dependencies'
+>>>>>>> efea554 (Update azure-pipelines.yml)
 
 
       
