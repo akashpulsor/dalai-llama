@@ -1,57 +1,77 @@
-name: Build and Deploy to Azure
-on:
-  push:
-    branches:
-      - v2
+trigger:
+  branches:
+    include:
+      - main  # Trigger on main branch changes
+  paths:
+    include:
+      - 'src/**'
+      - 'public/**'
+      - 'package.json'
+      - 'app.json'
+      - 'eas.json'
+pool:
+  vmImage: 'ubuntu-latest'  # Using Ubuntu as build agent
 
-permissions:
-  id-token: write
-  contents: read
+variables:
+  nodeVersion: '16.13.0'  # Use a version compatible with legacy peer dependencies
+  projectName: 'dalai-llama'  # Replace with your actual app name
 
-env:
-  NODE_VERSION: '22.x'
-  WEB_BUILD_OUTPUT: 'web-build'
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    
+stages:
+- stage: Build
+  displayName: 'Build and Deploy Expo Web App'
+  jobs:
+  - job: BuildAndDeploy
     steps:
-    - uses: actions/checkout@v3
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '$(nodeVersion)'
+      displayName: 'Install Node.js'
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        
-    - name: Azure Login
-      uses: azure/login@v1
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    - script: |
+        npm install -g expo-cli@4.12.0
+      displayName: 'Install Expo CLI'
 
-    - name: Install Dependencies
-      run: |
-        npm install -g expo-cli
+    - script: |
         npm install --legacy-peer-deps
+      displayName: 'Install dependencies with legacy peer flag'
+
+    - script: |
+        npm run build:web
+      displayName: 'Build Expo Web'
+    
+    - task: ArchiveFiles@2
+      inputs:
+        rootFolderOrFile: 'web-build'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/$(projectName).zip'
+        replaceExistingArchive: true
+      displayName: 'Archive Web Build'
+
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        artifactName: 'web-app'
+        publishLocation: 'Container'
+      displayName: 'Publish Build Artifacts'
       
-    - name: Build Web Version
-      run: |
-        expo install @expo/webpack-config
-        npx expo export:web
+- stage: Deploy
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: DeployWebApp
+    environment: 'Production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: 'YourAzureSubscription'  # Replace with your Azure subscription
+              appType: 'webApp'
+              appName: '$(projectName)'
+              package: '$(Pipeline.Workspace)/web-app/$(projectName).zip'
+              deploymentMethod: 'auto'
+            displayName: 'Deploy to Azure Web App'
 
-    - name: Archive Build
-      run: |
-        cd ${{ env.WEB_BUILD_OUTPUT }}
-        zip -r ../build.zip ./*
-
-    - name: Deploy to Azure Web App
-      uses: azure/webapps-deploy@v2
-      with:
-        app-name: 'dalai-llama'
-        package: build.zip
-        
-    - name: Azure Logout
-      run: |
-        az logout
+      
