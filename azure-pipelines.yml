@@ -54,7 +54,7 @@ stages:
         artifactName: 'web-app'
         publishLocation: 'Container'
       displayName: 'Publish Build Artifacts'
-      
+
 - stage: Deploy
   dependsOn: Build
   condition: succeeded()
@@ -67,11 +67,12 @@ stages:
           steps:
           - task: AzureWebApp@1
             inputs:
-              azureSubscription: 'YourAzureSubscription'  # Replace with your Azure subscription
+              azureSubscription: 'Microsoft Azure Sponsorship(d6714331-8b1a-434e-9ea6-f62310887e73)'  # Replace with your Azure subscription
               appType: 'webApp'
               appName: '$(projectName)'
               package: '$(Pipeline.Workspace)/web-app/$(projectName).zip'
               deploymentMethod: 'auto'
             displayName: 'Deploy to Azure Web App'
+
 
       
