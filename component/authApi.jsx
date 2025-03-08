@@ -13,8 +13,9 @@ const handleError = (error, dispatch) => {
 export const authApi = createApi({
   reducerPath: 'authApi',
   //https://api.dalai-llama.com
+  //https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api
   baseQuery: fetchBaseQuery(
-      { baseUrl: process.env.REACT_APP_API_BASE_URL ||'https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api',
+      { baseUrl: process.env.REACT_APP_API_BASE_URL ||'http://localhost:8080/api',
         prepareHeaders: (headers, { getState }) => {
           // Get the token from state
           const token = getState().auth.token;
