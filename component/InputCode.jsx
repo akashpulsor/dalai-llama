@@ -32,7 +32,7 @@ const InputCode = ({ onClose, verificationEmail, showNewPasswordModal }) => {
 
   const onSendCodePress = async () => {
     try {
-      await validateCode({ code, email: verificationEmail });
+      await validateCode({ code, verificationEmail });
     } catch (e) {
       setShowError(true);
       setVerificationError('An error occurred while validating the code. Please try again.');
@@ -43,7 +43,16 @@ const InputCode = ({ onClose, verificationEmail, showNewPasswordModal }) => {
     <View style={styles.slideContent}>
       {showError && (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{verificationError}</Text>
+          <Text style={styles.errorText}>
+            {verificationError.split(' ').reduce((acc, word, index) => {
+              if (index > 0 && index % 3 === 0) {
+                acc.push(<Text key={index}>{`${word} `}</Text>);
+              } else {
+                acc.push(<Text key={index}>{`${word} `}</Text>);
+              }
+              return acc;
+            }, [])}
+          </Text>
         </View>
       )}
       <TextInput
@@ -92,7 +101,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   errorContainer: {
-    height: 35, // Fixed height for error container
+    height: 'auto',
     justifyContent: 'center',
     width: '80%',
     paddingHorizontal: 0,
@@ -101,11 +110,11 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     fontSize: 10,
     lineHeight: 12,
-    flexWrap: 'wrap', // Enable text wrapping
+    flexWrap: 'wrap',
     textAlign: 'left',
     flexDirection: 'row',
     display: 'flex',
-    wordBreak: 'break-word', // Align text to left
+    wordBreak: 'break-word',
   },
   loadingContainer: {
     marginVertical: 20,

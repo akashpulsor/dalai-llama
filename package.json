@@ -26,12 +26,13 @@
     "axios": "^1.6.2",
     "cors": "^2.8.5",
     "country-state-city": "^3.2.1",
-    "expo": "^51.0.0",
+    "expo": "^49.0.23",
     "expo-status-bar": "~1.12.1",
     "expo-web-browser": "~13.0.3",
     "libphonenumber-js": "^1.11.16",
     "lucide-react": "^0.474.0",
     "postal-codes-js": "^2.5.2",
+    "process": "^0.11.10",
     "prop-types": "^15.8.1",
     "react": "18.2.0",
     "react-dom": "18.2.0",
@@ -67,11 +68,19 @@
     "react-phone-input-2": "^2.15.1",
     "react-razorpay": "^2.0.1",
     "react-redux": "^9.1.0",
+    "util": "^0.12.5",
+    "webpack": "^5.98.0",
     "yarn": "^1.22.21"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
-    "@expo/webpack-config": "~19.0.1"
+    "@expo/webpack-config": "~19.0.1",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.1",
+    "stream-browserify": "^3.0.0"
+  },
+  "browser": {
+    "crypto": false
   },
   "private": true
 }
