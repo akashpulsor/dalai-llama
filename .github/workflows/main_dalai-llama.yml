@@ -64,12 +64,12 @@ jobs:
           mkdir -p web-build
           unzip release.zip -d web-build/
       
-      - name: Login to Azure
+      - name: Azure Login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_10157F4B84C34E1BAEEC58C299094F02 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_BE0CA2323D2E413BA57F4764C1B0F0BF }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_9354FA6C8E7C4B238C0B2CDBF2702DF5 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_49246DA21BF143A79A5EF0ED6B3A15D7 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_7C39EF57EB4B44B184C03F29057D979E }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_92FAC193FEAD43A8B8B77E8BEB73F517 }}
 
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
