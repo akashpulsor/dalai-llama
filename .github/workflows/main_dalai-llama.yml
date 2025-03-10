@@ -78,4 +78,21 @@ jobs:
           app-name: 'dalai-llama'
           slot-name: 'Production'
           package: .
+          deployment-method: zipDeploy
           
+      # Add retry logic for deployment failures
+      - name: Retry deployment if failed
+        if: failure()
+        run: |
+          echo "First deployment attempt failed. Waiting 2 minutes before retry..."
+          sleep 120
+          echo "Retrying deployment..."
+          
+      - name: 'Retry Deploy to Azure Web App'
+        if: failure()
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'dalai-llama'
+          slot-name: 'Production'
+          package: .
+          deployment-method: zipDeploy
