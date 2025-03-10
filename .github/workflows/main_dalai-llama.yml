@@ -74,4 +74,6 @@ jobs:
           app-name: 'dalai-llama'
           slot-name: 'Production'
           package: .
-          
+          respect-pom-xml: false
+          clean: true
+          timeout-in-ms: 600000  # 10 minutes timeou
