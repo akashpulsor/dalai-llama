@@ -70,6 +70,11 @@ jobs:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_4B2F552F64EC4CC7BFCBACD6291AF575 }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_2A7624DD85784F2E8D233F5D5815F55C }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_87B0AC6F81F643D8AA9AD2BF5B7CA53A }}
+      - name: Create test file
+        run: |
+          mkdir -p test-deploy
+          echo "<html><body>Test deployment</body></html>" > test-deploy/index.html
+          
 
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
@@ -77,6 +82,5 @@ jobs:
         with:
           app-name: 'dalai-llama'
           slot-name: 'Production'
-          package: .
-          deployment-method: zipDeploy
-          timeout-in-ms: 600000  # 10 minutes timeou
+          package: test-deploy
+
