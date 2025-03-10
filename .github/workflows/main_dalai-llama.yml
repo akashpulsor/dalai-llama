@@ -55,12 +55,6 @@ jobs:
           name: node-app
 
       - name: Unzip artifact for deployment
-        run: unzip release.zip
-      - name: List files before deployment
-        run: |
-          echo "Current directory structure:"
-          ls -la
-      - name: Unzip artifact for deployment
         run: |
           unzip -q release.zip
           rm release.zip  # Remove the zip file to avoid conflicts
@@ -84,6 +78,5 @@ jobs:
           app-name: 'dalai-llama'
           slot-name: 'Production'
           package: .
-          respect-pom-xml: false
-          clean: true
+          deployment-method: zipDeploy
           timeout-in-ms: 600000  # 10 minutes timeou
