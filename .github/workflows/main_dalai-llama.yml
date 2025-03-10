@@ -64,6 +64,13 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_F73233751B784CF9AC4BD69FC65953D9 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_8227737BF53C45349B5F339463C09C5E }}
 
+    # Add a significant delay to ensure SCM is stable
+      - name: Wait for SCM to stabilize
+        run: |
+          echo "Waiting for SCM container to stabilize (60 seconds)..."
+          sleep 60
+          
+
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
