@@ -59,7 +59,17 @@ jobs:
       - name: List files before deployment
         run: |
           echo "Current directory structure:"
-          ls -la        
+          ls -la
+      - name: Unzip artifact for deployment
+        run: |
+          unzip -q release.zip
+          rm release.zip  # Remove the zip file to avoid conflicts
+
+      - name: Debug - Check unzipped content
+        run: |
+          ls -la
+          echo "Directory contents:"
+          find . -type f | sort    
       - name: Login to Azure
         uses: azure/login@v2
         with:
