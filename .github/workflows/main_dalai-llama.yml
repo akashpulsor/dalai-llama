@@ -78,7 +78,14 @@ jobs:
       - name: Download publishing profile
         run: |
           az login --service-principal -u ${{ secrets.AZUREAPPSERVICE_CLIENTID_4B2F552F64EC4CC7BFCBACD6291AF575 }} -p ${{ secrets.AZUREAPPSERVICE_CLIENTSECRET }} --tenant ${{ secrets.AZUREAPPSERVICE_TENANTID_2A7624DD85784F2E8D233F5D5815F55C }}
-          az webapp deployment list-publishing-profiles --name dalai-llama --resource-group YOUR_RESOURCE_GROUP --xml > publish_profile.xml        
+          az webapp deployment list-publishing-profiles --name dalai-llama --resource-group dalai-llama --xml > publish_profile.xml       
+      - name: Stop any ongoing deployments
+        run: |
+          az webapp deployment list --resource-group dalai-llama --name dalai-llama
+          az webapp deployment source cancel --resource-group dalai-llama --name dalai-llama
+                
+      - name: Wait for a moment
+        run: sleep 15     
           
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
