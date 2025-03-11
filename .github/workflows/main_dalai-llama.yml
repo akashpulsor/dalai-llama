@@ -32,7 +32,6 @@ jobs:
       - name: Zip artifact for deployment
         run: zip release.zip ./* -r
 
-
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
@@ -57,20 +56,13 @@ jobs:
 
       - name: Unzip artifact for deployment
         run: unzip release.zip
-        
+      
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_9777BC970FA441B496C604867232D7ED }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_F73233751B784CF9AC4BD69FC65953D9 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_8227737BF53C45349B5F339463C09C5E }}
-
-    # Add a significant delay to ensure SCM is stable
-      - name: Wait for SCM to stabilize
-        run: |
-          echo "Waiting for SCM container to stabilize (60 seconds)..."
-          sleep 60
-          
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_C32AC198F5364165943B283C430AC8C4 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_4F5B0933DE1E4460B662B996D3E921EE }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_759D55E520FA4D58BABA82F538D3908C }}
 
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
@@ -79,21 +71,4 @@ jobs:
           app-name: 'dalai-llama'
           slot-name: 'Production'
           package: .
-          deployment-method: zipDeploy
           
-      # Add retry logic for deployment failures
-      - name: Retry deployment if failed
-        if: failure()
-        run: |
-          echo "First deployment attempt failed. Waiting 2 minutes before retry..."
-          sleep 120
-          echo "Retrying deployment..."
-          
-      - name: 'Retry Deploy to Azure Web App'
-        if: failure()
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: 'dalai-llama'
-          slot-name: 'Production'
-          package: .
-          deployment-method: zipDeploy
