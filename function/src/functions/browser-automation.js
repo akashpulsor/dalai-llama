@@ -341,20 +341,6 @@ app.http('browser-automation', {
                                 context.log(`Performed manual drag and drop to coordinates.`);
                             }
                             break;
-                        case 'takeScreenshot':
-                            const screenshotPath = `/tmp/screenshot-<span class="math-inline">\{functionRunId\}\-</span>{stepCount}-${Date.now()}.png`;
-                            try {
-                                await page.screenshot({ path: screenshotPath, fullPage: nextAction.fullPage || false });
-                                context.log(`Took screenshot and saved to: ${screenshotPath}`);
-                                const screenshotBuffer = await fs.readFile(screenshotPath);
-                                const base64Screenshot = screenshotBuffer.toString('base64');
-                                const liveData = { functionRunId, step: stepCount, url: page.url(), screenshot: base64Screenshot, log: `Took screenshot` };
-                                await axios.post(`${springBootUrl}/publish-live-data`, liveData);
-                                await fs.unlink(screenshotPath); // Clean up local file
-                            } catch (error) {
-                                context.error(`Error taking screenshot: ${error.message}`);
-                            }
-                            break;
                         case 'emulateDevice':
                             if (nextAction.deviceName) {
                                 const devices = require('puppeteer/devices');

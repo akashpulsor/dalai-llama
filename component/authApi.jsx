@@ -14,8 +14,9 @@ export const authApi = createApi({
   reducerPath: 'authApi',
   //https://api.dalai-llama.com
   //https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api
+  //https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api
   baseQuery: fetchBaseQuery(
-      { baseUrl: process.env.REACT_APP_API_BASE_URL ||'https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api',
+      { baseUrl: process.env.REACT_APP_API_BASE_URL ||'https://localhost:8080/api',
         prepareHeaders: (headers, { getState }) => {
           // Get the token from state
           const token = getState().auth.token;
@@ -349,6 +350,39 @@ export const authApi = createApi({
         }
        
        },
+    }),
+    validateUrl: builder.query({
+      query: (params) => {
+        console.log('URL being validated:', params.url);
+        console.log('Business ID:', params.businessId);
+        return `/browser-agent/validate?url=${params.url}&businessId=${params.businessId}`;
+      },
+      onQueryStarted: async (arg, { dispatch, getState, queryFulfilled }) => {
+        const { data } = await queryFulfilled;
+        dispatch(setBusinessData(data));
+      }
+    }),
+    getPortals: builder.query({
+      query: (url) => `/browser-agent/validate?url=${url}`,
+      onQueryStarted: async (arg, { dispatch, getState, queryFulfilled }) => {
+            const { data } = await queryFulfilled;
+            dispatch(setBusinessData(data));
+       },
+    }),
+    addPortal: builder.mutation({
+      query: (data) => ({
+        url: '/meta/llm/add',
+        method: 'POST',
+        body: data
+      }),
+      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+        try{
+          const { data } = await queryFulfilled;
+        }
+        catch(error) {
+          handleError(error, dispatch)
+        }
+      },
     })
   }),
 });
@@ -359,5 +393,5 @@ export const { useLoginMutation, useRegisterMutation, useVerificationCodeMutatio
   useGetAgentListQuery, useGetCampaignListQuery, useGetLeadDataQuery, useGetLlmDataListQuery, useGetPhoneDataListQuery, useStartCampaignMutation, useAddPhoneDataMutation,
   useAddLLMDataMutation, useRunCampaignMutation, useGenerateTagsMutation, usePublishMutation, 
   useLoginWordpressMutation, useAddLeadMutation,useAddAgentMutation, useRefreshTokenQuery,
- useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery,useGenerateNumberMutation, useInterestMutation} = authApi;
+ useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery,useGenerateNumberMutation, useInterestMutation, useValidateUrlQuery, useGetPortalsQuery,useAddPortalMutation, useLazyValidateUrlQuery,} = authApi;
 

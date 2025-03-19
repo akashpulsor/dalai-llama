@@ -1,32 +1,47 @@
 // Import necessary components from React Native
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, TouchableWithoutFeedback, TextInput, Modal, Alert, ActivityIndicator, Image, StyleSheet } from 'react-native';
-import { useLoginMutation, useRegisterMutation } from '../component/authApi';
+import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Image, StyleSheet, ScrollView } from 'react-native';
+import { useGetPortalsQuery, useAddPortalMutation, useLazyValidateUrlQuery  } from '../component/authApi'; // Assuming you have portalApi
 import { WebView } from 'react-native-webview';
-import Ionicons from 'react-native-vector-icons/Ionicons'; // Assuming you want to use Ionicons
+import {selectUser} from '../component/authSlice';
+import { useSelector } from 'react-redux';
 
-// Create your functional component
 const PortalAgents = ({ navigation }) => {
-  const [showError, setShowError] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const user =  useSelector(selectUser);
   const [url, setUrl] = useState('');
   const [isValidUrl, setIsValidUrl] = useState(false);
   const [websiteLogo, setWebsiteLogo] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [websiteName, setWebsiteName] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [showError, setShowError] = useState(false);
   const webviewRef = useRef(null);
   const [allowedOrigins, setAllowedOrigins] = useState([
-    'https://your-trusted-domain-1.com',
+    'https://naukri.com',
     'https://your-trusted-domain-2.net',
     'https://another-safe-site.org',
-    // Add more allowed origins here
   ]);
 
-  useEffect(() => {
-    // You can load allowed origins from a config file or API here if needed
-  }, []);
+  const { data: portals, isLoading: portalsLoading, error: portalsError } = useGetPortalsQuery({businessId: user?.id});
+// Import the trigger version of the query
+  const [validateUrl, { data: validationData, isLoading: validating, error: validationError }] = 
+  useLazyValidateUrlQuery();
+  const [addPortal, { isLoading: addingPortal }] = useAddPortalMutation();
 
-  // Function to validate URL format
+// React to changes in validation data
+useEffect(() => {
+  if (validationData) {
+    // Handle successful validation
+    console.log('URL validation result:', validationData);
+    // Update your UI based on validation results
+  }
+  
+  if (validationError) {
+    setErrorMessage('Error validating URL');
+    setShowError(true);
+  }
+}, [validationData, validationError]);
+
   const isValidURLFormat = (string) => {
     try {
       new URL(string);
@@ -36,55 +51,15 @@ const PortalAgents = ({ navigation }) => {
     }
   };
 
-  // Function to check if website is reachable
-  const isWebsiteReachable = async (websiteUrl) => {
-    try {
-      // Ensure URL has protocol
-      if (!websiteUrl.startsWith('http')) {
-        websiteUrl = 'https://' + websiteUrl;
-      }
-
-      // Set a timeout for the fetch request
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-      // Attempt to fetch the website with HEAD request
-      const response = await fetch(websiteUrl, {
-        method: 'HEAD',
-        signal: controller.signal,
-        headers: {
-          'Cache-Control': 'no-cache',
-        },
-      });
-
-      clearTimeout(timeoutId);
-
-      // Check if response status is in the 2xx range (success)
-      return response.status >= 200 && response.status < 300;
-    } catch (error) {
-      console.error('Error checking website reachability:', error);
-      return false;
-    }
-  };
-
-  // Function to get favicon/logo from a website
   const getWebsiteLogo = async (websiteUrl) => {
     try {
-      // Ensure URL has protocol
       if (!websiteUrl.startsWith('http')) {
         websiteUrl = 'https://' + websiteUrl;
       }
-
-      // Extract domain from URL
       const urlObj = new URL(websiteUrl);
       const domain = urlObj.hostname;
-
-      // Set website name from domain (remove www. if present)
       setWebsiteName(domain.replace(/^www\./, ''));
-
-      // Use Google's favicon service to get the favicon
       const logoUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
-
       setWebsiteLogo(logoUrl);
       return true;
     } catch (error) {
@@ -93,55 +68,45 @@ const PortalAgents = ({ navigation }) => {
     }
   };
 
-  // Handle the click button press
   const handleValidateUrl = async () => {
     if (!url) {
-      Alert.alert('Error', 'Please enter a URL');
+      setErrorMessage('Error Please enter a URL.');
+      setShowError(true);
       return;
     }
 
     setIsLoading(true);
-    setIsValidUrl(false); // Reset validity on new check
+    setIsValidUrl(false);
     setWebsiteLogo(null);
     setErrorMessage('');
     setShowError(false);
 
-    // Check URL format first
     let formattedUrl = url;
     if (!url.startsWith('http')) {
       formattedUrl = 'https://' + url;
     }
 
     if (isValidURLFormat(formattedUrl)) {
-      // Check if the website is reachable
-      const isReachable = await isWebsiteReachable(formattedUrl);
-
-      if (isReachable) {
-        // Check if the origin is in the allowed list
-        try {
-          const origin = new URL(formattedUrl).origin;
-          if (allowedOrigins.includes(origin)) {
-            // If reachable and origin is allowed, get the logo and set valid
-            const logoSuccess = await getWebsiteLogo(formattedUrl);
-            setIsValidUrl(logoSuccess);
-            if (!logoSuccess) {
-              Alert.alert('Warning', 'Website is reachable and origin is allowed but couldn\'t fetch logo');
-            }
+      try {
+        const origin = new URL(formattedUrl).origin;
+        if (allowedOrigins.includes(origin)) {
+          const logoSuccess = await getWebsiteLogo(formattedUrl);
+          setIsValidUrl(logoSuccess);
+          if (logoSuccess) {
+            validateUrl({ url: formattedUrl, businessId: user?.id });
           } else {
-            setIsValidUrl(false);
-            setErrorMessage('This website origin is not on the allowed list.');
-            setShowError(true);
+            Alert.alert('Warning', 'Couldn\'t fetch logo');
           }
-        } catch (error) {
+        } else {
           setIsValidUrl(false);
-          setErrorMessage('Error parsing URL origin.');
+          setErrorMessage('This website origin is not on the allowed list.');
           setShowError(true);
-          console.error('Error parsing URL:', error);
         }
-      } else {
+      } catch (error) {
         setIsValidUrl(false);
-        setErrorMessage('Website is not reachable. Please check the URL or your internet connection.');
+        setErrorMessage('Error parsing URL origin.');
         setShowError(true);
+        console.error('Error parsing URL:', error);
       }
     } else {
       setIsValidUrl(false);
@@ -152,13 +117,8 @@ const PortalAgents = ({ navigation }) => {
     setIsLoading(false);
   };
 
-  const handleOpenWebView = () => {
-    if (isValidUrl && url) {
-      // Navigate to a screen with the WebView, passing the URL
-      navigation.navigate('WebViewScreen', { websiteUrl: url, allowedOrigins });
-    } else {
-      Alert.alert('Error', 'Please validate a valid and allowed URL first.');
-    }
+  const handlePortalPress = (portalUrl) => {
+    navigation.navigate('WebViewScreen', { websiteUrl: portalUrl, allowedOrigins });
   };
 
   return (
@@ -177,12 +137,12 @@ const PortalAgents = ({ navigation }) => {
           <TouchableOpacity
             style={styles.validateButton}
             onPress={handleValidateUrl}
-            disabled={isLoading}
+            disabled={isLoading || addingPortal}
           >
-            {isLoading ? (
+            {(isLoading || addingPortal) ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <Text style={styles.validateButtonText}>Click</Text>
+              <Text style={styles.validateButtonText}>Add Portal</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -200,23 +160,29 @@ const PortalAgents = ({ navigation }) => {
         </View>
       )}
 
-      {isValidUrl && websiteLogo && (
-        <View style={styles.resultContainer}>
-          <TouchableOpacity style={styles.websiteButton} onPress={handleOpenWebView}>
+      <ScrollView style={styles.portalsContainer}>
+        {portalsLoading ? (
+          <ActivityIndicator size="large" />
+        ) : portalsError ? (
+          <Text>Error loading portals.</Text>
+        ) : portals && portals.map((portal) => (
+          <TouchableOpacity
+            key={portal.url}
+            style={styles.portalButton}
+            onPress={() => handlePortalPress(portal.url)}
+          >
             <Image
-              source={{ uri: websiteLogo }}
-              style={styles.websiteLogo}
+              source={{ uri: portal.logo }}
+              style={styles.portalLogo}
               resizeMode="contain"
             />
-            <Text style={styles.websiteName}>{websiteName}</Text>
-            <Ionicons name="arrow-forward-outline" size={24} color="#444" />
+            <Text style={styles.portalName}>{portal.name}</Text>
           </TouchableOpacity>
-        </View>
-      )}
+        ))}
+      </ScrollView>
     </View>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -276,8 +242,8 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   resultContainer: {
-    marginTop: 25,
-    alignItems: 'center',
+    marginTop: 60,
+    alignItems: 'flex-start',
   },
   websiteButton: {
     flexDirection: 'row',
