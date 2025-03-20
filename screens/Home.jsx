@@ -2,23 +2,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity,TouchableWithoutFeedback, TextInput, Modal, ActivityIndicator,Image } from 'react-native';
 import styles from '../styles';
-import { useDispatch } from 'react-redux';
 import { MaterialIcons } from '@expo/vector-icons';
-import { setSignIn } from '../component/authApi';
-import CountryCodeDropdownPicker from 'react-native-dropdown-country-picker';
 import { useLoginMutation, useRegisterMutation } from '../component/authApi';
-import { useSelector } from 'react-redux';
-import {setToken,setUser} from "../component/authSlice";
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import {selectIsLoggedIn} from '../component/authSlice';
-import Toast from 'react-native-toast-message';
-
 import { emailValidator } from '../helper/emailValidator'
-import { passwordValidator } from '../helper/passwordValidator'
 import Button from '../component/Button';
 import RegistrationCarousel from '../component/RegistrationCarousel';
 import ResetPassword from '../component/ResetPassword';
-import PhoneInput from "react-native-phone-number-input";
 import InputCode from '../component/InputCode';
 import NewPassword from '../component/NewPassword';
 

@@ -15,16 +15,14 @@ import {
 import PropTypes from 'prop-types';
 import Button from './Button';
 import { MaterialIcons } from '@expo/vector-icons';
-import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
+
 import { useVerificationCodeMutation, useAddLeadMutation } from './authApi';
 import { Picker } from '@react-native-picker/picker';
 import { useSelector } from 'react-redux';
 import {selectUser } from '../component/authSlice';
 import { useDispatch } from 'react-redux';
 import { showMessage } from './flashMessageSlice';
-import CountryCodeDropdownPicker from './CountryCodeDropdownPicker';
 import WorldwideAddressPicker from './WorldwideAddressPicker';
-import countryData from '../helper/countryData';
 
 import { 
   isValidEmail, 
@@ -34,7 +32,7 @@ import {
 } from '../helper/utils';
 
 import CountryPicker from './CountryPicker';
-import { height } from '@fortawesome/free-solid-svg-icons/fa0';
+
 
 const AddLeadModal = ({ onClose, openModal }) => {
 
@@ -171,6 +169,15 @@ const AddLeadModal = ({ onClose, openModal }) => {
     try {
       const phoneNumber = parsePhoneNumber(phone, countryCode);
       return phoneNumber.formatInternational();
+    } catch (error) {
+      return phone;
+    }
+  };
+
+  const parsePhoneNumber = (phone, countryCode) => {
+    try {
+
+      return phone;
     } catch (error) {
       return phone;
     }

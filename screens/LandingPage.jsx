@@ -109,7 +109,7 @@ const LandingPage = ({ navigation }) => {
                                     <Text style={styles.navLink}>{link}</Text>
                                 </TouchableOpacity>
                             ))}
-                   
+
                         </View>
                     </View>
 
