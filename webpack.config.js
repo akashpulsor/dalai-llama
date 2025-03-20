@@ -1,4 +1,5 @@
 const createExpoWebpackConfigAsync = require('@expo/webpack-config');
+const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 
 module.exports = async function (env, argv) {
   const config = await createExpoWebpackConfigAsync({
@@ -12,7 +13,7 @@ module.exports = async function (env, argv) {
   if (!config.resolve.fallback) {
     config.resolve.fallback = {};
   }
-  
+
   config.resolve.fallback = {
     ...config.resolve.fallback,
     "crypto": require.resolve("crypto-browserify"),
@@ -20,5 +21,10 @@ module.exports = async function (env, argv) {
     "buffer": require.resolve("buffer"),
   };
 
-  return config;
+  config.plugins.push(new BundleAnalyzerPlugin()); // Add the analyzer here
+
+  
+ 
+
+  return config; // Return the modified configuration
 };

@@ -1,8 +1,7 @@
 // Import necessary components from React Native
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Image, StyleSheet, ScrollView } from 'react-native';
-import { useGetPortalsQuery, useAddPortalMutation, useLazyValidateUrlQuery  } from '../component/authApi'; // Assuming you have portalApi
-import { WebView } from 'react-native-webview';
+import { useGetPortalsQuery, useAddPortalMutation, useValidateUrlMutation  } from '../component/authApi'; // Assuming you have portalApi
 import {selectUser} from '../component/authSlice';
 import { useSelector } from 'react-redux';
 
@@ -25,7 +24,7 @@ const PortalAgents = ({ navigation }) => {
   const { data: portals, isLoading: portalsLoading, error: portalsError } = useGetPortalsQuery({businessId: user?.id});
 // Import the trigger version of the query
   const [validateUrl, { data: validationData, isLoading: validating, error: validationError }] = 
-  useLazyValidateUrlQuery();
+  useValidateUrlMutation();
   const [addPortal, { isLoading: addingPortal }] = useAddPortalMutation();
 
 // React to changes in validation data
@@ -282,74 +281,4 @@ const styles = StyleSheet.create({
   },
 });
 
-// Create a separate screen for the WebView
-const WebViewScreen = ({ route }) => {
-  const { websiteUrl, allowedOrigins } = route.params;
-  const webviewRef = useRef(null);
-
-  const handleWebViewMessage = (event) => {
-    try {
-      const messageData = JSON.parse(event.nativeEvent.data);
-      console.log('Received message from WebView:', messageData);
-      // Handle messages from the WebView (e.g., automation status)
-    } catch (error) {
-      console.log('Received message from WebView:', event.nativeEvent.data);
-    }
-  };
-
-  const handleNavigationStateChange = (navState) => {
-    console.log('WebView navigation state changed:', navState);
-    // You might want to track URL changes here
-  };
-
-  // Function to inject JavaScript into the WebView
-  const injectJavaScript = (code) => {
-    if (webviewRef.current) {
-      webviewRef.current.injectJavaScript(`
-        (function() {
-          try {
-            ${code}
-          } catch (error) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', message: error.message, stack: error.stack }));
-          }
-        })();
-      `);
-    } else {
-      console.warn('WebView ref not available, cannot inject JavaScript.');
-    }
-  };
-
-  useEffect(() => {
-    // Example of injecting JavaScript after the WebView loads
-    injectJavaScript(`
-      console.log('WebView loaded on client-side.');
-      // You can add your initial automation script here or trigger it from the React Native side
-    `);
-  }, []);
-
-  return (
-    <View style={{ flex: 1 }}>
-      <WebView
-        ref={webviewRef}
-        source={{ uri: websiteUrl }}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        onMessage={handleWebViewMessage}
-        onNavigationStateChange={handleNavigationStateChange}
-        originWhitelist={allowedOrigins} // This is for the WebView's own requests
-      />
-      {/* You can add UI elements here to control the WebView or trigger JavaScript injection */}
-      <TouchableOpacity
-        style={{ position: 'absolute', bottom: 20, left: 20, backgroundColor: 'blue', padding: 10, borderRadius: 5, elevation: 3 }}
-        onPress={() => injectJavaScript(`alert('Hello from React Native!');`)}
-      >
-        <Text style={{ color: 'white', fontWeight: 'bold' }}>Inject Alert</Text>
-      </TouchableOpacity>
-      {/* Add more buttons or inputs to control automation */}
-    </View>
-  );
-};
-
-// Export the components
-export { WebViewScreen };
 export default PortalAgents;

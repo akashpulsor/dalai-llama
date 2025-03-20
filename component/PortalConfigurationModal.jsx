@@ -15,16 +15,12 @@ import {
 import PropTypes from 'prop-types';
 import Button from './Button';
 import { MaterialIcons } from '@expo/vector-icons';
-import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
-import { useVerificationCodeMutation, useAddLeadMutation } from './authApi';
-import { Picker } from '@react-native-picker/picker';
+
 import { useSelector } from 'react-redux';
 import {selectUser } from '../component/authSlice';
 import { useDispatch } from 'react-redux';
 import { showMessage } from './flashMessageSlice';
-import CountryCodeDropdownPicker from './CountryCodeDropdownPicker';
-import WorldwideAddressPicker from './WorldwideAddressPicker';
-import countryData from '../helper/countryData';
+
 
 import { 
   isValidEmail, 

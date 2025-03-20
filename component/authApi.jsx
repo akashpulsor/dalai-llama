@@ -352,17 +352,20 @@ export const authApi = createApi({
        
        },
     }),
-    validateUrl: builder.query({
-      query: (params) => {
-        console.log('URL being validated:', params.url);
-        console.log('Business ID:', params.businessId);
-        console.log('url:', `/browser-agent/validate?url=${params.url}&businessId=${params.businessId}`);
-        return `/browser-agent/validate?url=${params.url}&businessId=${params.businessId}`;
+    validateUrl: builder.mutation({
+      query: (data) => ({
+        url: '/browser-agent/validate',
+        method: 'POST',
+        body: data
+      }),
+      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+        try{
+          const { data } = await queryFulfilled;
+        }
+        catch(error) {
+          handleError(error, dispatch)
+        }
       },
-      onQueryStarted: async (arg, { dispatch, getState, queryFulfilled }) => {
-        const { data } = await queryFulfilled;
-        dispatch(setBusinessData(data));
-      }
     }),
     getPortals: builder.query({
       query: (params) =>{
@@ -397,5 +400,5 @@ export const { useLoginMutation, useRegisterMutation, useVerificationCodeMutatio
   useGetAgentListQuery, useGetCampaignListQuery, useGetLeadDataQuery, useGetLlmDataListQuery, useGetPhoneDataListQuery, useStartCampaignMutation, useAddPhoneDataMutation,
   useAddLLMDataMutation, useRunCampaignMutation, useGenerateTagsMutation, usePublishMutation, 
   useLoginWordpressMutation, useAddLeadMutation,useAddAgentMutation, useRefreshTokenQuery,
- useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery,useGenerateNumberMutation, useInterestMutation, useValidateUrlQuery, useGetPortalsQuery,useAddPortalMutation, useLazyValidateUrlQuery,} = authApi;
+ useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery,useGenerateNumberMutation, useInterestMutation,  useGetPortalsQuery,useAddPortalMutation, useValidateUrlMutation} = authApi;
 

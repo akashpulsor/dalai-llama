@@ -11,8 +11,8 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import Modal from 'react-native-modal';
-import { Country, State, City } from 'country-state-city';
-import { validate } from 'postal-codes-js';
+
+
 
 const AddressField = ({ 
   label, 
