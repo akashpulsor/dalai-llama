@@ -16,7 +16,8 @@ export const authApi = createApi({
   //https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api
   //https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api
   baseQuery: fetchBaseQuery(
-      { baseUrl: process.env.REACT_APP_API_BASE_URL ||'https://localhost:8080/api',
+      { //baseUrl: 'http://localhost:8080/api',
+        baseUrl: process.env.REACT_APP_API_BASE_URL ||'https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api',
         prepareHeaders: (headers, { getState }) => {
           // Get the token from state
           const token = getState().auth.token;
@@ -355,6 +356,7 @@ export const authApi = createApi({
       query: (params) => {
         console.log('URL being validated:', params.url);
         console.log('Business ID:', params.businessId);
+        console.log('url:', `/browser-agent/validate?url=${params.url}&businessId=${params.businessId}`);
         return `/browser-agent/validate?url=${params.url}&businessId=${params.businessId}`;
       },
       onQueryStarted: async (arg, { dispatch, getState, queryFulfilled }) => {
@@ -363,10 +365,12 @@ export const authApi = createApi({
       }
     }),
     getPortals: builder.query({
-      query: (url) => `/browser-agent/validate?url=${url}`,
+      query: (params) =>{
+        return `/user-portals/user/${params.businessId}`;
+      },
       onQueryStarted: async (arg, { dispatch, getState, queryFulfilled }) => {
             const { data } = await queryFulfilled;
-            dispatch(setBusinessData(data));
+            
        },
     }),
     addPortal: builder.mutation({

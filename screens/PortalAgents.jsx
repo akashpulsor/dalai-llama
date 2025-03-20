@@ -35,12 +35,12 @@ useEffect(() => {
     console.log('URL validation result:', validationData);
     // Update your UI based on validation results
   }
-  
+  console.log('Configured portal', portals);
   if (validationError) {
     setErrorMessage('Error validating URL');
     setShowError(true);
   }
-}, [validationData, validationError]);
+}, [validationData, validationError, portals]);
 
   const isValidURLFormat = (string) => {
     try {
@@ -99,7 +99,7 @@ useEffect(() => {
           }
         } else {
           setIsValidUrl(false);
-          setErrorMessage('This website origin is not on the allowed list.');
+          setErrorMessage('We have not opened our Agent for this portal. We are working on it...');
           setShowError(true);
         }
       } catch (error) {

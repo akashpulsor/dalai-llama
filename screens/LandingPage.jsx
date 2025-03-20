@@ -109,12 +109,7 @@ const LandingPage = ({ navigation }) => {
                                     <Text style={styles.navLink}>{link}</Text>
                                 </TouchableOpacity>
                             ))}
-                            <TouchableOpacity 
-                                style={styles.loginButton} 
-                                onPress={handleLogin}
-                            >
-                                <Text style={styles.loginButtonText}>Login</Text>
-                            </TouchableOpacity>
+                   
                         </View>
                     </View>
 
@@ -197,7 +192,7 @@ const LandingPage = ({ navigation }) => {
                     <View style={styles.contactSection}>
                         <Text style={styles.sectionTitle}>Contact Us</Text>
                         <TouchableOpacity style={styles.contactButton} onPress={handleScheduleDemo}>
-                            <Text style={styles.contactButtonText}>Schedule a Demo</Text>
+                            <Text style={styles.contactButtonText}>Contact</Text>
                         </TouchableOpacity>
                     </View>
                 </ScrollView>
