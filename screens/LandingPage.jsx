@@ -109,7 +109,12 @@ const LandingPage = ({ navigation }) => {
                                     <Text style={styles.navLink}>{link}</Text>
                                 </TouchableOpacity>
                             ))}
-
+                            <TouchableOpacity 
+                                style={styles.loginButton} 
+                                onPress={handleLogin}
+                            >
+                                <Text style={styles.loginButtonText}>Login</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
 
