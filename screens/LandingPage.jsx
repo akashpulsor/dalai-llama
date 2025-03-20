@@ -1,4 +1,4 @@
-import React, { createRef , useState,useEffect } from 'react';
+import React, { createRef, useState, useEffect } from 'react';
 import { View, ScrollView, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
@@ -6,6 +6,7 @@ import LeadForm from '../component/LeadForm';
 import { useDispatch } from 'react-redux';
 import { useInterestMutation } from '../component/authApi';
 import { showMessage } from '../component/flashMessageSlice';
+
 const CurvedBackground = () => {
     return (
       <View style={styles.backgroundContainer}>
@@ -66,8 +67,6 @@ const LandingPage = ({ navigation }) => {
         catch(err) {
             console.error("Interest failed:", err);
         }
-
-        // Optional: Show a success toast or alert
     };
 
     useEffect(() => {
@@ -75,7 +74,7 @@ const LandingPage = ({ navigation }) => {
         if(isInterestDataSuccess){
             
             dispatch(showMessage({
-                message: 'You interest is submitted, Team will contact you',
+                message: 'Your interest is submitted, Team will contact you',
                 type: 'info'
               }));
               
@@ -91,7 +90,6 @@ const LandingPage = ({ navigation }) => {
                     style={styles.scrollContainer}
                     showsVerticalScrollIndicator={false}
                 >
-                    
                     
                     <View style={styles.header}>
                         <View style={styles.logoContainer}>
@@ -111,79 +109,81 @@ const LandingPage = ({ navigation }) => {
                                     <Text style={styles.navLink}>{link}</Text>
                                 </TouchableOpacity>
                             ))}
-                            <TouchableOpacity 
-                                style={styles.loginButton} 
-                                onPress={handleLogin}
-                            >
-                                <Text style={styles.loginButtonText}>Login</Text>
-                            </TouchableOpacity>
+                   
                         </View>
                     </View>
 
                     <View style={styles.heroSection}>
                         <View style={styles.heroContent}>
-                            <Text style={styles.heroTitle}>The Gen-AI Contact Center</Text>
-                            <Text style={styles.heroSubtitle}>Automate your complex call center with voice AI!</Text>
+                            <Text style={styles.heroTitle}>Multi-Agent Workflow Automation</Text>
+                            <Text style={styles.heroSubtitle}>Transform your business processes with AI agents!</Text>
                             
                             <View style={styles.trustIndicators}>
                                 <View style={styles.trustBadge}>
-                                    <Text style={styles.trustBadgeTitle}>30%</Text>
-                                    <Text style={styles.trustBadgeText}>Conversion Rate</Text>
+                                    <Text style={styles.trustBadgeTitle}>Improved</Text>
+                                    <Text style={styles.trustBadgeText}>Efficiency</Text>
                                 </View>
                                 <View style={styles.trustBadge}>
                                     <Text style={styles.trustBadgeTitle}>Enterprise</Text>
-                                    <Text style={styles.trustBadgeText}>Trusted Solutions</Text>
+                                    <Text style={styles.trustBadgeText}>Ready Solution</Text>
                                 </View>
                             </View>
                             
                             <Text style={styles.heroDescription}>
-                                Flexible CS scaling with our AI agents. Self-improving AI voice agents to replace your whole call center. Trusted by Enterprises and large retailers to deliver the same or better customer satisfaction than human agents. At scale.
+                                Automate complex business workflows with our intelligent multi-agent platform. Our self-improving AI agents collaborate to handle end-to-end processes, from recruitment to financial compliance, with minimal human intervention. Designed to deliver consistent results while reducing operational costs.
                             </Text>
                         </View>
                     </View>
 
                     <View style={styles.featuresSection}>
-                        <Text style={styles.sectionTitle}>Our Voice AI Platform</Text>
+                        <Text style={styles.sectionTitle}>Our Multi-Agent Platform</Text>
                         
                         <View style={styles.featureGrid}>
                             <View style={styles.featureCard}>
-                                <Text style={styles.featureTitle}>Human-like Conversations</Text>
+                                <Text style={styles.featureTitle}>Intelligent Workflow Orchestration</Text>
                                 <Text style={styles.featureDescription}>
-                                    Built on state-of-the-art Gen AI technology to deliver ultimate flexibility and human-like customer experiences.
+                                    Built on state-of-the-art Gen AI technology to coordinate multiple specialized agents that seamlessly handle complex business processes from start to finish.
                                 </Text>
                             </View>
                             
                             <View style={styles.featureCard}>
-                                <Text style={styles.featureTitle}>Outbound Campaigns</Text>
+                                <Text style={styles.featureTitle}>Process Automation</Text>
                                 <Text style={styles.featureDescription}>
-                                    Reach out to warm leads and schedule 1000s of calls simultaneously with a single click. Previous campaigns achieved 30% conversion rates.
+                                    Automate thousands of routine tasks simultaneously with a single setup. Our platform is designed to significantly reduce processing time compared to manual operations.
                                 </Text>
                             </View>
                         </View>
                     </View>
 
                     <View style={styles.benefitSection}>
-                        <Text style={styles.sectionTitle}>Key Benefits</Text>
+                        <Text style={styles.sectionTitle}>Key Use Cases</Text>
                         
                         <View style={styles.benefitGrid}>
                             <View style={styles.benefitCard}>
-                                <Text style={styles.benefitTitle}>Automated Marketing</Text>
+                                <Text style={styles.benefitTitle}>Recruitment Automation</Text>
                                 <Text style={styles.benefitDescription}>
-                                    Streamline your marketing campaigns with intelligent, automated outreach strategies.
+                                    From sourcing to screening to scheduling interviews, our AI agents handle the entire recruitment process, ensuring top talent doesn't slip through the cracks.
                                 </Text>
                             </View>
                             
                             <View style={styles.benefitCard}>
-                                <Text style={styles.benefitTitle}>AI Sales Agents</Text>
+                                <Text style={styles.benefitTitle}>GST Filing</Text>
                                 <Text style={styles.benefitDescription}>
-                                    Create autonomous sales agents that generate leads and drive sales conversations automatically.
+                                    Automate data extraction, reconciliation, and filing of GST returns with high accuracy, saving your finance team countless hours each month.
                                 </Text>
                             </View>
                             
                             <View style={styles.benefitCard}>
-                                <Text style={styles.benefitTitle}>Lead Protection</Text>
+                                <Text style={styles.benefitTitle}>Bid Management</Text>
                                 <Text style={styles.benefitDescription}>
-                                    Advanced security measures to prevent lead leakage and protect your valuable customer information.
+                                    Monitor opportunities, analyze RFPs, gather required documentation, and draft competitive proposals automatically and efficiently.
+                                </Text>
+                            </View>
+
+                            <View style={styles.benefitCard}>
+                                <Text style={styles.benefitTitle}>Digital Marketing</Text>
+                                <Text style={styles.benefitDescription}>
+                                    Coordinate content creation, scheduling, analytics, and optimization across multiple channels with AI agents that learn what works for your audience.
                                 </Text>
                             </View>
                         </View>
@@ -192,7 +192,7 @@ const LandingPage = ({ navigation }) => {
                     <View style={styles.contactSection}>
                         <Text style={styles.sectionTitle}>Contact Us</Text>
                         <TouchableOpacity style={styles.contactButton} onPress={handleScheduleDemo}>
-                            <Text style={styles.contactButtonText}>Schedule a Demo</Text>
+                            <Text style={styles.contactButtonText}>Contact</Text>
                         </TouchableOpacity>
                     </View>
                 </ScrollView>
@@ -216,12 +216,21 @@ const styles = StyleSheet.create({
         width: '100%',
         height: 280,
     },
+    curve: {
+        position: 'absolute',
+        width: '100%',
+        height: 280,
+    },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: 20,
         backgroundColor: 'transparent',
+    },
+    logoContainer: {
+        flexDirection: 'column',
+        alignItems: 'center',
     },
     headerLogo: {
         width: 100,
@@ -339,15 +348,16 @@ const styles = StyleSheet.create({
     },
     benefitGrid: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         justifyContent: 'center',
         marginTop: 20,
     },
     benefitCard: {
-        width: '30%',
+        width: '40%',
         padding: 20,
         backgroundColor: '#6b7280',
         borderRadius: 10,
-        marginHorizontal: 10,
+        margin: 10,
         alignItems: 'center',
     },
     benefitTitle: {
@@ -376,11 +386,6 @@ const styles = StyleSheet.create({
         color: '#ffffff',
         fontSize: 18,
         fontWeight: 'bold',
-    },
-    curve: {
-        position: 'absolute',
-        width: '100%',
-        height: 280,
     },
     sectionTitle: {
         fontSize: 32,

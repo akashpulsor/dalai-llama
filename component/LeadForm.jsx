@@ -175,7 +175,7 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
                                 style={[styles.submitButton, styles.shadowInput]} 
                                 onPress={handleSubmit}
                             >
-                                <Text style={styles.submitButtonText}>Submit Lead</Text>
+                                <Text style={styles.submitButtonText}>Submit</Text>
                             </TouchableOpacity>
                             <TouchableOpacity 
                                 style={[styles.cancelButton, styles.shadowInput]} 

@@ -18,6 +18,7 @@ import Agents from './screens/Agents';
 import Business from './screens/Business';
 import CampaignLogs from './screens/CampaignLogs';
 import Campaigns from './screens/Campaigns';
+import PortalAgents from './screens/PortalAgents';
 
 import LandingPage from './screens/LandingPage';
 import CallLogs from './screens/CallLogs';
@@ -115,6 +116,12 @@ const HomeStack = () => {
           <Drawer.Screen name="Campaigns" component={Campaigns}  options={
               {
                 headerTitle:"Campaigns"
+              }
+          }/>
+
+          <Drawer.Screen name="PortalAgents" component={PortalAgents}  options={
+              {
+                headerTitle:"PortalAgents"
               }
           }/>
 
