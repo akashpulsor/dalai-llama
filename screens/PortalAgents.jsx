@@ -2,10 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Image, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useGetPortalsQuery, useAddPortalMutation, useValidateUrlMutation } from '../component/authApi';
 import { selectUser } from '../component/authSlice';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import PortalConfigurationModal from '../component/PortalConfigurationModal';
+import { showMessage } from '../component/flashMessageSlice';
 
 const PortalAgents = ({ navigation }) => {
   const user = useSelector(selectUser);
+  const dispatch = useDispatch();
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -15,6 +18,8 @@ const PortalAgents = ({ navigation }) => {
   const [websiteLogo, setWebsiteLogo] = useState(null);
   const [websiteName, setWebsiteName] = useState('');
   const [validatedUrl, setValidatedUrl] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [selectedPortal, setSelectedPortal] = useState(null);
 
   const [allowedOrigins, setAllowedOrigins] = useState([
     'https://naukri.com',
@@ -184,19 +189,33 @@ const PortalAgents = ({ navigation }) => {
     setIsLoading(false);
   };
 
-  const handlePortalPress = (portalUrl) => {
-    navigation.navigate('WebViewScreen', { websiteUrl: portalUrl, allowedOrigins });
+  const handlePortalPress = (portal) => {
+    setSelectedPortal(portal);
+    setShowModal(true);
   };
   
-  // Function to configure an unconfigured portal
-  const handleConfigurePortal = (portal) => {
-    // Call the addPortal mutation to add this portal to configured portals
-    addPortal({ 
-      url: portal.url, 
-      logo: portal.logo, 
-      name: portal.name, 
-      businessId: user?.id 
-    });
+  const handleConfigurePortal = async (formData) => {
+    try {
+      await addPortal({
+        ...formData,
+        businessId: user?.id,
+        isConfigured: true
+      }).unwrap();
+      
+      dispatch(showMessage({
+        message: 'Portal configured successfully',
+        type: 'success'
+      }));
+      
+      refetchPortals();
+      setShowModal(false);
+    } catch (err) {
+      dispatch(showMessage({
+        message: 'Failed to configure portal',
+        type: 'error'
+      }));
+      throw err;
+    }
   };
 
   return (
@@ -207,7 +226,14 @@ const PortalAgents = ({ navigation }) => {
             style={styles.input}
             placeholder="Enter website URL"
             value={url}
-            onChangeText={setUrl}
+            onChangeText={(text) => {
+              setUrl(text);
+              // Clear error when input is emptied
+              if (!text) {
+                setShowError(false);
+                setErrorMessage('');
+              }
+            }}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
@@ -247,7 +273,7 @@ const PortalAgents = ({ navigation }) => {
               <View key={`${portal.url}-${index}`} style={styles.portalItemContainer}>
                 <TouchableOpacity
                   style={styles.portalButton}
-                  onPress={() => handlePortalPress(portal.url)}
+                  onPress={() => handlePortalPress(portal)}
                 >
                   <Image
                     source={{ uri: portal.logo }}
@@ -276,7 +302,7 @@ const PortalAgents = ({ navigation }) => {
               <TouchableOpacity
                 key={portal.url}
                 style={styles.portalButton}
-                onPress={() => handlePortalPress(portal.url)}
+                onPress={() => handlePortalPress(portal)}
               >
                 <Image
                   source={{ uri: portal.logo }}
@@ -291,6 +317,13 @@ const PortalAgents = ({ navigation }) => {
           )}
         </ScrollView>
       </View>
+
+      <PortalConfigurationModal
+        visible={showModal}
+        onClose={() => setShowModal(false)}
+        portalUrl={selectedPortal?.url}
+        onConfigure={handleConfigurePortal}
+      />
     </View>
   );
 };

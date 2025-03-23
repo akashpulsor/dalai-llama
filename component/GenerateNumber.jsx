@@ -13,7 +13,7 @@ import {
 import PropTypes from 'prop-types';
 import Button from './Button';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Picker } from '@react-native-picker/picker';
+
 import { useVerificationCodeMutation,useGenerateNumberMutation } from './authApi'; // Assuming this is your API call hook
 
 const GenerateNumber = ({ 

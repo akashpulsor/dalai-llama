@@ -1,6 +1,6 @@
 // Import necessary components from React Native
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Button, Modal } from 'react-native';
+import { View, Text,  TouchableOpacity } from 'react-native';
 import styles from '../styles';
 import { useDispatch } from 'react-redux';
 import {useLogoutMutation} from "./authApi";

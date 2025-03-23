@@ -1,16 +1,16 @@
-import React, {useEffect, useState} from 'react';
+import React from 'react';
 import {createStackNavigator} from '@react-navigation/stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { View, Text, Image,Button, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { NavigationContainer } from "@react-navigation/native";
+
 import { DrawerItemList } from "@react-navigation/drawer";
-import styles from './styles';
+
 import { useSelector } from 'react-redux';
-import { useDispatch } from 'react-redux';
-import {useGetLlmQuery, useLoginMutation} from './component/authApi';
+
+
 import {selectIsLoggedIn, selectLlmData, selectUser, setLlm, setSelectedLlm} from './component/authSlice';
-import DropDownPicker from "react-native-dropdown-picker";
+
 import User from "./assets/wordpress-logo.png";
 import Home from './screens/Home';
 import Dashboard from './screens/Dashboard';

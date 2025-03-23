@@ -363,7 +363,7 @@ export const authApi = createApi({
           const { data } = await queryFulfilled;
         }
         catch(error) {
-          console.log(error);
+          console.log(error)
           handleError(error, dispatch)
         }
       },
@@ -378,6 +378,21 @@ export const authApi = createApi({
        },
     }),
     addPortal: builder.mutation({
+      query: (data) => ({
+        url: '/meta/llm/add',
+        method: 'POST',
+        body: data
+      }),
+      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+        try{
+          const { data } = await queryFulfilled;
+        }
+        catch(error) {
+          handleError(error, dispatch)
+        }
+      },
+    }),
+    generateContext: builder.mutation({
       query: (data) => ({
         url: '/meta/llm/add',
         method: 'POST',

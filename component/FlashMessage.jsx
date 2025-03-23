@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Animated, StyleSheet, ScrollView, TouchableOpacity, Pressable } from 'react-native';
+import { View, Text,  StyleSheet, ScrollView, TouchableOpacity, Pressable } from 'react-native';
+import Animated from 'react-native-web/dist/exports/Animated';
 import { useSelector, useDispatch } from 'react-redux';
 import { hideMessage } from './flashMessageSlice';
 
