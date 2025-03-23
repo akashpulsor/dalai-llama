@@ -8,9 +8,10 @@ import {
   ActivityIndicator,
   ScrollView,
   Platform,
+  Modal,
   KeyboardAvoidingView,
 } from 'react-native';
-import Modal from 'react-native-modal';
+
 
 
 
