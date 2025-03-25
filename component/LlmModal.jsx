@@ -24,6 +24,7 @@ const LlmModal = ({ onClose , openModal}) => {
   const user =  useSelector(selectUser);
   const [errorMessages, setErrorMessages] = useState({});
   const [isActive, setIsActive] = useState(true);
+  const [isMulitModal, setIsMulitModal] = useState(true);
   const [isActiveToggleSwitch, setIsActiveToggleSwitch] = useState(false);
   const dispatch = useDispatch();
   const [formData, setFormData] = useState({
@@ -31,6 +32,9 @@ const LlmModal = ({ onClose , openModal}) => {
     businessId: user?.id,
     vendorName: '',
     apiKey:'',
+    multiModal:false,
+    modelName:'',
+    modelUrl:'',
     friendlyName: '',
     logoImage: '',
     status: '',
@@ -56,6 +60,9 @@ useEffect(() => {
         llmId: '',
         businessId: user?.id,
         vendorName: '',
+        multiModal:false,
+        modelName:'',
+        modelUrl:'',
         apiKey:'',
         friendlyName: '',
         logoImage: '',
@@ -83,6 +90,9 @@ useEffect(() => {
           apiKey:'',
           friendlyName: '',
           logoImage: '',
+          multiModal:false,
+          modelName:'',
+          modelUrl:'',
           status: '',
           active: isActive,
     });
@@ -105,6 +115,27 @@ useEffect(() => {
       active: newActiveState
     }));
   };
+
+  const multiModalSwitch = () => {
+    const newActiveState = !formData.multiModal;
+    setFormData(prevState => ({
+      ...prevState,
+      multiModal: newActiveState
+    }));
+  };
+
+  const models = [
+    { label: 'OpenAI o3-mini', value: 'openai_o3_mini' },
+    { label: 'gpt-4o-realtime', value: 'gpt-4o-realtime-preview-2024-10-01' },
+    { label: 'Google Gemini 2.0 Pro', value: 'google_gemini_2' },
+    { label: 'DeepSeek R1', value: 'deepseek_r1' },
+    { label: "Alibaba's Qwen 2.5 Max", value: 'alibaba_qwen_2_5_max' },
+    { label: "Anthropic's Claude 3.7", value: 'anthropic_claude_3_7' },
+    { label: 'Perplexity AI', value: 'perplexity_ai' },
+    { label: "xAI's Grok 3", value: 'xai_grok_3' },
+    { label: "Meta's Llama", value: 'meta_llama' },
+    { label: "Tencent's Hunyuan Turbo S", value: 'tencent_hunyuan_turbo_s' },
+];
 
   // Assuming phoneDataList is passed as a prop
 
@@ -148,6 +179,25 @@ useEffect(() => {
                               console.log('LLM Data List:', llmDataList);
                               console.log('Current Form Data:', formData);
                               
+                              if (value === "") {
+                                // Reset form values when "Select LLM" is chosen
+                                setFormData({
+                                  llmId: '',
+                                  businessId: user?.id,
+                                  vendorName: '',
+                                  apiKey: '',
+                                  multiModal: false,
+                                  modelName: '',
+                                  modelUrl: '',
+                                  friendlyName: '',
+                                  logoImage: '',
+                                  status: '',
+                                  active: isActive,
+                                });
+                                setIsActiveToggleSwitch(false);
+                                return;
+                              }
+                          
                               const selectedLlm = llmDataList.find(llm => {
                                 console.log('Comparing:', {
                                   currentLlmId: llm.llmId,
@@ -216,6 +266,39 @@ useEffect(() => {
                   </View>
 
 
+
+                  <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Model Name</Text>
+                        <View style={styles.pickerContainer}>
+                            <Picker
+                                    selectedValue={formData.modelName}
+                                    onValueChange={(value) =>
+                                        setFormData((prev) => ({ ...prev, modelName: value }))
+                                    }
+                                    style={[
+                                        styles.picker,
+                                        errorMessages.firstMessage ? styles.inputError : null,
+                                    ]}
+                                >
+                                    {models.map((model, index) => (
+                                        <Picker.Item key={index} label={model.label} value={model.value} />
+                                    ))}
+                              </Picker>
+                        </View>
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                      <Text style={styles.label}>Model Url</Text>
+                      <TextInput
+                          style={styles.input}
+                          placeholder="Modal Url"
+                          value={formData.modelUrl}
+                          onChangeText={(text) => handleChange('modelUrl', text)}
+                          required
+                      />
+                  </View>
+
+
                   <View style={styles.inputGroup}>
                                     <Text style={styles.label}>Vendor Name</Text>
                                     <View style={styles.pickerContainer}>
@@ -232,6 +315,7 @@ useEffect(() => {
                                           </Picker>
                                     </View>
                   </View>
+                  
 
                   <View style={[styles.inputGroup,{alignSelf:'center'}]}>
                     {isActiveToggleSwitch && <View>
@@ -247,7 +331,22 @@ useEffect(() => {
                         <Text style={styles.label}>Active</Text>
                       </Pressable>
                     </View>}
+                </View>
 
+                <View style={[styles.inputGroup,{alignSelf:'center'}]}>
+                    <View>
+                      <Switch
+                            trackColor={{ false: "#767577", true: "#81b0ff" }}
+                            thumbColor={isMulitModal ? "#007AFF" : "#f4f3f4"}
+                            ios_backgroundColor="#3e3e3e"
+                            onValueChange={multiModalSwitch}
+                            value={formData.multiModal}
+                            style={styles.switch}
+                        />
+                      <Pressable onPress={multiModalSwitch}>
+                        <Text style={styles.label}>MultiModal</Text>
+                      </Pressable>
+                    </View>
                 </View>
                 <View style={{flexDirection:'row', width:'100%' ,zIndex: 1, marginTop:'1%', alignSelf:'flex-end',alignContent:'center', justifyContent:'center'}}>
                         <View style={{margin:'5%'}}>

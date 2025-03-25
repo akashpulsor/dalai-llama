@@ -37,6 +37,9 @@ const CampaignForm = ({
                     <ScrollView style={{width:'100%', borderRadius:12, borderWidth:1, borderColor:'black'}}>
                         <View style={styles.container}>
                                 <View style={styles.inputGroup}>
+                                    <Text style={styles.label}>CampaignId : {formData.campaignId}</Text>
+                                </View>
+                                <View style={styles.inputGroup}>
                                     <Text style={styles.label}>Name of Campaign</Text>
                                     <TextInput
                                         style={[styles.input, !enabled && styles.disabledInput]}

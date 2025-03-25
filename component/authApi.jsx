@@ -273,6 +273,7 @@ export const authApi = createApi({
           const { data } = await queryFulfilled;
         }
         catch(error) {
+          console.log(error);
           handleError(error, dispatch)
         }
     
@@ -394,7 +395,7 @@ export const authApi = createApi({
     }),
     generateContext: builder.mutation({
       query: (data) => ({
-        url: '/meta/llm/add',
+        url: '/browser-agent/domContext',
         method: 'POST',
         body: data
       }),
@@ -416,5 +417,5 @@ export const { useLoginMutation, useRegisterMutation, useVerificationCodeMutatio
   useGetAgentListQuery, useGetCampaignListQuery, useGetLeadDataQuery, useGetLlmDataListQuery, useGetPhoneDataListQuery, useStartCampaignMutation, useAddPhoneDataMutation,
   useAddLLMDataMutation, useRunCampaignMutation, useGenerateTagsMutation, usePublishMutation, 
   useLoginWordpressMutation, useAddLeadMutation,useAddAgentMutation, useRefreshTokenQuery,
- useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery,useGenerateNumberMutation, useInterestMutation,  useGetPortalsQuery,useAddPortalMutation, useValidateUrlMutation} = authApi;
+ useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery,useGenerateNumberMutation, useInterestMutation,  useGetPortalsQuery,useAddPortalMutation, useValidateUrlMutation, useGenerateContextMutation} = authApi;
 
