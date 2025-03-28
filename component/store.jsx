@@ -1,9 +1,7 @@
 import { configureStore, combineReducers, getDefaultMiddleware } from '@reduxjs/toolkit';
 import { authApi } from './authApi'; // Import authApi
 import authReducer from './authSlice'; // Import authSlice reducer
-import { setUser, setToken, clearAuth, setTools } from './authSlice';
 import { setupListeners } from '@reduxjs/toolkit/query';
-import { useNavigation } from '@react-navigation/native';
 import flashMessageReducer from './flashMessageSlice';
 // Combine reducers
 const rootReducer = combineReducers({

@@ -11,7 +11,7 @@ import {
     StatusBar
 } from 'react-native';
 
-import Icon from 'react-native-vector-icons/Feather';
+
 import CountryCodeDropdownPicker from './CountryCodeDropdownPicker';
 import countryData from '../helper/countryData';
 

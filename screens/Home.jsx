@@ -174,10 +174,7 @@ const Home = ({navigation}) => {
 
 
       
-            
-        
-           
-            
+    
 
                   <Modal
                         animationType="slide"

@@ -4,11 +4,11 @@ import { View, Text, TextInput, TouchableOpacity,TouchableWithoutFeedback,Button
 import styles from '../styles';
 import { useDispatch } from 'react-redux';
 import { MaterialIcons } from '@expo/vector-icons';
-import { setSignIn } from './authApi';
-import CountryCodeDropdownPicker from 'react-native-dropdown-country-picker';
+
+
 import { useLoginMutation, useRegisterMutation } from './authApi';
 import { useSelector } from 'react-redux';
-import {setToken,setUser} from "./authSlice";
+
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import {selectIsLoggedIn} from './authSlice';
 import Toast from 'react-native-toast-message';

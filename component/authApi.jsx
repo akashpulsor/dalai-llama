@@ -371,7 +371,7 @@ export const authApi = createApi({
     }),
     getPortals: builder.query({
       query: (params) =>{
-        return `/user-portals/user/${params.businessId}`;
+        return `/portals/${params.businessId}`;
       },
       onQueryStarted: async (arg, { dispatch, getState, queryFulfilled }) => {
             const { data } = await queryFulfilled;
@@ -380,7 +380,7 @@ export const authApi = createApi({
     }),
     addPortal: builder.mutation({
       query: (data) => ({
-        url: '/meta/llm/add',
+        url: '/portals/configure',
         method: 'POST',
         body: data
       }),
@@ -395,7 +395,7 @@ export const authApi = createApi({
     }),
     generateContext: builder.mutation({
       query: (data) => ({
-        url: '/browser-agent/domContext',
+        url: '/browser-agent/urlContext',
         method: 'POST',
         body: data
       }),
