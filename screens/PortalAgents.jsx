@@ -1,14 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef,  useMemo  } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Image, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useGetPortalsQuery, useAddPortalMutation, useValidateUrlMutation } from '../component/authApi';
 import { selectUser } from '../component/authSlice';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import PortalConfigurationModal from '../component/PortalConfigurationModal';
-import { showMessage } from '../component/flashMessageSlice';
+import PortalRunModal from '../component/PortalRunModal';
 
 const PortalAgents = ({ navigation }) => {
   const user = useSelector(selectUser);
-  const dispatch = useDispatch();
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -20,14 +19,14 @@ const PortalAgents = ({ navigation }) => {
   const [validatedUrl, setValidatedUrl] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [selectedPortal, setSelectedPortal] = useState(null);
-
   const [allowedOrigins, setAllowedOrigins] = useState([
     'https://naukri.com',
+    'https://x.com',
     'https://your-trusted-domain-2.net',
     'https://another-safe-site.org',
   ]);
 
-  const { data: portals, isLoading: portalsLoading, error: portalsError, refetch: refetchPortals } = useGetPortalsQuery({ businessId: user?.id });
+  const { data: portals, isLoading: portalsLoading, isSuccess: isPortalSuccess, error: portalsError, refetch: refetchPortals } = useGetPortalsQuery({ businessId: user?.id });
   const [validateUrl, { data: validationData, isLoading: validating, error: validationError }] = useValidateUrlMutation();
   const [addPortal, { isLoading: addingPortal, isSuccess: addPortalSuccess }] = useAddPortalMutation();
 
@@ -98,7 +97,12 @@ const PortalAgents = ({ navigation }) => {
       // Reset the validated URL
       setValidatedUrl('');
     }
-  }, [addPortalSuccess, refetchPortals, validatedUrl]);
+    if(isPortalSuccess)
+    {
+      console.log("TESTTTT");
+      console.log(portals);
+    }
+  }, [addPortalSuccess, refetchPortals, validatedUrl, isPortalSuccess]);
 
   // Debugging for unConfiguredPortal state
   useEffect(() => {
@@ -130,6 +134,20 @@ const PortalAgents = ({ navigation }) => {
     } catch (error) {
       console.error('Error fetching website logo:', error);
       return false;
+    }
+  };
+
+  const getWebsiteLogoUrl = async (websiteUrl) => {
+    try {
+      if (!websiteUrl.startsWith('http')) {
+        websiteUrl = 'https://' + websiteUrl;
+      }
+      const urlObj = new URL(websiteUrl);
+      const domain = urlObj.hostname;
+      const name = domain.replace(/^www\./, '');
+      return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+    } catch (error) {
+      console.error('Error fetching website logo:', error);
     }
   };
 
@@ -194,29 +212,125 @@ const PortalAgents = ({ navigation }) => {
     setShowModal(true);
   };
   
-  const handleConfigurePortal = async (formData) => {
-    try {
-      await addPortal({
-        ...formData,
-        businessId: user?.id,
-        isConfigured: true
-      }).unwrap();
-      
-      dispatch(showMessage({
-        message: 'Portal configured successfully',
-        type: 'success'
-      }));
-      
-      refetchPortals();
-      setShowModal(false);
-    } catch (err) {
-      dispatch(showMessage({
-        message: 'Failed to configure portal',
-        type: 'error'
-      }));
-      throw err;
-    }
+  // Function to configure an unconfigured portal
+  const handleConfigurePortal = (portal) => {
+    // Call the addPortal mutation to add this portal to configured portals
+    addPortal({ 
+      url: portal.url, 
+      logo: portal.logo, 
+      name: portal.name, 
+      businessId: user?.id 
+    });
   };
+
+  const PortalItem = React.memo(({ 
+    portal, 
+    handlePortalPress, 
+    getWebsiteLogoUrl, 
+    styles 
+  }) => {
+    const [logoUrl, setLogoUrl] = useState(null);
+    const [isLogoLoading, setIsLogoLoading] = useState(true);
+    const [showModal, setShowModal] = useState(false);
+    const [selectedPortal, setSelectedPortal] = useState(null);
+  
+    useEffect(() => {
+      const fetchLogoUrl = async () => {
+        try {
+          setIsLogoLoading(true);
+          const url = await getWebsiteLogoUrl(portal.baseUrl);
+          setLogoUrl(url);
+        } catch (error) {
+          console.error('Error fetching logo URL:', error);
+          setLogoUrl(null);
+        } finally {
+          setIsLogoLoading(false);
+        }
+      };
+  
+      fetchLogoUrl();
+    }, [portal.baseUrl, getWebsiteLogoUrl]);
+  
+    return (
+      <View key={`${portal.portalId}`} style={{
+        flexDirection: 'row',
+        margin:'5%',
+        width:'15%',
+        alignItems: 'center',
+        marginBottom: 10,
+      }}>
+        <TouchableOpacity
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#fff',
+            
+            padding: 15,
+            borderRadius: 12,
+            flex: 1,
+            elevation: 3,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+          }}
+          onPress={() => {
+            setSelectedPortal(portal);
+            setShowModal(true);
+          }}
+        >
+          {isLogoLoading ? (
+            <ActivityIndicator 
+              size="small" 
+              color="#4285f4" 
+              style={{
+                width: 28,
+                height: 28,
+                marginRight: 12,
+              }} 
+            />
+          ) : (
+            
+            <Image
+              source={{ uri: logoUrl }}
+              style={{
+                width: 28,
+                height: 28,
+                marginRight: 12,
+              }}
+              resizeMode="contain"
+              defaultSource={require('../assets/logo.png')} // Optional: add a default logo
+            />
+          )}
+          <Text style={{
+        fontSize: 16,
+        color: '#333',
+      }}>{portal.portalName}</Text>
+        </TouchableOpacity>
+        
+    
+        <PortalRunModal
+        visible={showModal}
+        onClose={() => setShowModal(false)}
+        portalData={portal}
+        onConfigure={handleConfigurePortal}
+        onUpdate={handleConfigurePortal}
+      />
+      </View>
+    );
+  });
+
+  const portalsList = useMemo(() => {
+    return isPortalSuccess && portals.map((portal) => (
+      <PortalItem
+        key={`${portal.portalId}`}
+        portal={portal}
+        handlePortalPress={handlePortalPress}
+        getWebsiteLogoUrl={getWebsiteLogoUrl}
+        styles={styles}
+      />
+    ));
+  }, [portals, isPortalSuccess,handlePortalPress, getWebsiteLogoUrl, styles]);
 
   return (
     <View style={styles.container}>
@@ -226,14 +340,7 @@ const PortalAgents = ({ navigation }) => {
             style={styles.input}
             placeholder="Enter website URL"
             value={url}
-            onChangeText={(text) => {
-              setUrl(text);
-              // Clear error when input is emptied
-              if (!text) {
-                setShowError(false);
-                setErrorMessage('');
-              }
-            }}
+            onChangeText={setUrl}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
@@ -273,7 +380,7 @@ const PortalAgents = ({ navigation }) => {
               <View key={`${portal.url}-${index}`} style={styles.portalItemContainer}>
                 <TouchableOpacity
                   style={styles.portalButton}
-                  onPress={() => handlePortalPress(portal)}
+                  onPress={() => handlePortalPress(portal.url)}
                 >
                   <Image
                     source={{ uri: portal.logo }}
@@ -298,32 +405,20 @@ const PortalAgents = ({ navigation }) => {
           ) : portalsError ? (
             <Text>Error loading portals.</Text>
           ) : portals && portals.length > 0 ? (
-            portals.map((portal) => (
-              <TouchableOpacity
-                key={portal.url}
-                style={styles.portalButton}
-                onPress={() => handlePortalPress(portal)}
-              >
-                <Image
-                  source={{ uri: portal.logo }}
-                  style={styles.portalLogo}
-                  resizeMode="contain"
-                />
-                <Text style={styles.portalName}>{portal.name}</Text>
-              </TouchableOpacity>
-            ))
+            portalsList
           ) : (
             <Text style={styles.emptyText}>No configured portals yet.</Text>
           )}
         </ScrollView>
       </View>
-
       <PortalConfigurationModal
         visible={showModal}
         onClose={() => setShowModal(false)}
         portalUrl={selectedPortal?.url}
         onConfigure={handleConfigurePortal}
       />
+
+
     </View>
   );
 };
@@ -474,4 +569,4 @@ const styles = StyleSheet.create({
   }
 });
 
-export default PortalAgents;
+export default React.memo(PortalAgents);

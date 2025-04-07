@@ -371,7 +371,7 @@ export const authApi = createApi({
     }),
     getPortals: builder.query({
       query: (params) =>{
-        return `/user-portals/user/${params.businessId}`;
+        return `/portals/${params.businessId}`;
       },
       onQueryStarted: async (arg, { dispatch, getState, queryFulfilled }) => {
             const { data } = await queryFulfilled;
@@ -380,7 +380,7 @@ export const authApi = createApi({
     }),
     addPortal: builder.mutation({
       query: (data) => ({
-        url: '/meta/llm/add',
+        url: '/portals/configure',
         method: 'POST',
         body: data
       }),
@@ -395,7 +395,22 @@ export const authApi = createApi({
     }),
     generateContext: builder.mutation({
       query: (data) => ({
-        url: '/browser-agent/domContext',
+        url: '/browser-agent/urlContext',
+        method: 'POST',
+        body: data
+      }),
+      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+        try{
+          const { data } = await queryFulfilled;
+        }
+        catch(error) {
+          handleError(error, dispatch)
+        }
+      },
+    }),
+    initlializeBrowserAutomation: builder.mutation({
+      query: (data) => ({
+        url: '/browser-agent/init',
         method: 'POST',
         body: data
       }),
@@ -417,5 +432,5 @@ export const { useLoginMutation, useRegisterMutation, useVerificationCodeMutatio
   useGetAgentListQuery, useGetCampaignListQuery, useGetLeadDataQuery, useGetLlmDataListQuery, useGetPhoneDataListQuery, useStartCampaignMutation, useAddPhoneDataMutation,
   useAddLLMDataMutation, useRunCampaignMutation, useGenerateTagsMutation, usePublishMutation, 
   useLoginWordpressMutation, useAddLeadMutation,useAddAgentMutation, useRefreshTokenQuery,
- useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery,useGenerateNumberMutation, useInterestMutation,  useGetPortalsQuery,useAddPortalMutation, useValidateUrlMutation, useGenerateContextMutation} = authApi;
+ useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery,useGenerateNumberMutation, useInterestMutation,  useGetPortalsQuery,useAddPortalMutation, useValidateUrlMutation, useGenerateContextMutation, useInitlializeBrowserAutomationMutation} = authApi;
 

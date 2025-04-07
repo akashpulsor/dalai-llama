@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Modal,
-  Alert,
+
 } from 'react-native';
 import PropTypes from 'prop-types';
 import Button from './Button';

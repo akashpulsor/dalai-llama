@@ -13,19 +13,24 @@ import { useSelector } from 'react-redux';
 import { selectUser } from './authSlice';
 import { useDispatch } from 'react-redux';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useGetLlmDataListQuery, useGenerateContextMutation, useAddPortalMutation } from './authApi';
+import { useGetLlmDataListQuery, useGenerateContextMutation, useInitlializeBrowserAutomationMutation } from './authApi';
 import { Picker } from '@react-native-picker/picker';
 
-const PortalConfigurationModal = ({ visible, onClose, portalUrl, onConfigure }) => {
+
+const PortalRunModal = ({ visible, onClose, portalData, onConfigure, onUpdate }) => {
   const [formData, setFormData] = useState({
-    userName: '',
-    password: '',
-    portalName:'',
-    portalDescription: '',
-    intent: '',
-    campaignId:'',
-    steps: '',
-    baseUrl: portalUrl,
+    portalId: portalData.portalId,
+    userName: portalData.userName,
+    password: portalData.password,
+    portalName: portalData.portalName,
+    portalDescription: portalData.portalDescription,
+    intent: portalData.intents.find(intent => intent.intentName === "ROOT")?.description || null,
+    campaignId: '',
+    steps: [...portalData.intents]
+      .sort((a, b) => a.intentId - b.intentId)
+      .map(intent => intent.description)
+      .join(' | '),
+    baseUrl: portalData.baseUrl,
     llmId: ''
   });
   const user = useSelector(selectUser);
@@ -39,38 +44,19 @@ const PortalConfigurationModal = ({ visible, onClose, portalUrl, onConfigure }) 
   const { data: llmDataList, isSuccess: isLlmDataListSuccess, error: llmDataListError, isLoading: isLlmDataListLoading, isError: isLlmDataListError } = useGetLlmDataListQuery({
     businessId: user?.id,
   });
-  const [generateContext, { data: contextData, isLoading:isContextDataLoading, isSuccess:isContextDataSuccess, isError:isContextDataError, error:ContextDataError }] = useGenerateContextMutation();
 
-  const [addPortal, { data: portalData, isLoading:isPortalDataLoading, isSuccess:isPortalDataSuccess, isError:isPortalDataError, error:PortalDataError }] = useAddPortalMutation();
 
-  // Enable form only when LLM is selected
-  useEffect(() => {
-    setIsFormEnabled(formData.llmId !== '');
-    console.log("AKASH");
-    console.log(llmDataList);
-    if(isContextDataSuccess) {
-        setFormData({ ...formData, description: contextData.domContextResponse });
-    }
-        // Dispatch portal success event when portal is added successfully
-    if (isPortalDataSuccess && portalData) {
-        dispatch(addPortalSuccess(portalData));
-        onClose(); // Close the modal
-    }
-  }, [formData.llmId, llmDataList, isContextDataSuccess, isPortalDataSuccess, portalData]);
+  const [initAutomation, { data: automationIntilizationData, isLoading:isAutomationIntilizationLoading, isSuccess:isAutomationIntilizationSuccess, isError:isAutomationIntilizationError, error:AutomationIntilizationError }] = useInitlializeBrowserAutomationMutation();
+  
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.intent.trim()) {
-      newErrors.intent = 'Intent is required';
+    
+    if (!formData.llmId.trim()) {
+      newErrors.username = 'LLM is required';
     }
-    if (!formData.steps.trim()) {
-      newErrors.steps = 'Steps are required';
-    }
-    if (!formData.userName.trim()) {
-      newErrors.username = 'User name is required';
-    }
-    if (!formData.password.trim()) {
-      newErrors.password = 'Password is required';
+    if (!formData.campaignId.trim()) {
+      newErrors.password = 'Campaign Id is required';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -81,10 +67,11 @@ const PortalConfigurationModal = ({ visible, onClose, portalUrl, onConfigure }) 
 
     setIsLoading(true);
     try {
-      await addPortal({
-        ...formData,
+      await initAutomation({
         businessId: user?.id,
-        baseUrl: portalUrl
+        portalId: formData.portalId,
+        campaignId: formData.campaignId,
+        llmId: formData.llmId
       });
       onClose();
     } catch (error) {
@@ -118,7 +105,7 @@ const PortalConfigurationModal = ({ visible, onClose, portalUrl, onConfigure }) 
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <MaterialIcons name="cancel" size={24} color="gray" />
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Configure Portal</Text>
+            <Text style={styles.modalTitle}>Run Portal</Text>
           </View>
 
           <ScrollView style={styles.modalBody}>
@@ -134,6 +121,7 @@ const PortalConfigurationModal = ({ visible, onClose, portalUrl, onConfigure }) 
                     selectedValue={formData.llmId}
                     onValueChange={(itemValue) => {
                       setFormData({ ...formData, llmId: itemValue });
+                      setIsFormEnabled(true);
                       if (itemValue) {
                         //generateContext({ businessId: user?.id,llmId: itemValue, portalUrl: portalUrl });
                       }
@@ -161,7 +149,7 @@ const PortalConfigurationModal = ({ visible, onClose, portalUrl, onConfigure }) 
               <Text style={styles.label}>Website Url</Text>
               <TextInput
                 style={[styles.input, styles.disabledInput]}
-                value={portalUrl}
+                value={formData.baseUrl}
                 editable={false}
                 placeholder="Website Url"
               />
@@ -170,10 +158,10 @@ const PortalConfigurationModal = ({ visible, onClose, portalUrl, onConfigure }) 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Website Name</Text>
               <TextInput
-                style={[styles.input, !isFormEnabled && styles.disabledInput]}
+                style={[styles.input,  styles.disabledInput]}
                 value={formData.portalName}
                 onChangeText={(text) => setFormData({ ...formData, portalName: text })}
-                editable={isFormEnabled}
+                editable={false}
                 placeholder="Enter name Website name, you can personalize .."
               />
             </View>
@@ -184,14 +172,14 @@ const PortalConfigurationModal = ({ visible, onClose, portalUrl, onConfigure }) 
                 style={[
                   styles.input,
                   styles.textArea,
-                  !isFormEnabled && styles.disabledInput
+                   styles.disabledInput
                 ]}
                 value={formData.portalDescription}
                 onChangeText={(text) => setFormData({ ...formData, portalDescription: text })}
                 placeholder="Enter website description"
                 multiline
                 numberOfLines={3}
-                editable={isFormEnabled}
+                editable={false}
               />
             </View>
 
@@ -207,56 +195,17 @@ const PortalConfigurationModal = ({ visible, onClose, portalUrl, onConfigure }) 
               {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>User Name</Text>
-              <TextInput
-                style={[styles.input, !isFormEnabled && styles.disabledInput]}
-                value={formData.userName}
-                onChangeText={(text) => setFormData({ ...formData, userName: text })}
-                placeholder="User Name"
-                editable={isFormEnabled}
-              />
-              {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Password</Text>
-              <View style={[styles.passwordContainer, !isFormEnabled && styles.disabledBorder]}>
-                <TextInput
-                  style={[styles.passwordInput, !isFormEnabled && styles.disabledInput]}
-                  value={formData.password}
-                  onChangeText={(text) => setFormData({ ...formData, password: text })}
-                  placeholder="Password"
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={isFormEnabled}
-                />
-                <TouchableOpacity
-                  style={styles.eyeIconContainer}
-                  onPress={() => isFormEnabled && setShowPassword(!showPassword)}
-                  disabled={!isFormEnabled}
-                >
-                  <MaterialIcons
-                    name={showPassword ? 'visibility-off' : 'visibility'}
-                    size={24}
-                    color={isFormEnabled ? "#777" : "#aaa"}
-                  />
-                </TouchableOpacity>
-              </View>
-              {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
-            </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Intent</Text>
               <TextInput
-                style={[styles.input, styles.textArea, !isFormEnabled && styles.disabledInput]}
+                style={[styles.input, styles.textArea,  styles.disabledInput]}
                 value={formData.intent}
                 onChangeText={(text) => setFormData({ ...formData, intent: text })}
                 placeholder="What do you want to achieve with this portal?"
                 multiline
                 numberOfLines={3}
-                editable={isFormEnabled}
+                editable={false}
               />
               {errors.intent && <Text style={styles.errorText}>{errors.intent}</Text>}
             </View>
@@ -264,13 +213,13 @@ const PortalConfigurationModal = ({ visible, onClose, portalUrl, onConfigure }) 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Steps</Text>
               <TextInput
-                style={[styles.input, styles.textArea, !isFormEnabled && styles.disabledInput]}
+                style={[styles.input, styles.textArea,  styles.disabledInput]}
                 value={formData.steps}
                 onChangeText={(text) => setFormData({ ...formData, steps: text })}
                 placeholder="What steps are required to achieve this?"
                 multiline
                 numberOfLines={4}
-                editable={isFormEnabled}
+                editable={false}
               />
               {errors.steps && <Text style={styles.errorText}>{errors.steps}</Text>}
             </View>
@@ -289,7 +238,7 @@ const PortalConfigurationModal = ({ visible, onClose, portalUrl, onConfigure }) 
               {isLoading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.buttonText}>Configure</Text>
+                <Text style={styles.buttonText}>Initialize</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -445,4 +394,4 @@ const styles = StyleSheet.create({
   }
 });
 
-export default PortalConfigurationModal;
+export default PortalRunModal;

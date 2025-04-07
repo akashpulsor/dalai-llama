@@ -126,6 +126,7 @@ useEffect(() => {
 
   const models = [
     { label: 'OpenAI o3-mini', value: 'openai_o3_mini' },
+    { label: 'OpenAI gpt-4o', value: 'gpt-4o' },
     { label: 'gpt-4o-realtime', value: 'gpt-4o-realtime-preview-2024-10-01' },
     { label: 'Google Gemini 2.0 Pro', value: 'google_gemini_2' },
     { label: 'DeepSeek R1', value: 'deepseek_r1' },
