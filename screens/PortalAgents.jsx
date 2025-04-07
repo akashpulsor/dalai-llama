@@ -21,6 +21,7 @@ const PortalAgents = ({ navigation }) => {
   const [selectedPortal, setSelectedPortal] = useState(null);
   const [allowedOrigins, setAllowedOrigins] = useState([
     'https://naukri.com',
+    'https://x.com',
     'https://your-trusted-domain-2.net',
     'https://another-safe-site.org',
   ]);

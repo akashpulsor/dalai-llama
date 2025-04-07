@@ -17,7 +17,7 @@ export const authApi = createApi({
   //https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api
   baseQuery: fetchBaseQuery(
       { //baseUrl: 'http://localhost:8080/api',
-        baseUrl: process.env.REACT_APP_API_BASE_URL ||'http://localhost:8080/api',
+        baseUrl: process.env.REACT_APP_API_BASE_URL ||'https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api',
         prepareHeaders: (headers, { getState }) => {
           // Get the token from state
           const token = getState().auth.token;
@@ -407,6 +407,21 @@ export const authApi = createApi({
           handleError(error, dispatch)
         }
       },
+    }),
+    initlializeBrowserAutomation: builder.mutation({
+      query: (data) => ({
+        url: '/browser-agent/init',
+        method: 'POST',
+        body: data
+      }),
+      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+        try{
+          const { data } = await queryFulfilled;
+        }
+        catch(error) {
+          handleError(error, dispatch)
+        }
+      },
     })
   }),
 });
@@ -417,5 +432,5 @@ export const { useLoginMutation, useRegisterMutation, useVerificationCodeMutatio
   useGetAgentListQuery, useGetCampaignListQuery, useGetLeadDataQuery, useGetLlmDataListQuery, useGetPhoneDataListQuery, useStartCampaignMutation, useAddPhoneDataMutation,
   useAddLLMDataMutation, useRunCampaignMutation, useGenerateTagsMutation, usePublishMutation, 
   useLoginWordpressMutation, useAddLeadMutation,useAddAgentMutation, useRefreshTokenQuery,
- useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery,useGenerateNumberMutation, useInterestMutation,  useGetPortalsQuery,useAddPortalMutation, useValidateUrlMutation, useGenerateContextMutation} = authApi;
+ useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery,useGenerateNumberMutation, useInterestMutation,  useGetPortalsQuery,useAddPortalMutation, useValidateUrlMutation, useGenerateContextMutation, useInitlializeBrowserAutomationMutation} = authApi;
 

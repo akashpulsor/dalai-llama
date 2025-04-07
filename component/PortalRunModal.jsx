@@ -13,7 +13,7 @@ import { useSelector } from 'react-redux';
 import { selectUser } from './authSlice';
 import { useDispatch } from 'react-redux';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useGetLlmDataListQuery, useGenerateContextMutation, useAddPortalMutation } from './authApi';
+import { useGetLlmDataListQuery, useGenerateContextMutation, useInitlializeBrowserAutomationMutation } from './authApi';
 import { Picker } from '@react-native-picker/picker';
 
 
@@ -46,20 +46,17 @@ const PortalRunModal = ({ visible, onClose, portalData, onConfigure, onUpdate })
   });
 
 
+  const [initAutomation, { data: automationIntilizationData, isLoading:isAutomationIntilizationLoading, isSuccess:isAutomationIntilizationSuccess, isError:isAutomationIntilizationError, error:AutomationIntilizationError }] = useInitlializeBrowserAutomationMutation();
+  
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.intent.trim()) {
-      newErrors.intent = 'Intent is required';
+    
+    if (!formData.llmId.trim()) {
+      newErrors.username = 'LLM is required';
     }
-    if (!formData.steps.trim()) {
-      newErrors.steps = 'Steps are required';
-    }
-    if (!formData.userName.trim()) {
-      newErrors.username = 'User name is required';
-    }
-    if (!formData.password.trim()) {
-      newErrors.password = 'Password is required';
+    if (!formData.campaignId.trim()) {
+      newErrors.password = 'Campaign Id is required';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -70,10 +67,11 @@ const PortalRunModal = ({ visible, onClose, portalData, onConfigure, onUpdate })
 
     setIsLoading(true);
     try {
-      await addPortal({
-        ...formData,
+      await initAutomation({
         businessId: user?.id,
-        baseUrl: portalUrl
+        portalId: formData.portalId,
+        campaignId: formData.campaignId,
+        llmId: formData.llmId
       });
       onClose();
     } catch (error) {
