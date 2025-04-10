@@ -353,6 +353,33 @@ export const authApi = createApi({
        
        },
     }),
+    getCampaignRunLogs: builder.query({
+      query: (data) => {
+        const size = data.size || 10; // Default size to 10 if undefined
+        return `/campaign/${data.businessId}/${data.campaignId}/runs?page=${data.page}&size=${size}&sort=createdAt,desc`;
+      },
+      onQueryStarted: async (arg, { dispatch, getState, queryFulfilled }) => {
+        try {
+          const { data } = await queryFulfilled;
+        } catch (error) {
+          handleError(error, dispatch);
+        }
+      },
+    }),
+    getCallLogs: builder.query({
+      query: (data) => {
+        const size = data.size || 10; // Default size to 10 if undefined/{campaignRunId}/call-logs
+        return `/campaign/${data.campaignRunId}/call-logs?page=${data.page}&size=${size}&sort=startTime,desc`;
+      },
+      onQueryStarted: async (arg, { dispatch, getState, queryFulfilled }) => {
+        try {
+          const { data } = await queryFulfilled;
+        } catch (error) {
+          console.log(error);
+          handleError(error, dispatch);
+        }
+      },
+    }),
     validateUrl: builder.mutation({
       query: (data) => ({
         url: '/browser-agent/validate',
@@ -429,6 +456,21 @@ export const authApi = createApi({
         return url;
       },
     }),
+    registerBot: builder.mutation({
+      query: (data) => ({
+        url: '/bot/register',
+        method: 'POST',
+        body: { businessId: data.businessId }, // Include businessId in the request body
+      }),
+      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+        try {
+          const { data } = await queryFulfilled;
+          console.log('Bot registered successfully:', data);
+        } catch (error) {
+          handleError(error, dispatch);
+        }
+      },
+    }),
   }),
 });
 
@@ -438,7 +480,8 @@ export const { useLoginMutation, useRegisterMutation, useVerificationCodeMutatio
   useGetAgentListQuery, useGetCampaignListQuery, useGetLeadDataQuery, useGetLlmDataListQuery, useGetPhoneDataListQuery, useStartCampaignMutation, useAddPhoneDataMutation,
   useAddLLMDataMutation, useRunCampaignMutation, useAddLeadMutation,useAddAgentMutation, useRefreshTokenQuery,
  useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery,useGenerateNumberMutation, useInterestMutation,  useGetPortalsQuery,useAddPortalMutation, useValidateUrlMutation, useGenerateContextMutation, useInitlializeBrowserAutomationMutation, useGetDashboardDataQuery,
- useLazyGetDashboardDataQuery
+ useLazyGetDashboardDataQuery, useRegisterBotMutation,useGetCampaignRunLogsQuery, useGetCallLogsQuery
+
 
 } = authApi;
 

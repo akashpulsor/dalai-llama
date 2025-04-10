@@ -1,5 +1,5 @@
 import React, { createRef, useState, useEffect } from 'react';
-import { View, ScrollView, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, ScrollView, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import LeadForm from '../component/LeadForm';
@@ -164,33 +164,17 @@ const LandingPage = ({ navigation }) => {
                         <Text style={styles.sectionTitle}>Key Use Cases</Text>
                         
                         <View style={styles.benefitGrid}>
-                            <View style={styles.benefitCard}>
-                                <Text style={styles.benefitTitle}>Recruitment Automation</Text>
-                                <Text style={styles.benefitDescription}>
-                                    From sourcing to screening to scheduling interviews, our AI agents handle the entire recruitment process, ensuring top talent doesn't slip through the cracks.
-                                </Text>
-                            </View>
-                            
-                            <View style={styles.benefitCard}>
-                                <Text style={styles.benefitTitle}>GST Filing</Text>
-                                <Text style={styles.benefitDescription}>
-                                    Automate data extraction, reconciliation, and filing of GST returns with high accuracy, saving your finance team countless hours each month.
-                                </Text>
-                            </View>
-                            
-                            <View style={styles.benefitCard}>
-                                <Text style={styles.benefitTitle}>Bid Management</Text>
-                                <Text style={styles.benefitDescription}>
-                                    Monitor opportunities, analyze RFPs, gather required documentation, and draft competitive proposals automatically and efficiently.
-                                </Text>
-                            </View>
-
-                            <View style={styles.benefitCard}>
-                                <Text style={styles.benefitTitle}>Digital Marketing</Text>
-                                <Text style={styles.benefitDescription}>
-                                    Coordinate content creation, scheduling, analytics, and optimization across multiple channels with AI agents that learn what works for your audience.
-                                </Text>
-                            </View>
+                            {[
+                                { title: 'Recruitment Automation', description: 'From sourcing to screening to scheduling interviews, our AI agents handle the entire recruitment process, ensuring top talent doesn\'t slip through the cracks.' },
+                                { title: 'GST Filing', description: 'Automate data extraction, reconciliation, and filing of GST returns with high accuracy, saving your finance team countless hours each month.' },
+                                { title: 'Bid Management', description: 'Monitor opportunities, analyze RFPs, gather required documentation, and draft competitive proposals automatically and efficiently.' },
+                                { title: 'Digital Marketing', description: 'Coordinate content creation, scheduling, analytics, and optimization across multiple channels with AI agents that learn what works for your audience.' },
+                            ].map((useCase, index) => (
+                                <View key={index} style={styles.benefitCard}>
+                                    <Text style={styles.benefitTitle}>{useCase.title}</Text>
+                                    <Text style={styles.benefitDescription}>{useCase.description}</Text>
+                                </View>
+                            ))}
                         </View>
                     </View>
 
@@ -214,7 +198,7 @@ const LandingPage = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#d3d3d3'
+        backgroundColor: '#d3d3d3',
     },
     backgroundContainer: {
         position: 'absolute',
@@ -238,14 +222,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerLogo: {
-        width: 100,
-        height: 100,
-        alignSelf:'center',
+        width: 80,
+        height: 80,
         resizeMode: 'contain',
     },
     headerTitle: {
-        fontSize: 24,
-        alignSelf:'center',
+        fontSize: 20,
         fontWeight: 'bold',
         color: '#ffffff',
     },
@@ -254,16 +236,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     navLink: {
-        marginHorizontal: 15,
+        marginHorizontal: 10,
         fontSize: 16,
         color: '#4b5563',
     },
     loginButton: {
-        paddingVertical: 10,
-        paddingHorizontal: 20,
+        paddingVertical: 5,
+        paddingHorizontal: 15,
         backgroundColor: '#6b7280',
         borderRadius: 8,
-        marginLeft: 15,
+        marginLeft: 10,
     },
     loginButtonText: {
         color: '#fff',
@@ -275,41 +257,41 @@ const styles = StyleSheet.create({
     },
     heroContent: {
         alignItems: 'center',
-        maxWidth: 600,
+        maxWidth: 350,
     },
     heroTitle: {
-        fontSize: 40,
+        fontSize: 32,
         fontWeight: 'bold',
         color: '#ffffff',
         textAlign: 'center',
         marginBottom: 10,
     },
     heroSubtitle: {
-        fontSize: 24,
+        fontSize: 20,
         fontWeight: 'bold',
         color: '#ffffff',
         textAlign: 'center',
-        marginBottom: 20,
+        marginBottom: 15,
     },
     trustIndicators: {
         flexDirection: 'row',
         justifyContent: 'center',
-        marginBottom: 20,
+        marginBottom: 10,
     },
     trustBadge: {
         alignItems: 'center',
-        marginHorizontal: 20,
+        marginHorizontal: 10,
         padding: 10,
         backgroundColor: '#6b7280',
         borderRadius: 10,
     },
     trustBadgeTitle: {
-        fontSize: 28,
+        fontSize: 20,
         fontWeight: 'bold',
         color: '#ffffff',
     },
     trustBadgeText: {
-        fontSize: 16,
+        fontSize: 14,
         color: '#ffffff',
     },
     heroDescription: {
@@ -324,22 +306,23 @@ const styles = StyleSheet.create({
     },
     featureGrid: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         justifyContent: 'center',
-        marginTop: 20,
+        marginTop: 10,
     },
     featureCard: {
-        width: '45%',
+        width: '90%',
         padding: 20,
         backgroundColor: '#6b7280',
         borderRadius: 10,
-        marginHorizontal: 10,
+        marginVertical: 5,
         alignItems: 'center',
     },
     featureTitle: {
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: 'bold',
         color: '#ffffff',
-        marginBottom: 10,
+        marginBottom: 5,
         textAlign: 'center',
     },
     featureDescription: {
@@ -355,21 +338,21 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'center',
-        marginTop: 20,
+        marginTop: 10,
     },
     benefitCard: {
-        width: '40%',
+        width: '90%',
         padding: 20,
         backgroundColor: '#6b7280',
         borderRadius: 10,
-        margin: 10,
+        marginVertical: 5,
         alignItems: 'center',
     },
     benefitTitle: {
         fontSize: 20,
         fontWeight: 'bold',
         color: '#ffffff',
-        marginBottom: 10,
+        marginBottom: 5,
         textAlign: 'center',
     },
     benefitDescription: {
@@ -383,25 +366,25 @@ const styles = StyleSheet.create({
     },
     contactButton: {
         backgroundColor: '#6b7280',
-        paddingVertical: 15,
+        paddingVertical: 10,
         paddingHorizontal: 30,
         borderRadius: 10,
     },
     contactButtonText: {
         color: '#ffffff',
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: 'bold',
     },
     sectionTitle: {
         fontSize: 32,
         fontWeight: 'bold',
         color: '#ffffff',
-        marginBottom: 20,
+        marginBottom: 10,
         textAlign: 'center',
     },
     scrollContainer: {
-        backgroundColor: '#d3d3d3'
-    }
+        backgroundColor: '#d3d3d3',
+    },
 });
 
 export default LandingPage;

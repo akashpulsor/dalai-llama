@@ -1,162 +1,455 @@
-// Import necessary components from React Native
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity,TouchableWithoutFeedback, TextInput, Modal, ActivityIndicator,Image } from 'react-native';
-import styles from '../styles';
-import { useLoginMutation, useRegisterMutation } from '../component/authApi';
-import { emailValidator } from '../helper/emailValidator'
-import Button from '../component/Button';
+import React, { useState } from 'react';
+import { 
+    View, 
+    Text, 
+    TouchableOpacity, 
+    StyleSheet, 
+    ActivityIndicator, 
+    FlatList, 
+    Dimensions, 
+    Modal 
+} from 'react-native';
+import { useGetCampaignListQuery, useGetCampaignRunLogsQuery,useGetCallLogsQuery } from '../component/authApi';
+import { selectUser } from '../component/authSlice';
+import { useSelector } from 'react-redux';
 
+// Get device height for better layout calculations
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-
-
-// Create your functional component
-const CampaignLogs = ({navigation}) => {
-
-    const [email, setEmail] = useState('')
-    const [emailError, setEmailError] = useState('')
-    const [password, setPassword] = useState('')
-    const [passwordError, setPasswordError] = useState('');
-    const [modalVisible, setModalVisible] = useState(false);
-    const [showError, setShowError] = useState(false);
-    const [errorMessage, setErrorMessage] = useState('');
-    const [showResetPassword, setShowResetPassword] = useState(false);
-    const [showVerifyCode, setShowVerifyCode] = useState(false);
-    const [showNewPassword, setShowNewPassword] = useState(false);
-    const [showVerificationEmail, setShowVerificationEmail] = useState(false);
-    const [loginMutation, { data: loginData, isLoading:isLoginLoading, isSuccess:isLoginSuccess, isError:isLoginError, error:loginError }] = useLoginMutation();
-
-    useEffect(() => {
-     if (isLoginError) {
-        setShowError(true);
-        setErrorMessage(showError || 'Please try again after sometime.');
-      }
-    }, [isLoginLoading, isLoginSuccess, isLoginError,loginError, errorMessage, showError]);
-
-    const onLoginPress = async () => {
-      const emailError = emailValidator(email)
-      if (emailError) {
-        setShowError(true);
-        setErrorMessage(emailError)
-        return
-      }
-      let body = {"userName": email, "password": password};
-      body = JSON.stringify(body);
-      console.log(body);
-      await loginMutation(body);
-    }
-
-    const handleModalClose = () => {
-      setModalVisible(false);
-    }
-
-    const handleRegisterPress = () => {
-      setModalVisible(true);
-    }
-
-    const handleResetPasswordPress = () => {
-      setShowResetPassword(true);
-    }
-
-    const handleResetPasswordModalClose = () => {
-      setShowResetPassword(false);
-    }
-
-    const handleVerifyCodeModalClose = () => {
-      setShowVerifyCode(false);
-    }
-
-    const handleNewPasswordModalClose = () => {
-      setShowNewPassword(false);
-    }
-
-
-
-
-   
-
-  return (
-    // Main container with a gray background
-    <View style={[styles.container,{padding: 0,}]}>
-       
-
-
-            <View style={{ width:'50%', height:'30%', marginLeft:'25%',alignItems:'center'}}>
-                  <View style={{ width:'90%', height:'35%', margin:'1%'}}>
-                          <TextInput
-                          style={[styles.input,{width:'100%',height:'100%'}, emailError ? styles.inputError : null]}
-                          value={email}
-                          onChangeText={(text) => {
-                            setEmail(text);
-                          }}
-                          placeholder="Registered Email"
-                          editable={!isLoginLoading}
-                      />
-                      {showError && emailError ? (
-                        <Text style={styles.errorText}>
-                          {emailError.split(' ').reduce((acc, word, index) => {
-                            if (index > 0 && index % 3 === 0) {
-                              acc.push(<Text key={index}>{`${word} `}</Text>);
-                            } else {
-                              acc.push(<Text key={index}>{`${word} `}</Text>);
-                            }
-                            return acc;
-                          }, [])}
-                        </Text>
-                      ) : null}         
-                  </View>
-
-                  <View style={{ width:'90%', height:'35%', margin:'1%'}}>
-                        <TextInput
-                                  style={[styles.input,{width:'100%',height:'100%'}, passwordError ? styles.inputError : null]}
-                                  value={password}
-                                  onChangeText={setPassword}
-                                  placeholder="Password"
-                                  secureTextEntry
-                                  editable={!isLoginLoading}
-                              />
-                  </View>
-                  <View style={[{flexDirection:'row', alignItems:'center',marginRight:'10%'}]}>
-
-                      <View style={{ width:'50%',margin:'5%',height:'90%'}}>
-                        <Button mode="contained" onPress={onLoginPress} disabled={isLoginLoading}>
-                          Create
-                        </Button>
-                      </View>          
-
-                          
-                      <View style={{width:'50%',margin:'5%',height:'90%'}}>
-                        <Button mode="contained" onPress={handleRegisterPress} disabled={isLoginLoading}>
-                          Register
-                        </Button>
-                      </View>
-
-                      <View style={{justifyContent:'center', marginTop:'3%'}}>
-  
-                      </View>
-                  </View>
-                     
+const CampaignLogItem = ({ item, onPress }) => {
+    return (
+        <TouchableOpacity onPress={onPress}>
+            <View style={styles.cardContainer}>
+                <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: '1%' }}>
+                    <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
+                        Campaign ID: 
+                    </Text>
+                    <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
+                        {item.campaignId}
+                    </Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: '1%' }}>
+                    <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
+                        Name: 
+                    </Text>
+                    <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
+                        {item.campaignName}
+                    </Text>
+                </View>
             </View>
-
-
-
-      
-            
-        
-           
-            
-
-
-                  
-
-
-
-                    
-    </View>
-  );
+        </TouchableOpacity>
+    );
 };
 
+const CampaignLogs = ({ navigation }) => {
+    const user = useSelector(selectUser);
+    const { 
+        data, 
+        error, 
+        isSuccess, 
+        isLoading, 
+        isError 
+    } = useGetCampaignListQuery(user?.id);
 
-// Export the component
+    const [selectedCampaign, setSelectedCampaign] = useState(null);
+    const [modalVisible, setModalVisible] = useState(false);
+    const [page, setPage] = useState(0);
+    const [callLogsModalVisible, setCallLogsModalVisible] = useState(false);
+    const [selectedRunLog, setSelectedRunLog] = useState(null);
+    const [callLogsPage, setCallLogsPage] = useState(0);
+    const [runLogContent, setRunLogContent] = useState([]);
+
+    const { 
+        data: runLogs, 
+        isLoading: isRunLogsLoading, 
+        isError: isRunLogsError 
+    } = useGetCampaignRunLogsQuery({ campaignId: selectedCampaign?.campaignId,businessId:user?.id,page: page }, { skip: !selectedCampaign });
+
+    const { 
+        data: callLogsData, 
+        isLoading: isCallLogsLoading, 
+        isError: isCallLogsError 
+    } = useGetCallLogsQuery(
+        { campaignRunId: selectedRunLog?.campaignRunId, page: callLogsPage }, 
+        { skip: !selectedRunLog }
+    );
+
+    React.useEffect(() => {
+        if (runLogs?.content) {
+            setRunLogContent(prev => {
+                if (page === 0) return runLogs.content;
+                return [...prev, ...runLogs.content];
+            });
+        }
+    }, [runLogs?.content]);
+
+    const renderLogItem = ({ item }) => (
+        <CampaignLogItem 
+            item={item} 
+            onPress={() => {
+                setSelectedCampaign(item);
+                setModalVisible(true);
+            }} 
+        />
+    );
+
+    const renderRunLogItem = ({ item }) => (
+        <TouchableOpacity 
+            style={styles.cardContainer} 
+            onPress={() => {
+                setSelectedRunLog(item);
+                setCallLogsModalVisible(true);
+            }}
+        >
+            <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: '1%' }}>
+                <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
+                    Campaign Run ID: 
+                </Text>
+                <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
+                    {item.campaignRunId}
+                </Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: '1%' }}>
+                <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
+                    Language: 
+                </Text>
+                <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
+                    {item.language}
+                </Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: '1%' }}>
+                <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
+                    Status: 
+                </Text>
+                <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
+                    {item.status}
+                </Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: '1%' }}>
+                <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
+                    Call SID: 
+                </Text>
+                <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
+                    {item.callSId || 'N/A'}
+                </Text>
+            </View>
+        </TouchableOpacity>
+    );
+
+    const loadMoreLogs = () => {
+        console.log("Loading more logs, current page:", page);
+        if (!runLogs?.last) {
+            setPage((prevPage) => {
+                const nextPage = prevPage + 1;
+                console.log("Loading next page:", nextPage);
+                return nextPage;
+            });
+        }
+    };
+
+    const loadMoreCallLogs = () => {
+        if (!callLogsData?.last) {
+            setCallLogsPage((prevPage) => prevPage + 1);
+        }
+    };
+
+    const renderContent = () => {
+        if (isError) {
+            return (
+                <View style={styles.emptyContainer}>
+                    <Text style={styles.errorText}>
+                        Something went wrong
+                    </Text>
+                </View>
+            );
+        }
+
+        if (isLoading) {
+            return (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#0000ff" />
+                </View>
+            );
+        }
+
+        if (isSuccess && (!data || data.length === 0)) {
+            return (
+                <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyText}>
+                        No campaign logs available
+                    </Text>
+                </View>
+            );
+        }
+
+        return (
+            <FlatList
+                data={data}
+                renderItem={renderLogItem}
+                keyExtractor={(item) => item.campaignId.toString()}
+                contentContainerStyle={styles.listContent}
+                ItemSeparatorComponent={() => <View style={styles.separator} />}
+                ListHeaderComponent={<View style={styles.headerSpace} />}
+                onEndReached={({ distanceFromEnd }) => {
+                    if (distanceFromEnd < 0) return;
+                    if (!isLoading && !data?.last) {
+                        loadMoreLogs();
+                    }
+                }}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={
+                    isLoading ? (
+                        <ActivityIndicator size="small" color="#0000ff" />
+                    ) : null
+                }
+                showsVerticalScrollIndicator={true}
+                scrollEnabled={true}
+                bounces={true}
+            />
+        );
+    };
+
+    return (
+        <View style={styles.container}>
+            <View style={styles.listContainer}>
+                {renderContent()}
+            </View>
+
+            <Modal
+                visible={modalVisible}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => {
+                    setModalVisible(false);
+                    setSelectedCampaign(null);
+                    setPage(0);
+                }}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>
+                            Campaign ID: {selectedCampaign?.campaignId}
+                        </Text>
+                        {isRunLogsLoading ? (
+                            <ActivityIndicator size="large" color="#0000ff" />
+                        ) : isRunLogsError ? (
+                            <Text style={styles.errorText}>Failed to load logs</Text>
+                        ) : (
+                            <FlatList
+                                data={runLogContent}
+                                renderItem={renderRunLogItem}
+                                keyExtractor={(item) => item.campaignRunId.toString()}
+                                onEndReached={({ distanceFromEnd }) => {
+                                    if (distanceFromEnd < 0) return;
+                                    if (!isRunLogsLoading && !runLogs?.last) {
+                                        loadMoreLogs();
+                                    }
+                                }}
+                                onEndReachedThreshold={0.5}
+                                ItemSeparatorComponent={() => <View style={styles.separator} />}
+                                ListFooterComponent={
+                                    isRunLogsLoading ? (
+                                        <ActivityIndicator size="small" color="#0000ff" />
+                                    ) : null
+                                }
+                            />
+                        )}
+                        <TouchableOpacity
+                            style={styles.closeButton}
+                            onPress={() => {
+                                setModalVisible(false);
+                                setSelectedCampaign(null);
+                                setPage(0);
+                            }}
+                        >
+                            <Text style={styles.closeButtonText}>Close</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                visible={callLogsModalVisible}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => {
+                    setCallLogsModalVisible(false);
+                    setSelectedRunLog(null);
+                    setCallLogsPage(0);
+                }}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>
+                            Call Logs for Run ID: {selectedRunLog?.campaignRunId}
+                        </Text>
+                        {isCallLogsLoading ? (
+                            <ActivityIndicator size="large" color="#0000ff" />
+                        ) : isCallLogsError ? (
+                            <Text style={styles.errorText}>Failed to load call logs</Text>
+                        ) : (
+                            <FlatList
+                                data={callLogsData?.content || []}
+                                renderItem={({ item }) => (
+                                    <View style={styles.cardContainer}>
+                                        <Text style={styles.label}>Call ID: {item.callId}</Text>
+                                        <Text style={styles.label}>Duration: {item.duration}</Text>
+                                        <Text style={styles.label}>Status: {item.status}</Text>
+                                    </View>
+                                )}
+                                keyExtractor={(item) => item.callId.toString()}
+                                onEndReached={loadMoreCallLogs}
+                                onEndReachedThreshold={0.5}
+                                ItemSeparatorComponent={() => <View style={styles.separator} />}
+                                ListFooterComponent={
+                                    callLogsData?.hasNextPage ? (
+                                        isCallLogsLoading && <ActivityIndicator size="small" color="#0000ff" />
+                                    ) : null
+                                }
+                            />
+                        )}
+                        <TouchableOpacity
+                            style={styles.closeButton}
+                            onPress={() => {
+                                setCallLogsModalVisible(false);
+                                setSelectedRunLog(null);
+                                setCallLogsPage(0);
+                            }}
+                        >
+                            <Text style={styles.closeButtonText}>Close</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+        </View>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#d3d3d3',
+    },
+    listContainer: {
+        flex: 1,
+        paddingHorizontal: 10,
+    },
+    listContent: {
+        flexGrow: 1,
+        paddingBottom: 20,
+    },
+    headerSpace: {
+        height: 10,
+    },
+    footerSpace: {
+        height: 10,
+    },
+    separator: {
+        height: 30,
+    },
+    cardContainer: {
+        width: '100%',
+        height: 50,
+        backgroundColor: 'white',
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        flexDirection: 'row',
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    modalContent: {
+        width: '90%',
+        maxHeight: '80%',
+        backgroundColor: '#d3d3d3',
+        borderRadius: 20,
+        padding: 20,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 10,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 10,
+        textAlign: 'center',
+    },
+    closeButton: {
+        marginTop: 20,
+        padding: 10,
+        backgroundColor: '#0000ff',
+        borderRadius: 5,
+        alignItems: 'center',
+    },
+    closeButtonText: {
+        color: 'white',
+        fontSize: 16,
+    },
+    emptyContainer: {
+        flex: 1,
+        marginTop: '15%',
+        width: '40%',
+        height: SCREEN_HEIGHT * 0.5,
+        alignSelf: 'center',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'white',
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 10,
+    },
+    loadingContainer: {
+        flex: 1,
+        marginTop: '15%',
+        width: '40%',
+        height: '50%',
+        alignSelf: 'center',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 20,
+        backgroundColor: '#d3d3d3',
+    },
+    errorText: {
+        margin: '10%',
+        fontFamily: 'bold',
+        fontWeight: 'bold',
+        fontSize: 24,
+    },
+    emptyText: {
+        margin: '10%',
+        fontFamily: 'bold',
+        fontWeight: 'bold',
+        fontSize: 24,
+    },
+    label: {
+        marginHorizontal: 5,
+    },
+});
+
 export default CampaignLogs;
 
 
