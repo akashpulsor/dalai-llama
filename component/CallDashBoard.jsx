@@ -69,7 +69,7 @@ const CallDashBoard = ({ businessId }) => {
 
         const intervalId = setInterval(() => {
             fetchData(); // Call every 60 seconds
-        }, 60000);
+        }, 600000);
 
         return () => clearInterval(intervalId); // Clean up interval on unmount
     }, [businessId, trigger, startDate, endDate]); // Re-run effect on these dependencies
@@ -105,15 +105,28 @@ const CallDashBoard = ({ businessId }) => {
     };
 
     if (isLoading) {
-        return <View><Text>Loading dashboard data...</Text></View>;
+        return (
+            <View style={styles.centerContainer}>
+                <ActivityIndicator size="large" color="#0000ff" />
+                <Text style={styles.loadingText}>Loading dashboard data...</Text>
+            </View>
+        );
     }
 
     if (isError) {
-        return <View><Text>Error loading dashboard data: {error?.message || 'Something went wrong'}</Text></View>;
+        return (
+            <View style={styles.centerContainer}>
+                <View style={styles.errorCard}>
+                    <Text style={styles.errorMessage}>
+                        {error?.message || 'Something went wrong while loading dashboard data'}
+                    </Text>
+                </View>
+            </View>
+        );
     }
 
     return (
-        <ScrollView style={styles.tableContainer}>
+        <View style={styles.tableContainer}>
             <View style={styles.contentWrapper}>
                 {/* Picker */}
                 <View style={styles.pickerContainer}>
@@ -156,7 +169,7 @@ const CallDashBoard = ({ businessId }) => {
                     </ScrollView>
                 </View>
             </View>
-        </ScrollView>
+        </View>
     );
 
 }
@@ -225,6 +238,41 @@ const styles = StyleSheet.create({
         borderWidth: 1, // Add a border for better visibility
         borderColor: '#333', // Match border color with card theme
         paddingHorizontal: 8, // Add padding inside the picker
+    },
+    centerContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    loadingText: {
+        marginTop: 10,
+        fontSize: 16,
+        color: '#666',
+    },
+    errorCard: {
+        backgroundColor: 'white',
+        padding: 20,
+        borderRadius: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
+        width: '90%',
+        maxWidth: 400,
+    },
+    errorTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#ff0000',
+        marginBottom: 10,
+        textAlign: 'center',
+    },
+    errorMessage: {
+        fontSize: 16,
+        color: '#666',
+        textAlign: 'center',
     },
 });
 

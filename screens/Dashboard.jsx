@@ -28,7 +28,6 @@ const Dashboard = ({navigation}) => {
         if(user){
           console.log(user);
         }
-        console.log(user.id);
     }, [user, onBoardingData]);
 
 

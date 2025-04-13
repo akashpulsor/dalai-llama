@@ -29,7 +29,9 @@ const CampaignItem = ({ item, onBlur }) => {
     };
 
     const updateAgent = (agentData, agentId) => {
+        // Ensure modal state is explicitly set to false after updating
         setShowCreateAgentModal(false);
+        onBlur(false); // Reset blur state
     };
 
     return (
@@ -41,7 +43,10 @@ const CampaignItem = ({ item, onBlur }) => {
                 </View>
                
                 <CampaignRun 
-                    onClose={setShowCreateAgentModal} 
+                    onClose={() => {
+                        setShowCreateAgentModal(false); // Ensure modal closes properly
+                        onBlur(false); // Reset blur state
+                    }} 
                     openModal={showCreateAgentModal} 
                     campaignData={item} 
                 />

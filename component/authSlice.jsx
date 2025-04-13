@@ -21,10 +21,16 @@ export const authSlice = createSlice({
   },
   reducers: {
     setUser: (state, action) => {
+      console.log("User");
+      console.log(action.payload);
+      console.log("USER");
       state.user = action.payload.user;
       console.log(state);
     },
     setToken: (state, action) => {
+        console.log("TOKEN");
+        console.log(action.payload.token);
+        console.log("TOKEN");
         storeTokenInAsyncStorage(action.payload.token);
         state.isLoggedIn = true;
         state.token = action.payload.token;
@@ -59,7 +65,7 @@ export const { setUser, setToken, clearAuth,
 // Store token in AsyncStorage
 const storeTokenInAsyncStorage = async (token) => {
   try {
-    await AsyncStorage.setItem('authToken', token);
+    await AsyncStorage.setItem('token', token);
   } catch (error) {
     console.error('Error storing token:', error);
   }
@@ -67,7 +73,7 @@ const storeTokenInAsyncStorage = async (token) => {
 
 const removeTokenInAsyncStorage = async () => {
     try {
-        await AsyncStorage.removeItem('authToken');
+        await AsyncStorage.removeItem('token');
     } catch (error) {
         console.error('Error storing token:', error);
     }
