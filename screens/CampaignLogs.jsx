@@ -13,7 +13,6 @@ import { MaterialIcons } from '@expo/vector-icons'; // Add this import
 import { useGetCampaignListQuery, useGetCampaignRunLogsQuery, useGetCallLogsQuery, useLazyGetCallLogByCallIdQuery } from '../component/authApi';
 import { selectUser } from '../component/authSlice';
 import { useSelector } from 'react-redux';
-import { useSubscribeCampaignRunQuery } from '../component/websocketApi'; // Add WebSocket subscription import
 
 // Get device height for better layout calculations
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -90,70 +89,39 @@ const CampaignLogs = ({ navigation }) => {
         fixedCacheKey: `call-log-details-${selectedCampaign?.campaignId}`,
     });
 
-    // Add WebSocket subscription for campaign runs
-    const { data: wsData } = useSubscribeCampaignRunQuery(
-        { 
-            businessId: user?.id, 
-            campaignId: selectedCampaign?.campaignId 
-        },
-        { skip: !selectedCampaign }
-    );
-
     React.useEffect(() => {
         if (runLogs?.content) {
-            const sortedContent = [...runLogs.content].sort((a, b) => b.campaignRunId - a.campaignRunId);
             setAllRunLogContent(prev => ({
                 ...prev,
-                [currentPage]: sortedContent
+                [currentPage]: runLogs.content
             }));
         }
+    }, [runLogs?.content, currentPage]);
 
-        // Handle WebSocket updates with the new response structure
-        if (wsData) {
-            const newRunLog = {
-                campaignRunId: wsData.campaignRunId,
-                businessId: wsData.businessId,
-                campaignId: wsData.campaignId,
-                all: wsData.all,
-                agentId: wsData.agentId,
-                language: wsData.language,
-                status: wsData.status,
-                llmId: wsData.llmId,
-                phoneId: wsData.phoneId,
-                callSId: wsData.callSId,
-                createdAt: wsData.createdAt,
-                updatedAt: wsData.updatedAt
-            };
+    const handleScroll = (event) => {
+        const offsetY = event.nativeEvent.contentOffset.y;
+        const contentHeight = event.nativeEvent.contentSize.height;
+        const scrollViewHeight = event.nativeEvent.layoutMeasurement.height;
 
-            setAllRunLogContent(prev => {
-                const firstPageContent = prev[0] || [];
-                // Add new log at the beginning of the first page
-                const updatedFirstPage = [newRunLog, ...firstPageContent];
-                return {
-                    ...prev,
-                    0: updatedFirstPage
-                };
-            });
+        // Calculate distance from bottom
+        const distanceFromBottom = contentHeight - scrollViewHeight - offsetY;
+
+        // Load next page when near bottom
+        if (distanceFromBottom < 50 && !isRunLogsLoading && !runLogs?.last) {
+            setCurrentPage(prev => prev + 1);
         }
-    }, [runLogs?.content, currentPage, wsData]);
+
+        // Load previous page when near top
+        if (offsetY < 50 && currentPage > 0 && !isRunLogsLoading) {
+            setCurrentPage(prev => prev - 1);
+        }
+    };
 
     const getAllContent = () => {
         const pages = Object.keys(allRunLogContent).sort((a, b) => Number(a) - Number(b));
-        const allContent = pages.reduce((acc, pageNum) => {
+        return pages.reduce((acc, pageNum) => {
             return [...acc, ...allRunLogContent[pageNum]];
         }, []);
-        
-        // Sort by campaignRunId in descending order
-        return allContent.sort((a, b) => b.campaignRunId - a.campaignRunId);
-    };
-
-    const handleScroll = ({ nativeEvent }) => {
-        const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-        const isEndReached = layoutMeasurement.height + contentOffset.y >= contentSize.height - 20;
-        
-        if (isEndReached && !isRunLogsLoading && !runLogs?.last) {
-            setCurrentPage(prevPage => prevPage + 1);
-        }
     };
 
     const renderLogItem = ({ item }) => (
@@ -176,22 +144,34 @@ const CampaignLogs = ({ navigation }) => {
         >
             <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: '1%' }}>
                 <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
-                    Run ID: {item.campaignRunId}
+                    Campaign Run ID: 
+                </Text>
+                <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
+                    {item.campaignRunId}
                 </Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: '1%' }}>
                 <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
-                    Language: {item.language}
+                    Language: 
+                </Text>
+                <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
+                    {item.language}
                 </Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: '1%' }}>
                 <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
-                    Status: {item.status}
+                    Status: 
+                </Text>
+                <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
+                    {item.status}
                 </Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: '1%' }}>
                 <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
-                    Created: {new Date(item.createdAt).toLocaleString()}
+                    Call SID: 
+                </Text>
+                <Text style={[styles.label, { fontFamily: 'bold', fontWeight: "bold", fontSize: 16 }]}>
+                    {item.callSId || 'N/A'}
                 </Text>
             </View>
         </TouchableOpacity>
@@ -247,7 +227,7 @@ const CampaignLogs = ({ navigation }) => {
                         </View>
                         <Text style={styles.callLogText}>From: {item?.fromNumber || 'N/A'}</Text>
                         <Text style={styles.callLogText}>
-                            Duration: {usageData ? `${usageData.totalCallTime}s` : 'Loading...'}
+                            Duration: {usageData ? `${usageData.totalCallTime || 0}s` : 'Loading...'}
                         </Text>
                     </View>
                 </TouchableOpacity>
@@ -255,14 +235,18 @@ const CampaignLogs = ({ navigation }) => {
                 {isExpanded && usageData && (
                     <View style={styles.expandedContent}>
                         <Text style={styles.sectionTitle}>Status History:</Text>
-                        {item?.statusHistory?.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-                            .map((status, index) => (
-                                <Text key={`${item.callLogId}-status-${index}-${status.timestamp}`} 
-                                    style={styles.statusText}>
-                                    {new Date(status.timestamp).toLocaleString()} - {status.status}
-                                </Text>
-                            ))
-                        }
+                        {item?.statusHistory?.length > 0 ? (
+                            [...item.statusHistory] // Create a copy of the array
+                                .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+                                .map((status, index) => (
+                                    <Text key={`${item.callLogId}-status-${index}-${status.timestamp}`} 
+                                        style={styles.statusText}>
+                                        {new Date(status.timestamp).toLocaleString()} - {status.status}
+                                    </Text>
+                                ))
+                        ) : (
+                            <Text style={styles.noStatusText}>No status history available</Text>
+                        )}
                         <Text style={styles.sectionTitle}>Usage Details:</Text>
                         <View style={styles.usageGrid}>
                             <View style={styles.usageRow}>
@@ -292,25 +276,6 @@ const CampaignLogs = ({ navigation }) => {
                 )}
             </View>
         );
-    };
-
-    const processCallLogs = (logs) => {
-        if (!logs) return [];
-        
-        // Create a Map to store unique entries using callLogId as key
-        const uniqueLogs = new Map();
-        
-        logs.forEach(log => {
-            uniqueLogs.set(log.callLogId, log);
-        });
-        
-        // Convert back to array and sort by timestamp in descending order
-        return Array.from(uniqueLogs.values())
-            .sort((a, b) => {
-                const timeA = a.statusHistory?.[0]?.timestamp || 0;
-                const timeB = b.statusHistory?.[0]?.timestamp || 0;
-                return new Date(timeB) - new Date(timeA);
-            });
     };
 
     const loadMoreLogs = () => {
@@ -472,9 +437,9 @@ const CampaignLogs = ({ navigation }) => {
                             </View>
                         ) : (
                             <FlatList
-                                data={processCallLogs(callLogsData?.content)}
+                                data={callLogsData?.content || []}
                                 renderItem={renderCallLogItem}
-                                keyExtractor={(item) => `call-${item.callLogId}`}
+                                keyExtractor={(item, index) => `call-${item.callLogId}-${item.campaignRunId}-${index}`}
                                 ItemSeparatorComponent={() => <View style={styles.separator} />}
                                 contentContainerStyle={styles.callLogsContent}
                             />
@@ -695,7 +660,6 @@ const styles = StyleSheet.create({
     },
     callLogBasicInfo: {
         padding: 10,
-        flexDirection:'column'
     },
     expandIcon: {
         position: 'absolute',
@@ -741,6 +705,11 @@ const styles = StyleSheet.create({
     usageValue: {
         fontSize: 14,
         color: '#333',
+    },
+    noStatusText: {
+        fontSize: 14,
+        color: '#666',
+        marginVertical: 5,
     },
 });
 
