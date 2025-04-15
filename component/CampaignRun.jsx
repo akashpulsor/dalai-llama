@@ -30,7 +30,7 @@ const CampaignRun = ({ onClose, openModal, campaignData }) => {
 
   const [formData, setFormData] = useState({
     campaignId: campaignData?.campaignId,
-    all: false,
+    all: true,
     leadList: [],
     agentId:'',
     language: '',
@@ -45,7 +45,6 @@ const CampaignRun = ({ onClose, openModal, campaignData }) => {
   const [enabled, setEnabled] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
   const [isMainFlowVisible, setIsMainFlowVisible] = useState(false);
-  const [isUserEnabled, setIsUserEnabled] = useState(true);
   const [playCampaign, setPlayCampaign] = useState(false);
   const [testList, setTestList] = useState([]);
   const [testLeadPage, setTestLeadPage] = useState(0);
@@ -53,11 +52,17 @@ const CampaignRun = ({ onClose, openModal, campaignData }) => {
   const [testLeadPageSort, setTestLeadPageSort] = useState("leadId");
   const [selectedLeads, setSelectedLeads] = useState([]);
   const [campignRunFormData,  setCampignRunFormData] = useState({});
-  const toggleSwitch = () => setIsUserEnabled(previousState => !previousState);
   const { data: agentDataList, error,isLoading, isError } = useGetAgentListQuery(user?.id);
   const [addCampaign, { data: campaignResponseData, isLoading:isCampaignDataLoading, isSuccess:isCampaignDataSuccess, isError:isCampaignDataError, error:campaignDataError }] = useAddCampaignMutation();
   const [startCampaign, { data: startCampaignResponseData, isLoading:isStartCampaignResponseLoading, isSuccess:isStartCampaignResponseSuccess, isError:isStartCampaignResponseError, error:startCampaignResponseError }] = useStartCampaignMutation();
-  const [runCampaign, { data: runCampaignResponseData, isLoading:isRunCampaignResponseLoading, isSuccess:isRunCampaignResponseSuccess, isError:isRunCampaignResponseError, error:runCampaignResponseError }] = useRunCampaignMutation();
+  const [runCampaign, { 
+    data: runCampaignResponseData, 
+    isLoading: isRunCampaignResponseLoading, 
+    isSuccess: isRunCampaignResponseSuccess, 
+    isError: isRunCampaignResponseError, 
+    error: runCampaignResponseError, 
+    reset: resetRunCampaignResponse 
+  }] = useRunCampaignMutation();
   
   const { data: testLeadDataList, isSuccess:isTestListSuccess, error: testListError, isLoading: isTestListLoading, isError: isTestListError,} = useGetLeadDataQuery({
     businessId: user?.id,
@@ -78,30 +83,27 @@ const CampaignRun = ({ onClose, openModal, campaignData }) => {
   });
 
 
-    // Add validation function
+    // Update validation function
     const isStartButtonDisabled = () => {
-        if (isMainFlowVisible) {
-          return !formData.phoneId || !formData.llmId || !formData.language || !formData.agentId || selectedLeads.length === 0;
-        }
-        return !formData.phoneId || !formData.llmId || !formData.language || !formData.agentId || selectedLeads.length === 0;
-      };
+        return !formData.phoneId || !formData.llmId || !formData.language || !formData.agentId;
+    };
     
       // Reset form function
       const resetForm = () => {
-        setFormData(prev => ({
-          ...prev,
-          phoneId: '',
-          llmId: '',
-          language: '',
-          agentId: '',
+        setFormData({
+          campaignId: campaignData?.campaignId,
+          all: true,
           leadList: [],
-          businessNumber: ''
-        }));
+          agentId: '',
+          language: '',
+          llmId: '',
+          phoneId: '',
+          businessId: user?.id
+        });
         setSelectedLeads([]);
+        setIsMainFlowVisible(false);
+        setPlayCampaign(false);
       };
-
-
-
 
     const handleLeadSelect = (leadId) => {
         setSelectedLeads(prevSelected => {
@@ -139,10 +141,16 @@ const CampaignRun = ({ onClose, openModal, campaignData }) => {
   };
 
   const testToggleSwitch = () =>{
-    setIsMainFlowVisible(isMainFlowVisible => !isMainFlowVisible);
-  }
+    setIsMainFlowVisible(prev => !prev);
+    setFormData(prev => ({
+      ...prev,
+      all: !prev.all,
+      leadList: []
+    }));
+  };
+
   const handleModalClose = () => {
-    
+    resetForm();
     onClose(false);
   };
 
@@ -154,15 +162,16 @@ const CampaignRun = ({ onClose, openModal, campaignData }) => {
   };
 
   const handleStartCampaign = () => {
-        startCampaign(formData);
-        
+    const campaignData = {
+      ...formData,
+      all: !isMainFlowVisible
+    };
+    startCampaign(campaignData);
   };
 
   const handleRunCampaign = () => {
     runCampaign(campignRunFormData);
   };
-
-
 
   const handlePhoneSelection = (businessNumber) => {
     // Find the selected phone data object
@@ -178,25 +187,40 @@ const CampaignRun = ({ onClose, openModal, campaignData }) => {
     }
   };
 
-
-
   useEffect(() => {
+    if (openModal) {
+        // Reset playCampaign, formData, and other states when the modal is opened
+        setPlayCampaign(false);
+        setFormData({
+          campaignId: campaignData?.campaignId,
+          all: true,
+          leadList: [],
+          agentId: '',
+          language: '',
+          llmId: '',
+          phoneId: '',
+          businessId: user?.id
+        });
+        setSelectedLeads([]);
+        setIsMainFlowVisible(false);
+        resetRunCampaignResponse(); // Reset isRunCampaignResponseSuccess
+    }
+}, [openModal, campaignData, user?.id]);
+
+useEffect(() => {
     if (isTestListSuccess && testLeadDataList) {
- 
         setTestList(testLeadDataList.content);
     }
-    if(isStartCampaignResponseSuccess){
+    if (isStartCampaignResponseSuccess) {
         setPlayCampaign(true);
-        setCampignRunFormData({businessId: user?.id, campaignRunId:startCampaignResponseData?.campaignRunId});
+        setCampignRunFormData({ businessId: user?.id, campaignRunId: startCampaignResponseData?.campaignRunId });
     }
-    if(isRunCampaignResponseSuccess){
+    if (isRunCampaignResponseSuccess) {
         resetForm();
-        setPlayCampaign(false);
-    
-        handleModalClose();
+        handleModalClose(); // Only close modal after the campaign run is completed
+        resetRunCampaignResponse(); // Reset isRunCampaignResponseSuccess after handling
     }
-
-  }, [isTestListSuccess, isStartCampaignResponseSuccess,isRunCampaignResponseSuccess]);
+}, [isTestListSuccess, isStartCampaignResponseSuccess, isRunCampaignResponseSuccess]);
 
   const memoizedCampaignFormData = React.useMemo(() => campaignFormData, [campaignFormData]);
 
@@ -342,7 +366,7 @@ const CampaignRun = ({ onClose, openModal, campaignData }) => {
                     </View>
                 </View>
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Test</Text>
+                    <Text style={styles.label}>Test Mode</Text>
 
                     <Switch
                         trackColor={{ false: "#767577", true: "#81b0ff" }}
@@ -356,22 +380,6 @@ const CampaignRun = ({ onClose, openModal, campaignData }) => {
                     <Text style={styles.label}>Run With Test Users</Text>
                   </Pressable>
                 </View>
-
-               { !isMainFlowVisible && <View style={styles.inputGroup}>
-                    <Text style={styles.label}>User</Text>
-
-                    <Switch
-                        trackColor={{ false: "#767577", true: "#81b0ff" }}
-                        thumbColor={isUserEnabled ? "#007AFF" : "#f4f3f4"}
-                        ios_backgroundColor="#3e3e3e"
-                        onValueChange={toggleSwitch}
-                        value={isUserEnabled}
-                        style={styles.switch}
-                    />
-                  <Pressable onPress={toggleSwitch}>
-                    <Text style={styles.label}>Select All User</Text>
-                  </Pressable>
-                </View>}
 
                 {isMainFlowVisible && (
                     <View style={styles.userList}>
