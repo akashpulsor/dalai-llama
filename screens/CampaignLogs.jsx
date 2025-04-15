@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons'; // Add this import
 import { useGetCampaignListQuery, useGetCampaignRunLogsQuery, useGetCallLogsQuery, useLazyGetCallLogByCallIdQuery } from '../component/authApi';
+import { useSubscribeToEventsQuery } from '../component/authApi';
 import { selectUser } from '../component/authSlice';
 import { useSelector } from 'react-redux';
 
@@ -89,6 +90,14 @@ const CampaignLogs = ({ navigation }) => {
         fixedCacheKey: `call-log-details-${selectedCampaign?.campaignId}`,
     });
 
+      const {
+        data: eventData,
+        isLoading: isEventLoading,
+        isError: isEventError,
+        error: eventError
+    } = useSubscribeToEventsQuery(user?.id);
+
+    
     React.useEffect(() => {
         if (runLogs?.content) {
             setAllRunLogContent(prev => ({
@@ -98,6 +107,22 @@ const CampaignLogs = ({ navigation }) => {
         }
     }, [runLogs?.content, currentPage]);
 
+      // Log new events as they come in
+      React.useEffect(() => {
+        if (eventData?.events?.length > 0) {
+          console.log('New event received:', eventData.events[eventData.events.length - 1]);
+        }
+      }, [eventData?.events]);
+    
+      if (isEventLoading) {
+          console.log('Connecting to event stream');
+      }
+    
+      if (isEventError) {
+        console.log(eventError);
+      }
+
+      
     const handleScroll = (event) => {
         const offsetY = event.nativeEvent.contentOffset.y;
         const contentHeight = event.nativeEvent.contentSize.height;

@@ -579,6 +579,68 @@ export const authApi = createApi({
         }
       },
     }),
+    subscribeToEvents: builder.query({
+      query: (userId) => ({
+        url: `/events/user/${userId}/subscribe`,
+        headers: {
+          'Accept': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+        },
+      }),
+      async onCacheEntryAdded(
+        arg,
+        { updateCachedData, cacheDataLoaded, cacheEntryRemoved }
+      ) {
+        try {
+          await cacheDataLoaded;
+
+          const eventSource = new EventSource(
+            `http://localhost:8080/api/events/user/${arg}/subscribe`,
+            {
+              withCredentials: true,
+            }
+          );
+
+          eventSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            updateCachedData((draft) => {
+              // Update the cached data based on the event type
+              if (!draft) draft = { events: [] };
+              draft.events.push(data);
+            });
+          };
+
+          eventSource.addEventListener('callLogEvent', (event) => {
+            const data = JSON.parse(event.data);
+            updateCachedData((draft) => {
+              if (!draft) draft = { callLogs: [] };
+              draft.callLogs = [data, ...(draft.callLogs || [])];
+            });
+          });
+
+          eventSource.addEventListener('chargesDataEvent', (event) => {
+            const data = JSON.parse(event.data);
+            updateCachedData((draft) => {
+              if (!draft) draft = { charges: [] };
+              draft.charges = [data, ...(draft.charges || [])];
+            });
+          });
+
+          eventSource.addEventListener('makeCallEvent', (event) => {
+            const data = JSON.parse(event.data);
+            updateCachedData((draft) => {
+              if (!draft) draft = { campaignRuns: [] };
+              draft.campaignRuns = [data, ...(draft.campaignRuns || [])];
+            });
+          });
+
+          await cacheEntryRemoved;
+          eventSource.close();
+        } catch (error) {
+          console.error('SSE subscription error:', error);
+        }
+      },
+    }),
   }),
 });
 
@@ -589,8 +651,6 @@ export const { useLoginMutation, useRegisterMutation, useVerificationCodeMutatio
   useAddLLMDataMutation, useRunCampaignMutation, useAddLeadMutation, useAddAgentMutation, useRefreshTokenQuery,
   useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery, useGenerateNumberMutation, useInterestMutation, useGetPortalsQuery, useAddPortalMutation, useValidateUrlMutation, useGenerateContextMutation, useInitlializeBrowserAutomationMutation, useGetDashboardDataQuery,
   useLazyGetDashboardDataQuery, useRegisterBotMutation, useGetCampaignRunLogsQuery, useGetCallLogsQuery,
-  useGetCallLogByCallIdQuery, useLazyGetCallLogByCallIdQuery
-
-
+  useGetCallLogByCallIdQuery, useLazyGetCallLogByCallIdQuery, useSubscribeToEventsQuery
 } = authApi;
 
