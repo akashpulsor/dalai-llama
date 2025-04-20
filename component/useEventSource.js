@@ -54,7 +54,8 @@ function useEventSource(userId) {
         console.log('Attempting connection with token:', token.substring(0, 20) + '...');
 
         await fetchEventSource(
-          `http://localhost:8080/api/events/user/${userId}/subscribe`,
+          
+          `https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api/events/user/${userId}/subscribe`,
           {
             method: 'GET',
             headers: {
