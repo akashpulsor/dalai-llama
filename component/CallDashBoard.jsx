@@ -69,7 +69,7 @@ const CallDashBoard = ({ businessId }) => {
 
         const intervalId = setInterval(() => {
             fetchData(); // Call every 60 seconds
-        }, 600000);
+        }, 60000);
 
         return () => clearInterval(intervalId); // Clean up interval on unmount
     }, [businessId, trigger, startDate, endDate]); // Re-run effect on these dependencies
@@ -151,7 +151,7 @@ const CallDashBoard = ({ businessId }) => {
                             <Text style={styles.cardLabel}>Total Calls</Text>
                         </View>
                         <View style={styles.cardContainer}>
-                            <Text style={styles.cardValue}>${data?.totalCost?.toFixed(2) || '0.00'}</Text>
+                            <Text style={styles.cardValue}>${data?.totalCharges?.toFixed(2) || '0.00'}</Text>
                             <Text style={styles.cardLabel}>Total Cost</Text>
                         </View>
                         <View style={styles.cardContainer}>
