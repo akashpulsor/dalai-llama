@@ -17,7 +17,8 @@ export const authSlice = createSlice({
     businessData: null,
     isLoggedIn: false,
     twiliodata:null,
-    selectedLlm: {}
+    selectedLlm: {},
+    websocketClient: null // Add websocketClient to state
   },
   reducers: {
     setUser: (state, action) => {
@@ -55,12 +56,20 @@ export const authSlice = createSlice({
     },
     setTwilioData: (state, action) => {
       state.twiliodata = action.payload;
+    },
+    setWebsocketClient: (state, action) => {
+      state.websocketClient = action.payload; // Set websocket client
+    },
+    clearWebsocketClient: (state) => {
+      state.websocketClient = null; // Clear websocket client
     }
   }
 });
 
 export const { setUser, setToken, clearAuth,
-  setOnboardingData, setBusinessData,setTwilioData  } = authSlice.actions;
+  setOnboardingData, setBusinessData,setTwilioData,
+  setWebsocketClient, clearWebsocketClient // Export new actions
+} = authSlice.actions;
 
 // Store token in AsyncStorage
 const storeTokenInAsyncStorage = async (token) => {
@@ -87,12 +96,15 @@ export default authSlice.reducer;
 export const selectIsLoggedIn = (state) => state.auth.isLoggedIn;
 export const selectUser = (state) => state.auth.user;
 
-
-
 export const selectError = (state) => state.auth.error;
 
 export const selectOnboardingData = (state) => state.auth.onboardingData;
 export const selectBusinessData = (state) => state.auth.businessData;
 
 export const selectTwilioData = (state) => state.auth.TwilioData;
+
+export const selectWebsocketClient = (state) => state.auth.websocketClient; // Selector for websocketClient
+
+// Add this selector with the other selectors
+export const selectToken = (state) => state.auth.token;
 

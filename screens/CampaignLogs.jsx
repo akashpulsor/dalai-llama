@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect,useRef } from 'react';
 import { 
     View, 
     Text, 
@@ -9,14 +9,75 @@ import {
     Dimensions, 
     Modal 
 } from 'react-native';
+
+
 import { MaterialIcons } from '@expo/vector-icons'; // Add this import
-import { useGetCampaignListQuery, useGetCampaignRunLogsQuery, useGetCallLogsQuery, useLazyGetCallLogByCallIdQuery } from '../component/authApi';
-import { useSubscribeToEventsQuery } from '../component/authApi';
+import { useGetCampaignListQuery, useGetCampaignRunLogsQuery, useGetCallLogsQuery, useLazyGetCallLogByCallIdQuery, useLazyGetRecordingBytesQuery } from '../component/authApi';
 import { selectUser } from '../component/authSlice';
 import { useSelector } from 'react-redux';
+import * as FileSystem from 'expo-file-system';
+import { Audio } from 'expo-av';
 
 // Get device height for better layout calculations
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+const RecordingPlayer = ({ transcription, recordingId, styles }) => {
+  const audioRef = useRef(null);
+  const [audioUrl, setAudioUrl] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [fetchRecordingBytes, { isLoading }] = useLazyGetRecordingBytesQuery();
+
+  const handlePlayRecording = async () => {
+      if (!audioUrl) {
+          try {
+              const { data: blob } = await fetchRecordingBytes(recordingId);
+              const audioBlob = blob instanceof Blob ? blob : new Blob([blob]);
+              const url = URL.createObjectURL(audioBlob);
+              setAudioUrl(url);
+              setTimeout(() => {
+                  audioRef.current.play();
+                  setIsPlaying(true);
+              }, 100);
+          } catch (e) {
+              alert('Failed to load audio');
+          }
+      } else {
+          if (isPlaying) {
+              audioRef.current.pause();
+              setIsPlaying(false);
+          } else {
+              audioRef.current.play();
+              setIsPlaying(true);
+          }
+      }
+  };
+
+  return (
+      <View style={[styles.usageRow, { flexDirection: 'column', alignItems: 'flex-start' }]}>
+          <Text style={styles.usageLabel}>Transcription Data</Text>
+          <Text style={styles.usageValue}>{transcription || 'N/A'}</Text>
+          <View style={{ width: '100%', alignItems: 'center', marginTop: 12 }}>
+              <TouchableOpacity
+                  style={styles.audioButton}
+                  onPress={handlePlayRecording}
+                  disabled={isLoading}
+              >
+                  <Text style={styles.audioButtonText}>
+                      {isLoading ? 'Loading...' : isPlaying ? 'Stop' : 'Play Recording'}
+                  </Text>
+              </TouchableOpacity>
+              {audioUrl && (
+                  <audio
+                      ref={audioRef}
+                      src={audioUrl}
+                      onEnded={() => setIsPlaying(false)}
+                      style={{ display: 'none' }}
+                  />
+              )}
+          </View>
+      </View>
+  );
+};
 
 const CampaignLogItem = ({ item, onPress }) => {
     return (
@@ -90,12 +151,6 @@ const CampaignLogs = ({ navigation }) => {
         fixedCacheKey: `call-log-details-${selectedCampaign?.campaignId}`,
     });
 
-      const {
-        data: eventData,
-        isLoading: isEventLoading,
-        isError: isEventError,
-        error: eventError
-    } = useSubscribeToEventsQuery(user?.id);
 
     
     React.useEffect(() => {
@@ -108,19 +163,6 @@ const CampaignLogs = ({ navigation }) => {
     }, [runLogs?.content, currentPage]);
 
       // Log new events as they come in
-      React.useEffect(() => {
-        if (eventData?.events?.length > 0) {
-          console.log('New event received:', eventData.events[eventData.events.length - 1]);
-        }
-      }, [eventData?.events]);
-    
-      if (isEventLoading) {
-          console.log('Connecting to event stream');
-      }
-    
-      if (isEventError) {
-        console.log(eventError);
-      }
 
       
     const handleScroll = (event) => {
@@ -296,6 +338,11 @@ const CampaignLogs = ({ navigation }) => {
                                     {usageData.totalInputToken || 0} / {usageData.totalOutputToken || 0}
                                 </Text>
                             </View>
+                            <RecordingPlayer
+                              transcription={usageData?.inBoundText}
+                              recordingId={item?.callLogId}
+                              styles={styles}
+                            />
                         </View>
                     </View>
                 )}
@@ -736,6 +783,22 @@ const styles = StyleSheet.create({
         color: '#666',
         marginVertical: 5,
     },
+    audioButton: {
+      marginTop: 0,
+      paddingVertical: 10,
+      paddingHorizontal: 28,
+      backgroundColor: '#007AFF',
+      borderRadius: 24,
+      alignItems: 'center',
+      alignSelf: 'center',
+      minWidth: 140,
+  },
+  audioButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+      textAlign: 'center',
+  },
 });
 
 export default CampaignLogs;
