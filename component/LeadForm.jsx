@@ -10,10 +10,11 @@ import {
     Platform,
     StatusBar
 } from 'react-native';
-
+import { WebView } from 'react-native-webview';
 
 import CountryCodeDropdownPicker from './CountryCodeDropdownPicker';
 import countryData from '../helper/countryData';
+import { useInterestMutation } from './publicApi';
 
 const countryCodes = [
     { code: '+1', name: 'United States', flag: '🇺🇸' },
@@ -21,7 +22,37 @@ const countryCodes = [
     { code: '+44', name: 'United Kingdom', flag: '🇬🇧' },
     { code: '+86', name: 'China', flag: '🇨🇳' },
     { code: '+81', name: 'Japan', flag: '🇯🇵' },
+    { code: '+61', name: 'Australia', flag: '🇦🇺' },
 ];
+
+const injectLinkedInScriptWeb = () => {
+    if (typeof window === 'undefined') return;
+    // Prevent duplicate injection
+    if (document.getElementById('linkedin-insight-script')) return;
+
+    // First script
+    const script1 = document.createElement('script');
+    script1.type = 'text/javascript';
+    script1.id = 'linkedin-insight-script';
+    script1.innerHTML = `
+        _linkedin_partner_id = "7164620";
+        window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+        window._linkedin_data_partner_ids.push(_linkedin_partner_id);
+    `;
+    document.head.appendChild(script1);
+
+    // Second script
+    const script2 = document.createElement('script');
+    script2.type = 'text/javascript';
+    script2.async = true;
+    script2.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
+    document.head.appendChild(script2);
+
+    // Noscript fallback (optional, for completeness)
+    const noscript = document.createElement('noscript');
+    noscript.innerHTML = '<img height="1" width="1" style="display:none;" alt="" src="https://px.ads.linkedin.com/collect/?pid=7164620&fmt=gif" />';
+    document.body.appendChild(noscript);
+};
 
 const LeadForm = ({ visible, onClose, onSubmit }) => {
     const [formData, setFormData] = useState({
@@ -34,39 +65,50 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
     });
 
     const [errors, setErrors] = useState({});
-    
+    const [showLinkedInPixel, setShowLinkedInPixel] = useState(false);
 
     const [countryCallingCode, setCountryCallingCode] = useState('+1');
     const [countryCode, setCountryCode] = useState('US');
     const [phone, setPhone] = useState('');
+    const [submitting, setSubmitting] = useState(false);
 
-    const validateForm = () => {
-        const newErrors = {};
-        
-        if (!formData.name.trim()) newErrors.name = 'Name is required';
-        if (!formData.email.trim()) newErrors.email = 'Email is required';
-        if (!formData.mobileNumber.trim()) newErrors.mobileNumber = 'Mobile number is required';
-        if (!formData.companySize) newErrors.companySize = 'Company size is required';
-        
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (formData.email && !emailRegex.test(formData.email)) {
-            newErrors.email = 'Invalid email format';
-        }
+    const [interest, { isLoading, error }] = useInterestMutation();
 
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
+    const handleSubmit = async () => {
+        if (submitting) return;
+        setSubmitting(true);
 
-    const handleSubmit = () => {
-        setFormData((prevFormData) => ({
-            ...prevFormData,
+        // Build the latest payload directly
+        const payload = {
+            ...formData,
             mobileNumber: phone,
             countryCode: countryCode,
             countryCallingCode: countryCallingCode
-            }));
-        if (validateForm()) {
-            onSubmit(formData);
+        };
+
+        // Validate using the latest payload
+        const newErrors = {};
+        if (!payload.name.trim()) newErrors.name = 'Name is required';
+        if (!payload.email.trim()) newErrors.email = 'Email is required';
+        if (!payload.mobileNumber.trim()) newErrors.mobileNumber = 'Mobile number is required';
+        if (!payload.companySize) newErrors.companySize = 'Company size is required';
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (payload.email && !emailRegex.test(payload.email)) {
+            newErrors.email = 'Invalid email format';
+        }
+        setErrors(newErrors);
+
+        if (Object.keys(newErrors).length === 0) {
+            await interest(payload);
+            if (Platform.OS === 'web') {
+                injectLinkedInScriptWeb();
+            } else {
+                setShowLinkedInPixel(true); // Show the WebView to trigger LinkedIn script
+            }
             onClose();
+            setSubmitting(false);
+        } else {
+            setSubmitting(false);
         }
     };
 
@@ -172,8 +214,9 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
 
                         <View style={styles.buttonContainer}>
                             <TouchableOpacity 
-                                style={[styles.submitButton, styles.shadowInput]} 
+                                style={[styles.submitButton, styles.shadowInput, submitting && { opacity: 0.5 }]} 
                                 onPress={handleSubmit}
+                                disabled={submitting}
                             >
                                 <Text style={styles.submitButtonText}>Submit</Text>
                             </TouchableOpacity>
@@ -185,6 +228,42 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
                             </TouchableOpacity>
                         </View>
                     </ScrollView>
+                    {showLinkedInPixel && Platform.OS !== 'web' && (
+                        <WebView
+                            source={{
+                                html: `
+                                <!DOCTYPE html>
+                                <html>
+                                <head>
+                                <script type="text/javascript">
+                                _linkedin_partner_id = "7164620";
+                                window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+                                window._linkedin_data_partner_ids.push(_linkedin_partner_id);
+                                </script>
+                                <script type="text/javascript">
+                                (function(l) {
+                                if (!l){window.lintrk = function(a,b){window.lintrk.q.push([a,b])};
+                                window.lintrk.q=[]}
+                                var s = document.getElementsByTagName("script")[0];
+                                var b = document.createElement("script");
+                                b.type = "text/javascript";b.async = true;
+                                b.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
+                                s.parentNode.insertBefore(b, s);})(window.lintrk);
+                                </script>
+                                <noscript>
+                                <img height="1" width="1" style="display:none;" alt="" src="https://px.ads.linkedin.com/collect/?pid=7164620&fmt=gif" />
+                                </noscript>
+                                </head>
+                                <body></body>
+                                </html>
+                                `
+                            }}
+                            style={{ width: 0, height: 0, opacity: 0 }}
+                            javaScriptEnabled
+                            injectedJavaScript={`true;`}
+                            onLoadEnd={() => setTimeout(() => setShowLinkedInPixel(false), 2000)}
+                        />
+                    )}
                 </View>
             </View>
         </Modal>
