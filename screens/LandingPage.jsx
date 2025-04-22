@@ -1,11 +1,36 @@
 import React, { createRef, useState, useEffect } from 'react';
-import { View, ScrollView, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { View, ScrollView, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Platform } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import LeadForm from '../component/LeadForm';
 import { useDispatch } from 'react-redux';
 import { useInterestMutation } from '../component/authApi';
 import { showMessage } from '../component/flashMessageSlice';
+
+const injectLinkedInScriptWeb = () => {
+    if (typeof window === 'undefined') return;
+    if (document.getElementById('linkedin-insight-script')) return;
+
+    const script1 = document.createElement('script');
+    script1.type = 'text/javascript';
+    script1.id = 'linkedin-insight-script';
+    script1.innerHTML = `
+        _linkedin_partner_id = "7164620";
+        window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+        window._linkedin_data_partner_ids.push(_linkedin_partner_id);
+    `;
+    document.head.appendChild(script1);
+
+    const script2 = document.createElement('script');
+    script2.type = 'text/javascript';
+    script2.async = true;
+    script2.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
+    document.head.appendChild(script2);
+
+    const noscript = document.createElement('noscript');
+    noscript.innerHTML = '<img height="1" width="1" style="display:none;" alt="" src="https://px.ads.linkedin.com/collect/?pid=7164620&fmt=gif" />';
+    document.body.appendChild(noscript);
+};
 
 const CurvedBackground = () => {
     return (
@@ -97,6 +122,12 @@ const LandingPage = ({ navigation }) => {
         }
     
       }, [isInterestDataSuccess]);
+
+    useEffect(() => {
+        if (Platform.OS === 'web') {
+            injectLinkedInScriptWeb();
+        }
+    }, []);
 
     return (
         <View style={styles.container}>
