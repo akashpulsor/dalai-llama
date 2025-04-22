@@ -149,24 +149,14 @@ const Home = ({navigation}) => {
                   </View>
                   <View style={[{flexDirection:'row', alignItems:'center',marginRight:'10%'}]}>
 
-                      <View style={{ width:'50%',margin:'5%',height:'90%'}}>
+                      <View style={{ width:'200%',margin:'5%',height:'90%'}}>
                         <Button mode="contained" onPress={onLoginPress} disabled={isLoginLoading}>
                           Login
                         </Button>
                       </View>          
 
                           
-                      <View style={{width:'50%',margin:'5%',height:'90%'}}>
-                        <Button mode="contained" onPress={handleRegisterPress} disabled={isLoginLoading}>
-                          Register
-                        </Button>
-                      </View>
 
-                      <View style={{justifyContent:'center', marginTop:'3%'}}>
-                        <TouchableOpacity onPress={() =>  handleResetPasswordPress()}>
-                            <Text style={{ fontSize: 10, color: 'blue' }}>Reset Password</Text>
-                        </TouchableOpacity>
-                      </View>
                   </View>
                      
             </View>

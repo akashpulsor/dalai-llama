@@ -68,8 +68,8 @@ const isTokenExpired = (token) => {
 export const authApi = createApi({
   reducerPath: 'authApi',
   baseQuery: fetchBaseQuery({
-    //baseUrl: 'http://localhost:8080/api',
-    baseUrl: process.env.REACT_APP_API_BASE_URL ||'https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api',
+    baseUrl: 'http://localhost:8080/api',
+    //baseUrl: process.env.REACT_APP_API_BASE_URL ||'https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api',
     prepareHeaders: async (headers) => {
       try {
         const token = await AsyncStorage.getItem('token');
