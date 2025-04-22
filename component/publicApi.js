@@ -4,7 +4,7 @@ import { showMessage } from './flashMessageSlice';
 export const publicApi = createApi({
   reducerPath: 'publicApi',
   baseQuery: fetchBaseQuery({
-    baseUrl: 'http://localhost:8080/api',
+    baseUrl: process.env.REACT_APP_API_BASE_URL ||'https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api',
     prepareHeaders: (headers) => {
       headers.set('Content-Type', 'application/json');
       // Do NOT set Authorization header
