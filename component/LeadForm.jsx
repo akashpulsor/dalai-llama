@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
     View, 
     Text, 
@@ -11,6 +11,8 @@ import {
     StatusBar
 } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { useDispatch } from 'react-redux';
+import { showMessage } from './flashMessageSlice';
 
 import CountryCodeDropdownPicker from './CountryCodeDropdownPicker';
 import countryData from '../helper/countryData';
@@ -72,7 +74,17 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
     const [phone, setPhone] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
-    const [interest, { isLoading, error }] = useInterestMutation();
+    const dispatch = useDispatch();
+    const [interest, { isLoading, error, isSuccess }] = useInterestMutation();
+
+    useEffect(() => {
+        if (isSuccess) {
+            dispatch(showMessage({
+                message: 'We have recieved your interest, Team will get back to you',
+                type: 'info'
+            }));
+        }
+    }, [isSuccess, dispatch]);
 
     const handleSubmit = async () => {
         if (submitting) return;
