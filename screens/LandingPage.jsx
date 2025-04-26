@@ -1,6 +1,7 @@
 import React, { createRef, useState, useEffect } from 'react';
 import { View, ScrollView, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Platform } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { useWindowDimensions } from 'react-native';
 
 import LeadForm from '../component/LeadForm';
 import { useDispatch } from 'react-redux';
@@ -61,6 +62,9 @@ const LandingPage = ({ navigation }) => {
         isLoading: isInterestDataLoading, 
         error: interestDataError 
     }] = useInterestMutation();
+
+    const { width: screenWidth } = useWindowDimensions();
+    const isMobile = screenWidth < 600;
 
     // Update scroll position calculation
     const handleNavClick = (sectionId) => {
@@ -130,65 +134,65 @@ const LandingPage = ({ navigation }) => {
     }, []);
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, isMobile && styles.containerMobile]}>
             <ScrollView 
                 ref={scrollViewRef} 
                 style={styles.scrollContainer}
                 showsVerticalScrollIndicator={false}
             >
-                <View style={styles.header}>
-                    <View style={styles.logoContainer}>
+                <View style={[styles.header, isMobile && styles.headerMobile]}>
+                    <View style={[styles.logoContainer, isMobile && styles.logoContainerMobile]}>
                         <Image 
                             source={require('../assets/search-logo.png')} 
-                            style={styles.headerLogo} 
+                            style={[styles.headerLogo, isMobile && styles.headerLogoMobile]} 
                         />
-                        <Text style={styles.headerTitle}>DALAI LLAMA</Text>
+                        <Text style={[styles.headerTitle, isMobile && styles.headerTitleMobile]}>DALAI LLAMA</Text>
                     </View>
 
-                    <View style={styles.navLinks}>
+                    <View style={[styles.navLinks, isMobile && styles.navLinksMobile]}>
                         {['About', 'Industry', 'Features', 'Benefit', 'Contact'].map((link) => (
                             <TouchableOpacity 
                                 key={link} 
                                 onPress={() => handleNavClick(link.toLowerCase())}
                             >
-                                <Text style={styles.navLink}>{link}</Text>
+                                <Text style={[styles.navLink, isMobile && styles.navLinkMobile]}>{link}</Text>
                             </TouchableOpacity>
                         ))}
                         <TouchableOpacity 
-                            style={styles.loginButton} 
+                            style={[styles.loginButton, isMobile && styles.loginButtonMobile]} 
                             onPress={handleLogin}
                         >
-                            <Text style={styles.loginButtonText}>Login</Text>
+                            <Text style={[styles.loginButtonText, isMobile && styles.loginButtonTextMobile]}>Login</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                <View style={styles.heroSection}>
-                    <View style={styles.heroContent}>
-                        <Text style={[styles.heroTitle, { flexWrap: 'nowrap' }]}>AI-Powered Outbound Calling</Text>
-                        <Text style={[styles.heroSubtitle, { flexWrap: 'nowrap' }]}>Scale Your Sales & Support Operations</Text>
-                        <Text style={[styles.heroSubtitle, { flexWrap: 'nowrap' }]}>Increase Revenue by 200%</Text>
+                <View style={[styles.heroSection, isMobile && styles.heroSectionMobile]}>
+                    <View style={[styles.heroContent, isMobile && styles.heroContentMobile]}>
+                        <Text style={[styles.heroTitle, isMobile && styles.heroTitleMobile]}>AI-Powered Outbound Calling</Text>
+                        <Text style={[styles.heroSubtitle, isMobile && styles.heroSubtitleMobile]}>Scale Your Sales & Support Operations</Text>
+                        <Text style={[styles.heroSubtitle, isMobile && styles.heroSubtitleMobile]}>Increase Revenue by 200%</Text>
                         
-                        <View style={styles.trustIndicators}>
-                            <View style={styles.trustBadge}>
-                                <Text style={styles.trustBadgeTitle}>5000+</Text>
-                                <Text style={styles.trustBadgeText}>Calls/Hour</Text>
+                        <View style={[styles.trustIndicators, isMobile && styles.trustIndicatorsMobile]}>
+                            <View style={[styles.trustBadge, isMobile && styles.trustBadgeMobile]}>
+                                <Text style={[styles.trustBadgeTitle, isMobile && styles.trustBadgeTitleMobile]}>5000+</Text>
+                                <Text style={[styles.trustBadgeText, isMobile && styles.trustBadgeTextMobile]}>Calls/Hour</Text>
                             </View>
-                            <View style={styles.trustBadge}>
-                                <Text style={styles.trustBadgeTitle}>40%</Text>
-                                <Text style={styles.trustBadgeText}>Higher Conversion</Text>
+                            <View style={[styles.trustBadge, isMobile && styles.trustBadgeMobile]}>
+                                <Text style={[styles.trustBadgeTitle, isMobile && styles.trustBadgeTitleMobile]}>40%</Text>
+                                <Text style={[styles.trustBadgeText, isMobile && styles.trustBadgeTextMobile]}>Higher Conversion</Text>
                             </View>
                         </View>
                     </View>
                 </View>
 
-                <View ref={industryRef} style={styles.industrySection}>
-                    <Text style={styles.sectionTitle}>Industry Solutions</Text>
-                    <View style={styles.industryContainer}>
+                <View ref={industryRef} style={[styles.industrySection, isMobile && styles.industrySectionMobile]}>
+                    <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]}>Industry Solutions</Text>
+                    <View style={[styles.industryContainer, isMobile && styles.industryContainerMobile]}>
                         <ScrollView 
-                            horizontal 
+                            horizontal={!isMobile}
                             showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.industryScrollContent}
+                            contentContainerStyle={[styles.industryScrollContent, isMobile && styles.industryScrollContentMobile]}
                         >
                             {[
                                 {
@@ -216,14 +220,14 @@ const LandingPage = ({ navigation }) => {
                                     description: 'Admission inquiries, course registration, fee reminder calls'
                                 }
                             ].map((industry, index) => (
-                                <View key={index} style={styles.industryCard}>
-                                    <View style={styles.industryImageContainer}>
-                                        <Image source={industry.image} style={styles.industryImage} />
+                                <View key={index} style={[styles.industryCard, isMobile && styles.industryCardMobile]}>
+                                    <View style={[styles.industryImageContainer, isMobile && styles.industryImageContainerMobile]}>
+                                        <Image source={industry.image} style={[styles.industryImage, isMobile && styles.industryImageMobile]} />
                                     </View>
                                     <View style={styles.industryContent}>
-                                        <Text style={styles.industryTitle}>{industry.title}</Text>
-                                        <Text style={styles.metricsText}>{industry.metrics}</Text>
-                                        <Text style={styles.industryDescription}>{industry.description}</Text>
+                                        <Text style={[styles.industryTitle, isMobile && styles.industryTitleMobile]}>{industry.title}</Text>
+                                        <Text style={[styles.metricsText, isMobile && styles.metricsTextMobile]}>{industry.metrics}</Text>
+                                        <Text style={[styles.industryDescription, isMobile && styles.industryDescriptionMobile]}>{industry.description}</Text>
                                     </View>
                                 </View>
                             ))}
@@ -231,8 +235,8 @@ const LandingPage = ({ navigation }) => {
                     </View>
                 </View>
 
-                <View ref={featuresRef} style={styles.featuresSection}>
-                    <Text style={styles.sectionTitle}>Outbound Calling Features</Text>
+                <View ref={featuresRef} style={[styles.featuresSection, isMobile && styles.featuresSectionMobile]}>
+                    <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]}>Outbound Calling Features</Text>
                     <View style={styles.featureGrid}>
                         {[
                             {
@@ -256,18 +260,18 @@ const LandingPage = ({ navigation }) => {
                                 icon: '🔗'
                             }
                         ].reduce((rows, feature, index) => {
-                            if (index % 2 === 0) rows.push([]);
+                            if (isMobile || index % 2 === 0) rows.push([]);
                             rows[rows.length - 1].push(feature);
                             return rows;
                         }, []).map((row, rowIndex) => (
-                            <View key={rowIndex} style={styles.featureRow}>
+                            <View key={rowIndex} style={[styles.featureRow, isMobile && styles.featureRowMobile]}>
                                 {row.map((feature, colIndex) => (
-                                    <View key={colIndex} style={styles.featureCard}>
+                                    <View key={colIndex} style={[styles.featureCard, isMobile && styles.featureCardMobile]}>
                                         <View style={styles.featureHeader}>
-                                            <Text style={styles.featureIcon}>{feature.icon}</Text>
-                                            <Text style={styles.featureTitle}>{feature.title}</Text>
+                                            <Text style={[styles.featureIcon, isMobile && styles.featureIconMobile]}>{feature.icon}</Text>
+                                            <Text style={[styles.featureTitle, isMobile && styles.featureTitleMobile]}>{feature.title}</Text>
                                         </View>
-                                        <Text style={styles.featureDescription}>{feature.description}</Text>
+                                        <Text style={[styles.featureDescription, isMobile && styles.featureDescriptionMobile]}>{feature.description}</Text>
                                     </View>
                                 ))}
                             </View>
@@ -275,27 +279,27 @@ const LandingPage = ({ navigation }) => {
                     </View>
                 </View>
 
-                <View ref={benefitsRef} style={styles.statsSection}>
-                    <Text style={styles.sectionTitle}>Performance Metrics</Text>
-                    <View style={styles.statsGrid}>
+                <View ref={benefitsRef} style={[styles.statsSection, isMobile && styles.statsSectionMobile]}>
+                    <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]}>Performance Metrics</Text>
+                    <View style={[styles.statsGrid, isMobile && styles.statsGridMobile]}>
                         {[
                             { metric: '98%', label: 'Call Completion Rate' },
                             { metric: '45%', label: 'Cost Reduction' },
                             { metric: '3x', label: 'Lead Coverage' },
                             { metric: '24/7', label: 'Operation Hours' }
                         ].map((stat, index) => (
-                            <View key={index} style={styles.statCard}>
-                                <Text style={styles.statMetric}>{stat.metric}</Text>
-                                <Text style={styles.statLabel}>{stat.label}</Text>
+                            <View key={index} style={[styles.statCard, isMobile && styles.statCardMobile]}>
+                                <Text style={[styles.statMetric, isMobile && styles.statMetricMobile]}>{stat.metric}</Text>
+                                <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>{stat.label}</Text>
                             </View>
                         ))}
                     </View>
                 </View>
 
-                <View ref={contactRef} style={styles.contactSection}>
-                    <Text style={styles.sectionTitle}>Contact Us</Text>
-                    <TouchableOpacity style={styles.contactButton} onPress={handleScheduleDemo}>
-                        <Text style={styles.contactButtonText}>Contact</Text>
+                <View ref={contactRef} style={[styles.contactSection, isMobile && styles.contactSectionMobile]}>
+                    <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]}>Contact Us</Text>
+                    <TouchableOpacity style={[styles.contactButton, isMobile && styles.contactButtonMobile]} onPress={handleScheduleDemo}>
+                        <Text style={[styles.contactButtonText, isMobile && styles.contactButtonTextMobile]}>Contact</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
@@ -600,6 +604,163 @@ const styles = StyleSheet.create({
     },
     scrollContainer: {
         backgroundColor: '#d3d3d3',
+    },
+    // Responsive overrides below:
+    containerMobile: {
+        padding: 0,
+    },
+    headerMobile: {
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        padding: 10,
+    },
+    logoContainerMobile: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    headerLogoMobile: {
+        width: 50,
+        height: 50,
+        marginRight: 10,
+    },
+    headerTitleMobile: {
+        fontSize: 16,
+    },
+    navLinksMobile: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginTop: 10,
+    },
+    navLinkMobile: {
+        fontSize: 14,
+        marginHorizontal: 5,
+        marginVertical: 2,
+    },
+    loginButtonMobile: {
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+        borderRadius: 6,
+        marginLeft: 5,
+    },
+    loginButtonTextMobile: {
+        fontSize: 14,
+    },
+    heroSectionMobile: {
+        padding: 10,
+    },
+    heroContentMobile: {
+        maxWidth: '100%',
+    },
+    heroTitleMobile: {
+        fontSize: 22,
+    },
+    heroSubtitleMobile: {
+        fontSize: 16,
+    },
+    trustIndicatorsMobile: {
+        flexDirection: 'column',
+        alignItems: 'center',
+        width: '100%',
+        paddingHorizontal: 0,
+    },
+    trustBadgeMobile: {
+        width: 120,
+        height: 60,
+        marginVertical: 5,
+        padding: 10,
+    },
+    trustBadgeTitleMobile: {
+        fontSize: 16,
+    },
+    trustBadgeTextMobile: {
+        fontSize: 10,
+    },
+    industrySectionMobile: {
+        padding: 10,
+    },
+    industryContainerMobile: {
+        width: '100%',
+        alignItems: 'center',
+    },
+    industryScrollContentMobile: {
+        flexDirection: 'column',
+        alignItems: 'center',
+        paddingHorizontal: 0,
+    },
+    industryCardMobile: {
+        width: '95%',
+        height: 260,
+        marginVertical: 8,
+        marginHorizontal: 0,
+        padding: 8,
+    },
+    industryImageContainerMobile: {
+        height: 90,
+    },
+    industryImageMobile: {
+        height: '100%',
+    },
+    industryTitleMobile: {
+        fontSize: 16,
+    },
+    metricsTextMobile: {
+        fontSize: 12,
+    },
+    industryDescriptionMobile: {
+        fontSize: 10,
+    },
+    featuresSectionMobile: {
+        padding: 8,
+    },
+    featureRowMobile: {
+        flexDirection: 'column',
+    },
+    featureCardMobile: {
+        width: '100%',
+        marginBottom: 10,
+        padding: 8,
+    },
+    featureIconMobile: {
+        fontSize: 28,
+    },
+    featureTitleMobile: {
+        fontSize: 18,
+    },
+    featureDescriptionMobile: {
+        fontSize: 12,
+    },
+    statsSectionMobile: {
+        padding: 10,
+    },
+    statsGridMobile: {
+        flexDirection: 'column',
+    },
+    statCardMobile: {
+        width: '100%',
+        marginBottom: 10,
+        padding: 10,
+    },
+    statMetricMobile: {
+        fontSize: 18,
+    },
+    statLabelMobile: {
+        fontSize: 10,
+    },
+    contactSectionMobile: {
+        padding: 10,
+    },
+    contactButtonMobile: {
+        paddingVertical: 8,
+        paddingHorizontal: 15,
+        borderRadius: 8,
+    },
+    contactButtonTextMobile: {
+        fontSize: 14,
+    },
+    sectionTitleMobile: {
+        fontSize: 20,
+        marginBottom: 8,
     },
 });
 
