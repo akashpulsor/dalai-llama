@@ -589,8 +589,8 @@ const styles = StyleSheet.create({
 
   },
   logo: {
-    width: 150,
-    height: 150,
+    width: 72,
+    height: 72,
     marginBottom: 20,
   },
   checkboxContainer: {
@@ -626,8 +626,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#333',
   },
   Searchlogo: {
-    width: 200,
-    height: 300,
+    width: 100,
+    height: 150,
     alignSelf:'center'
   },
   input: {

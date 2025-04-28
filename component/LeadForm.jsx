@@ -8,7 +8,8 @@ import {
     Modal, 
     ScrollView,
     Platform,
-    StatusBar
+    StatusBar,
+    useWindowDimensions
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useDispatch } from 'react-redux';
@@ -77,6 +78,9 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
     const dispatch = useDispatch();
     const [interest, { isLoading, error, isSuccess }] = useInterestMutation();
 
+    const { width: screenWidth } = useWindowDimensions();
+    const isMobile = screenWidth < 600;
+
     useEffect(() => {
         if (isSuccess) {
             dispatch(showMessage({
@@ -143,36 +147,41 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
             onRequestClose={onClose}
         >
             <View style={styles.modalOverlay}>
-                <View style={styles.modalContainer}>
-                    <Text style={styles.modalTitle}>Schedule a Demo</Text>
+                <View style={[
+                    styles.modalContainer,
+                    isMobile && styles.modalContainerMobile
+                ]}>
+                    <Text style={[styles.modalTitle, isMobile && styles.modalTitleMobile]}>Schedule a Demo</Text>
                     
                     <ScrollView 
                         contentContainerStyle={styles.formContainer}
                         keyboardShouldPersistTaps="handled"
                     >
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Full Name</Text>
+                            <Text style={[styles.label, isMobile && styles.labelMobile]}>Full Name</Text>
                             <TextInput
                                 style={[
                                     styles.input, 
                                     styles.shadowInput, 
-                                    errors.name && styles.errorInput
+                                    errors.name && styles.errorInput,
+                                    isMobile && styles.inputMobile
                                 ]}
                                 placeholder="Enter your full name"
                                 placeholderTextColor="#9ca3af"
                                 value={formData.name}
                                 onChangeText={(text) => setFormData({...formData, name: text})}
                             />
-                            {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
+                            {errors.name && <Text style={[styles.errorText, isMobile && styles.errorTextMobile]}>{errors.name}</Text>}
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Email</Text>
+                            <Text style={[styles.label, isMobile && styles.labelMobile]}>Email</Text>
                             <TextInput
                                 style={[
                                     styles.input, 
                                     styles.shadowInput, 
-                                    errors.email && styles.errorInput
+                                    errors.email && styles.errorInput,
+                                    isMobile && styles.inputMobile
                                 ]}
                                 placeholder="Enter your business email"
                                 placeholderTextColor="#9ca3af"
@@ -180,11 +189,11 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
                                 value={formData.email}
                                 onChangeText={(text) => setFormData({...formData, email: text})}
                             />
-                            {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+                            {errors.email && <Text style={[styles.errorText, isMobile && styles.errorTextMobile]}>{errors.email}</Text>}
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Mobile Number</Text>
+                            <Text style={[styles.label, isMobile && styles.labelMobile]}>Mobile Number</Text>
                             <View style={styles.mobileNumberContainer}>
                                 <CountryCodeDropdownPicker
                                     onSelectCountry={handleCountrySelect}
@@ -195,7 +204,7 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
                     </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Company Size</Text>
+                            <Text style={[styles.label, isMobile && styles.labelMobile]}>Company Size</Text>
                             <View style={styles.companySizeContainer}>
                                 {[
                                     { label: '0-100', value: '0-100' },
@@ -208,35 +217,46 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
                                         style={[
                                             styles.companySizeOption,
                                             styles.shadowInput,
-                                            formData.companySize === size.value && styles.selectedCompanySize
+                                            formData.companySize === size.value && styles.selectedCompanySize,
+                                            isMobile && styles.companySizeOptionMobile
                                         ]}
                                         onPress={() => setFormData({...formData, companySize: size.value})}
                                     >
                                         <Text style={[
                                             styles.companySizeText,
-                                            formData.companySize === size.value && styles.selectedCompanySizeText
+                                            formData.companySize === size.value && styles.selectedCompanySizeText,
+                                            isMobile && styles.companySizeTextMobile
                                         ]}>
                                             {size.label}
                                         </Text>
                                     </TouchableOpacity>
                                 ))}
                             </View>
-                            {errors.companySize && <Text style={styles.errorText}>{errors.companySize}</Text>}
+                            {errors.companySize && <Text style={[styles.errorText, isMobile && styles.errorTextMobile]}>{errors.companySize}</Text>}
                         </View>
 
                         <View style={styles.buttonContainer}>
                             <TouchableOpacity 
-                                style={[styles.submitButton, styles.shadowInput, submitting && { opacity: 0.5 }]} 
+                                style={[
+                                    styles.submitButton, 
+                                    styles.shadowInput, 
+                                    submitting && { opacity: 0.5 },
+                                    isMobile && styles.submitButtonMobile
+                                ]} 
                                 onPress={handleSubmit}
                                 disabled={submitting}
                             >
-                                <Text style={styles.submitButtonText}>Submit</Text>
+                                <Text style={[styles.submitButtonText, isMobile && styles.submitButtonTextMobile]}>Submit</Text>
                             </TouchableOpacity>
                             <TouchableOpacity 
-                                style={[styles.cancelButton, styles.shadowInput]} 
+                                style={[
+                                    styles.cancelButton, 
+                                    styles.shadowInput,
+                                    isMobile && styles.cancelButtonMobile
+                                ]} 
                                 onPress={onClose}
                             >
-                                <Text style={styles.cancelButtonText}>Cancel</Text>
+                                <Text style={[styles.cancelButtonText, isMobile && styles.cancelButtonTextMobile]}>Cancel</Text>
                             </TouchableOpacity>
                         </View>
                     </ScrollView>
@@ -306,6 +326,11 @@ const styles = StyleSheet.create({
         shadowRadius: 6,
         elevation: 8,
     },
+    modalContainerMobile: {
+        width: '95%',
+        padding: 10,
+        borderRadius: 10,
+    },
     shadowInput: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -320,6 +345,10 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         color: '#4b5563',
     },
+    modalTitleMobile: {
+        fontSize: 18,
+        marginBottom: 10,
+    },
     formContainer: {
         paddingHorizontal: 10,
     },
@@ -331,6 +360,9 @@ const styles = StyleSheet.create({
         color: '#4b5563',
         fontWeight: 'bold',
     },
+    labelMobile: {
+        fontSize: 14,
+    },
     input: {
         borderWidth: 1,
         borderColor: 'rgba(209, 213, 219, 0.5)',
@@ -339,6 +371,10 @@ const styles = StyleSheet.create({
         fontSize: 16,
         backgroundColor: 'rgba(255, 255, 255, 0.8)',
     },
+    inputMobile: {
+        fontSize: 14,
+        padding: 8,
+    },
     errorInput: {
         borderColor: 'red',
     },
@@ -346,6 +382,9 @@ const styles = StyleSheet.create({
         color: 'red',
         fontSize: 12,
         marginTop: 5,
+    },
+    errorTextMobile: {
+        fontSize: 10,
     },
     phoneInputContainer: {
         position: 'relative',
@@ -421,6 +460,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: 'rgba(255, 255, 255, 0.8)',
     },
+    companySizeOptionMobile: {
+        width: '100%',
+        marginBottom: 8,
+        padding: 8,
+    },
     selectedCompanySize: {
         backgroundColor: '#6b7280',
         borderColor: '#6b7280',
@@ -428,6 +472,9 @@ const styles = StyleSheet.create({
     companySizeText: {
         color: '#4b5563',
         fontWeight: 'bold',
+    },
+    companySizeTextMobile: {
+        fontSize: 12,
     },
     selectedCompanySizeText: {
         color: 'white',
@@ -445,11 +492,20 @@ const styles = StyleSheet.create({
         flex: 1,
         marginRight: 10,
     },
+    submitButtonMobile: {
+        paddingVertical: 10,
+        paddingHorizontal: 10,
+        borderRadius: 8,
+        marginRight: 5,
+    },
     submitButtonText: {
         color: 'white',
         textAlign: 'center',
         fontWeight: 'bold',
         fontSize: 16,
+    },
+    submitButtonTextMobile: {
+        fontSize: 14,
     },
     cancelButton: {
         backgroundColor: '#f3f4f6',
@@ -458,11 +514,19 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         flex: 1,
     },
+    cancelButtonMobile: {
+        paddingVertical: 10,
+        paddingHorizontal: 10,
+        borderRadius: 8,
+    },
     cancelButtonText: {
         color: '#4b5563',
         textAlign: 'center',
         fontWeight: 'bold',
         fontSize: 16,
+    },
+    cancelButtonTextMobile: {
+        fontSize: 14,
     },
     mobileNumberContainer: {
         flexDirection: 'row',
