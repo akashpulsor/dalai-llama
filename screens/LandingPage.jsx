@@ -5,7 +5,7 @@ import { useWindowDimensions } from 'react-native';
 
 import LeadForm from '../component/LeadForm';
 import { useDispatch } from 'react-redux';
-import { useInterestMutation } from '../component/authApi';
+import { useInterestMutation } from '../component/publicApi';
 import { showMessage } from '../component/flashMessageSlice';
 
 const injectLinkedInScriptWeb = () => {

@@ -3,6 +3,7 @@ import {createStackNavigator} from '@react-navigation/stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { View, Text, Image,Button, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useWindowDimensions } from 'react-native';
 
 import { DrawerItemList } from "@react-navigation/drawer";
 
@@ -36,6 +37,8 @@ const Drawer = createDrawerNavigator();
 
 const HomeStack = () => {
     const user =  useSelector(selectUser);
+    const { width: screenWidth } = useWindowDimensions();
+    const isSmallScreen = screenWidth < 600;
     
   return (
 
@@ -105,7 +108,8 @@ const HomeStack = () => {
     >
          <Drawer.Screen name="Dashboard" component={Dashboard} options={
               {
-                headerTitle:"Dashboard"
+                headerTitle:"Dashboard",
+                swipeEnabled: !isSmallScreen ? false : true
               }
           } />
           <Drawer.Screen name="Agents" component={Agents} options={

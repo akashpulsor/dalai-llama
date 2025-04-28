@@ -9,6 +9,7 @@ import {
   ScrollView,
   Modal,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import PropTypes from 'prop-types';
@@ -23,34 +24,9 @@ const CallDashBoard = ({ businessId }) => {
     const [selectedDuration, setSelectedDuration] = useState('');
     const [startDate, setStartDate] = useState(null);
     const [endDate, setEndDate] = useState(null);
-    const [isStartDatePickerVisible, setStartDatePickerVisible] = useState(false);
-    const [isEndDatePickerVisible, setEndDatePickerVisible] = useState(false);
 
-    const showStartDatePicker = () => {
-        setStartDatePickerVisible(true);
-    };
-
-    const hideStartDatePicker = () => {
-        setStartDatePickerVisible(false);
-    };
-
-    const handleStartDateConfirm = (date) => {
-        setStartDate(date);
-        hideStartDatePicker();
-    };
-
-    const showEndDatePicker = () => {
-        setEndDatePickerVisible(true);
-    };
-
-    const hideEndDatePicker = () => {
-        setEndDatePickerVisible(false);
-    };
-
-    const handleEndDateConfirm = (date) => {
-        setEndDate(date);
-        hideEndDatePicker();
-    };
+    const { width: screenWidth } = useWindowDimensions();
+    const isSmallScreen = screenWidth < 600;
 
     const fetchData = () => {
         let queryParams = `businessId=${businessId}`;
@@ -125,11 +101,15 @@ const CallDashBoard = ({ businessId }) => {
         );
     }
 
+    // Responsive card width
+    const cardWidth = isSmallScreen ? '95%' : '45%';
+    const pickerWidth = isSmallScreen ? '90%' : '20%';
+
     return (
         <View style={styles.tableContainer}>
             <View style={styles.contentWrapper}>
                 {/* Picker */}
-                <View style={styles.pickerContainer}>
+                <View style={[styles.pickerContainer, { width: pickerWidth }]}>
                     <Picker
                         style={styles.picker}
                         selectedValue={selectedDuration}
@@ -144,25 +124,28 @@ const CallDashBoard = ({ businessId }) => {
                 </View>
 
                 {/* Cards Grid */}
-                <View style={styles.cardsWrapper}>
-                    <ScrollView contentContainerStyle={styles.cardsGrid}>
-                        <View style={styles.cardContainer}>
+                <View style={[styles.cardsWrapper, { height: isSmallScreen ? undefined : 300 }]}>
+                    <ScrollView contentContainerStyle={[
+                        styles.cardsGrid,
+                        { flexDirection: isSmallScreen ? 'column' : 'row' }
+                    ]}>
+                        <View style={[styles.cardContainer, { width: cardWidth }]}>
                             <Text style={styles.cardValue}>{data?.totalCall || 0}</Text>
                             <Text style={styles.cardLabel}>Total Calls</Text>
                         </View>
-                        <View style={styles.cardContainer}>
+                        <View style={[styles.cardContainer, { width: cardWidth }]}>
                             <Text style={styles.cardValue}>${data?.totalCharges?.toFixed(2) || '0.00'}</Text>
                             <Text style={styles.cardLabel}>Total Cost</Text>
                         </View>
-                        <View style={styles.cardContainer}>
+                        <View style={[styles.cardContainer, { width: cardWidth }]}>
                             <Text style={styles.cardValue}>{data?.totalToken || 0}</Text>
                             <Text style={styles.cardLabel}>Total Tokens</Text>
                         </View>
-                        <View style={styles.cardContainer}>
+                        <View style={[styles.cardContainer, { width: cardWidth }]}>
                             <Text style={styles.cardValue}>{data?.totalLeads || 0}</Text>
                             <Text style={styles.cardLabel}>Total Leads</Text>
                         </View>
-                        <View style={styles.cardContainer}>
+                        <View style={[styles.cardContainer, { width: cardWidth }]}>
                             <Text style={styles.cardValue}>{data?.totalCampaigns || 0}</Text>
                             <Text style={styles.cardLabel}>Total Campaigns</Text>
                         </View>
@@ -191,16 +174,14 @@ const styles = StyleSheet.create({
         padding: 10, // Slightly reduce padding for compactness
     },
     cardsWrapper: {
-        height: 300, // Fixed height to limit the scrollable area
+        // height set dynamically
     },
     cardsGrid: {
-        flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'center', // Center the cards horizontally
         alignItems: 'center', // Center the last card vertically
     },
     cardContainer: {
-        width: '45%', // Adjust width for better spacing
         aspectRatio: 1.5,
         backgroundColor: 'white',
         borderRadius: 8,
@@ -227,9 +208,9 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     pickerContainer: {
-        width: '20%',
         marginTop: 15, // Reduce top margin for compactness
         paddingHorizontal: 8, // Slightly reduce horizontal padding
+        alignSelf: 'center',
     },
     picker: {
         height: 45, // Slightly smaller height for compactness

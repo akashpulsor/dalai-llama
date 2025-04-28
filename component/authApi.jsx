@@ -177,38 +177,6 @@ export const authApi = createApi({
         await AsyncStorage.setItem('token', response.loginResponseDto.accessToken);
       },
     }),
-    interest: builder.mutation({
-      // Use a custom baseQuery to avoid Authorization header
-      baseQuery: fetchBaseQuery({
-        baseUrl: 'http://localhost:8080/api',
-        prepareHeaders: (headers) => {
-          headers.set('Content-Type', 'application/json');
-          // Do NOT set Authorization header here
-          return headers;
-        },
-      }),
-      query: (data) => ({
-        url: '/auth/interest',
-        method: 'POST',
-        body: data,
-      }),
-      
-      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
-        try {
-          const { response } = await queryFulfilled;
-        }
-        catch (error) {
-          console.log(error);
-          handleError(error, dispatch)
-        }
-      },
-      onSuccess: (response, { dispatch }) => {
-        dispatch(showMessage({
-          message: 'We have recieved your interest, Team will get back to you',
-          type: 'info'
-        }));
-      },
-    }),
     verificationCode: builder.mutation({
       query: (data) => ({
         url: '/auth/verification-code',
@@ -605,7 +573,7 @@ export const { useLoginMutation, useRegisterMutation, useVerificationCodeMutatio
   useLogoutMutation, useAddCampaignMutation, useGetCompanySizeQuery,
   useGetAgentListQuery, useGetCampaignListQuery, useGetLeadDataQuery, useGetLlmDataListQuery, useGetPhoneDataListQuery, useStartCampaignMutation, useAddPhoneDataMutation,
   useAddLLMDataMutation, useRunCampaignMutation, useAddLeadMutation, useAddAgentMutation, useRefreshTokenQuery,
-  useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery, useGenerateNumberMutation, useInterestMutation, useGetPortalsQuery, useAddPortalMutation, useValidateUrlMutation, useGenerateContextMutation, useInitlializeBrowserAutomationMutation, useGetDashboardDataQuery,
+  useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery, useGenerateNumberMutation, useGetPortalsQuery, useAddPortalMutation, useValidateUrlMutation, useGenerateContextMutation, useInitlializeBrowserAutomationMutation, useGetDashboardDataQuery,
   useLazyGetDashboardDataQuery, useRegisterBotMutation, useGetCampaignRunLogsQuery, useGetCallLogsQuery,
   useGetCallLogByCallIdQuery, useLazyGetCallLogByCallIdQuery, useCheckEventStatusQuery,useLazyGetRecordingBytesQuery
 } = authApi;
