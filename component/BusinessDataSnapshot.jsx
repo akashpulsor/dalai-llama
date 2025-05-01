@@ -1,241 +1,159 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
-  ActivityIndicator,
   TouchableOpacity,
-  ScrollView,
-  Modal,
-  Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { useSelector } from 'react-redux';
-import {selectUser, selectOnboardingData} from './authSlice';
-import {useGetBusinessDataQuery,useGeneratePhoneMutation} from './authApi';
+import { selectUser, selectOnboardingData } from './authSlice';
+import { useGetBusinessDataQuery } from './authApi';
 
-import PhoneModal from './PhoneModal'
+import PhoneModal from './PhoneModal';
 import LlmModal from './LlmModal';
 
-const BusinessDataSnapShot = ({navigation}) => {
-    const [PhoneDataModal, setPhoneDataModal] = useState(false);
-    const [llmDataModel, setLlmDataModal] = useState(false);
-    const user =  useSelector(selectUser);
-    const onBoardingData =  useSelector(selectOnboardingData);
-    const { data: businessData, error, isLoading, isError } = useGetBusinessDataQuery(
-        user?.id
-    );
+const BusinessDataSnapShot = ({ navigation }) => {
+  const [PhoneDataModal, setPhoneDataModal] = useState(false);
+  const [llmDataModel, setLlmDataModal] = useState(false);
+  const user = useSelector(selectUser);
+  const onBoardingData = useSelector(selectOnboardingData);
+  const { data: businessData, isLoading } = useGetBusinessDataQuery(user?.id);
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const isSmallScreen = screenWidth < 600;
 
-   
+  useEffect(() => {
+    console.log("DHANYAAAAAA");
+    console.log(onBoardingData);
+  }, [onBoardingData]);
 
+  const openPhoneModal = () => {
+    setLlmDataModal(false);
+    setPhoneDataModal(true);
+  };
+  const openLlmModal = () => {
+    setPhoneDataModal(false);
+    setLlmDataModal(true);
+  };
 
-    useEffect(() => {
-        console.log("DHANYAAAAAA");
-        console.log(onBoardingData);
-    }, [onBoardingData]);
-
-    const openPhoneModal = () => {
-        setLlmDataModal(false);
-        setPhoneDataModal(true);
-    };
-    const openLlmModal = () => {
-        setPhoneDataModal(false);
-        setLlmDataModal(true);
-    };
-    return (
-        <View style={[styles.tableContainer,{flexDirection:'column'}]}>
-                {/* Business Name */}
-                <View style={[styles.section]}>
-                    <Text style={styles.businessName}>{businessData?.businessName}</Text>
-                    <View style={{flexDirection:'row'}}>
-                        <Text style={[styles.label,{fontFamily:'bold',fontWeight: "bold"}]}>Email: </Text>
-                        <Text style={[styles.value]}>{businessData?.email||'-'}</Text>
-                    </View>
-                    <View style={{flexDirection:'row'}}>
-                            <Text style={[styles.label,{fontFamily:'bold',fontWeight: "bold"}]}>Inbound: </Text>
-                            <Text style={[styles.value]}>{businessData?.email||'-'}</Text>
-                    </View>
-                    <View  style={{flexDirection:'row'}}>
-                        <Text style={[styles.label,{fontFamily:'bold',fontWeight: "bold"}]}>Outbound: </Text>
-                        <Text style={[styles.value]}>{businessData?.email||'-'} </Text>
-                    </View>
-                </View>
-
-                
-                    <View style={{flexDirection:'row'}}>
-                                <PhoneModal onClose={setPhoneDataModal} openModal={PhoneDataModal} />
-                                <LlmModal onClose={setLlmDataModal} openModal={llmDataModel} />
-                                <TouchableOpacity 
-                                    style={[styles.generateButton,{margin:'5%'}]}
-                                    onPress={() => openPhoneModal()}
-                                >
-                                    <Text style={styles.generateButtonText}>
-                                        Configure Phone
-                                    </Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity 
-                                    style={[styles.generateButton,{margin:'5%'}]}
-                                    onPress={() => openLlmModal()}
-                                >
-                                    <Text style={styles.generateButtonText}>
-                                        Configure LLM
-                                    </Text>
-                                </TouchableOpacity>
-                            
-                    </View>
-
+  return (
+    <View
+      style={[
+        styles.outerContainer,
+        {
+          padding: isSmallScreen ? 10 : 24,
+          minHeight: isSmallScreen ? screenHeight * 0.7 : 400,
+        },
+      ]}
+    >
+      <View style={styles.card}>
+        <View style={styles.infoSection}>
+          <Text style={styles.businessName}>
+            {businessData?.businessName || 'Business Name'}
+          </Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Email: </Text>
+            <Text style={styles.value}>{businessData?.email || '-'}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Inbound: </Text>
+            <Text style={styles.value}>{businessData?.inbound || '-'}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Outbound: </Text>
+            <Text style={styles.value}>{businessData?.outbound || '-'}</Text>
+          </View>
         </View>
-    );
-
-}
+        <View style={styles.buttonSection}>
+          <PhoneModal onClose={setPhoneDataModal} openModal={PhoneDataModal} />
+          <LlmModal onClose={setLlmDataModal} openModal={llmDataModel} />
+          <TouchableOpacity
+            style={styles.generateButton}
+            onPress={openPhoneModal}
+          >
+            <Text style={styles.generateButtonText}>Configure Phone</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.generateButton}
+            onPress={openLlmModal}
+          >
+            <Text style={styles.generateButtonText}>Configure LLM</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+};
 
 export default BusinessDataSnapShot;
 
-BusinessDataSnapShot.propTypes = {
-   
-};
+BusinessDataSnapShot.propTypes = {};
 
 const styles = StyleSheet.create({
-    tableContainer :{
-        
-        height:'90%',
-        backgroundColor: 'white',
-        borderRadius: 20,
-        padding: 35,
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: {
-          width: 0,
-          height: 4,
-        },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 5,
-        width: '100%',
-        flexDirection:'column'
-    },
-    cardsGrid: {
-      flex: 1,
-      flexDirection: 'row',
-      justifyContent: "flex-start",
-      alignItems: 'flex-start',
-    },
-    column: {
-      width: '23%', // Slightly less than 25% to account for spacing
-      alignItems: 'center',
-    },
-    cardContainer: {
-      width: '80%',
-      height:'50%',
-      aspectRatio: 1, // Makes it square
-      backgroundColor: '#f0f0f0',
-      borderRadius: 20,
-      marginVertical: 5,
-      shadowColor: '#000',
-      shadowOffset: {
-        width: 0,
-        height: 4,
-      },
-      shadowOpacity: 0.25,
-      shadowRadius: 3.84,
-      elevation: 5,
-    },
-    loadingContainer: {
-      marginVertical: 20,
-    },
-    businessName: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      marginBottom: 16,
-      color: '#333',
-    },
-    section: {
-      marginBottom: 16,
-      flexDirection:'column',
-      alignSelf:'flex-start'
-    },
-    phoneContainer: {
-      marginBottom: 12,
-    },
-    label: {
-      fontSize: 14,
-      color: '#666',
-      marginBottom: 4,
-   
-    },
-    value: {
-      fontSize: 16,
-      color: '#333',
-    },
-    generateButton: {
-      backgroundColor: '#007AFF',
-      padding: 12,
-      borderRadius: 6,
-      alignItems: 'center',
-      width:'30%',
-      marginBottom:'50%'
-    },
-    generateButtonDisabled: {
-      backgroundColor: '#A5A5A5',
-    },
-    generateButtonText: {
-      color: 'white',
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    errorText: {
-      color: 'red',
-      fontSize: 16,
-      textAlign: 'center',
-    },
-  contentContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  businessInfoSection: {
+  outerContainer: {
     flex: 1,
-    paddingRight: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f7f7f7',
+    width: '100%',
+  },
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 18,
+    padding: 20,
+    width: '100%',
+    maxWidth: 420,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 6,
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    justifyContent: 'space-between',
+    minHeight: 320,
+  },
+  infoSection: {
+    marginBottom: 18,
   },
   businessName: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#333',
+    marginBottom: 10,
+    color: '#222',
+    textAlign: 'left',
   },
   infoRow: {
     flexDirection: 'row',
-    marginBottom: 4,
+    alignItems: 'center',
+    marginBottom: 6,
   },
   label: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#444',
   },
   value: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#666',
   },
   buttonSection: {
-    justifyContent: 'center',
+    flexDirection: 'column',
+    gap: 10,
+    alignItems: 'stretch',
+    marginTop: 10,
   },
   generateButton: {
     backgroundColor: '#007AFF',
-    padding: 12,
-    borderRadius: 12,
-    minWidth: 150,
-  },
-  generateButtonDisabled: {
-    backgroundColor: '#A5A5A5',
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginBottom: 8,
+    alignItems: 'center',
   },
   generateButtonText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    textAlign: 'center',
   },
-
 });
 

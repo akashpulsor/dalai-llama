@@ -318,15 +318,19 @@ const CampaignLogs = ({ navigation }) => {
                         <View style={styles.usageGrid}>
                             <View style={styles.usageRow}>
                                 <Text style={styles.usageLabel}>Total Charges:</Text>
-                                <Text style={styles.usageValue}>${usageData.totalCharges?.toFixed(2) || '0.00'}</Text>
+                                <Text style={styles.usageValue}>${usageData.totalCharges?.toFixed(4) || '0.0000'}</Text>
+                            </View>
+                            <View style={styles.usageRow}>
+                                <Text style={styles.usageLabel}>Carrier Charges:</Text>
+                                <Text style={styles.usageValue}>${usageData.totalCarrierCharges?.toFixed(4) || '0.00'}</Text>
                             </View>
                             <View style={styles.usageRow}>
                                 <Text style={styles.usageLabel}>Service Charges:</Text>
-                                <Text style={styles.usageValue}>${usageData.totalServiceCharges?.toFixed(2) || '0.00'}</Text>
+                                <Text style={styles.usageValue}>${usageData.totalServiceCharges?.toFixed(4) || '0.00'}</Text>
                             </View>
                             <View style={styles.usageRow}>
                                 <Text style={styles.usageLabel}>Model Charges:</Text>
-                                <Text style={styles.usageValue}>${usageData.totalModelCharges?.toFixed(2) || '0.00'}</Text>
+                                <Text style={styles.usageValue}>${usageData.totalModelCharges?.toFixed(4) || '0.00'}</Text>
                             </View>
                             <View style={styles.usageRow}>
                                 <Text style={styles.usageLabel}>Total Tokens:</Text>
