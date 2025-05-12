@@ -54,7 +54,6 @@ const CountryPicker = ({
       onPress={() => handleSelectCountry(item)}
     >
       <Text style={styles.flag}>{item.flag}</Text>
-      <Text style={[styles.countryName, textStyle]}>{item.country}</Text>
       <Text style={[styles.countryCode, textStyle]}>{item.code}</Text>
     </TouchableOpacity>
   );

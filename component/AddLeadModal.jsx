@@ -10,147 +10,79 @@ import {
   Modal,
   Pressable,
   Switch,
-  Alert,
+  Platform,
+  useWindowDimensions,
+  KeyboardAvoidingView,
 } from 'react-native';
 import PropTypes from 'prop-types';
 import Button from './Button';
 import { MaterialIcons } from '@expo/vector-icons';
-
-import { useVerificationCodeMutation, useAddLeadMutation } from './authApi';
+import { useAddLeadMutation } from './authApi';
 import { Picker } from '@react-native-picker/picker';
-import { useSelector } from 'react-redux';
-import {selectUser } from '../component/authSlice';
-import { useDispatch } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectUser } from '../component/authSlice';
 import { showMessage } from './flashMessageSlice';
 import WorldwideAddressPicker from './WorldwideAddressPicker';
-
-import { 
-  isValidEmail, 
-  isValidPhone, 
-  isValidWhatsApp,
-  cleanContactData 
+import {
+  isValidEmail,
+  isValidPhone,
+  cleanContactData,
 } from '../helper/utils';
-
 import CountryPicker from './CountryPicker';
 
-
 const AddLeadModal = ({ onClose, openModal }) => {
-
-  const user =  useSelector(selectUser);
-  const [addLead, { data: leadData, isLoading:isLeadDataLoading, isSuccess:isLeadDataSuccess, isError:isLeadDataError, error:LeadDataError }] = useAddLeadMutation();
+  const user = useSelector(selectUser);
+  const [addLead, { isLoading: isLeadDataLoading, isSuccess: isLeadDataSuccess, isError: isLeadDataError, error: LeadDataError }] = useAddLeadMutation();
   const [errorMessages, setErrorMessages] = useState({});
   const [formData, setFormData] = useState({
-          name: '',
-          email: '',
-          phone: '',
-          phoneCountryCode: 'US',
-          test:false,
-          whatsapp: '',
-          whatsappCountryCode: 'US',
-          gender: '',
-          address: {      
-            country: {
-                name: '',
-                isoCode: '',
-                flag: '',
-                phonecode: '',
-                currency: '',
-                latitude: '',
-                longitude: '',
-                timezones: [
-                    {
-                        zoneName: '',
-                        gmtOffset: 0,
-                        gmtOffsetName: '',
-                        abbreviation: '',
-                        tzName: ''
-                    }
-                ]
-            },
-            state: {
-              name: '',
-              isoCode: '',
-              countryCode: '',
-              latitude: '',
-              longitude: ''
-            },
-            city: {
-              name: '',
-              countryCode: '',
-              stateCode: '',
-              latitude: '',
-              longitude: ''
-            },
-            streetAddress: '',
-            apartment: '',
-            postalCode: '',
-            formattedAddress: ''
-          }
+    name: '',
+    email: '',
+    phone: '',
+    phoneCountryCode: '+91',
+    test: false,
+    whatsapp: '',
+    whatsappCountryCode: '+91',
+    gender: '',
+    address: {
+      country: { name: '', code: '', flag: '' },
+      streetAddress: '',
+      apartment: '',
+      postalCode: '',
+      formattedAddress: ''
+    }
   });
   const dispatch = useDispatch();
   const [isTestEnabled, setIsTestEnabled] = useState(true);
-  const toggleSwitch = () => setIsTestEnabled(previousState => !previousState);
+  const { width: screenWidth } = useWindowDimensions();
+  const isSmallScreen = screenWidth < 700;
+
   useEffect(() => {
-    if (isLeadDataSuccess && leadData) {
-      setFormData(leadData);
+    if (isLeadDataSuccess) {
       dispatch(showMessage({
         message: 'Lead created successfully',
         type: 'info'
       }));
       resetForm();
       onClose(false);
-
-  }
-
-  }, []);
-
+    }
+    // eslint-disable-next-line
+  }, [isLeadDataSuccess]);
 
   const resetForm = () => {
     setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        phoneCountryCode: 'US',
-        whatsapp: '',
-        whatsappCountryCode: 'US',
-        gender: '',
-        address: {      
-          country: {
-              name: '',
-              isoCode: '',
-              flag: '',
-              phonecode: '',
-              currency: '',
-              latitude: '',
-              longitude: '',
-              timezones: [
-                  {
-                      zoneName: '',
-                      gmtOffset: 0,
-                      gmtOffsetName: '',
-                      abbreviation: '',
-                      tzName: ''
-                  }
-              ]
-          },
-          state: {
-            name: '',
-            isoCode: '',
-            countryCode: '',
-            latitude: '',
-            longitude: ''
-          },
-          city: {
-            name: '',
-            countryCode: '',
-            stateCode: '',
-            latitude: '',
-            longitude: ''
-          },
-          streetAddress: '',
-          apartment: '',
-          postalCode: '',
-          formattedAddress: ''
+      name: '',
+      email: '',
+      phone: '',
+      phoneCountryCode: '+91',
+      whatsapp: '',
+      whatsappCountryCode: '+91',
+      gender: '',
+      address: {
+        country: { name: '', code: '', flag: '' },
+        streetAddress: '',
+        apartment: '',
+        postalCode: '',
+        formattedAddress: ''
       }
     });
     setErrorMessages({});
@@ -158,28 +90,9 @@ const AddLeadModal = ({ onClose, openModal }) => {
 
   const validatePhoneNumber = (phone, countryCode) => {
     try {
-      phone=countryCode+phone;
-      return isValidPhone(phone);
-    } catch (error) {
+      return isValidPhone(countryCode + phone);
+    } catch {
       return false;
-    }
-  };
-
-  const formatPhoneNumber = (phone, countryCode) => {
-    try {
-      const phoneNumber = parsePhoneNumber(phone, countryCode);
-      return phoneNumber.formatInternational();
-    } catch (error) {
-      return phone;
-    }
-  };
-
-  const parsePhoneNumber = (phone, countryCode) => {
-    try {
-
-      return phone;
-    } catch (error) {
-      return phone;
     }
   };
 
@@ -189,114 +102,47 @@ const AddLeadModal = ({ onClose, openModal }) => {
       businessId: user?.id,
       test: isTestEnabled
     };
-  
-    // Validate businessId first
+
     if (!newFormData.businessId) {
       dispatch(showMessage({
         message: 'Business Id not present',
         type: 'error'
       }));
-  
       return;
     }
-  
+
     const errors = {};
-  
-    // Phone validation
     if (!newFormData.phone) {
       errors.phone = 'Phone is required';
     } else if (!validatePhoneNumber(newFormData.phone, newFormData.phoneCountryCode)) {
       errors.phone = 'Please enter a valid phone number (e.g., +1234567890)';
     }
-  
-    // Email validation
     if (!newFormData.email) {
       errors.email = 'Email is required';
     } else if (!isValidEmail(newFormData.email)) {
       errors.email = 'Please enter a valid email address';
     }
-  
-    // WhatsApp validation (if provided)
     if (newFormData.whatsapp && !validatePhoneNumber(newFormData.whatsapp, newFormData.whatsappCountryCode)) {
       errors.whatsapp = 'Please enter a valid WhatsApp number with country code (e.g., +1234567890)';
     }
-  
-    // Additional validation for empty or whitespace-only values
     ['phone', 'email', 'whatsapp'].forEach(field => {
       if (newFormData[field] && newFormData[field].trim() === '') {
         errors[field] = `${field.charAt(0).toUpperCase() + field.slice(1)} cannot be empty`;
       }
     });
-  
+
     setErrorMessages(errors);
-  
+
     if (Object.keys(errors).length === 0) {
-      // Clean the data before submitting
       const cleanedFormData = cleanContactData(newFormData);
-            // Format phone numbers before submission
-      const formattedData = {
-        ...cleanedFormData,
-        phone: formatPhoneNumber(cleanedFormData.phone, cleanedFormData.phoneCountryCode),
-        whatsapp: cleanedFormData.whatsapp ? formatPhoneNumber(cleanedFormData.whatsapp, cleanedFormData.whatsappCountryCode) : ''
-      };
-      console.log("Lead Data");
-      console.log(newFormData);
-      addLead(formattedData);
+      addLead(cleanedFormData);
     }
   };
-  const handleModalClose = () => {
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      phoneCountryCode: 'US',
-      whatsapp: '',
-      whatsappCountryCode: 'US',
-      gender: '',
-      address: {      
-        country: {
-            name: '',
-            isoCode: '',
-            flag: '',
-            phonecode: '',
-            currency: '',
-            latitude: '',
-            longitude: '',
-            timezones: [
-                {
-                    zoneName: '',
-                    gmtOffset: 0,
-                    gmtOffsetName: '',
-                    abbreviation: '',
-                    tzName: ''
-                }
-            ]
-        },
-        state: {
-          name: '',
-          isoCode: '',
-          countryCode: '',
-          latitude: '',
-          longitude: ''
-        },
-        city: {
-          name: '',
-          countryCode: '',
-          stateCode: '',
-          latitude: '',
-          longitude: ''
-        },
-        streetAddress: '',
-        apartment: '',
-        postalCode: '',
-        formattedAddress: '',
-        test:false
-      }
-    });
-    setErrorMessages({});
-    onClose(false);
-  }
 
+  const handleModalClose = () => {
+    resetForm();
+    onClose(false);
+  };
 
   const handleChange = (name, value) => {
     setFormData(prevState => ({
@@ -307,7 +153,6 @@ const AddLeadModal = ({ onClose, openModal }) => {
 
   const handlePhoneChange = (text, field) => {
     handleChange(field, text);
-    // Clear error when user starts typing
     if (errorMessages[field]) {
       setErrorMessages(prev => ({
         ...prev,
@@ -317,339 +162,366 @@ const AddLeadModal = ({ onClose, openModal }) => {
   };
 
   const handleAddressChange = (address) => {
-    handleChange("address",address);
+    handleChange("address", address);
   };
 
-  const handleCountrySelect = (text, field) => {
-    console.log("AKASHHH");
-    console.log(field);
-    handleChange(text,field.code);
+  const handleCountrySelect = (field, country) => {
+    handleChange(field, country.code);
   };
 
+  // Responsive layout: 2 columns on large screens, 1 column on mobile
+  const formRowStyle = isSmallScreen
+    ? { flexDirection: 'column', gap: 0 }
+    : { flexDirection: 'row', gap: 16, alignItems: 'flex-start' };
+
+  const formColStyle = isSmallScreen
+    ? { width: '100%' }
+    : { width: '48%' };
+
+  const addressColStyle = isSmallScreen
+    ? { width: '100%' }
+    : { width: '48%', marginLeft: 8 };
+
+  // Add extra margin for test lead and button in web view
+  const testLeadRowStyle = isSmallScreen
+    ? {}
+    : { marginTop: 40 };
+
+  const fabCenteredStyle = isSmallScreen
+    ? styles.fabCentered
+    : [styles.fabCentered, { bottom: 24 }];
 
   return (
-
     <Modal
-    animationType="slide"
-    transparent={true}
-    visible={openModal}
-    onRequestClose={handleModalClose}
->
-                <View style={styles.centeredView}>
-                    <TouchableOpacity  style={{justifyContent:'center'}} onPress={() =>  handleModalClose()}>
-                        <MaterialIcons name="cancel" size={24} color="gray" />
-                    </TouchableOpacity>
-                            <View style={[styles.modalView]}>
-                                  <Text style={{fontSize:34, fontFamily:'bold'}}> Lead Data</Text>
-                                  {isLeadDataLoading &&  <View style={styles.loadingContainer}>
-                                    <ActivityIndicator size="large" color="#0000ff" />
-                                  </View>}
-                                  {isLeadDataError &&  <View style={styles.loadingContainer}>
-                                  <Text style={[styles.label,{color:'red', fontSize:10}]}>{LeadDataError}</Text>
-                                  </View>}
-                                  <ScrollView style={styles.container}>
-                                        <View style={styles.formContainer}>
-                                                <View style={styles.inputGroup}>
-                                                      <Text style={styles.label}>Name of Lead</Text>
-                                                      <TextInput
-                                                          style={styles.input}
-                                                          placeholder="Name"
-                                                          value={formData.name}
-                                                          onChangeText={(text) => handleChange('name', text)}
-                                                          required
-                                                      />
-                                                </View>
-
-                                                <View style={styles.inputGroup}>
-                                                    <Text style={styles.label}>Email</Text>
-                                                    <TextInput
-                                                            style={[styles.input,errorMessages.email ? styles.inputError : null]}
-                                                            placeholder="Email"
-                                                            keyboardType="email-address"
-                                                            value={formData.email}
-                                                            onChangeText={(text) => handleChange('email', text)}
-                                                            required
-                                                    />
-                                                </View>
-
-                                                <View style={styles.inputGroup}>
-                                                  <Text style={styles.label}>Phone</Text>
-                                                  <View style={styles.phoneContainer}>
-                                                      
-
-                                                  <CountryPicker
-                                                    onSelect={(country) => handleCountrySelect('phoneCountryCode', country)}
-                                                    defaultCountryCode="+1"
-                                                    buttonStyle={{width: '100%', backgroundColor:"#ffff"}}
-                                                    containerStyle={{ width: '20%' }}
-                                                    dropdownStyle={{ maxHeight: 250,position:'relative', backgroundColor:"#ffff" }} // Optional: customize dropdown height
-                                                  />  
-
-                                                  <TextInput
-                                                          style={[styles.input, {height:'85%'},errorMessages.phone && styles.inputError]}
-                                                          placeholder="234 567 8900"
-                                                          keyboardType="phone-pad"
-                                                          value={formData.phone}
-                                                          onChangeText={(text) => handlePhoneChange(text, 'phone')}
-                                                        />
-                                                  </View>
-
-                                                  {errorMessages.phone && (
-                                                    <Text style={styles.errorText}>{errorMessages.phone}</Text>
-                                                  )}
-                                                </View>
-
-                                                <View style={styles.inputGroup}>
-                                                      <Text style={styles.label}>WhatsApp</Text>
-                                                      <View style={styles.phoneContainer}>
-                                                        
-                                                        <CountryPicker
-                                                            onSelect={(country) => handleCountrySelect('whatsappCountryCode', country)}
-                                                            defaultCountryCode="+1"
-                                                            buttonStyle={{width: '100%', backgroundColor:"#ffff"}}
-                                                            containerStyle={{ width: '20%' }}
-                                                            dropdownStyle={{ maxHeight: 250,position:'relative', backgroundColor:"#ffff" }} // Optional: customize dropdown height
-                                                        />       
-                                                        <TextInput
-                                                          style={[styles.input, {height:'85%'},errorMessages.whatsapp && styles.inputError]}
-                                                          placeholder="234 567 8900"
-                                                          keyboardType="phone-pad"
-                                                          value={formData.whatsapp}
-                                                          onChangeText={(text) => handlePhoneChange(text, 'whatsapp')}
-                                                        />
-
-                                                      </View>
-                                                      {errorMessages.whatsapp && (
-                                                        <Text style={styles.errorText}>{errorMessages.whatsapp}</Text>
-                                                      )}
-                                               </View>
-                
-
-                                                <View style={styles.inputGroup}>
-                                                  <Text style={styles.label}>Gender</Text>
-                                                  <View style={styles.pickerContainer}>
-                                                        <Picker
-                                                          selectedValue={formData.gender}
-                                                          onValueChange={(value) =>
-                                                            setFormData(prev => ({ ...prev, gender: value }))
-                                                          }
-                                                          style={styles.picker}
-                                                        >
-                                                        <Picker.Item label="Select Gender" value="" />
-                                                            <Picker.Item label="Male" value="male" />
-                                                            <Picker.Item label="Female" value="female" />
-                                                            <Picker.Item label="Other" value="other" />
-                                                            <Picker.Item label="Prefer Not to Say" value="prefer-not-to-say" />
-                                                        </Picker>
-                                                  </View>
-                                                </View>
-                                                <View style={styles.inputGroup}>
-                                                    <Switch
-                                                        trackColor={{ false: "#767577", true: "#81b0ff" }}
-                                                        thumbColor={isTestEnabled ? "#007AFF" : "#f4f3f4"}
-                                                        ios_backgroundColor="#3e3e3e"
-                                                        onValueChange={toggleSwitch}
-                                                        value={isTestEnabled}
-                                                        style={styles.switch}
-                                                    />
-                                                  <Pressable onPress={toggleSwitch}>
-                                                    <Text style={styles.label}>Test User</Text>
-                                                  </Pressable>
-                                                </View>
-                                                        
-                                                <View style={styles.inputGroup}>
-                                                  <Text style={styles.label}>Address</Text>
-                                                  <WorldwideAddressPicker
-                                                    isEditMode={true}
-                                                    initialAddress={formData.address}
-                                                    onAddressChange={handleAddressChange}
-                                                    onSubmit={handleAddressChange}
-                                                  />
-                                                </View>
-                    
-                                        </View>
-                                  </ScrollView>
-
-
-
-                                <View style={{flexDirection:'row', width:'100%',position: 'absolute' ,zIndex: 1, marginTop:'45%', alignSelf:'flex-end',alignContent:'center', justifyContent:'center'}}>
-                                    <View style={{margin:'5%'}}>
-                                        <Button mode="contained" onPress={() => onAddLeadPress()} >
-                                            Add Lead
-                                        </Button>
-                                    </View>
-                                </View>
-                            </View> 
-                    
+      animationType="fade"
+      transparent={true}
+      visible={openModal}
+      onRequestClose={handleModalClose}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.centeredView}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[
+            styles.modalCard,
+            { width: isSmallScreen ? '98%' : 650 } // Decreased width for web
+          ]}>
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>Add New Lead</Text>
+              <TouchableOpacity onPress={handleModalClose}>
+                <MaterialIcons name="close" size={28} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            {/* Form */}
+            <ScrollView
+              style={{ flex: 1, width: '100%' }}
+              contentContainerStyle={{ padding: isSmallScreen ? 12 : 32 }}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={[formRowStyle, { width: '100%' }]}>
+                {/* Left Column */}
+                <View style={formColStyle}>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Name of Lead</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Name"
+                      value={formData.name}
+                      onChangeText={(text) => handleChange('name', text)}
+                    />
+                  </View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Email</Text>
+                    <TextInput
+                      style={[styles.input, errorMessages.email && styles.inputError]}
+                      placeholder="Email"
+                      keyboardType="email-address"
+                      value={formData.email}
+                      onChangeText={(text) => handleChange('email', text)}
+                    />
+                    {errorMessages.email && (
+                      <Text style={styles.errorText}>{errorMessages.email}</Text>
+                    )}
+                  </View>
+                  {/* Simple Phone Input */}
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Phone</Text>
+                    <View style={styles.simplePhoneRow}>
+                      <TextInput
+                        style={styles.countryCodeInput}
+                        value={formData.phoneCountryCode}
+                        onChangeText={(text) => handleChange('phoneCountryCode', text)}
+                        placeholder="+91"
+                        maxLength={4}
+                      />
+                      <TextInput
+                        style={[
+                          styles.input,
+                          errorMessages.phone && styles.inputError,
+                          { flex: 1, marginLeft: 8 }
+                        ]}
+                        placeholder="234 567 8900"
+                        keyboardType="phone-pad"
+                        value={formData.phone}
+                        onChangeText={(text) => handlePhoneChange(text, 'phone')}
+                      />
+                    </View>
+                    {errorMessages.phone && (
+                      <Text style={styles.errorText}>{errorMessages.phone}</Text>
+                    )}
+                  </View>
+                  {/* Simple WhatsApp Input */}
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>WhatsApp</Text>
+                    <View style={styles.simplePhoneRow}>
+                      <TextInput
+                        style={styles.countryCodeInput}
+                        value={formData.whatsappCountryCode}
+                        onChangeText={(text) => handleChange('whatsappCountryCode', text)}
+                        placeholder="+91"
+                        maxLength={4}
+                      />
+                      <TextInput
+                        style={[
+                          styles.input,
+                          errorMessages.whatsapp && styles.inputError,
+                          { flex: 1, marginLeft: 8 }
+                        ]}
+                        placeholder="234 567 8900"
+                        keyboardType="phone-pad"
+                        value={formData.whatsapp}
+                        onChangeText={(text) => handlePhoneChange(text, 'whatsapp')}
+                      />
+                    </View>
+                    {errorMessages.whatsapp && (
+                      <Text style={styles.errorText}>{errorMessages.whatsapp}</Text>
+                    )}
+                  </View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Gender</Text>
+                    <View style={styles.pickerContainer}>
+                      <Picker
+                        selectedValue={formData.gender}
+                        onValueChange={(value) =>
+                          setFormData(prev => ({ ...prev, gender: value }))
+                        }
+                        style={styles.picker}
+                      >
+                        <Picker.Item label="Select Gender" value="" />
+                        <Picker.Item label="Male" value="male" />
+                        <Picker.Item label="Female" value="female" />
+                        <Picker.Item label="Other" value="other" />
+                        <Picker.Item label="Prefer Not to Say" value="prefer-not-to-say" />
+                      </Picker>
+                    </View>
+                  </View>
+                  <View style={styles.inputGroup}>
+                    <View style={[styles.switchRow, testLeadRowStyle]}>
+                      <Switch
+                        trackColor={{ false: "#767577", true: "#81b0ff" }}
+                        thumbColor={isTestEnabled ? "#007AFF" : "#f4f3f4"}
+                        ios_backgroundColor="#3e3e3e"
+                        onValueChange={() => setIsTestEnabled(prev => !prev)}
+                        value={isTestEnabled}
+                        style={styles.switch}
+                      />
+                      <Pressable onPress={() => setIsTestEnabled(prev => !prev)}>
+                        <Text style={styles.label}>Test User</Text>
+                      </Pressable>
+                    </View>
+                  </View>
                 </View>
-  
-        </Modal>
-
+                {/* Right Column */}
+                <View style={addressColStyle}>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Address</Text>
+                    <WorldwideAddressPicker
+                      isEditMode={true}
+                      initialAddress={formData.address}
+                      onAddressChange={handleAddressChange}
+                      onSubmit={handleAddressChange}
+                    />
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+            {/* Floating Action Button */}
+            <TouchableOpacity
+              style={fabCenteredStyle}
+              onPress={onAddLeadPress}
+              disabled={isLeadDataLoading}
+            >
+              {isLeadDataLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.fabText}>Add Lead</Text>
+              )}
+            </TouchableOpacity>
+            {isLeadDataError && (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorText}>
+                  {LeadDataError?.data?.message || 'Failed to add lead.'}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 };
 
 AddLeadModal.propTypes = {
   onClose: PropTypes.func.isRequired,
-  openModal : PropTypes.bool.isRequired
+  openModal: PropTypes.bool.isRequired,
 };
 
 export default AddLeadModal;
 
 const styles = StyleSheet.create({
   centeredView: {
-        flex: 1,
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center'
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  modalView: {
-      margin: 2.5,
-      height:'90%',
-      backgroundColor: '#d3d3d3',
-      borderRadius: 20,
-      padding: 35,
-      alignItems: 'center',
-      shadowColor: '#000',
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
-      shadowOpacity: 0.25,
-      shadowRadius: 4,
-      elevation: 5,
-      width: '80%'
-  },  
+  modalOverlay: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: 'rgba(30,30,30,0.18)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 8,
+    minHeight: 400,
+    maxHeight: '95%',
+    width: '98%',
+    alignSelf: 'center',
+  },
+  header: {
+    backgroundColor: '#007AFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+  },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 26,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  },
+  inputGroup: {
+    marginBottom: 18,
+    width: '100%',
+  },
+  label: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 6,
+    color: '#222',
+  },
   input: {
     width: '100%',
-    height: 50,
+    height: 46,
     borderColor: '#ddd',
     borderWidth: 1,
-    marginBottom: 10,
-    paddingHorizontal: 15,
+    paddingHorizontal: 14,
     borderRadius: 8,
-    backgroundColor: 'white'
-  },   
-  inputContainer: {
-      padding: 2,
-      backgroundColor: 'white',
-      shadowColor: '#000',
-      shadowOffset: {
-          width: 0,
-          height: 1,
-      },
-      shadowOpacity: 0.2,
-      shadowRadius: 2,
-      elevation: 2,
-      justifyContent: 'center'
+    backgroundColor: '#f9f9f9',
+    fontSize: 16,
   },
-  textInput: {
-      flex: 1,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-      fontSize: 14,
-      color: '#333',
-      backgroundColor: 'transparent',
-
-      textAlignVertical: 'center',
+  inputError: {
+    borderColor: '#ff4444',
+  },
+  errorText: {
+    color: '#ff4444',
+    fontSize: 13,
+    marginTop: 4,
+  },
+  errorBanner: {
+    backgroundColor: '#ffeaea',
+    padding: 10,
+    borderRadius: 8,
+    margin: 12,
+    alignItems: 'center',
+  },
+  phoneContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%',
   },
   pickerContainer: {
     width: '100%',
     borderColor: '#ddd',
     borderWidth: 1,
-    marginBottom: 15,
     borderRadius: 8,
-    backgroundColor: 'white'
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  formContainer: {
-    backgroundColor: '#d3d3d3',
-    borderRadius: 10,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  container: {
-    flex: 1,
-    width:'100%',
-    backgroundColor: '#d3d3d3',
-    paddingHorizontal: 20,
-    paddingVertical: 40,
+    backgroundColor: '#f9f9f9',
+    marginTop: 2,
   },
   picker: {
-    height: 50,
+    height: 46,
     borderRadius: 8,
+    width: '100%',
   },
-  inputError: {
-    borderColor: 'red',
-  },
-  phoneContainer: {
+  switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10
+    gap: 10,
+    marginTop: 4,
   },
-  phoneInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 10,
-    backgroundColor: 'white'
+  fabCentered: {
+    position: 'absolute',
+    left: '50%',
+    bottom: 32,
+    transform: [{ translateX: -100 }],
+    backgroundColor: '#007AFF',
+    borderRadius: 32,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    elevation: 4,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    minWidth: 200,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fabText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  },
+  simplePhoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    gap: 0,
   },
   countryCodeInput: {
-    width: 60,
-    borderWidth: 1,
+    width: 56,
+    height: 46,
     borderColor: '#ddd',
+    borderWidth: 1,
     borderRadius: 8,
-    padding: 10,
-    backgroundColor: 'white',
-    textAlign: 'center'
-  },
-  buttonStyle: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#007AFF',
-  },
-  buttonTextStyle: {
-    color: '#333',
-    fontSize: 18,
-  },
-  modalStyle: {
     backgroundColor: '#f9f9f9',
-  },
-  modalHeaderStyle: {
-    backgroundColor: '#007AFF',
-    height: 60,
-  },
-  modalTitleStyle: {
-    color: '#fff',
-    fontSize: 20,
-  },
-  searchInputStyle: {
-    backgroundColor: '#fff',
-    borderRadius: 25,
-    height: 50,
-  },
-  listItemStyle: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginVertical: 4,
-    borderRadius: 8,
-  },
-  listItemTextStyle: {
-    color: '#333',
+    fontSize: 16,
+    paddingHorizontal: 8,
+    textAlign: 'center',
   },
 });

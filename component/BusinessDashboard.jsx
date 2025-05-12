@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '500',
     color: '#333',
-    marginBottom: 4,
+    marginBottom: 10,
     textAlign: 'center',
   },
   cardValue: {
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 2,
   },
   pickerContainer: {
     marginTop: 0,
