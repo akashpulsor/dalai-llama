@@ -4,24 +4,28 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  ActivityIndicator,TouchableOpacity,
+  ActivityIndicator,
+  TouchableOpacity,
   ScrollView,
   Modal,
   Pressable,
   Switch,
+  Platform,
+  KeyboardAvoidingView,
+  useWindowDimensions,
 } from 'react-native';
 import PropTypes from 'prop-types';
 import Button from './Button';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { useSelector } from 'react-redux';
-import {selectUser } from './authSlice';
+import { selectUser } from './authSlice';
 import { useGetLlmDataListQuery, useAddLLMDataMutation } from './authApi';
 import { useDispatch } from 'react-redux';
 import { showMessage } from './flashMessageSlice';
 
-const LlmModal = ({ onClose , openModal}) => {
-  const user =  useSelector(selectUser);
+const LlmModal = ({ onClose, openModal }) => {
+  const user = useSelector(selectUser);
   const [errorMessages, setErrorMessages] = useState({});
   const [isActive, setIsActive] = useState(true);
   const [isMulitModal, setIsMulitModal] = useState(true);
@@ -31,25 +35,23 @@ const LlmModal = ({ onClose , openModal}) => {
     llmId: '',
     businessId: user?.id,
     vendorName: '',
-    apiKey:'',
-    multiModal:false,
-    modelName:'',
-    modelUrl:'',
+    apiKey: '',
+    multiModal: false,
+    modelName: '',
+    modelUrl: '',
     friendlyName: '',
     logoImage: '',
     status: '',
     active: isActive,
   });
 
-  const { 
-    data: llmDataList, 
-    error, 
-    isSuccess, 
-    isLoading, 
-    isError 
-} = useGetLlmDataListQuery({businessId: user?.id});
-const [addLLMData, { data: llmData, isLoading:isLlmDataLoading, isSuccess:isLlmDataSuccess, isError:isLlmDataError, error:llmDataError }] = useAddLLMDataMutation();
-useEffect(() => {
+  const { data: llmDataList, error, isSuccess, isLoading, isError } = useGetLlmDataListQuery({ businessId: user?.id });
+  const [addLLMData, { data: llmData, isLoading: isLlmDataLoading, isSuccess: isLlmDataSuccess, isError: isLlmDataError, error: llmDataError }] = useAddLLMDataMutation();
+
+  const { width: screenWidth } = useWindowDimensions();
+  const isSmallScreen = screenWidth < 700;
+
+  useEffect(() => {
     if (isLlmDataSuccess && llmData) {
       setFormData(llmData);
       dispatch(showMessage({
@@ -60,10 +62,10 @@ useEffect(() => {
         llmId: '',
         businessId: user?.id,
         vendorName: '',
-        multiModal:false,
-        modelName:'',
-        modelUrl:'',
-        apiKey:'',
+        multiModal: false,
+        modelName: '',
+        modelUrl: '',
+        apiKey: '',
         friendlyName: '',
         logoImage: '',
         status: '',
@@ -71,34 +73,30 @@ useEffect(() => {
       });
       setIsActiveToggleSwitch(false);
       onClose(false);
-  }
-
-  if(isSuccess){
-    console.log(llmDataList);
-  }
-}, [llmDataList, isLlmDataSuccess, isSuccess]);
+    }
+  }, [llmDataList, isLlmDataSuccess, isSuccess]);
 
   const addLLMDataPress = async () => {
-     addLLMData(formData);
+    addLLMData(formData);
   };
 
   const handleModalClose = () => {
     setFormData({
-          llmId: '',
-          businessId: user?.id,
-          vendorName: '',
-          apiKey:'',
-          friendlyName: '',
-          logoImage: '',
-          multiModal:false,
-          modelName:'',
-          modelUrl:'',
-          status: '',
-          active: isActive,
+      llmId: '',
+      businessId: user?.id,
+      vendorName: '',
+      apiKey: '',
+      friendlyName: '',
+      logoImage: '',
+      multiModal: false,
+      modelName: '',
+      modelUrl: '',
+      status: '',
+      active: isActive,
     });
     setErrorMessages({});
     onClose(false);
-  }
+  };
 
   const handleChange = (name, value) => {
     setFormData(prevState => ({
@@ -136,98 +134,84 @@ useEffect(() => {
     { label: "xAI's Grok 3", value: 'xai_grok_3' },
     { label: "Meta's Llama", value: 'meta_llama' },
     { label: "Tencent's Hunyuan Turbo S", value: 'tencent_hunyuan_turbo_s' },
-];
-
-  // Assuming phoneDataList is passed as a prop
-
-  const handleLlmSelection = (data) => {
-        // Return early if no ID provided
-        console.log(data)
-        setFormData(data);
-  };
+  ];
 
   return (
     <Modal
-      animationType="slide"
+      animationType="fade"
       transparent={true}
       visible={openModal}
       onRequestClose={handleModalClose}
     >
-        <View style={styles.slideContent}>
-                <TouchableOpacity  style={{justifyContent:'center'}} onPress={() =>  handleModalClose()}>
-                    <MaterialIcons name="cancel" size={24} color="gray" />
-                </TouchableOpacity>
-                
-          <View style={styles.container}>
-            <Text style={{fontSize:34, fontFamily:'bold',alignSelf:'center'}}>LLM Data</Text>
-              
-            <ScrollView style={styles.formContainer}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.centeredView}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[
+            styles.modalCard,
+            { width: isSmallScreen ? '98%' : 650 }
+          ]}>
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>LLM Data</Text>
+              <TouchableOpacity onPress={handleModalClose}>
+                <MaterialIcons name="close" size={28} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            {/* Form */}
+            <ScrollView
+              style={{ flex: 1, width: '100%' }}
+              contentContainerStyle={{ padding: isSmallScreen ? 12 : 32 }}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={{ width: '100%' }}>
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Configured LLM</Text>
-                    <View style={styles.pickerContainer}>
+                  <Text style={styles.label}>Configured LLM</Text>
+                  <View style={styles.pickerContainer}>
                     {isLoading ? (
                       <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="small" color="#0000ff" />
+                        <ActivityIndicator size="small" color="#007AFF" />
                       </View>
                     ) : isError ? (
                       <Text style={styles.errorText}>Error loading LLM data</Text>
                     ) : (
                       <>
-                      <Picker
-                            selectedValue={formData.llmId}
-                            onValueChange={(value) => {
-                              console.log('Selected Value:', value);
-                              console.log('LLM Data List:', llmDataList);
-                              console.log('Current Form Data:', formData);
-                              
-                              if (value === "") {
-                                // Reset form values when "Select LLM" is chosen
-                                setFormData({
-                                  llmId: '',
-                                  businessId: user?.id,
-                                  vendorName: '',
-                                  apiKey: '',
-                                  multiModal: false,
-                                  modelName: '',
-                                  modelUrl: '',
-                                  friendlyName: '',
-                                  logoImage: '',
-                                  status: '',
-                                  active: isActive,
-                                });
-                                setIsActiveToggleSwitch(false);
-                                return;
-                              }
-                          
-                              const selectedLlm = llmDataList.find(llm => {
-                                console.log('Comparing:', {
-                                  currentLlmId: llm.llmId,
-                                  currentLlmIdType: typeof llm.llmId,
-                                  selectedValue: value,
-                                  selectedValueType: typeof value,
-                                  isMatch: String(llm.llmId) === String(value)
-                                });
-                                return String(llm.llmId) === String(value);  // Convert both to strings for comparison
+                        <Picker
+                          selectedValue={formData.llmId}
+                          onValueChange={(value) => {
+                            if (value === "") {
+                              setFormData({
+                                llmId: '',
+                                businessId: user?.id,
+                                vendorName: '',
+                                apiKey: '',
+                                multiModal: false,
+                                modelName: '',
+                                modelUrl: '',
+                                friendlyName: '',
+                                logoImage: '',
+                                status: '',
+                                active: isActive,
                               });
-                              
-                              console.log('Selected LLM:', selectedLlm);
-                              if (selectedLlm) {
-                                console.log('Updating form with selected LLM:', selectedLlm);
-                                setFormData({
-                                  ...formData,
-                                  ...selectedLlm
-                                });
-                                setIsActiveToggleSwitch(true);
-                              } else {
-                                console.log('No matching LLM found for value:', value);
-                              }
-                            }}
-                            style={[
-                              styles.picker,
-                              errorMessages?.llmId && styles.inputError
-                            ]}
-                            enabled={!isLoading && llmDataList.length > 0}
-                          >
+                              setIsActiveToggleSwitch(false);
+                              return;
+                            }
+                            const selectedLlm = llmDataList.find(llm => String(llm.llmId) === String(value));
+                            if (selectedLlm) {
+                              setFormData({
+                                ...formData,
+                                ...selectedLlm
+                              });
+                              setIsActiveToggleSwitch(true);
+                            }
+                          }}
+                          style={[
+                            styles.picker,
+                            errorMessages?.llmId && styles.inputError
+                          ]}
+                          enabled={!isLoading && llmDataList.length > 0}
+                        >
                           <Picker.Item label="Select LLM" value="" />
                           {llmDataList.map((llmData) => (
                             <Picker.Item
@@ -243,122 +227,129 @@ useEffect(() => {
                       </>
                     )}
                   </View>
-                  </View>
-                  <View style={styles.inputGroup}>
-                      <Text style={styles.label}>API Key</Text>
-                      <TextInput
-                          style={styles.input}
-                          placeholder="Api Key"
-                          value={formData.apiKey}
-                          onChangeText={(text) => handleChange('apiKey', text)}
-                          required
-                      />
-                  </View>
-
-                  <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Friendly Name</Text>
-                      <TextInput
-                          style={styles.input}
-                          placeholder="Friendly Name"
-                          value={formData.friendlyName}
-                          onChangeText={(text) => handleChange('friendlyName', text)}
-                          required
-                      />
-                  </View>
-
-
-
-                  <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Model Name</Text>
-                        <View style={styles.pickerContainer}>
-                            <Picker
-                                    selectedValue={formData.modelName}
-                                    onValueChange={(value) =>
-                                        setFormData((prev) => ({ ...prev, modelName: value }))
-                                    }
-                                    style={[
-                                        styles.picker,
-                                        errorMessages.firstMessage ? styles.inputError : null,
-                                    ]}
-                                >
-                                    {models.map((model, index) => (
-                                        <Picker.Item key={index} label={model.label} value={model.value} />
-                                    ))}
-                              </Picker>
-                        </View>
-                  </View>
-
-                  <View style={styles.inputGroup}>
-                      <Text style={styles.label}>Model Url</Text>
-                      <TextInput
-                          style={styles.input}
-                          placeholder="Modal Url"
-                          value={formData.modelUrl}
-                          onChangeText={(text) => handleChange('modelUrl', text)}
-                          required
-                      />
-                  </View>
-
-
-                  <View style={styles.inputGroup}>
-                                    <Text style={styles.label}>Vendor Name</Text>
-                                    <View style={styles.pickerContainer}>
-                                          <Picker
-                                            selectedValue={formData.vendorName}
-                                            onValueChange={(value) =>
-                                              setFormData(prev => ({ ...prev, vendorName: value }))
-                                            }
-                                            style={[styles.picker, errorMessages.firstMessage ? styles.inputError : null]}
-                                          >
-                                            <Picker.Item label="Vendor name" value="" />
-                                            <Picker.Item label="openAi" value="openAi" />
-
-                                          </Picker>
-                                    </View>
-                  </View>
-                  
-
-                  <View style={[styles.inputGroup,{alignSelf:'center'}]}>
-                    {isActiveToggleSwitch && <View>
-                      <Switch
-                            trackColor={{ false: "#767577", true: "#81b0ff" }}
-                            thumbColor={isActive ? "#007AFF" : "#f4f3f4"}
-                            ios_backgroundColor="#3e3e3e"
-                            onValueChange={toggleSwitch}
-                            value={isActive}
-                            style={styles.switch}
-                        />
-                      <Pressable onPress={toggleSwitch}>
-                        <Text style={styles.label}>Active</Text>
-                      </Pressable>
-                    </View>}
                 </View>
-
-                <View style={[styles.inputGroup,{alignSelf:'center'}]}>
-                    <View>
-                      <Switch
-                            trackColor={{ false: "#767577", true: "#81b0ff" }}
-                            thumbColor={isMulitModal ? "#007AFF" : "#f4f3f4"}
-                            ios_backgroundColor="#3e3e3e"
-                            onValueChange={multiModalSwitch}
-                            value={formData.multiModal}
-                            style={styles.switch}
-                        />
-                      <Pressable onPress={multiModalSwitch}>
-                        <Text style={styles.label}>MultiModal</Text>
-                      </Pressable>
-                    </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>API Key</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Api Key"
+                    value={formData.apiKey}
+                    onChangeText={(text) => handleChange('apiKey', text)}
+                  />
                 </View>
-                <View style={{flexDirection:'row', width:'100%' ,zIndex: 1, marginTop:'1%', alignSelf:'flex-end',alignContent:'center', justifyContent:'center'}}>
-                        <View style={{margin:'5%'}}>
-                            <Button mode="contained" onPress={() => addLLMDataPress()} >
-                                Add LLM
-                            </Button>
-                        </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Friendly Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Friendly Name"
+                    value={formData.friendlyName}
+                    onChangeText={(text) => handleChange('friendlyName', text)}
+                  />
                 </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Model Name</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={formData.modelName}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({ ...prev, modelName: value }))
+                      }
+                      style={[
+                        styles.picker,
+                        errorMessages.firstMessage ? styles.inputError : null,
+                      ]}
+                    >
+                      {models.map((model, index) => (
+                        <Picker.Item key={index} label={model.label} value={model.value} />
+                      ))}
+                    </Picker>
+                  </View>
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Model Url</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Model Url"
+                    value={formData.modelUrl}
+                    onChangeText={(text) => handleChange('modelUrl', text)}
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Vendor Name</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={formData.vendorName}
+                      onValueChange={(value) =>
+                        setFormData(prev => ({ ...prev, vendorName: value }))
+                      }
+                      style={[styles.picker, errorMessages.firstMessage ? styles.inputError : null]}
+                    >
+                      <Picker.Item label="Vendor name" value="" />
+                      <Picker.Item label="openAi" value="openAi" />
+                    </Picker>
+                  </View>
+                </View>
+                <View style={[styles.inputGroup, { alignSelf: 'center' }]}>
+                  {isActiveToggleSwitch && <View>
+                    <Switch
+                      trackColor={{ false: "#767577", true: "#81b0ff" }}
+                      thumbColor={isActive ? "#007AFF" : "#f4f3f4"}
+                      ios_backgroundColor="#3e3e3e"
+                      onValueChange={toggleSwitch}
+                      value={isActive}
+                      style={styles.switch}
+                    />
+                    <Pressable onPress={toggleSwitch}>
+                      <Text style={styles.label}>Active</Text>
+                    </Pressable>
+                  </View>}
+                </View>
+                <View style={[styles.inputGroup, { alignSelf: 'center' }]}>
+                  <View>
+                    <Switch
+                      trackColor={{ false: "#767577", true: "#81b0ff" }}
+                      thumbColor={isMulitModal ? "#007AFF" : "#f4f3f4"}
+                      ios_backgroundColor="#3e3e3e"
+                      onValueChange={multiModalSwitch}
+                      value={formData.multiModal}
+                      style={styles.switch}
+                    />
+                    <Pressable onPress={multiModalSwitch}>
+                      <Text style={styles.label}>MultiModal</Text>
+                    </Pressable>
+                  </View>
+                </View>
+                {isLlmDataError && (
+                  <Text style={[styles.label, { color: 'red', fontSize: 12 }]}>
+                    {llmDataError}
+                  </Text>
+                )}
+                {isLlmDataLoading && (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#007AFF" />
+                  </View>
+                )}
+              </View>
             </ScrollView>
+            {/* Centered Add LLM Button */}
+            <TouchableOpacity
+              style={
+                isSmallScreen
+                  ? [styles.fabCentered, { paddingHorizontal: 18, minWidth: 140 }]
+                  : [styles.fabCentered, { bottom: 24 }]
+              }
+              onPress={addLLMDataPress}
+              disabled={isLlmDataLoading}
+            >
+              {isLlmDataLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.fabText} numberOfLines={1}>Add LLM</Text>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -371,116 +362,111 @@ LlmModal.propTypes = {
 export default LlmModal;
 
 const styles = StyleSheet.create({
-  slideContent: {
-    marginTop:'5%',
+  centeredView: {
     flex: 1,
     justifyContent: 'center',
-    alignSelf:'center',
     alignItems: 'center',
-    flexDirection: 'column',
-    width:'50%',
-    height:'60%',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 5
-    },
-
-    borderRadius:12,
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    marginBottom:'5%',
   },
-  input: {
-    width: '150%',
-    borderWidth: 1,
-    marginTop: 15,
-    borderColor: 'white',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 10,
-    fontSize: 16,
-  },
-  errorContainer: {
-    height: 'auto',
-    justifyContent: 'center',
-    width: '80%',
-    paddingHorizontal: 0,
-  },
-  errorText: {
-    color: '#FF3B30',
-    fontSize: 10,
-    lineHeight: 12,
-    flexWrap: 'wrap',
-    textAlign: 'left',
-    flexDirection: 'row',
-    display: 'flex',
-    wordBreak: 'break-word',
-  },
-  loadingContainer: {
-    marginVertical: 20,
-  },
-  formContainer: {
-    backgroundColor: '#d3d3d3',
-    borderRadius: 10,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  container: {
+  modalOverlay: {
     flex: 1,
-    width:'100%',
-    backgroundColor: '#d3d3d3',
-    paddingHorizontal: 20,
-    paddingVertical: 40,
-    borderRadius: 10,
-    padding: 20,
+    width: '100%',
+    backgroundColor: 'rgba(30,30,30,0.18)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 8,
+    minHeight: 400,
+    maxHeight: '95%',
+    width: '98%',
+    alignSelf: 'center',
+  },
+  header: {
+    backgroundColor: '#007AFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+  },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 26,
+    fontWeight: 'bold',
+    letterSpacing: 1,
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 18,
+    width: '100%',
   },
   label: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },  
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 6,
+    color: '#222',
+  },
   input: {
     width: '100%',
-    height: 50,
+    height: 46,
     borderColor: '#ddd',
     borderWidth: 1,
-    marginBottom: 10,
-    paddingHorizontal: 15,
+    paddingHorizontal: 14,
     borderRadius: 8,
-    backgroundColor: 'white'
+    backgroundColor: '#f9f9f9',
+    fontSize: 16,
+  },
+  inputError: {
+    borderColor: '#ff4444',
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
   },
   pickerContainer: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 5,
+    backgroundColor: '#fff',
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#DDDDDD',
+    borderColor: '#ddd',
     overflow: 'hidden',
   },
   picker: {
     height: 50,
     borderRadius: 8,
   },
-  inputError: {
-    borderColor: 'red',
-  }
+  loadingContainer: {
+    marginVertical: 20,
+  },
+  fabCentered: {
+    position: 'absolute',
+    left: '50%',
+    bottom: 32,
+    transform: [{ translateX: -100 }],
+    backgroundColor: '#007AFF',
+    borderRadius: 32,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    elevation: 4,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    minWidth: 200,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fabText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  },
 });
