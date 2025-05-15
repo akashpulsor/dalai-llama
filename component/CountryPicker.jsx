@@ -13,13 +13,14 @@ import {
 import countryData from '../helper/countryData';
 
 const CountryPicker = ({
-  containerWidth = '100%',
+  containerWidth = 90,
   onSelect,
   defaultCountryCode = '+1',
   containerStyle,
   buttonStyle,
   dropdownStyle,
   textStyle,
+  renderButton,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,7 +37,7 @@ const CountryPicker = ({
   useEffect(() => {
     Animated.timing(dropdownHeight, {
       toValue: isOpen ? 300 : 0,
-      duration: 300,
+      duration: 200,
       useNativeDriver: false,
     }).start();
   }, [isOpen]);
@@ -54,8 +55,16 @@ const CountryPicker = ({
       onPress={() => handleSelectCountry(item)}
     >
       <Text style={styles.flag}>{item.flag}</Text>
-      <Text style={[styles.countryCode, textStyle]}>{item.code}</Text>
+      <Text style={styles.countryCode}>{item.code}</Text>
     </TouchableOpacity>
+  );
+
+  // Only show flag + code in the picker button
+  const defaultRenderButton = (country) => (
+    <View style={styles.codeButton}>
+      <Text style={styles.flag}>{country.flag}</Text>
+      <Text style={styles.countryCode}>{country.code}</Text>
+    </View>
   );
 
   return (
@@ -63,24 +72,24 @@ const CountryPicker = ({
       <TouchableOpacity
         style={[styles.pickerButton, buttonStyle]}
         onPress={() => setIsOpen(!isOpen)}
+        activeOpacity={0.7}
       >
-        <Text style={styles.flag}>{selectedCountry.flag}</Text>
-        <Text style={[styles.selectedText, textStyle]}>
-          {selectedCountry.country} ({selectedCountry.code})
-        </Text>
+        {renderButton
+          ? renderButton(selectedCountry)
+          : defaultRenderButton(selectedCountry)}
       </TouchableOpacity>
 
-      <Animated.View 
+      <Animated.View
         style={[
           styles.dropdownContainer,
           dropdownStyle,
-          { maxHeight: dropdownHeight }
+          { maxHeight: dropdownHeight, width: '100%' }
         ]}
       >
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
-            placeholder="Search countries..."
+            placeholder="Search..."
             value={searchQuery}
             onChangeText={setSearchQuery}
             clearButtonMode="while-editing"
@@ -88,11 +97,10 @@ const CountryPicker = ({
             autoCapitalize="none"
           />
         </View>
-
         <FlatList
           data={filteredCountries}
           renderItem={renderCountryItem}
-          keyExtractor={item => item.code}
+          keyExtractor={item => item.code + item.country}
           initialNumToRender={5}
           maxToRenderPerBatch={5}
           windowSize={2}
@@ -105,27 +113,41 @@ const CountryPicker = ({
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
+    width: 90,
     position: 'relative',
     zIndex: 1000,
   },
   pickerButton: {
     flexDirection: 'row',
+    alignItems: 'center',
     width: '100%',
-    padding: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#e0e0e0',
     borderRadius: 8,
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
+    minHeight: 44,
+    minWidth: 60,
+    justifyContent: 'center',
   },
-  selectedText: {
-    flex: 1,
-    marginLeft: 10,
-    fontSize: 16,
+  codeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  flag: {
+    fontSize: 18,
+    marginRight: 4,
+  },
+  countryCode: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
   },
   dropdownContainer: {
     width: '100%',
-    backgroundColor: '',
+    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#d3d3d3',
     borderRadius: 8,
@@ -136,38 +158,33 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 9999,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
   },
   searchContainer: {
     padding: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    backgroundColor: '#fafafa',
   },
   searchInput: {
-    height: 40,
-    paddingHorizontal: 12,
+    height: 36,
+    paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#eee',
     borderRadius: 8,
     backgroundColor: '#f8f8f8',
+    fontSize: 15,
   },
   countryItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
-  },
-  flag: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  countryName: {
-    flex: 1,
-    fontSize: 16,
-  },
-  countryCode: {
-    fontSize: 16,
-    color: '#666',
   },
 });
 

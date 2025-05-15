@@ -210,7 +210,7 @@ const BusinessDashboard = ({ navigation }) => {
             <Text style={styles.cardLabel}>Total Calls</Text>
           </View>
           <View style={[styles.tile, { width: tileWidth, height: tileHeight, minHeight: 180, marginBottom: isSmallScreen ? 16 : 24 }]}>
-            <Text style={styles.cardValue}>${dashboardData?.totalCharges?.toFixed(2) || '0.00'}</Text>
+            <Text style={styles.cardValue}>${dashboardData?.totalCharges?.toFixed(4) || '0.00'}</Text>
             <Text style={styles.cardLabel}>Total Cost</Text>
           </View>
           <View style={[styles.tile, { width: tileWidth, height: tileHeight, minHeight: 180, marginBottom: isSmallScreen ? 16 : 24 }]}>
