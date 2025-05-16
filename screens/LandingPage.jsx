@@ -1,10 +1,11 @@
 import React, { createRef, useState, useEffect, useRef } from 'react';
-import { View, ScrollView, Text, StyleSheet, TouchableOpacity, Image, Animated, Platform, Modal, Pressable, FlatList } from 'react-native';
+import { View, ScrollView, Text, StyleSheet, TouchableOpacity, Image, Animated, Platform, Modal, Pressable } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useWindowDimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Easing } from 'react-native';
+import { Animated as RNAnimated, PanResponder, Easing as RNEasing } from 'react-native';
 
 import LeadForm from '../component/LeadForm';
 import { useDispatch } from 'react-redux';
@@ -207,10 +208,266 @@ const VoiceCallAnimation = ({ playing }) => (
     </View>
 );
 
+const DragUpHintInline = ({ visible, isMobile, onPress, style }) => {
+    const bounceAnim = useRef(new RNAnimated.Value(0)).current;
+    const pulseAnim = useRef(new RNAnimated.Value(1)).current;
+
+    useEffect(() => {
+        let bounceLoop, pulseLoop;
+        if (visible) {
+            bounceLoop = RNAnimated.loop(
+                RNAnimated.sequence([
+                    RNAnimated.timing(bounceAnim, {
+                        toValue: -18,
+                        duration: 600,
+                        useNativeDriver: true,
+                    }),
+                    RNAnimated.timing(bounceAnim, {
+                        toValue: 0,
+                        duration: 600,
+                        useNativeDriver: true,
+                    }),
+                ])
+            );
+            bounceLoop.start();
+            pulseLoop = RNAnimated.loop(
+                RNAnimated.sequence([
+                    RNAnimated.timing(pulseAnim, { toValue: 1.13, duration: 700, useNativeDriver: true }),
+                    RNAnimated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+                ])
+            );
+            pulseLoop.start();
+        } else {
+            pulseAnim.setValue(1);
+        }
+        return () => {
+            bounceLoop && bounceLoop.stop();
+            pulseLoop && pulseLoop.stop();
+        };
+    }, [visible]);
+
+    if (!visible) return null;
+
+    return (
+        <RNAnimated.View
+            style={[
+                {
+                    alignItems: 'center',
+                    opacity: 1,
+                    transform: [{ translateY: bounceAnim }, { scale: pulseAnim }],
+                    marginTop: 0,
+                    marginBottom: -24,
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    zIndex: 10,
+                },
+                style,
+            ]}
+        >
+            <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={onPress}
+                style={{
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 32,
+                    padding: isMobile ? 12 : 18,
+                    backgroundColor: 'transparent',
+                }}
+            >
+                <Image
+                    source={require('../assets/search-logo.png')}
+                    style={{
+                        width: isMobile ? 44 : 60,
+                        height: isMobile ? 44 : 60,
+                        marginBottom: 6,
+                        opacity: 0.95,
+                    }}
+                    resizeMode="contain"
+                />
+                <Ionicons name="chevron-up-circle" size={isMobile ? 36 : 48} color="#007AFF" style={{ marginBottom: 2 }} />
+                <Text style={{
+                    fontSize: isMobile ? 15 : 18,
+                    color: '#007AFF',
+                    fontWeight: 'bold',
+                    marginTop: 2,
+                    letterSpacing: 0.5,
+                }}>
+                    Drag up to explore
+                </Text>
+            </TouchableOpacity>
+        </RNAnimated.View>
+    );
+};
+
+const DragUpHintFloating = ({ visible, isMobile, onPress, y, height, containerHeight, mode }) => {
+    const bounceAnim = useRef(new RNAnimated.Value(0)).current;
+    const pulseAnim = useRef(new RNAnimated.Value(1)).current;
+
+    useEffect(() => {
+        let bounceLoop, pulseLoop;
+        if (visible) {
+            bounceLoop = RNAnimated.loop(
+                RNAnimated.sequence([
+                    RNAnimated.timing(bounceAnim, {
+                        toValue: -18,
+                        duration: 600,
+                        useNativeDriver: true,
+                    }),
+                    RNAnimated.timing(bounceAnim, {
+                        toValue: 0,
+                        duration: 600,
+                        useNativeDriver: true,
+                    }),
+                ])
+            );
+            bounceLoop.start();
+            pulseLoop = RNAnimated.loop(
+                RNAnimated.sequence([
+                    RNAnimated.timing(pulseAnim, { toValue: 1.13, duration: 700, useNativeDriver: true }),
+                    RNAnimated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+                ])
+            );
+            pulseLoop.start();
+        } else {
+            pulseAnim.setValue(1);
+        }
+        return () => {
+            bounceLoop && bounceLoop.stop();
+            pulseLoop && pulseLoop.stop();
+        };
+    }, [visible]);
+
+    if (!visible || y == null || height == null) return null;
+
+    let top;
+    if (mode === 'hero') {
+        // At the bottom border of hero section
+        top = y + height - 36;
+    } else {
+        // Floating at 60% of the section height
+        top = y + height * 0.6;
+    }
+    if (containerHeight && top > containerHeight - 120) {
+        top = containerHeight - 120;
+    }
+
+    return (
+        <RNAnimated.View
+            style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                top,
+                alignItems: 'center',
+                opacity: 1,
+                zIndex: 100,
+                transform: [{ translateY: bounceAnim }, { scale: pulseAnim }],
+                pointerEvents: 'box-none',
+            }}
+            pointerEvents="box-none"
+        >
+            <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={onPress}
+                style={{
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 32,
+                    padding: isMobile ? 12 : 18,
+                    backgroundColor: 'transparent',
+                }}
+            >
+                <Image
+                    source={require('../assets/search-logo.png')}
+                    style={{
+                        width: isMobile ? 44 : 60,
+                        height: isMobile ? 44 : 60,
+                        marginBottom: 6,
+                        opacity: 0.95,
+                    }}
+                    resizeMode="contain"
+                />
+                <Ionicons name="chevron-up-circle" size={isMobile ? 36 : 48} color="#007AFF" style={{ marginBottom: 2 }} />
+                <Text style={{
+                    fontSize: isMobile ? 15 : 18,
+                    color: '#007AFF',
+                    fontWeight: 'bold',
+                    marginTop: 2,
+                    letterSpacing: 0.5,
+                }}>
+                    Drag up to explore
+                </Text>
+            </TouchableOpacity>
+        </RNAnimated.View>
+    );
+};
+
+const FloatingContactSparkle = ({ visible, onPress, isMobile }) => {
+    const pulseAnim = useRef(new RNAnimated.Value(1)).current;
+    useEffect(() => {
+        let loop;
+        if (visible) {
+            loop = RNAnimated.loop(
+                RNAnimated.sequence([
+                    RNAnimated.timing(pulseAnim, { toValue: 1.13, duration: 700, useNativeDriver: true }),
+                    RNAnimated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+                ])
+            );
+            loop.start();
+        } else {
+            pulseAnim.setValue(1);
+        }
+        return () => loop && loop.stop();
+    }, [visible]);
+    return (
+        <RNAnimated.View style={{
+            transform: [{ scale: pulseAnim }],
+            position: 'absolute',
+            right: 18,
+            bottom: 24,
+            zIndex: 100,
+        }}>
+            <TouchableOpacity
+                style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#007AFF',
+                    borderRadius: 32,
+                    paddingVertical: 12,
+                    paddingHorizontal: 22,
+                    elevation: 8,
+                    shadowColor: '#007AFF',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.18,
+                    shadowRadius: 8,
+                }}
+                onPress={onPress}
+                activeOpacity={0.85}
+            >
+                <Ionicons name="chatbubbles" size={28} color="#fff" />
+                <Text style={{
+                    color: '#fff',
+                    fontWeight: 'bold',
+                    fontSize: 16,
+                    marginLeft: 10,
+                }}>Contact Us</Text>
+            </TouchableOpacity>
+        </RNAnimated.View>
+    );
+};
+
 const LandingPage = ({ navigation }) => {
-    const scrollViewRef = createRef();
+    const scrollViewRef = useRef(null);
+    const sectionRefs = useRef([]);
+    const showcaseVideoRef = useRef(null);
     const [isLeadFormVisible, setLeadFormVisible] = useState(false);
     const [showShowcaseModal, setShowShowcaseModal] = useState(false);
+    const [activeSection, setActiveSection] = useState(0);
+    const [sectionLayouts, setSectionLayouts] = useState([]);
+    const [showcaseVideoLayout, setShowcaseVideoLayout] = useState(null);
+    const [containerHeight, setContainerHeight] = useState(null);
     const dispatch = useDispatch();
     
     const [addInterest, { 
@@ -276,43 +533,8 @@ const LandingPage = ({ navigation }) => {
         }
     };
 
-    // Track which sections are visible
-    const [viewableSections, setViewableSections] = useState({});
-    const viewabilityConfig = { itemVisiblePercentThreshold: 40 };
-    const onViewableItemsChanged = useRef(({ viewableItems }) => {
-        const newViewable = {};
-        viewableItems.forEach(item => {
-            newViewable[item.index] = true;
-        });
-        setViewableSections(prev => ({ ...prev, ...newViewable }));
-    }).current;
-
-    // Section data for FlatList
-    const headerSection = {
-        key: 'header',
-        render: () => (
-            <View style={[styles.header, isMobile && styles.headerMobile]}>
-                <View style={[styles.logoContainer, isMobile && styles.logoContainerMobile]}>
-                    <Image 
-                        source={require('../assets/search-logo.png')} 
-                        style={[styles.headerLogo, isMobile && styles.headerLogoMobile]} 
-                    />
-                    <Text style={[styles.headerTitle, isMobile && styles.headerTitleMobile]}>DALAI LLAMA</Text>
-                </View>
-                <View style={[styles.navLinks, isMobile && styles.navLinksMobile]}>
-                    <TouchableOpacity 
-                        style={[styles.loginButton, isMobile && styles.loginButtonMobile]} 
-                        onPress={handleLogin}
-                    >
-                        <Text style={[styles.loginButtonText, isMobile && styles.loginButtonTextMobile]}>Login</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        ),
-    };
-
+    // All sections in one array, in order (without "See Dalai Llama in Action" as a section)
     const sections = [
-        headerSection,
         {
             key: 'hero',
             render: () => (
@@ -373,10 +595,14 @@ const LandingPage = ({ navigation }) => {
                             />
                         </View>
                         {/* YouTube Video - below audio, responsive aspect ratio */}
-                        <View style={[
-                            styles.videoContainer,
-                            isMobile && styles.videoContainerMobile
-                        ]}>
+                        <View
+                            ref={showcaseVideoRef}
+                            onLayout={e => setShowcaseVideoLayout(e.nativeEvent.layout)}
+                            style={[
+                                styles.videoContainer,
+                                isMobile && styles.videoContainerMobile
+                            ]}
+                        >
                             {Platform.OS === 'web' ? (
                                 <div style={{
                                     position: 'relative',
@@ -524,7 +750,14 @@ const LandingPage = ({ navigation }) => {
             render: () => (
                 <View ref={scrollViewRef} style={[styles.sectionCardModern, isMobile && styles.sectionCardMobile, styles.contactSection, isMobile && styles.contactSectionMobile]}>
                     <Text style={styles.sectionTitleModern}>Contact Us</Text>
-                    <TouchableOpacity style={[styles.contactButton, isMobile && styles.contactButtonMobile]} onPress={handleScheduleDemo}>
+                    <TouchableOpacity
+                        style={[
+                            styles.contactButton,
+                            { backgroundColor: '#007AFF', alignSelf: 'center', marginTop: 18 }
+                        ]}
+                        onPress={handleScheduleDemo}
+                        activeOpacity={0.85}
+                    >
                         <Text style={styles.contactButtonText}>Contact</Text>
                     </TouchableOpacity>
                 </View>
@@ -532,40 +765,125 @@ const LandingPage = ({ navigation }) => {
         },
     ];
 
-    // Instead of ScrollView, use Animated.FlatList for floating slide-up effect
+    // Scroll to the next section when drag up is pressed
+    const handleDragUpHint = (idx) => {
+        const nextIdx = idx + 1;
+        if (sectionRefs.current[nextIdx]) {
+            sectionRefs.current[nextIdx].measureLayout(
+                scrollViewRef.current.getInnerViewNode(),
+                (x, y) => {
+                    scrollViewRef.current.scrollTo({ y, animated: true });
+                }
+            );
+        }
+    };
+
+    // On scroll, update activeSection and sectionLayouts
+    const handleScroll = (event) => {
+        const scrollY = event.nativeEvent.contentOffset.y;
+        let found = 0;
+        let layouts = [];
+        for (let i = 0; i < sections.length; i++) {
+            if (sectionRefs.current[i]) {
+                sectionRefs.current[i].measureLayout(
+                    scrollViewRef.current.getInnerViewNode(),
+                    (x, y, w, h) => {
+                        layouts[i] = { y, h };
+                        if (scrollY + 80 >= y) found = i;
+                    }
+                );
+            }
+        }
+        setTimeout(() => {
+            setActiveSection(found);
+            setSectionLayouts(layouts);
+        }, 120);
+    };
+
+    // On layout, get container height for clamping
+    const handleContainerLayout = (e) => {
+        setContainerHeight(e.nativeEvent.layout.height);
+    };
+
+    // Get current section's layout for drag button
+    const currentLayout = sectionLayouts[activeSection] || {};
+
+    // Determine drag button mode: 'hero' for first section, 'float' for others
+    let dragMode = activeSection === 0 ? 'hero' : 'float';
+
     return (
-        <View style={[styles.container, isMobile && styles.containerMobile]}>
-            <Animated.FlatList
-                data={sections}
-                keyExtractor={item => item.key}
-                renderItem={({ item, index }) => (
-                    <FloatingSection
-                        viewable={!!viewableSections[index]}
-                        style={{ marginBottom: 48 }}
-                    >
-                        {item.render()}
-                    </FloatingSection>
-                )}
-                contentContainerStyle={{ paddingBottom: 80, paddingTop: 8 }}
+        <View style={[styles.container, isMobile && styles.containerMobile]} onLayout={handleContainerLayout}>
+            <ScrollView
+                ref={scrollViewRef}
+                style={{ flex: 1 }}
                 showsVerticalScrollIndicator={false}
-                onViewableItemsChanged={onViewableItemsChanged}
-                viewabilityConfig={viewabilityConfig}
-            />
-            <LeadForm 
+                contentContainerStyle={{ paddingBottom: 120 }}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+            >
+                {/* Hero Section */}
+                <View
+                    ref={ref => sectionRefs.current[0] = ref}
+                    onLayout={() => {}}
+                    style={{ position: 'relative', marginBottom: 24 }}
+                >
+                    <FloatingSection viewable={true}>
+                        {sections[0].render()}
+                    </FloatingSection>
+                    <View style={[
+                        styles.showcaseSection,
+                        isMobile && styles.showcaseSectionMobile,
+                        !isMobile && styles.showcaseSectionWeb,
+                        { marginBottom: 0 }
+                    ]}>
+                        <Text style={styles.sectionTitleModern}>See Dalai Llama in Action</Text>
+                    </View>
+                </View>
+
+                {/* Remaining sections */}
+                {sections.slice(1).map((section, idx) => (
+                    <View
+                        key={section.key}
+                        ref={ref => sectionRefs.current[idx + 1] = ref}
+                        onLayout={() => {}}
+                        style={{ position: 'relative', marginBottom: 24 }}
+                    >
+                        <FloatingSection viewable={true}>
+                            {section.render()}
+                        </FloatingSection>
+                    </View>
+                ))}
+            </ScrollView>
+            {/* Single floating drag up button: at bottom border for hero, floating for others (except last section) */}
+            {activeSection < sections.length - 1 && (
+                <DragUpHintFloating
+                    visible={true}
+                    isMobile={isMobile}
+                    onPress={() => handleDragUpHint(activeSection)}
+                    y={currentLayout.y}
+                    height={currentLayout.h}
+                    containerHeight={containerHeight}
+                    mode={dragMode}
+                />
+            )}
+            <LeadForm
                 visible={isLeadFormVisible}
                 onClose={() => setLeadFormVisible(false)}
                 onSubmit={handleLeadSubmit}
             />
-            {isMobile && (
-                <TouchableOpacity
-                    style={styles.floatingContact}
-                    onPress={handleScheduleDemo}
-                    activeOpacity={0.85}
-                >
-                    <Ionicons name="chatbubbles" size={28} color="#fff" />
-                    <Text style={styles.floatingContactText}>Contact Us</Text>
-                </TouchableOpacity>
-            )}
+            <FloatingContactSparkle
+                visible={!isLeadFormVisible}
+                onPress={handleScheduleDemo}
+                isMobile={isMobile}
+            >
+                <Ionicons name="chatbubbles" size={28} color="#fff" />
+                <Text style={{
+                    color: '#fff',
+                    fontWeight: 'bold',
+                    fontSize: 16,
+                    marginLeft: 10,
+                }}>Contact Us</Text>
+            </FloatingContactSparkle>
         </View>
     );
 }
@@ -898,41 +1216,21 @@ const styles = StyleSheet.create({
         padding: 0,
     },
     headerMobile: {
-        flexDirection: 'column',
-        alignItems: 'flex-start',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         padding: 10,
     },
     logoContainerMobile: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 10,
+        marginBottom: 0,
     },
-    headerLogoMobile: {
-        width: 50,
-        height: 50,
-        marginRight: 10,
-    },
-    headerTitleMobile: {
-        fontSize: 16,
-    },
-    navLinksMobile: {
+    navLinksMobileRight: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginTop: 10,
-    },
-    navLinkMobile: {
-        fontSize: 14,
-        marginHorizontal: 5,
-        marginVertical: 2,
-    },
-    loginButtonMobile: {
-        paddingVertical: 4,
-        paddingHorizontal: 10,
-        borderRadius: 6,
-        marginLeft: 5,
-    },
-    loginButtonTextMobile: {
-        fontSize: 14,
+        alignItems: 'center',
+        marginTop: 0,
+        marginLeft: 'auto',
     },
     heroSectionMobile: {
         padding: 10,
@@ -945,6 +1243,17 @@ const styles = StyleSheet.create({
     },
     heroSubtitleMobile: {
         fontSize: 16,
+    },
+    industrySectionMobile: {
+        padding: 10,
+    },
+    industryContainerMobile: {
+        width: '100%',
+        alignItems: 'center',
+    },
+    industryCardMobile: {
+        width: '95%',
+        marginVertical: 8,
     },
     industrySectionMobile: {
         padding: 10,
@@ -1031,49 +1340,6 @@ const styles = StyleSheet.create({
     floatingContact: {
         position: 'absolute',
         right: 18,
-        bottom: 24,
-        backgroundColor: '#007AFF',
-        borderRadius: 32,
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 22,
-        elevation: 8,
-        shadowColor: '#007AFF',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.18,
-        shadowRadius: 8,
-        zIndex: 100,
-    },
-    floatingContactText: {
-        color: '#fff',
-        fontWeight: 'bold',
-        fontSize: 16,
-        marginLeft: 10,
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(30,30,30,0.25)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modalContent: {
-        backgroundColor: '#fff',
-        borderRadius: 18,
-        padding: 24,
-        alignItems: 'center',
-        width: '90%',
-        maxWidth: 600,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.18,
-        shadowRadius: 16,
-        elevation: 8,
-    },
-    modalTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#1a237e',
         marginBottom: 18,
         textAlign: 'center',
     },
