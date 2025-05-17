@@ -1,13 +1,13 @@
-import React, { createRef, useState, useEffect, useRef } from 'react';
+import React, { createRef, useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { View, ScrollView, Text, StyleSheet, TouchableOpacity, Image, Animated, Platform, Modal, Pressable } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useWindowDimensions } from 'react-native';
-import { WebView } from 'react-native-webview';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Easing } from 'react-native';
 import { Animated as RNAnimated, PanResponder, Easing as RNEasing } from 'react-native';
 
-import LeadForm from '../component/LeadForm';
+const LeadForm = lazy(() => import('../component/LeadForm'));
+
 import { useDispatch } from 'react-redux';
 import { useInterestMutation } from '../component/publicApi';
 import { showMessage } from '../component/flashMessageSlice';
@@ -545,24 +545,36 @@ const LandingPage = ({ navigation }) => {
 
     useEffect(() => {
         if (Platform.OS === 'web') {
-            // Google Analytics 4
-            if (!document.getElementById('ga4-script')) {
-                const gaScript = document.createElement('script');
-                gaScript.id = 'ga4-script';
-                gaScript.async = true;
-                gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX'; // Replace with your GA4 ID
-                document.head.appendChild(gaScript);
-                const gaInit = document.createElement('script');
-                gaInit.innerHTML = `window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-XXXXXXXXXX');`;
-                document.head.appendChild(gaInit);
-            }
-            // Microsoft Clarity
-            if (!document.getElementById('clarity-script')) {
-                const clarityScript = document.createElement('script');
-                clarityScript.id = 'clarity-script';
-                clarityScript.type = 'text/javascript';
-                clarityScript.innerHTML = `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/XXXXXXXXXX";y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window, document, "clarity", "script", "XXXXXXXXXX");`;
-                document.head.appendChild(clarityScript);
+            // Defer analytics/tracking scripts to after first render
+            const injectScripts = () => {
+                // Google Analytics 4
+                if (!document.getElementById('ga4-script')) {
+                    const gaScript = document.createElement('script');
+                    gaScript.id = 'ga4-script';
+                    gaScript.async = true;
+                    gaScript.defer = true;
+                    gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX'; // Replace with your GA4 ID
+                    document.head.appendChild(gaScript);
+                    const gaInit = document.createElement('script');
+                    gaInit.defer = true;
+                    gaInit.innerHTML = `window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-XXXXXXXXXX');`;
+                    document.head.appendChild(gaInit);
+                }
+                // Microsoft Clarity
+                if (!document.getElementById('clarity-script')) {
+                    const clarityScript = document.createElement('script');
+                    clarityScript.id = 'clarity-script';
+                    clarityScript.type = 'text/javascript';
+                    clarityScript.async = true;
+                    clarityScript.defer = true;
+                    clarityScript.innerHTML = `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/XXXXXXXXXX";y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window, document, "clarity", "script", "XXXXXXXXXX");`;
+                    document.head.appendChild(clarityScript);
+                }
+            };
+            if ('requestIdleCallback' in window) {
+                window.requestIdleCallback(injectScripts);
+            } else {
+                setTimeout(injectScripts, 1200);
             }
         }
     }, []);
@@ -1028,12 +1040,26 @@ const LandingPage = ({ navigation }) => {
                 containerHeight={containerHeight}
                 mode={dragMode}
             />
-            <LeadForm
-                visible={isLeadFormVisible}
-                onClose={() => setLeadFormVisible(false)}
-                onSubmit={handleLeadSubmit}
-                modalStyle={{ maxHeight: '70vh' }} // Reduce modal height
-            />
+            <Suspense fallback={null}>
+                <LeadForm
+                    visible={isLeadFormVisible}
+                    onClose={() => setLeadFormVisible(false)}
+                    onSubmit={handleLeadSubmit}
+                    modalStyle={{ maxHeight: '70vh' }}
+                />
+            </Suspense>
+            <Suspense fallback={null}>
+                {/* Only for non-web, wrap WebView in Suspense */}
+                {Platform.OS !== 'web' && (
+                    <WebView
+                        style={isMobile ? styles.youtubeMobile : styles.youtube}
+                        javaScriptEnabled={true}
+                        domStorageEnabled={true}
+                        source={{ uri: 'https://www.youtube.com/embed/Bo_gUCXr8lM' }}
+                        allowsFullscreenVideo
+                    />
+                )}
+            </Suspense>
             <FloatingContactSparkle
                 visible={!isLeadFormVisible}
                 onPress={handleScheduleDemo}
