@@ -890,24 +890,17 @@ const LandingPage = ({ navigation }) => {
         } else {
             nextIdx = idx + 1;
         }
+        // Scroll exactly to the top of the next section
         if (sectionRefs.current[nextIdx]) {
             sectionRefs.current[nextIdx].measureLayout(
                 scrollViewRef.current.getInnerViewNode(),
                 (x, y) => {
-                    // If moving from hero to showcase, scroll to just above the YouTube video
-                    if (idx === 0 && nextIdx === 1 && showcaseVideoRef.current) {
-                        showcaseVideoRef.current.measureLayout(
-                            scrollViewRef.current.getInnerViewNode(),
-                            (vx, vy) => {
-                                // Scroll to the top of the showcase section, not skipping any content
-                                scrollViewRef.current.scrollTo({ y: vy - 32, animated: true });
-                            }
-                        );
-                    } else {
-                        scrollViewRef.current.scrollTo({ y, animated: true });
-                    }
+                    scrollViewRef.current.scrollTo({ y, animated: true });
+                    setActiveSection(nextIdx); // update active section/viewport immediately
                 }
             );
+        } else {
+            setActiveSection(nextIdx); // fallback
         }
     };
 
@@ -1025,18 +1018,16 @@ const LandingPage = ({ navigation }) => {
                     </View>
                 ))}
             </ScrollView>
-            {/* Single floating drag up button: at bottom border for hero, floating for others (except last section) */}
-            {activeSection < sections.length - 1 && (
-                <DragUpHintFloating
-                    visible={true}
-                    isMobile={isMobile}
-                    onPress={() => handleDragUpHint(activeSection)}
-                    y={currentLayout.y}
-                    height={currentLayout.h}
-                    containerHeight={containerHeight}
-                    mode={dragMode}
-                />
-            )}
+            {/* Single floating drag up button: at bottom border for hero, floating for others (now always visible) */}
+            <DragUpHintFloating
+                visible={true}
+                isMobile={isMobile}
+                onPress={() => handleDragUpHint(activeSection)}
+                y={currentLayout.y}
+                height={currentLayout.h}
+                containerHeight={containerHeight}
+                mode={dragMode}
+            />
             <LeadForm
                 visible={isLeadFormVisible}
                 onClose={() => setLeadFormVisible(false)}
