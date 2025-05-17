@@ -1,7 +1,11 @@
-import React, { createRef, useState, useEffect } from 'react';
-import { View, ScrollView, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Platform } from 'react-native';
+import React, { createRef, useState, useEffect, useRef } from 'react';
+import { View, ScrollView, Text, StyleSheet, TouchableOpacity, Image, Animated, Platform, Modal, Pressable } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useWindowDimensions } from 'react-native';
+import { WebView } from 'react-native-webview';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Easing } from 'react-native';
+import { Animated as RNAnimated, PanResponder, Easing as RNEasing } from 'react-native';
 
 import LeadForm from '../component/LeadForm';
 import { useDispatch } from 'react-redux';
@@ -33,6 +37,30 @@ const injectLinkedInScriptWeb = () => {
     document.body.appendChild(noscript);
 };
 
+// Facebook Pixel (Meta Pixel) inject for web
+const injectFacebookPixelWeb = () => {
+    if (typeof window === 'undefined') return;
+    if (document.getElementById('fb-pixel-script')) return;
+    const script = document.createElement('script');
+    script.id = 'fb-pixel-script';
+    script.innerHTML = `
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', 'YOUR_PIXEL_ID');
+      fbq('track', 'PageView');
+    `;
+    document.head.appendChild(script);
+    const noscript = document.createElement('noscript');
+    noscript.innerHTML = '<img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=YOUR_PIXEL_ID&ev=PageView&noscript=1"/>';
+    document.body.appendChild(noscript);
+};
+
 const CurvedBackground = () => {
     return (
       <View style={styles.backgroundContainer}>
@@ -46,17 +74,426 @@ const CurvedBackground = () => {
     );
 };
 
+const industrySolutions = [
+    {
+        icon: '📞',
+        title: 'Insurance Sales',
+        metrics: '3x Lead Qualification',
+        description: 'Policy renewal reminders, cross-selling opportunities, claim follow-ups'
+    },
+    {
+        icon: '🏠',
+        title: 'Real Estate',
+        metrics: '45% More Appointments',
+        description: 'Property listings, viewing schedules, follow-up with potential buyers'
+    },
+    {
+        icon: '💳',
+        title: 'Banking & Finance',
+        metrics: '60% Cost Reduction',
+        description: 'Credit card sales, loan applications, payment reminders'
+    },
+    {
+        icon: '🎓',
+        title: 'Education',
+        metrics: '2x Enrollment Rate',
+        description: 'Admission inquiries, course registration, fee reminder calls'
+    }
+];
+
+const featureIcons = [
+    { icon: 'target-variant', color: '#007AFF' }, // Smart Lead Prioritization
+    { icon: 'translate', color: '#43a047' },      // Multi-Language Support
+    { icon: 'autorenew', color: '#ff9800' },      // Automated Follow-ups
+    { icon: 'database-sync', color: '#8e24aa' },  // CRM Integration
+];
+
+const AnimatedCard = ({ children, delay = 0, style = {}, ...props }) => {
+    const fadeAnim = React.useRef(new Animated.Value(0)).current;
+    const slideAnim = React.useRef(new Animated.Value(20)).current;
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, { toValue: 1, duration: 500, delay, useNativeDriver: true }),
+            Animated.timing(slideAnim, { toValue: 0, duration: 500, delay, useNativeDriver: true }),
+        ]).start();
+    }, []);
+    return (
+        <Animated.View style={[{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }, style]} {...props}>
+            {children}
+        </Animated.View>
+    );
+};
+
+// Bidirectional FloatingSection: animates in/out on viewable change
+const FloatingSection = ({ children, viewable, style = {}, ...props }) => {
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const translateY = useRef(new Animated.Value(40)).current;
+
+    useEffect(() => {
+        if (viewable) {
+            Animated.parallel([
+                Animated.timing(fadeAnim, {
+                    toValue: 1,
+                    duration: 700,
+                    useNativeDriver: true,
+                    easing: Easing.out(Easing.exp),
+                }),
+                Animated.timing(translateY, {
+                    toValue: 0,
+                    duration: 700,
+                    useNativeDriver: true,
+                    easing: Easing.out(Easing.exp),
+                }),
+            ]).start();
+        } else {
+            Animated.parallel([
+                Animated.timing(fadeAnim, {
+                    toValue: 0,
+                    duration: 500,
+                    useNativeDriver: true,
+                    easing: Easing.in(Easing.exp),
+                }),
+                Animated.timing(translateY, {
+                    toValue: 40,
+                    duration: 500,
+                    useNativeDriver: true,
+                    easing: Easing.in(Easing.exp),
+                }),
+            ]).start();
+        }
+    }, [viewable]);
+
+    return (
+        <Animated.View style={[{ opacity: fadeAnim, transform: [{ translateY }] }, style]} {...props}>
+            {children}
+        </Animated.View>
+    );
+};
+
+// Animated frequency bars for speaking animation
+const FrequencyBars = ({ playing }) => {
+    const anims = [useRef(new Animated.Value(1)).current, useRef(new Animated.Value(1)).current, useRef(new Animated.Value(1)).current, useRef(new Animated.Value(1)).current, useRef(new Animated.Value(1)).current];
+
+    useEffect(() => {
+        if (playing) {
+            const animations = anims.map((anim, i) =>
+                Animated.loop(
+                    Animated.sequence([
+                        Animated.timing(anim, {
+                            toValue: 2,
+                            duration: 200 + i * 60,
+                            useNativeDriver: true,
+                            easing: Easing.linear,
+                        }),
+                        Animated.timing(anim, {
+                            toValue: 1,
+                            duration: 200 + i * 60,
+                            useNativeDriver: true,
+                            easing: Easing.linear,
+                        }),
+                    ])
+                )
+            );
+            Animated.stagger(80, animations).start();
+        } else {
+            anims.forEach(anim => anim.setValue(1));
+        }
+    }, [playing]);
+
+    return (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 24, marginHorizontal: 8 }}>
+            {anims.map((anim, i) => (
+                <Animated.View
+                    key={i}
+                    style={{
+                        width: 4,
+                        marginHorizontal: 2,
+                        borderRadius: 2,
+                        backgroundColor: i === 2 ? '#007AFF' : '#43a047',
+                        height: anim.interpolate({
+                            inputRange: [1, 2],
+                            outputRange: [10, 24],
+                        }),
+                    }}
+                />
+            ))}
+        </View>
+    );
+};
+
+// Voice Call Animation Row
+const VoiceCallAnimation = ({ playing }) => (
+    <View style={styles.voiceCallAnimRow}>
+        <MaterialCommunityIcons name="robot" size={32} color="#007AFF" style={{ marginRight: 8 }} />
+        <Text style={styles.voiceCallText}>Voice Call</Text>
+        <MaterialCommunityIcons name="phone" size={24} color="#222" style={{ marginHorizontal: 8 }} />
+        <FrequencyBars playing={playing} />
+        <MaterialCommunityIcons name="account-circle" size={32} color="#43a047" style={{ marginLeft: 8 }} />
+    </View>
+);
+
+const DragUpHintInline = ({ visible, isMobile, onPress, style }) => {
+    const bounceAnim = useRef(new RNAnimated.Value(0)).current;
+    const pulseAnim = useRef(new RNAnimated.Value(1)).current;
+
+    useEffect(() => {
+        let bounceLoop, pulseLoop;
+        if (visible) {
+            bounceLoop = RNAnimated.loop(
+                RNAnimated.sequence([
+                    RNAnimated.timing(bounceAnim, {
+                        toValue: -18,
+                        duration: 600,
+                        useNativeDriver: true,
+                    }),
+                    RNAnimated.timing(bounceAnim, {
+                        toValue: 0,
+                        duration: 600,
+                        useNativeDriver: true,
+                    }),
+                ])
+            );
+            bounceLoop.start();
+            pulseLoop = RNAnimated.loop(
+                RNAnimated.sequence([
+                    RNAnimated.timing(pulseAnim, { toValue: 1.13, duration: 700, useNativeDriver: true }),
+                    RNAnimated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+                ])
+            );
+            pulseLoop.start();
+        } else {
+            pulseAnim.setValue(1);
+        }
+        return () => {
+            bounceLoop && bounceLoop.stop();
+            pulseLoop && pulseLoop.stop();
+        };
+    }, [visible]);
+
+    if (!visible) return null;
+
+    return (
+        <RNAnimated.View
+            style={[
+                {
+                    alignItems: 'center',
+                    opacity: 1,
+                    transform: [{ translateY: bounceAnim }, { scale: pulseAnim }],
+                    marginTop: 0,
+                    marginBottom: -24,
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    zIndex: 10,
+                },
+                style,
+            ]}
+        >
+            <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={onPress}
+                style={{
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 32,
+                    padding: isMobile ? 12 : 18,
+                    backgroundColor: 'transparent',
+                }}
+            >
+                <Image
+                    source={require('../assets/search-logo.png')}
+                    style={{
+                        width: isMobile ? 44 : 60,
+                        height: isMobile ? 44 : 60,
+                        marginBottom: 6,
+                        opacity: 0.95,
+                    }}
+                    resizeMode="contain"
+                />
+                <Ionicons name="chevron-up-circle" size={isMobile ? 36 : 48} color="#007AFF" style={{ marginBottom: 2 }} />
+                <Text style={{
+                    fontSize: isMobile ? 15 : 18,
+                    color: '#007AFF',
+                    fontWeight: 'bold',
+                    marginTop: 2,
+                    letterSpacing: 0.5,
+                }}>
+                    Drag up to explore
+                </Text>
+            </TouchableOpacity>
+        </RNAnimated.View>
+    );
+};
+
+const DragUpHintFloating = ({ visible, isMobile, onPress, y, height, containerHeight, mode }) => {
+    const bounceAnim = useRef(new RNAnimated.Value(0)).current;
+    const pulseAnim = useRef(new RNAnimated.Value(1)).current;
+
+    useEffect(() => {
+        let bounceLoop, pulseLoop;
+        if (visible) {
+            bounceLoop = RNAnimated.loop(
+                RNAnimated.sequence([
+                    RNAnimated.timing(bounceAnim, {
+                        toValue: -18,
+                        duration: 600,
+                        useNativeDriver: true,
+                    }),
+                    RNAnimated.timing(bounceAnim, {
+                        toValue: 0,
+                        duration: 600,
+                        useNativeDriver: true,
+                    }),
+                ])
+            );
+            bounceLoop.start();
+            pulseLoop = RNAnimated.loop(
+                RNAnimated.sequence([
+                    RNAnimated.timing(pulseAnim, { toValue: 1.13, duration: 700, useNativeDriver: true }),
+                    RNAnimated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+                ])
+            );
+            pulseLoop.start();
+        } else {
+            pulseAnim.setValue(1);
+        }
+        return () => {
+            bounceLoop && bounceLoop.stop();
+            pulseLoop && pulseLoop.stop();
+        };
+    }, [visible]);
+
+    if (!visible || y == null || height == null) return null;
+
+    let top;
+    if (mode === 'hero') {
+        // At the bottom border of hero section
+        top = y + height - 36;
+    } else {
+        // Floating at 60% of the section height
+        top = y + height * 0.6;
+    }
+    if (containerHeight && top > containerHeight - 120) {
+        top = containerHeight - 120;
+    }
+
+    return (
+        <RNAnimated.View
+            style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                top,
+                alignItems: 'center',
+                opacity: 1,
+                zIndex: 100,
+                transform: [{ translateY: bounceAnim }, { scale: pulseAnim }],
+                pointerEvents: 'box-none',
+            }}
+            pointerEvents="box-none"
+        >
+            <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={onPress}
+                style={{
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 32,
+                    padding: isMobile ? 12 : 18,
+                    backgroundColor: 'transparent',
+                }}
+            >
+                <Image
+                    source={require('../assets/search-logo.png')}
+                    style={{
+                        width: isMobile ? 44 : 60,
+                        height: isMobile ? 44 : 60,
+                        marginBottom: 6,
+                        opacity: 0.95,
+                    }}
+                    resizeMode="contain"
+                />
+                <Ionicons name="chevron-up-circle" size={isMobile ? 36 : 48} color="#007AFF" style={{ marginBottom: 2 }} />
+                <Text style={{
+                    fontSize: isMobile ? 15 : 18,
+                    color: '#007AFF',
+                    fontWeight: 'bold',
+                    marginTop: 2,
+                    letterSpacing: 0.5,
+                }}>
+                    Drag up to explore
+                </Text>
+            </TouchableOpacity>
+        </RNAnimated.View>
+    );
+};
+
+const FloatingContactSparkle = ({ visible, onPress, isMobile }) => {
+    const pulseAnim = useRef(new RNAnimated.Value(1)).current;
+    useEffect(() => {
+        let loop;
+        if (visible) {
+            loop = RNAnimated.loop(
+                RNAnimated.sequence([
+                    RNAnimated.timing(pulseAnim, { toValue: 1.13, duration: 700, useNativeDriver: true }),
+                    RNAnimated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+                ])
+            );
+            loop.start();
+        } else {
+            pulseAnim.setValue(1);
+        }
+        return () => loop && loop.stop();
+    }, [visible]);
+    return (
+        <RNAnimated.View style={{
+            transform: [{ scale: pulseAnim }],
+            position: 'absolute',
+            right: 18,
+            bottom: 24,
+            zIndex: 100,
+        }}>
+            <TouchableOpacity
+                style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#007AFF',
+                    borderRadius: 32,
+                    paddingVertical: 12,
+                    paddingHorizontal: 22,
+                    elevation: 8,
+                    shadowColor: '#007AFF',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.18,
+                    shadowRadius: 8,
+                }}
+                onPress={onPress}
+                activeOpacity={0.85}
+            >
+                <Ionicons name="chatbubbles" size={28} color="#fff" />
+                <Text style={{
+                    color: '#fff',
+                    fontWeight: 'bold',
+                    fontSize: 16,
+                    marginLeft: 10,
+                }}>Contact Us</Text>
+            </TouchableOpacity>
+        </RNAnimated.View>
+    );
+};
+
 const LandingPage = ({ navigation }) => {
-    const scrollViewRef = createRef();
+    const scrollViewRef = useRef(null);
+    const sectionRefs = useRef([]);
+    const showcaseVideoRef = useRef(null);
     const [isLeadFormVisible, setLeadFormVisible] = useState(false);
+    const [showShowcaseModal, setShowShowcaseModal] = useState(false);
+    const [activeSection, setActiveSection] = useState(0);
+    const [sectionLayouts, setSectionLayouts] = useState([]);
+    const [showcaseVideoLayout, setShowcaseVideoLayout] = useState(null);
+    const [containerHeight, setContainerHeight] = useState(null);
     const dispatch = useDispatch();
     
-    // Add refs for each section
-    const industryRef = createRef();
-    const featuresRef = createRef();
-    const benefitsRef = createRef();
-    const contactRef = createRef();
-
     const [addInterest, { 
         isSuccess: isInterestDataSuccess, 
         isLoading: isInterestDataLoading, 
@@ -65,34 +502,6 @@ const LandingPage = ({ navigation }) => {
 
     const { width: screenWidth } = useWindowDimensions();
     const isMobile = screenWidth < 600;
-
-    // Update scroll position calculation
-    const handleNavClick = (sectionId) => {
-        switch(sectionId) {
-            case 'industry':
-                industryRef.current?.measure((x, y, width, height, pageX, pageY) => {
-                    scrollViewRef.current?.scrollTo({ y: pageY - 50, animated: true });
-                });
-                break;
-            case 'features':
-                featuresRef.current?.measure((x, y, width, height, pageX, pageY) => {
-                    scrollViewRef.current?.scrollTo({ y: pageY - 50, animated: true });
-                });
-                break;
-            case 'benefit':
-                benefitsRef.current?.measure((x, y, width, height, pageX, pageY) => {
-                    scrollViewRef.current?.scrollTo({ y: pageY - 50, animated: true });
-                });
-                break;
-            case 'contact':
-                contactRef.current?.measure((x, y, width, height, pageX, pageY) => {
-                    scrollViewRef.current?.scrollTo({ y: pageY - 50, animated: true });
-                });
-                break;
-            default:
-                scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-        }
-    };
 
     const handleLogin = () => {
         navigation.navigate('Login');
@@ -130,184 +539,523 @@ const LandingPage = ({ navigation }) => {
     useEffect(() => {
         if (Platform.OS === 'web') {
             injectLinkedInScriptWeb();
+            injectFacebookPixelWeb(); // Add Facebook Pixel
         }
     }, []);
 
-    return (
-        <View style={[styles.container, isMobile && styles.containerMobile]}>
-            <ScrollView 
-                ref={scrollViewRef} 
-                style={styles.scrollContainer}
-                showsVerticalScrollIndicator={false}
-            >
-                <View style={[styles.header, isMobile && styles.headerMobile]}>
-                    <View style={[styles.logoContainer, isMobile && styles.logoContainerMobile]}>
-                        <Image 
-                            source={require('../assets/search-logo.png')} 
-                            style={[styles.headerLogo, isMobile && styles.headerLogoMobile]} 
-                        />
-                        <Text style={[styles.headerTitle, isMobile && styles.headerTitleMobile]}>DALAI LLAMA</Text>
-                    </View>
+    useEffect(() => {
+        if (Platform.OS === 'web') {
+            // Google Analytics 4
+            if (!document.getElementById('ga4-script')) {
+                const gaScript = document.createElement('script');
+                gaScript.id = 'ga4-script';
+                gaScript.async = true;
+                gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX'; // Replace with your GA4 ID
+                document.head.appendChild(gaScript);
+                const gaInit = document.createElement('script');
+                gaInit.innerHTML = `window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-XXXXXXXXXX');`;
+                document.head.appendChild(gaInit);
+            }
+            // Microsoft Clarity
+            if (!document.getElementById('clarity-script')) {
+                const clarityScript = document.createElement('script');
+                clarityScript.id = 'clarity-script';
+                clarityScript.type = 'text/javascript';
+                clarityScript.innerHTML = `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/XXXXXXXXXX";y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window, document, "clarity", "script", "XXXXXXXXXX");`;
+                document.head.appendChild(clarityScript);
+            }
+        }
+    }, []);
 
-                    <View style={[styles.navLinks, isMobile && styles.navLinksMobile]}>
-                        {['About', 'Industry', 'Features', 'Benefit', 'Contact'].map((link) => (
-                            <TouchableOpacity 
-                                key={link} 
-                                onPress={() => handleNavClick(link.toLowerCase())}
-                            >
-                                <Text style={[styles.navLink, isMobile && styles.navLinkMobile]}>{link}</Text>
-                            </TouchableOpacity>
-                        ))}
-                        <TouchableOpacity 
-                            style={[styles.loginButton, isMobile && styles.loginButtonMobile]} 
-                            onPress={handleLogin}
+    // For audio sample
+    const [audioPlaying, setAudioPlaying] = useState(false);
+    const [selectedLanguage, setSelectedLanguage] = useState('english');
+    const audioRefs = {
+        hindi: useRef(null),
+        english: useRef(null),
+        british_english: useRef(null),
+    };
+
+    const handlePlayAudio = () => {
+        const ref = audioRefs[selectedLanguage];
+        if (ref.current) {
+            if (audioPlaying) {
+                ref.current.pause();
+                setAudioPlaying(false);
+            } else {
+                ref.current.play();
+                setAudioPlaying(true);
+            }
+        }
+    };
+
+    // All sections in one array, in order (without "See Dalai Llama in Action" as a section)
+    const sections = [
+        {
+            key: 'hero',
+            render: () => (
+                <AnimatedCard delay={0} style={[styles.heroSection, isMobile && styles.heroSectionMobile]}>
+                    <Text style={styles.heroHeadline}>AI-Powered Outbound Calling</Text>
+                    <Text style={styles.heroSubtext}>Scale Your Sales & Support Operations</Text>
+                    <Text style={styles.heroSubtext}>Increase Revenue by 200%</Text>
+                    <View style={[styles.heroMetricsRow, isMobile && styles.heroMetricsRowMobile]}>
+                        <AnimatedCard delay={200} style={styles.metricCardModern}>
+                            <Text style={styles.metricValueModern}>5000+</Text>
+                            <Text style={styles.metricLabelModern}>Calls/Hour</Text>
+                        </AnimatedCard>
+                        <AnimatedCard delay={400} style={styles.metricCardModern}>
+                            <Text style={styles.metricValueModern}>40%</Text>
+                            <Text style={styles.metricLabelModern}>Higher Conversion</Text>
+                        </AnimatedCard>
+                    </View>
+                </AnimatedCard>
+            ),
+        },
+        {
+            key: 'showcase',
+            render: () => (
+                <View style={[
+                    styles.showcaseSection,
+                    isMobile && styles.showcaseSectionMobile,
+                    !isMobile && styles.showcaseSectionWeb
+                ]}>
+                    <Pressable onPress={() => setShowShowcaseModal(true)} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
+                        <Text style={styles.sectionTitleModern}>See Dalai Llama in Action</Text>
+                    </Pressable>
+                    <View style={[
+                        styles.showcaseContent,
+                        isMobile && styles.showcaseContentMobile
+                    ]}>
+                        {/* Voice AI Audio Sample - now above video */}
+                        <View style={{
+                            width: '100%',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: 32,
+                        }}>
+                            <View style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: '#f8fafd',
+                                borderRadius: 20,
+                                paddingVertical: 14,
+                                paddingHorizontal: isMobile ? 10 : 32,
+                                boxShadow: Platform.OS === 'web' ? '0 2px 12px #e3e8fd' : undefined,
+                                elevation: 3,
+                                maxWidth: 480,
+                                width: '100%',
+                                minWidth: isMobile ? 220 : 340,
+                                borderWidth: 1,
+                                borderColor: '#e3e8fd',
+                                justifyContent: 'space-between',
+                                gap: 18,
+                            }}>
+                                <TouchableOpacity
+                                    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}
+                                    onPress={handlePlayAudio}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name={audioPlaying ? "stop-circle" : "play-circle"} size={isMobile ? 36 : 44} color="#007AFF" />
+                                    <Text style={{ fontSize: 18, color: '#1a237e', fontWeight: '700', letterSpacing: 0.2 }}>
+                                        {audioPlaying ? "Stop" : "Play"} Sample
+                                    </Text>
+                                </TouchableOpacity>
+                                {/* Modern Language dropdown with custom SVG chevron */}
+                                {Platform.OS === 'web' ? (
+                                    <div style={{ position: 'relative', minWidth: 140, width: 160 }}>
+                                        <select
+                                            style={{
+                                                width: '100%',
+                                                fontSize: isMobile ? 15 : 17,
+                                                padding: '10px 36px 10px 14px',
+                                                borderRadius: 14,
+                                                border: '1.5px solid #d1d5db',
+                                                background: '#fff',
+                                                color: '#1a237e',
+                                                fontWeight: 600,
+                                                appearance: 'none',
+                                                outline: 'none',
+                                                boxShadow: '0 1px 4px #e3e8fd',
+                                                transition: 'border 0.2s',
+                                            }}
+                                            value={selectedLanguage}
+                                            onChange={e => setSelectedLanguage(e.target.value)}
+                                        >
+                                            <option value="hindi">Hindi</option>
+                                            <option value="english">English</option>
+                                            <option value="british_english">British English</option>
+                                        </select>
+                                        {/* Custom SVG chevron */}
+                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+                                            <path d="M6 8l4 4 4-4" stroke="#007AFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </svg>
+                                    </div>
+                                ) : (
+                                    <TouchableOpacity
+                                        style={{ borderWidth: 1.5, borderColor: '#d1d5db', borderRadius: 14, backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 8, minWidth: 120, alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }}
+                                        onPress={() => {/* open language picker modal for mobile if needed */}}
+                                    >
+                                        <Text style={{ fontSize: isMobile ? 15 : 17, color: '#1a237e', fontWeight: '600' }}>
+                                            {selectedLanguage === 'hindi' ? 'Hindi' : selectedLanguage === 'english' ? 'English' : 'British English'}
+                                        </Text>
+                                        <Svg width={18} height={18} viewBox="0 0 20 20" style={{ marginLeft: 6 }}>
+                                            <Path d="M6 8l4 4 4-4" stroke="#007AFF" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+                                        </Svg>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                            {/* Dummy audio elements for each language */}
+                            <audio ref={audioRefs.hindi} src="/assets/audio-sample-hindi.mp3" style={{ display: 'none' }} />
+                            <audio ref={audioRefs.english} src="/assets/audio-sample-english.mp3" style={{ display: 'none' }} />
+                            <audio ref={audioRefs.british_english} src="/assets/audio-sample-british.mp3" style={{ display: 'none' }} />
+                            {audioPlaying && <VoiceCallAnimation playing={audioPlaying} />}
+                        </View>
+                        {/* YouTube Video - below audio, responsive aspect ratio */}
+                        <View
+                            ref={showcaseVideoRef}
+                            onLayout={e => setShowcaseVideoLayout(e.nativeEvent.layout)}
+                            style={[
+                                styles.videoContainer,
+                                isMobile && styles.videoContainerMobile
+                            ]}
                         >
-                            <Text style={[styles.loginButtonText, isMobile && styles.loginButtonTextMobile]}>Login</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                <View style={[styles.heroSection, isMobile && styles.heroSectionMobile]}>
-                    <View style={[styles.heroContent, isMobile && styles.heroContentMobile]}>
-                        <Text style={[styles.heroTitle, isMobile && styles.heroTitleMobile]}>AI-Powered Outbound Calling</Text>
-                        <Text style={[styles.heroSubtitle, isMobile && styles.heroSubtitleMobile]}>Scale Your Sales & Support Operations</Text>
-                        <Text style={[styles.heroSubtitle, isMobile && styles.heroSubtitleMobile]}>Increase Revenue by 200%</Text>
-                        
-                        <View style={[styles.trustIndicators, isMobile && styles.trustIndicatorsMobile]}>
-                            <View style={[styles.trustBadge, isMobile && styles.trustBadgeMobile]}>
-                                <Text style={[styles.trustBadgeTitle, isMobile && styles.trustBadgeTitleMobile]}>5000+</Text>
-                                <Text style={[styles.trustBadgeText, isMobile && styles.trustBadgeTextMobile]}>Calls/Hour</Text>
-                            </View>
-                            <View style={[styles.trustBadge, isMobile && styles.trustBadgeMobile]}>
-                                <Text style={[styles.trustBadgeTitle, isMobile && styles.trustBadgeTitleMobile]}>40%</Text>
-                                <Text style={[styles.trustBadgeText, isMobile && styles.trustBadgeTextMobile]}>Higher Conversion</Text>
-                            </View>
+                            {Platform.OS === 'web' ? (
+                                <div style={{
+                                    position: 'relative',
+                                    width: '100%',
+                                    paddingBottom: '56.25%',
+                                    borderRadius: isMobile ? 8 : 12,
+                                    overflow: 'hidden',
+                                    background: '#000'
+                                }}>
+                                    <iframe
+                                        title="Dalai Llama Demo"
+                                        style={{
+                                            position: 'absolute',
+                                            top: 0,
+                                            left: 0,
+                                            width: '100%',
+                                            height: '100%',
+                                            border: 0,
+                                            borderRadius: isMobile ? 8 : 12,
+                                            background: '#000'
+                                        }}
+                                        src="https://www.youtube.com/embed/Bo_gUCXr8lM"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowFullScreen
+                                    />
+                                </div>
+                            ) : (
+                                <WebView
+                                    style={isMobile ? styles.youtubeMobile : styles.youtube}
+                                    javaScriptEnabled={true}
+                                    domStorageEnabled={true}
+                                    source={{ uri: 'https://www.youtube.com/embed/Bo_gUCXr8lM' }}
+                                    allowsFullscreenVideo
+                                />
+                            )}
                         </View>
                     </View>
                 </View>
-
-                <View ref={industryRef} style={[styles.industrySection, isMobile && styles.industrySectionMobile]}>
-                    <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]}>Industry Solutions</Text>
-                    <View style={[styles.industryContainer, isMobile && styles.industryContainerMobile]}>
-                        <ScrollView 
-                            horizontal={!isMobile}
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={[styles.industryScrollContent, isMobile && styles.industryScrollContentMobile]}
-                        >
-                            {[
-                                {
-                                    title: 'Insurance Sales',
-                                    image: require('../assets/insurance-calls.png'),
-                                    metrics: '3x Lead Qualification',
-                                    description: 'Policy renewal reminders, cross-selling opportunities, claim follow-ups'
-                                },
-                                {
-                                    title: 'Real Estate',
-                                    image: require('../assets/realestate-calls.png'),
-                                    metrics: '45% More Appointments',
-                                    description: 'Property listings, viewing schedules, follow-up with potential buyers'
-                                },
-                                {
-                                    title: 'Banking & Finance',
-                                    image: require('../assets/banking-calls.png'),
-                                    metrics: '60% Cost Reduction',
-                                    description: 'Credit card sales, loan applications, payment reminders'
-                                },
-                                {
-                                    title: 'Education',
-                                    image: require('../assets/education-calls.png'),
-                                    metrics: '2x Enrollment Rate',
-                                    description: 'Admission inquiries, course registration, fee reminder calls'
-                                }
-                            ].map((industry, index) => (
-                                <View key={index} style={[styles.industryCard, isMobile && styles.industryCardMobile]}>
-                                    <View style={[styles.industryImageContainer, isMobile && styles.industryImageContainerMobile]}>
-                                        <Image source={industry.image} style={[styles.industryImage, isMobile && styles.industryImageMobile]} />
-                                    </View>
-                                    <View style={styles.industryContent}>
-                                        <Text style={[styles.industryTitle, isMobile && styles.industryTitleMobile]}>{industry.title}</Text>
-                                        <Text style={[styles.metricsText, isMobile && styles.metricsTextMobile]}>{industry.metrics}</Text>
-                                        <Text style={[styles.industryDescription, isMobile && styles.industryDescriptionMobile]}>{industry.description}</Text>
-                                    </View>
-                                </View>
-                            ))}
-                        </ScrollView>
-                    </View>
+            ),
+        },
+        {
+            key: 'industry',
+            render: () => (
+                <View ref={scrollViewRef} style={[styles.sectionCardModern, isMobile && styles.sectionCardMobile]}>
+                    <Text style={styles.sectionTitleModern}>Industry Solutions</Text>
+                    <ScrollView
+                        horizontal={!isMobile}
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={[
+                            styles.industryScrollModern,
+                            isMobile && styles.industryScrollModernMobile
+                        ]}
+                    >
+                        {industrySolutions.map((industry, index) => (
+                            <AnimatedCard key={index} delay={index * 120}>
+                                <Pressable style={({ pressed }) => [
+                                    styles.industryModernCard,
+                                    isMobile && styles.industryModernCardMobile,
+                                    pressed && { backgroundColor: '#e3e8fd' }
+                                ]}>
+                                    <Text style={styles.industryIconModern}>{industry.icon}</Text>
+                                    <Text style={styles.industryTitleModern}>{industry.title}</Text>
+                                    <Text style={styles.industryMetricsModern}>{industry.metrics}</Text>
+                                    <Text style={styles.industryDescriptionModern}>{industry.description}</Text>
+                                </Pressable>
+                            </AnimatedCard>
+                        ))}
+                    </ScrollView>
                 </View>
-
-                <View ref={featuresRef} style={[styles.featuresSection, isMobile && styles.featuresSectionMobile]}>
-                    <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]}>Outbound Calling Features</Text>
-                    <View style={styles.featureGrid}>
+            ),
+        },
+        {
+            key: 'features',
+            render: () => (
+                <View ref={scrollViewRef} style={[styles.sectionCardModern, isMobile && styles.sectionCardMobile]}>
+                    <Text style={styles.sectionTitleModern}>Outbound Calling Features</Text>
+                    <View style={[
+                        styles.featureGridModern,
+                        isMobile && { flexDirection: 'column', gap: 0 }
+                    ]}>
                         {[
                             {
                                 title: 'Smart Lead Prioritization',
                                 description: 'AI-driven scoring to call high-potential leads first',
-                                icon: '🎯'
                             },
                             {
                                 title: 'Multi-Language Support',
                                 description: 'Engage customers in their preferred language',
-                                icon: '🌐'
                             },
                             {
                                 title: 'Automated Follow-ups',
                                 description: 'Schedule and execute follow-up calls automatically',
-                                icon: '🔄'
                             },
                             {
                                 title: 'CRM Integration',
                                 description: 'Seamless integration with your existing CRM',
-                                icon: '🔗'
                             }
-                        ].reduce((rows, feature, index) => {
-                            if (isMobile || index % 2 === 0) rows.push([]);
-                            rows[rows.length - 1].push(feature);
-                            return rows;
-                        }, []).map((row, rowIndex) => (
-                            <View key={rowIndex} style={[styles.featureRow, isMobile && styles.featureRowMobile]}>
-                                {row.map((feature, colIndex) => (
-                                    <View key={colIndex} style={[styles.featureCard, isMobile && styles.featureCardMobile]}>
-                                        <View style={styles.featureHeader}>
-                                            <Text style={[styles.featureIcon, isMobile && styles.featureIconMobile]}>{feature.icon}</Text>
-                                            <Text style={[styles.featureTitle, isMobile && styles.featureTitleMobile]}>{feature.title}</Text>
-                                        </View>
-                                        <Text style={[styles.featureDescription, isMobile && styles.featureDescriptionMobile]}>{feature.description}</Text>
-                                    </View>
-                                ))}
-                            </View>
+                        ].map((feature, idx) => (
+                            <AnimatedCard key={idx} delay={idx * 120}>
+                                <Pressable style={({ pressed }) => [
+                                    styles.featureModernCard,
+                                    isMobile && styles.featureModernCardMobile,
+                                    pressed && { backgroundColor: '#e3e8fd' }
+                                ]}>
+                                    <MaterialCommunityIcons
+                                        name={featureIcons[idx].icon}
+                                        size={36}
+                                        color={featureIcons[idx].color}
+                                        style={styles.featureIconModern}
+                                    />
+                                    <Text style={styles.featureTitleModern}>{feature.title}</Text>
+                                    <Text style={styles.featureDescriptionModern}>{feature.description}</Text>
+                                </Pressable>
+                            </AnimatedCard>
                         ))}
                     </View>
                 </View>
-
-                <View ref={benefitsRef} style={[styles.statsSection, isMobile && styles.statsSectionMobile]}>
-                    <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]}>Performance Metrics</Text>
-                    <View style={[styles.statsGrid, isMobile && styles.statsGridMobile]}>
+            ),
+        },
+        {
+            key: 'metrics',
+            render: () => (
+                <View ref={scrollViewRef} style={[styles.sectionCardModern, isMobile && styles.sectionCardMobile]}>
+                    <Text style={styles.sectionTitleModern}>Performance Metrics</Text>
+                    <View style={styles.metricsGridModern}>
                         {[
                             { metric: '98%', label: 'Call Completion Rate' },
                             { metric: '45%', label: 'Cost Reduction' },
                             { metric: '3x', label: 'Lead Coverage' },
                             { metric: '24/7', label: 'Operation Hours' }
                         ].map((stat, index) => (
-                            <View key={index} style={[styles.statCard, isMobile && styles.statCardMobile]}>
-                                <Text style={[styles.statMetric, isMobile && styles.statMetricMobile]}>{stat.metric}</Text>
-                                <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>{stat.label}</Text>
-                            </View>
+                            <AnimatedCard key={index} delay={index * 100}>
+                                <View style={[styles.metricsModernCard, isMobile && styles.metricsModernCardMobile]}>
+                                    <Text style={styles.metricsValueModern}>{stat.metric}</Text>
+                                    <Text style={styles.metricsLabelModern}>{stat.label}</Text>
+                                </View>
+                            </AnimatedCard>
                         ))}
                     </View>
                 </View>
-
-                <View ref={contactRef} style={[styles.contactSection, isMobile && styles.contactSectionMobile]}>
-                    <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]}>Contact Us</Text>
-                    <TouchableOpacity style={[styles.contactButton, isMobile && styles.contactButtonMobile]} onPress={handleScheduleDemo}>
-                        <Text style={[styles.contactButtonText, isMobile && styles.contactButtonTextMobile]}>Contact</Text>
+            ),
+        },
+        {
+            key: 'contact',
+            render: () => (
+                <View ref={scrollViewRef} style={[styles.sectionCardModern, isMobile && styles.sectionCardMobile, styles.contactSection, isMobile && styles.contactSectionMobile]}>
+                    <Text style={styles.sectionTitleModern}>Contact Us</Text>
+                    <TouchableOpacity
+                        style={[
+                            styles.contactButton,
+                            { backgroundColor: '#007AFF', alignSelf: 'center', marginTop: 18 }
+                        ]}
+                        onPress={handleScheduleDemo}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={styles.contactButtonText}>Contact</Text>
                     </TouchableOpacity>
                 </View>
+            ),
+        },
+    ];
+
+    // Scroll to the next section when drag up is pressed
+    const handleDragUpHint = (idx) => {
+        let nextIdx;
+        if (idx >= sections.length - 1) {
+            // If last section, go to hero (first section)
+            nextIdx = 0;
+        } else {
+            nextIdx = idx + 1;
+        }
+        if (sectionRefs.current[nextIdx]) {
+            sectionRefs.current[nextIdx].measureLayout(
+                scrollViewRef.current.getInnerViewNode(),
+                (x, y) => {
+                    // If moving from hero to showcase, scroll to just above the YouTube video
+                    if (idx === 0 && nextIdx === 1 && showcaseVideoRef.current) {
+                        showcaseVideoRef.current.measureLayout(
+                            scrollViewRef.current.getInnerViewNode(),
+                            (vx, vy) => {
+                                // Scroll to the top of the showcase section, not skipping any content
+                                scrollViewRef.current.scrollTo({ y: vy - 32, animated: true });
+                            }
+                        );
+                    } else {
+                        scrollViewRef.current.scrollTo({ y, animated: true });
+                    }
+                }
+            );
+        }
+    };
+
+    // On scroll, update activeSection and sectionLayouts
+    const handleScroll = (event) => {
+        const scrollY = event.nativeEvent.contentOffset.y;
+        let found = 0;
+        let layouts = [];
+        for (let i = 0; i < sections.length; i++) {
+            if (sectionRefs.current[i]) {
+                sectionRefs.current[i].measureLayout(
+                    scrollViewRef.current.getInnerViewNode(),
+                    (x, y, w, h) => {
+                        layouts[i] = { y, h };
+                        if (scrollY + 80 >= y) found = i;
+                    }
+                );
+            }
+        }
+        setTimeout(() => {
+            setActiveSection(found);
+            setSectionLayouts(layouts);
+        }, 120);
+    };
+
+    // On layout, get container height for clamping
+    const handleContainerLayout = (e) => {
+        setContainerHeight(e.nativeEvent.layout.height);
+    };
+
+    // Get current section's layout for drag button
+    const currentLayout = sectionLayouts[activeSection] || {};
+
+    // Determine drag button mode: 'hero' for first section, 'float' for others
+    let dragMode = activeSection === 0 ? 'hero' : 'float';
+
+    // Cookie Consent Banner
+    const [showCookieBanner, setShowCookieBanner] = useState(false);
+    useEffect(() => {
+        if (Platform.OS === 'web') {
+            const consent = localStorage.getItem('cookieConsent');
+            if (!consent) setShowCookieBanner(true);
+        }
+    }, []);
+    const handleAcceptCookies = () => {
+        localStorage.setItem('cookieConsent', 'true');
+        setShowCookieBanner(false);
+    };
+
+    return (
+        <View style={[styles.container, isMobile && styles.containerMobile]} onLayout={handleContainerLayout}>
+            {/* Cookie Consent Banner */}
+            {showCookieBanner && (
+                <View style={{
+                    position: 'fixed',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    backgroundColor: '#222',
+                    padding: 18,
+                    zIndex: 9999,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}>
+                    <Text style={{ color: '#fff', fontSize: 15, marginRight: 18 }}>
+                        This website uses cookies to ensure you get the best experience on our website.
+                    </Text>
+                    <TouchableOpacity
+                        style={{ backgroundColor: '#007AFF', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 22 }}
+                        onPress={handleAcceptCookies}
+                    >
+                        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>Accept</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+            <ScrollView
+                ref={scrollViewRef}
+                style={{ flex: 1 }}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 120 }}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+            >
+                {/* Hero Section */}
+                <View
+                    ref={ref => sectionRefs.current[0] = ref}
+                    onLayout={() => {}}
+                    style={{ position: 'relative', marginBottom: 24 }}
+                >
+                    <FloatingSection viewable={true}>
+                        {sections[0].render()}
+                    </FloatingSection>
+                    <View style={[
+                        styles.showcaseSection,
+                        isMobile && styles.showcaseSectionMobile,
+                        !isMobile && styles.showcaseSectionWeb,
+                        { marginBottom: 0 }
+                    ]}>
+
+                    </View>
+                </View>
+
+                {/* Remaining sections */}
+                {sections.slice(1).map((section, idx) => (
+                    <View
+                        key={section.key}
+                        ref={ref => sectionRefs.current[idx + 1] = ref}
+                        onLayout={() => {}}
+                        style={{ position: 'relative', marginBottom: 24 }}
+                    >
+                        <FloatingSection viewable={true}>
+                            {section.render()}
+                        </FloatingSection>
+                    </View>
+                ))}
             </ScrollView>
-            <LeadForm 
+            {/* Single floating drag up button: at bottom border for hero, floating for others (except last section) */}
+            {activeSection < sections.length - 1 && (
+                <DragUpHintFloating
+                    visible={true}
+                    isMobile={isMobile}
+                    onPress={() => handleDragUpHint(activeSection)}
+                    y={currentLayout.y}
+                    height={currentLayout.h}
+                    containerHeight={containerHeight}
+                    mode={dragMode}
+                />
+            )}
+            <LeadForm
                 visible={isLeadFormVisible}
                 onClose={() => setLeadFormVisible(false)}
                 onSubmit={handleLeadSubmit}
+                modalStyle={{ maxHeight: '70vh' }} // Reduce modal height
             />
+            <FloatingContactSparkle
+                visible={!isLeadFormVisible}
+                onPress={handleScheduleDemo}
+                isMobile={isMobile}
+            >
+                <Ionicons name="chatbubbles" size={28} color="#fff" />
+                <Text style={{
+                    color: '#fff',
+                    fontWeight: 'bold',
+                    fontSize: 16,
+                    marginLeft: 10,
+                }}>Contact Us</Text>
+            </FloatingContactSparkle>
         </View>
     );
 }
@@ -355,7 +1103,6 @@ const styles = StyleSheet.create({
     navLink: {
         marginHorizontal: 10,
         fontSize: 16,
-        color: '#4b5563',
     },
     loginButton: {
         paddingVertical: 5,
@@ -365,286 +1112,297 @@ const styles = StyleSheet.create({
         marginLeft: 10,
     },
     loginButtonText: {
-        color: '#fff',
         fontSize: 16,
     },
     heroSection: {
         alignItems: 'center',
-        padding: 20,
+        padding: 0,
+        marginTop: 24,
+        marginBottom: 8,
     },
-    heroContent: {
-        alignItems: 'center',
-        maxWidth: 350,
+    heroSectionMobile: {
+        marginTop: 8,
+        marginBottom: 0,
     },
-    heroTitle: {
+    heroHeadline: {
         fontSize: 38,
         fontWeight: 'bold',
-        color: '#ffffff',
+        color: '#1a237e',
         textAlign: 'center',
-        marginBottom: 10,
-        flexWrap: 'nowrap',
+        marginBottom: 8,
+        letterSpacing: 0.5,
     },
-    heroSubtitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#ffffff',
+    heroSubtext: {
+        fontSize: 20,
+        color: '#222',
         textAlign: 'center',
-        marginBottom: 15,
-        flexWrap: 'nowrap',
+        marginBottom: 4,
+        fontWeight: '500',
     },
-    trustIndicators: {
+    heroMetricsRow: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
-        marginBottom: 10,
-        width: '100%',
-        paddingHorizontal: 20,
-    },
-    trustBadge: {
-        alignItems: 'center',
-        marginHorizontal: 10,
-        padding: 15,
-        backgroundColor: '#6b7280',
-        borderRadius: 10,
-        width: 150,
-        height: 80,
         justifyContent: 'center',
-    },
-    trustBadgeTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#ffffff',
-        marginBottom: 5,
-    },
-    trustBadgeText: {
-        fontSize: 14,
-        color: '#ffffff',
-        textAlign: 'center',
-    },
-    heroAnimation: {
-        width: '100%',
-        height: 200,
-        marginVertical: 20,
-    },
-    demoButton: {
-        backgroundColor: '#4CAF50',
-        paddingVertical: 15,
-        paddingHorizontal: 30,
-        borderRadius: 25,
-        marginTop: 20,
-        elevation: 5,
-    },
-    demoButtonText: {
-        color: '#ffffff',
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
-    industrySection: {
-        padding: 20,
         alignItems: 'center',
-        width: '100%',
+        marginTop: 18,
+        gap: 24,
     },
-    industryContainer: {
-        width: '100%',
+    heroMetricsRowMobile: {
+        flexDirection: 'column',
+        gap: 10,
+        marginTop: 12,
+    },
+    metricCardModern: {
+        backgroundColor: '#e3e8fd',
+        borderRadius: 14,
+        paddingVertical: 18,
+        paddingHorizontal: 32,
         alignItems: 'center',
-    },
-    industryScrollContent: {
-        paddingVertical: 15,
-        paddingHorizontal: 10,
-        alignItems: 'center',
-    },
-    industryCard: {
-        width: 280,
-        height: 400,
-        backgroundColor: '#ffffff',
-        borderRadius: 15,
-        padding: 15,
-        marginHorizontal: 10,
-        elevation: 5,
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-    },
-    industryImageContainer: {
-        width: '100%',
-        height: 180,
-        marginBottom: 15,
-        borderRadius: 10,
-        overflow: 'hidden',
+        marginHorizontal: 8,
+        minWidth: 140,
+        marginBottom: 0,
+        shadowColor: '#1a237e',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
         elevation: 2,
     },
-    industryImage: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover',
-    },
-    industryContent: {
-        width: '100%',
-        paddingHorizontal: 10,
-        flex: 1,
-        justifyContent: 'flex-start',
-    },
-    industryTitle: {
-        fontSize: 22,
+    metricValueModern: {
+        fontSize: 28,
         fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 8,
+        color: '#1a237e',
+        marginBottom: 2,
+    },
+    metricLabelModern: {
+        fontSize: 15,
+        color: '#222',
+        fontWeight: '500',
         textAlign: 'center',
     },
-    metricsText: {
-        fontSize: 18,
-        color: '#4CAF50',
+    sectionTitleModern: {
+        fontSize: 28,
         fontWeight: 'bold',
-        marginBottom: 8,
+        color: '#1a237e',
+        marginBottom: 18,
         textAlign: 'center',
+        letterSpacing: 0.5,
     },
-    industryDescription: {
-        fontSize: 14,
-        color: '#666',
-        lineHeight: 20,
-        textAlign: 'center',
-    },
-    featuresSection: {
-        padding: 16,
-        width: '100%',
-        marginVertical: 10,
-    },
-    featureGrid: {
-        width: '100%',
-    },
-    featureRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 12,
-    },
-    featureCard: {
-        width: '48%',
-        backgroundColor: '#ffffff',
-        borderRadius: 8,
-        padding: 12,
-        elevation: 3,
+    sectionCardModern: {
+        backgroundColor: '#fff',
+        borderRadius: 18,
+        margin: 18,
+        padding: 24,
+        alignItems: 'center',
         shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.10,
+        shadowRadius: 12,
+        elevation: 6,
+        width: '95%',
+        alignSelf: 'center',
+        marginBottom: 18,
+    },
+    industryScrollModern: {
+        flexDirection: 'row',
+        gap: 24,
+        justifyContent: 'center',
+        alignItems: 'stretch',
+        width: '100%',
+    },
+    industryScrollModernMobile: {
+        flexDirection: 'column',
+        gap: 12,
+        alignItems: 'center',
+        width: '100%',
+    },
+    industryModernCard: {
+        backgroundColor: '#f7f9fc',
+        borderRadius: 14,
+        padding: 20,
+        marginHorizontal: 8,
+        alignItems: 'center',
+        minWidth: 220,
+        maxWidth: 260,
+        shadowColor: '#1a237e',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowOpacity: 0.06,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    industryModernCardMobile: {
+        minWidth: '90%',
+        maxWidth: '100%',
+        marginHorizontal: 0,
+        marginBottom: 10,
+    },
+    industryIconModern: {
+        fontSize: 36,
+        marginBottom: 8,
+        color: '#007AFF',
+    },
+    industryTitleModern: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#1a237e',
+        marginBottom: 4,
+        textAlign: 'center',
+    },
+    industryMetricsModern: {
+        fontSize: 15,
+        color: '#007AFF',
+        fontWeight: '600',
+        marginBottom: 6,
+        textAlign: 'center',
+    },
+    industryDescriptionModern: {
+        fontSize: 14,
+        color: '#222',
+        textAlign: 'center',
+        marginBottom: 0,
+    },
+    featureGridModern: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 18,
+        justifyContent: 'center',
+        width: '100%',
+    },
+    featureModernCard: {
+        backgroundColor: '#f7f9fc',
+        borderRadius: 14,
+        padding: 18,
+        margin: 8,
+        alignItems: 'center',
+        minWidth: 200,
+        maxWidth: 240,
+        flex: 1,
+        shadowColor: '#1a237e',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 2,
+        elevation: 1,
+        justifyContent: 'center',
+    },
+    featureModernCardMobile: {
+        minWidth: '96%',
+        maxWidth: '100%',
+        marginHorizontal: 0,
+        marginBottom: 10,
+        alignSelf: 'center',
         alignItems: 'center',
         justifyContent: 'center',
     },
-    featureHeader: {
-        flexDirection: 'column',
-        alignItems: 'center',
-        marginBottom: 12,
+    featureIconModern: {
+        fontSize: 36,
+        marginBottom: 14,
+        color: '#007AFF',
+        alignSelf: 'center',
+    },
+    featureTitleModern: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#1a237e',
+        marginBottom: 8,
+        textAlign: 'center',
+        alignSelf: 'center',
         width: '100%',
     },
-    featureIcon: {
-        fontSize: 40,
-        marginBottom: 8,
-    },
-    featureTitle: {
-        fontSize: 30,
-        fontWeight: '600',
-        color: '#2d3748',
+    featureDescriptionModern: {
+        fontSize: 15,
+        color: '#222',
         textAlign: 'center',
-    },
-    featureDescription: {
-        fontSize: 20,
-        color: '#718096',
+        alignSelf: 'center',
+        width: '100%',
+        marginBottom: 2,
         lineHeight: 20,
-        textAlign: 'center',
-        paddingHorizontal: 8,
     },
-    statsSection: {
-        padding: 20,
-    },
-    statsGrid: {
+    metricsGridModern: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        marginTop: 20,
+        gap: 18,
+        justifyContent: 'center',
+        width: '100%',
     },
-    statCard: {
-        width: '48%',
-        backgroundColor: '#ffffff',
-        borderRadius: 15,
-        padding: 20,
-        marginBottom: 15,
+    metricsModernCard: {
+        backgroundColor: '#f7f9fc',
+        borderRadius: 14,
+        padding: 18,
+        margin: 8,
         alignItems: 'center',
-        elevation: 3,
+        minWidth: 140,
+        maxWidth: 180,
+        flex: 1,
+        shadowColor: '#1a237e',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 2,
+        elevation: 1,
     },
-    statMetric: {
-        fontSize: 28,
+    metricsModernCardMobile: {
+        minWidth: '90%',
+        maxWidth: '100%',
+        marginHorizontal: 0,
+        marginBottom: 10,
+    },
+    metricsValueModern: {
+        fontSize: 24,
         fontWeight: 'bold',
-        color: '#4CAF50',
+        color: '#1a237e',
+        marginBottom: 2,
     },
-    statLabel: {
-        fontSize: 14,
-        color: '#666',
+    metricsLabelModern: {
+        fontSize: 13,
+        color: '#222',
         textAlign: 'center',
-        marginTop: 5,
     },
-    contactSection: {
-        padding: 20,
-        alignItems: 'center',
-    },
-    contactButton: {
-        backgroundColor: '#6b7280',
-        paddingVertical: 10,
-        paddingHorizontal: 30,
-        borderRadius: 10,
-    },
-    contactButtonText: {
-        color: '#ffffff',
+    audioTitleModern: {
         fontSize: 20,
-        fontWeight: 'bold',
-    },
-    sectionTitle: {
-        fontSize: 36,
-        fontWeight: 'bold',
-        color: '#ffffff',
-        marginBottom: 15,
+        marginBottom: 10,
         textAlign: 'center',
+        color: '#1a237e',
+        fontWeight: 'bold',
     },
-    scrollContainer: {
-        backgroundColor: '#d3d3d3',
+    audioPlayButtonModern: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: '#f5f5f5',
+        borderRadius: 24,
+        paddingVertical: 10,
+        paddingHorizontal: 18,
+        marginTop: 8,
+        shadowColor: '#007AFF',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.10,
+        shadowRadius: 4,
+        elevation: 2,
     },
-    // Responsive overrides below:
+    audioPlayTextModern: {
+        fontSize: 18,
+        color: '#222',
+        fontWeight: '600',
+    },
+    audioContainer: {
+        marginBottom: 32, // Increased space below audio before video
+    },
     containerMobile: {
         padding: 0,
     },
     headerMobile: {
-        flexDirection: 'column',
-        alignItems: 'flex-start',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         padding: 10,
     },
     logoContainerMobile: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 10,
+        marginBottom: 0,
     },
-    headerLogoMobile: {
-        width: 50,
-        height: 50,
-        marginRight: 10,
-    },
-    headerTitleMobile: {
-        fontSize: 16,
-    },
-    navLinksMobile: {
+    navLinksMobileRight: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginTop: 10,
-    },
-    navLinkMobile: {
-        fontSize: 14,
-        marginHorizontal: 5,
-        marginVertical: 2,
-    },
-    loginButtonMobile: {
-        paddingVertical: 4,
-        paddingHorizontal: 10,
-        borderRadius: 6,
-        marginLeft: 5,
-    },
-    loginButtonTextMobile: {
-        fontSize: 14,
+        alignItems: 'center',
+        marginTop: 0,
+        marginLeft: 'auto',
     },
     heroSectionMobile: {
         padding: 10,
@@ -658,23 +1416,16 @@ const styles = StyleSheet.create({
     heroSubtitleMobile: {
         fontSize: 16,
     },
-    trustIndicatorsMobile: {
-        flexDirection: 'column',
-        alignItems: 'center',
-        width: '100%',
-        paddingHorizontal: 0,
-    },
-    trustBadgeMobile: {
-        width: 120,
-        height: 60,
-        marginVertical: 5,
+    industrySectionMobile: {
         padding: 10,
     },
-    trustBadgeTitleMobile: {
-        fontSize: 16,
+    industryContainerMobile: {
+        width: '100%',
+        alignItems: 'center',
     },
-    trustBadgeTextMobile: {
-        fontSize: 10,
+    industryCardMobile: {
+        width: '95%',
+        marginVertical: 8,
     },
     industrySectionMobile: {
         padding: 10,
@@ -683,26 +1434,17 @@ const styles = StyleSheet.create({
         width: '100%',
         alignItems: 'center',
     },
-    industryScrollContentMobile: {
-        flexDirection: 'column',
-        alignItems: 'center',
-        paddingHorizontal: 0,
-    },
     industryCardMobile: {
         width: '95%',
-        height: 260,
         marginVertical: 8,
         marginHorizontal: 0,
         padding: 8,
     },
-    industryImageContainerMobile: {
-        height: 90,
-    },
-    industryImageMobile: {
-        height: '100%',
+    industryIconMobile: {
+        fontSize: 28,
     },
     industryTitleMobile: {
-        fontSize: 16,
+        fontSize: 18,
     },
     metricsTextMobile: {
         fontSize: 12,
@@ -761,6 +1503,76 @@ const styles = StyleSheet.create({
     sectionTitleMobile: {
         fontSize: 20,
         marginBottom: 8,
+    },
+    showcaseSectionWeb: {
+        maxWidth: 900,
+        alignSelf: 'center',
+        width: '100%',
+    },
+    floatingContact: {
+        position: 'absolute',
+        right: 18,
+        marginBottom: 18,
+        textAlign: 'center',
+    },
+    closeModalBtn: {
+        marginTop: 10,
+        alignSelf: 'center',
+    },
+    voiceCallAnimRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 8,
+        marginTop: 4,
+    },
+    voiceCallText: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#007AFF',
+        marginHorizontal: 8,
+    },
+    voiceCallHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 6,
+        justifyContent: 'center',
+    },
+    voiceWaveAnim: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginLeft: 4,
+    },
+    waveDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#43a047',
+        marginHorizontal: 1,
+        opacity: 0.7,
+    },
+    contactButton: {
+        backgroundColor: '#007AFF',
+        paddingVertical: 16,
+        paddingHorizontal: 48,
+        borderRadius: 14,
+        marginTop: 18,
+        marginBottom: 8,
+        elevation: 4,
+        shadowColor: '#007AFF',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.18,
+        shadowRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: 180,
+    },
+    contactButtonText: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: '#fff',
+        letterSpacing: 1,
+        textTransform: 'uppercase',
     },
 });
 

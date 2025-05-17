@@ -1,108 +1,83 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    View, 
-    Text, 
-    TextInput, 
-    TouchableOpacity, 
-    StyleSheet, 
-    Modal, 
+import {
+    View,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    StyleSheet,
+    Modal,
     ScrollView,
     Platform,
-    StatusBar,
-    useWindowDimensions
+    useWindowDimensions,
+    KeyboardAvoidingView,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useDispatch } from 'react-redux';
 import { showMessage } from './flashMessageSlice';
-
 import CountryCodeDropdownPicker from './CountryCodeDropdownPicker';
 import countryData from '../helper/countryData';
 import { useInterestMutation } from './publicApi';
 
-const countryCodes = [
-    { code: '+1', name: 'United States', flag: '🇺🇸' },
-    { code: '+91', name: 'India', flag: '🇮🇳' },
-    { code: '+44', name: 'United Kingdom', flag: '🇬🇧' },
-    { code: '+86', name: 'China', flag: '🇨🇳' },
-    { code: '+81', name: 'Japan', flag: '🇯🇵' },
-    { code: '+61', name: 'Australia', flag: '🇦🇺' },
+const companySizes = [
+    { label: '0-100', value: '0-100' },
+    { label: '100-500', value: '100-500' },
+    { label: '500-1000', value: '500-1000' },
+    { label: '1000-5000', value: '1000-5000' }
 ];
-
-const injectLinkedInScriptWeb = () => {
-    if (typeof window === 'undefined') return;
-    // Prevent duplicate injection
-    if (document.getElementById('linkedin-insight-script')) return;
-
-    // First script
-    const script1 = document.createElement('script');
-    script1.type = 'text/javascript';
-    script1.id = 'linkedin-insight-script';
-    script1.innerHTML = `
-        _linkedin_partner_id = "7164620";
-        window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
-        window._linkedin_data_partner_ids.push(_linkedin_partner_id);
-    `;
-    document.head.appendChild(script1);
-
-    // Second script
-    const script2 = document.createElement('script');
-    script2.type = 'text/javascript';
-    script2.async = true;
-    script2.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
-    document.head.appendChild(script2);
-
-    // Noscript fallback (optional, for completeness)
-    const noscript = document.createElement('noscript');
-    noscript.innerHTML = '<img height="1" width="1" style="display:none;" alt="" src="https://px.ads.linkedin.com/collect/?pid=7164620&fmt=gif" />';
-    document.body.appendChild(noscript);
-};
 
 const LeadForm = ({ visible, onClose, onSubmit }) => {
     const [formData, setFormData] = useState({
         name: '',
         email: '',
-        countryCode: countryCodes[0],
+        countryCode: '+1',
         mobileNumber: '',
-        companySize: '',
-        countryCallingCode: ''
+        companySize: ''
     });
-
     const [errors, setErrors] = useState({});
-    const [showLinkedInPixel, setShowLinkedInPixel] = useState(false);
-
-    const [countryCallingCode, setCountryCallingCode] = useState('+1');
-    const [countryCode, setCountryCode] = useState('US');
-    const [phone, setPhone] = useState('');
     const [submitting, setSubmitting] = useState(false);
-
     const dispatch = useDispatch();
     const [interest, { isLoading, error, isSuccess }] = useInterestMutation();
-
     const { width: screenWidth } = useWindowDimensions();
     const isMobile = screenWidth < 600;
 
     useEffect(() => {
         if (isSuccess) {
             dispatch(showMessage({
-                message: 'We have recieved your interest, Team will get back to you',
+                message: 'We have received your interest, Team will get back to you',
                 type: 'info'
             }));
         }
     }, [isSuccess, dispatch]);
 
+    useEffect(() => {
+        if (Platform.OS === 'web') {
+            // Google Analytics 4
+            if (!document.getElementById('ga4-script')) {
+                const gaScript = document.createElement('script');
+                gaScript.id = 'ga4-script';
+                gaScript.async = true;
+                gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX'; // Replace with your GA4 ID
+                document.head.appendChild(gaScript);
+                const gaInit = document.createElement('script');
+                gaInit.innerHTML = `window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-XXXXXXXXXX');`;
+                document.head.appendChild(gaInit);
+            }
+            // Microsoft Clarity
+            if (!document.getElementById('clarity-script')) {
+                const clarityScript = document.createElement('script');
+                clarityScript.id = 'clarity-script';
+                clarityScript.type = 'text/javascript';
+                clarityScript.innerHTML = `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/XXXXXXXXXX";y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window, document, "clarity", "script", "XXXXXXXXXX");`;
+                document.head.appendChild(clarityScript);
+            }
+        }
+    }, []);
+
     const handleSubmit = async () => {
         if (submitting) return;
         setSubmitting(true);
 
-        // Build the latest payload directly
-        const payload = {
-            ...formData,
-            mobileNumber: phone,
-            countryCode: countryCode,
-            countryCallingCode: countryCallingCode
-        };
-
-        // Validate using the latest payload
+        const payload = { ...formData };
         const newErrors = {};
         if (!payload.name.trim()) newErrors.name = 'Name is required';
         if (!payload.email.trim()) newErrors.email = 'Email is required';
@@ -116,11 +91,6 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
 
         if (Object.keys(newErrors).length === 0) {
             await interest(payload);
-            if (Platform.OS === 'web') {
-                injectLinkedInScriptWeb();
-            } else {
-                setShowLinkedInPixel(true); // Show the WebView to trigger LinkedIn script
-            }
             onClose();
             setSubmitting(false);
         } else {
@@ -129,395 +99,284 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
     };
 
     const handleCountrySelect = (selectedCountryCode) => {
-        // Find the selected country from countryData
-        const selectedCountry = countryData.find(item => item.code === selectedCountryCode);
-        if (selectedCountry) {
-            console.log("BBBBBB" + selectedCountry.country);
-          setCountryCode(selectedCountry.country);    // Set the country code (e.g., 'US')
-          setCountryCallingCode(selectedCountry.code);    // Set the calling code (e.g., '+1')
-        }
-      };
-
+        setFormData(prev => ({
+            ...prev,
+            countryCode: selectedCountryCode
+        }));
+    };
 
     return (
         <Modal
-            animationType="slide"
+            animationType="fade"
             transparent={true}
             visible={visible}
             onRequestClose={onClose}
         >
-            <View style={styles.modalOverlay}>
-                <View style={[
-                    styles.modalContainer,
-                    isMobile && styles.modalContainerMobile
-                ]}>
-                    <Text style={[styles.modalTitle, isMobile && styles.modalTitleMobile]}>Schedule a Demo</Text>
-                    
-                    <ScrollView 
-                        contentContainerStyle={styles.formContainer}
-                        keyboardShouldPersistTaps="handled"
-                    >
-                        <View style={styles.inputGroup}>
-                            <Text style={[styles.label, isMobile && styles.labelMobile]}>Full Name</Text>
-                            <TextInput
-                                style={[
-                                    styles.input, 
-                                    styles.shadowInput, 
-                                    errors.name && styles.errorInput,
-                                    isMobile && styles.inputMobile
-                                ]}
-                                placeholder="Enter your full name"
-                                placeholderTextColor="#9ca3af"
-                                value={formData.name}
-                                onChangeText={(text) => setFormData({...formData, name: text})}
-                            />
-                            {errors.name && <Text style={[styles.errorText, isMobile && styles.errorTextMobile]}>{errors.name}</Text>}
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={[styles.label, isMobile && styles.labelMobile]}>Email</Text>
-                            <TextInput
-                                style={[
-                                    styles.input, 
-                                    styles.shadowInput, 
-                                    errors.email && styles.errorInput,
-                                    isMobile && styles.inputMobile
-                                ]}
-                                placeholder="Enter your business email"
-                                placeholderTextColor="#9ca3af"
-                                keyboardType="email-address"
-                                value={formData.email}
-                                onChangeText={(text) => setFormData({...formData, email: text})}
-                            />
-                            {errors.email && <Text style={[styles.errorText, isMobile && styles.errorTextMobile]}>{errors.email}</Text>}
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={[styles.label, isMobile && styles.labelMobile]}>Mobile Number</Text>
-                            <View style={styles.mobileNumberContainer}>
-                                <CountryCodeDropdownPicker
-                                    onSelectCountry={handleCountrySelect}
-                                    value={phone}
-                                    onChangeText={setPhone}/>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                style={styles.centeredView}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[
+                        styles.card,
+                        isMobile && styles.cardMobile
+                    ]}>
+                        <Text style={styles.title}>Schedule a Demo</Text>
+                        <Text style={styles.subtitle}>Let us know your details and our team will reach out to you.</Text>
+                        <ScrollView
+                            style={{ width: '100%' }}
+                            contentContainerStyle={{ paddingVertical: 8 }}
+                            keyboardShouldPersistTaps="handled"
+                        >
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Full Name</Text>
+                                <TextInput
+                                    style={[
+                                        styles.input,
+                                        errors.name && styles.inputError,
+                                        isMobile && styles.inputMobile
+                                    ]}
+                                    placeholder="Enter your full name"
+                                    value={formData.name}
+                                    onChangeText={text => setFormData({ ...formData, name: text })}
+                                />
+                                {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
                             </View>
-                        
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Email</Text>
+                                <TextInput
+                                    style={[
+                                        styles.input,
+                                        errors.email && styles.inputError,
+                                        isMobile && styles.inputMobile
+                                    ]}
+                                    placeholder="Enter your business email"
+                                    keyboardType="email-address"
+                                    value={formData.email}
+                                    onChangeText={text => setFormData({ ...formData, email: text })}
+                                />
+                                {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+                            </View>
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Mobile Number</Text>
+                                <View style={styles.phoneRow}>
+                                    <CountryCodeDropdownPicker
+                                        onSelectCountry={handleCountrySelect}
+                                        value={formData.mobileNumber}
+                                        onChangeText={text => setFormData({ ...formData, mobileNumber: text })}
+                                        selectedCountryCode={formData.countryCode}
+                                    />
+                                </View>
+                                {errors.mobileNumber && <Text style={styles.errorText}>{errors.mobileNumber}</Text>}
+                            </View>
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Company Size</Text>
+                                <View style={styles.companySizeRow}>
+                                    {companySizes.map(size => (
+                                        <TouchableOpacity
+                                            key={size.value}
+                                            style={[
+                                                styles.companySizeOption,
+                                                formData.companySize === size.value && styles.companySizeOptionSelected,
+                                                isMobile && styles.companySizeOptionMobile
+                                            ]}
+                                            onPress={() => setFormData({ ...formData, companySize: size.value })}
+                                        >
+                                            <Text style={[
+                                                styles.companySizeText,
+                                                formData.companySize === size.value && styles.companySizeTextSelected
+                                            ]}>
+                                                {size.label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                                {errors.companySize && <Text style={styles.errorText}>{errors.companySize}</Text>}
+                            </View>
+                        </ScrollView>
+                        <TouchableOpacity
+                            style={[
+                                styles.submitButton,
+                                submitting && { opacity: 0.7 },
+                                isMobile && styles.submitButtonMobile
+                            ]}
+                            onPress={handleSubmit}
+                            disabled={submitting}
+                        >
+                            <Text style={styles.submitButtonText}>Submit</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.cancelButton}
+                            onPress={onClose}
+                        >
+                            <Text style={styles.cancelButtonText}>Cancel</Text>
+                        </TouchableOpacity>
                     </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={[styles.label, isMobile && styles.labelMobile]}>Company Size</Text>
-                            <View style={styles.companySizeContainer}>
-                                {[
-                                    { label: '0-100', value: '0-100' },
-                                    { label: '100-500', value: '100-500' },
-                                    { label: '500-1000', value: '500-1000' },
-                                    { label: '1000-5000', value: '1000-5000' }
-                                ].map((size) => (
-                                    <TouchableOpacity
-                                        key={size.value}
-                                        style={[
-                                            styles.companySizeOption,
-                                            styles.shadowInput,
-                                            formData.companySize === size.value && styles.selectedCompanySize,
-                                            isMobile && styles.companySizeOptionMobile
-                                        ]}
-                                        onPress={() => setFormData({...formData, companySize: size.value})}
-                                    >
-                                        <Text style={[
-                                            styles.companySizeText,
-                                            formData.companySize === size.value && styles.selectedCompanySizeText,
-                                            isMobile && styles.companySizeTextMobile
-                                        ]}>
-                                            {size.label}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                            {errors.companySize && <Text style={[styles.errorText, isMobile && styles.errorTextMobile]}>{errors.companySize}</Text>}
-                        </View>
-
-                        <View style={styles.buttonContainer}>
-                            <TouchableOpacity 
-                                style={[
-                                    styles.submitButton, 
-                                    styles.shadowInput, 
-                                    submitting && { opacity: 0.5 },
-                                    isMobile && styles.submitButtonMobile
-                                ]} 
-                                onPress={handleSubmit}
-                                disabled={submitting}
-                            >
-                                <Text style={[styles.submitButtonText, isMobile && styles.submitButtonTextMobile]}>Submit</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity 
-                                style={[
-                                    styles.cancelButton, 
-                                    styles.shadowInput,
-                                    isMobile && styles.cancelButtonMobile
-                                ]} 
-                                onPress={onClose}
-                            >
-                                <Text style={[styles.cancelButtonText, isMobile && styles.cancelButtonTextMobile]}>Cancel</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </ScrollView>
-                    {showLinkedInPixel && Platform.OS !== 'web' && (
-                        <WebView
-                            source={{
-                                html: `
-                                <!DOCTYPE html>
-                                <html>
-                                <head>
-                                <script type="text/javascript">
-                                _linkedin_partner_id = "7164620";
-                                window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
-                                window._linkedin_data_partner_ids.push(_linkedin_partner_id);
-                                </script>
-                                <script type="text/javascript">
-                                (function(l) {
-                                if (!l){window.lintrk = function(a,b){window.lintrk.q.push([a,b])};
-                                window.lintrk.q=[]}
-                                var s = document.getElementsByTagName("script")[0];
-                                var b = document.createElement("script");
-                                b.type = "text/javascript";b.async = true;
-                                b.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
-                                s.parentNode.insertBefore(b, s);})(window.lintrk);
-                                </script>
-                                <noscript>
-                                <img height="1" width="1" style="display:none;" alt="" src="https://px.ads.linkedin.com/collect/?pid=7164620&fmt=gif" />
-                                </noscript>
-                                </head>
-                                <body></body>
-                                </html>
-                                `
-                            }}
-                            style={{ width: 0, height: 0, opacity: 0 }}
-                            javaScriptEnabled
-                            injectedJavaScript={`true;`}
-                            onLoadEnd={() => setTimeout(() => setShowLinkedInPixel(false), 2000)}
-                        />
-                    )}
                 </View>
-            </View>
+            </KeyboardAvoidingView>
         </Modal>
     );
 };
 
 const styles = StyleSheet.create({
-    modalOverlay: {
+    centeredView: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'center',
         alignItems: 'center',
-        ...Platform.select({
-            ios: {
-                paddingTop: StatusBar.currentHeight || 0
-            }
-        })
     },
-    modalContainer: {
-        width: '50%', // Changed from 90% to 50%
-        backgroundColor: '#d3d3d3',
-        borderRadius: 20,
-        padding: 20,
-        maxHeight: '80%',
+    modalOverlay: {
+        flex: 1,
+        width: '100%',
+        backgroundColor: 'rgba(30,30,30,0.18)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    card: {
+        backgroundColor: '#fff',
+        borderRadius: 22,
+        padding: 36,
+        width: 420,
+        maxWidth: '98%',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.18,
+        shadowRadius: 16,
         elevation: 8,
+        alignItems: 'center',
     },
-    modalContainerMobile: {
-        width: '95%',
-        padding: 10,
-        borderRadius: 10,
+    cardMobile: {
+        width: '98%',
+        padding: 16,
+        borderRadius: 14,
     },
-    shadowInput: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 3,
-        elevation: 4,
-    },
-    modalTitle: {
-        fontSize: 24,
+    title: {
+        fontSize: 28,
         fontWeight: 'bold',
+        color: '#1a237e',
+        marginBottom: 6,
         textAlign: 'center',
-        marginBottom: 20,
-        color: '#4b5563',
+        letterSpacing: 0.5,
     },
-    modalTitleMobile: {
-        fontSize: 18,
-        marginBottom: 10,
-    },
-    formContainer: {
-        paddingHorizontal: 10,
+    subtitle: {
+        fontSize: 15,
+        color: '#555',
+        marginBottom: 18,
+        textAlign: 'center',
+        fontWeight: '500',
     },
     inputGroup: {
-        marginBottom: 15,
+        marginBottom: 18,
+        width: '100%',
     },
     label: {
-        marginBottom: 5,
-        color: '#4b5563',
-        fontWeight: 'bold',
-    },
-    labelMobile: {
-        fontSize: 14,
+        fontSize: 15,
+        fontWeight: '600',
+        marginBottom: 6,
+        color: '#222',
     },
     input: {
+        width: '100%',
+        height: 46,
+        borderColor: '#ddd',
         borderWidth: 1,
-        borderColor: 'rgba(209, 213, 219, 0.5)',
+        paddingHorizontal: 14,
         borderRadius: 8,
-        padding: 10,
+        backgroundColor: '#f9f9f9',
         fontSize: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
     },
     inputMobile: {
-        fontSize: 14,
-        padding: 8,
+        fontSize: 15,
+        height: 40,
+        paddingHorizontal: 10,
     },
-    errorInput: {
-        borderColor: 'red',
+    inputError: {
+        borderColor: '#ff4444',
     },
     errorText: {
-        color: 'red',
-        fontSize: 12,
-        marginTop: 5,
+        color: '#ff4444',
+        fontSize: 13,
+        marginTop: 4,
     },
-    errorTextMobile: {
-        fontSize: 10,
-    },
-    phoneInputContainer: {
-        position: 'relative',
+    phoneRow: {
         flexDirection: 'row',
         alignItems: 'center',
+        width: '100%',
     },
-    countryCodePicker: {
-        backgroundColor: 'rgba(243, 244, 246, 0.7)',
-        padding: 10,
-        borderTopLeftRadius: 8,
-        borderBottomLeftRadius: 8,
-        borderWidth: 1,
-        borderColor: 'rgba(209, 213, 219, 0.5)',
-    },
-    countryCodeRow: {
+    companySizeRow: {
         flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-    },
-    flagText: {
-        fontSize: 18,
-    },
-    countryCodeText: {
-        color: '#4b5563',
-        fontWeight: 'bold',
-    },
-    dropdownContainer: {
-        position: 'absolute',
-        top: '100%',
-        left: 0,
-        right: 0,
-        backgroundColor: 'blue',
-        borderWidth: 1,
-        borderColor: 'rgba(209, 213, 219, 0.5)',
-        borderRadius: 8,
-        zIndex: -1,
-        maxHeight: 200,
-    },
-    dropdownItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 10,
-        borderBottomWidth: 1,
-        
-        borderBottomColor: 'rgba(209, 213, 219, 0.5)',
-    },
-    dropdownItemText: {
-        marginLeft: 10,
-        color: '#4b5563',
-    },
-    phoneInput: {
-        flex: 1,
-        borderWidth: 1,
-        borderColor: 'rgba(209, 213, 219, 0.5)',
-        borderTopRightRadius: 8,
-        borderBottomRightRadius: 8,
-        padding: 10,
-        fontSize: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    },
-    companySizeContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
         flexWrap: 'wrap',
+        gap: 10,
+        justifyContent: 'space-between',
+        width: '100%',
     },
     companySizeOption: {
-        width: '48%',
-        padding: 10,
+        flex: 1,
+        minWidth: 90,
+        maxWidth: '48%',
+        paddingVertical: 10,
         borderWidth: 1,
-        borderColor: 'rgba(209, 213, 219, 0.5)',
+        borderColor: '#ddd',
         borderRadius: 8,
-        marginBottom: 10,
+        marginBottom: 8,
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        backgroundColor: '#f9f9f9',
     },
     companySizeOptionMobile: {
-        width: '100%',
+        minWidth: '100%',
+        maxWidth: '100%',
         marginBottom: 8,
-        padding: 8,
+        paddingVertical: 8,
     },
-    selectedCompanySize: {
-        backgroundColor: '#6b7280',
-        borderColor: '#6b7280',
+    companySizeOptionSelected: {
+        backgroundColor: '#007AFF',
+        borderColor: '#007AFF',
     },
     companySizeText: {
-        color: '#4b5563',
+        color: '#222',
         fontWeight: 'bold',
+        fontSize: 15,
     },
-    companySizeTextMobile: {
-        fontSize: 12,
-    },
-    selectedCompanySizeText: {
-        color: 'white',
-    },
-    buttonContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 20,
+    companySizeTextSelected: {
+        color: '#fff',
     },
     submitButton: {
-        backgroundColor: '#6b7280',
-        paddingVertical: 15,
-        paddingHorizontal: 30,
-        borderRadius: 10,
-        flex: 1,
-        marginRight: 10,
+        backgroundColor: '#007AFF',
+        borderRadius: 14,
+        paddingVertical: 16,
+        paddingHorizontal: 48,
+        marginTop: 10,
+        marginBottom: 8,
+        elevation: 4,
+        shadowColor: '#007AFF',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.18,
+        shadowRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: 180,
+        width: '100%',
     },
     submitButtonMobile: {
-        paddingVertical: 10,
+        paddingVertical: 12,
         paddingHorizontal: 10,
-        borderRadius: 8,
-        marginRight: 5,
+        borderRadius: 10,
+        minWidth: '100%',
     },
     submitButtonText: {
-        color: 'white',
-        textAlign: 'center',
+        fontSize: 20,
         fontWeight: 'bold',
-        fontSize: 16,
-    },
-    submitButtonTextMobile: {
-        fontSize: 14,
+        color: '#fff',
+        letterSpacing: 1,
+        textTransform: 'uppercase',
     },
     cancelButton: {
         backgroundColor: '#f3f4f6',
-        paddingVertical: 15,
-        paddingHorizontal: 30,
         borderRadius: 10,
-        flex: 1,
-    },
-    cancelButtonMobile: {
-        paddingVertical: 10,
-        paddingHorizontal: 10,
-        borderRadius: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 30,
+        marginTop: 2,
+        alignItems: 'center',
+        width: '100%',
     },
     cancelButtonText: {
         color: '#4b5563',
@@ -525,63 +384,6 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         fontSize: 16,
     },
-    cancelButtonTextMobile: {
-        fontSize: 14,
-    },
-    mobileNumberContainer: {
-        flexDirection: 'row',
-        position: 'relative',
-        zIndex: 1,
-      },
-      countryCodePicker: {
-        backgroundColor: 'rgba(243, 244, 246, 0.7)',
-        padding: 10,
-        borderTopLeftRadius: 8,
-        borderBottomLeftRadius: 8,
-        borderWidth: 1,
-        borderColor: 'rgba(209, 213, 219, 0.5)',
-        zIndex: 2,
-      },
-      countryCodePickerActive: {
-        zIndex: 999,
-      },
-      phoneInput: {
-        flex: 1,
-        borderWidth: 1,
-        borderColor: 'rgba(209, 213, 219, 0.5)',
-        borderTopRightRadius: 8,
-        borderBottomRightRadius: 8,
-        padding: 10,
-        fontSize: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-      },
-      dropdownOverlay: {
-        position: 'absolute',
-        top: '100%',
-        left: 0,
-        right: 0,
-        zIndex: 10000,
-      },
-      dropdownContainer: {
-        backgroundColor: 'white',
-        borderWidth: 1,
-        borderColor: 'rgba(209, 213, 219, 0.5)',
-        borderRadius: 8,
-        maxHeight: 200,
-        marginTop: 5,
-        zIndex: 999,
-      },
-      dropdownItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(209, 213, 219, 0.5)',
-      },
-      dropdownItemText: {
-        marginLeft: 10,
-        color: '#4b5563',
-      },
 });
 
 export default LeadForm;
