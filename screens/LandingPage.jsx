@@ -341,7 +341,7 @@ const LandingPage = ({ navigation }) => {
             injectLinkedInScriptWeb();
             injectFacebookPixelWeb();
             injectAnalyticsScripts({
-                gaId: 'G-XXXXXXXXXX', // TODO: Replace with your real GA4 ID
+                gaId: 'G-KCK0RY0YPP', // TODO: Replace with your real GA4 ID
                 clarityId: 'XXXXXXXXXX', // TODO: Replace with your real Clarity ID
             });
         }
