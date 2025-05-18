@@ -17,6 +17,7 @@ import { showMessage } from './flashMessageSlice';
 import CountryCodeDropdownPicker from './CountryCodeDropdownPicker';
 import countryData from '../helper/countryData';
 import { useInterestMutation } from './publicApi';
+import { injectAnalyticsScripts } from '../utils/injectAnalytics';
 
 const companySizes = [
     { label: '0-100', value: '0-100' },
@@ -51,37 +52,10 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
 
     useEffect(() => {
         if (Platform.OS === 'web') {
-            // Defer analytics/tracking scripts to after first render
-            const injectScripts = () => {
-                // Google Analytics 4
-                if (!document.getElementById('ga4-script')) {
-                    const gaScript = document.createElement('script');
-                    gaScript.id = 'ga4-script';
-                    gaScript.async = true;
-                    gaScript.defer = true;
-                    gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX'; // Replace with your GA4 ID
-                    document.head.appendChild(gaScript);
-                    const gaInit = document.createElement('script');
-                    gaInit.defer = true;
-                    gaInit.innerHTML = `window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-XXXXXXXXXX');`;
-                    document.head.appendChild(gaInit);
-                }
-                // Microsoft Clarity
-                if (!document.getElementById('clarity-script')) {
-                    const clarityScript = document.createElement('script');
-                    clarityScript.id = 'clarity-script';
-                    clarityScript.type = 'text/javascript';
-                    clarityScript.async = true;
-                    clarityScript.defer = true;
-                    clarityScript.innerHTML = `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/XXXXXXXXXX";y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window, document, "clarity", "script", "XXXXXXXXXX");`;
-                    document.head.appendChild(clarityScript);
-                }
-            };
-            if ('requestIdleCallback' in window) {
-                window.requestIdleCallback(injectScripts);
-            } else {
-                setTimeout(injectScripts, 1200);
-            }
+            injectAnalyticsScripts({
+                gaId: 'G-XXXXXXXXXX', // TODO: Replace with your real GA4 ID
+                clarityId: 'XXXXXXXXXX', // TODO: Replace with your real Clarity ID
+            });
         }
     }, []);
 
