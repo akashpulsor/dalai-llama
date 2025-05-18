@@ -6,12 +6,12 @@ import { publicApi } from './publicApi'; // Add this import
 import { setupListeners } from '@reduxjs/toolkit/query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { clearAuth } from './authSlice';
-import jwt_decode from 'jwt-decode';
+import { jwtDecode } from 'jwt-decode';
 import flashMessageReducer from './flashMessageSlice';
 
 const isTokenExpired = (token) => {
   try {
-    const decodedToken = jwt_decode(token);
+    const decodedToken = jwtDecode(token);
     const currentTime = Math.floor(Date.now() / 1000);
     return decodedToken.exp < currentTime;
   } catch (error) {
