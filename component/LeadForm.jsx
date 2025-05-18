@@ -136,7 +136,7 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
                         <Text style={styles.title}>Schedule a Demo</Text>
                         <Text style={styles.subtitle}>Let us know your details and our team will reach out to you.</Text>
                         <ScrollView
-                            style={{ width: '100%' }}
+                            style={{ width: '100%', maxHeight: isMobile ? 340 : undefined }}
                             contentContainerStyle={{ paddingVertical: 8 }}
                             keyboardShouldPersistTaps="handled"
                         >

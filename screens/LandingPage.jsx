@@ -2,64 +2,18 @@ import React, { createRef, useState, useEffect, useRef, lazy, Suspense } from 'r
 import { View, ScrollView, Text, StyleSheet, TouchableOpacity, Image, Animated, Platform, Modal, Pressable } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useWindowDimensions } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { Easing } from 'react-native';
-import { Animated as RNAnimated, PanResponder, Easing as RNEasing } from 'react-native';
-
-const LeadForm = lazy(() => import('../component/LeadForm'));
-
+import { Animated as RNAnimated } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { useInterestMutation } from '../component/publicApi';
 import { showMessage } from '../component/flashMessageSlice';
+import { industrySolutions, featureIcons, AnimatedCard, FloatingSection } from './LandingPageHelpers';
 
-const injectLinkedInScriptWeb = () => {
-    if (typeof window === 'undefined') return;
-    if (document.getElementById('linkedin-insight-script')) return;
+const LeadForm = lazy(() => import('../component/LeadForm'));
+const LazySections = lazy(() => import('../LazySections'));
 
-    const script1 = document.createElement('script');
-    script1.type = 'text/javascript';
-    script1.id = 'linkedin-insight-script';
-    script1.innerHTML = `
-        _linkedin_partner_id = "7164620";
-        window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
-        window._linkedin_data_partner_ids.push(_linkedin_partner_id);
-    `;
-    document.head.appendChild(script1);
-
-    const script2 = document.createElement('script');
-    script2.type = 'text/javascript';
-    script2.async = true;
-    script2.src = "https://snap.licdn.com/li.lms-analytics/insight.min.js";
-    document.head.appendChild(script2);
-
-    const noscript = document.createElement('noscript');
-    noscript.innerHTML = '<img height="1" width="1" style="display:none;" alt="" src="https://px.ads.linkedin.com/collect/?pid=7164620&fmt=gif" />';
-    document.body.appendChild(noscript);
-};
-
-// Facebook Pixel (Meta Pixel) inject for web
-const injectFacebookPixelWeb = () => {
-    if (typeof window === 'undefined') return;
-    if (document.getElementById('fb-pixel-script')) return;
-    const script = document.createElement('script');
-    script.id = 'fb-pixel-script';
-    script.innerHTML = `
-      !function(f,b,e,v,n,t,s)
-      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-      n.callMethod.apply(n,arguments):n.queue.push(arguments};
-      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-      n.queue=[];t=b.createElement(e);t.async=!0;
-      t.src=v;s=b.getElementsByTagName(e)[0];
-      s.parentNode.insertBefore(t,s)}(window, document,'script',
-      'https://connect.facebook.net/en_US/fbevents.js');
-      fbq('init', 'YOUR_PIXEL_ID');
-      fbq('track', 'PageView');
-    `;
-    document.head.appendChild(script);
-    const noscript = document.createElement('noscript');
-    noscript.innerHTML = '<img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=YOUR_PIXEL_ID&ev=PageView&noscript=1"/>';
-    document.body.appendChild(noscript);
-};
+import { injectLinkedInScriptWeb, injectFacebookPixelWeb } from '../utils/injectScripts';
 
 const CurvedBackground = () => {
     return (
@@ -73,164 +27,6 @@ const CurvedBackground = () => {
       </View>
     );
 };
-
-const industrySolutions = [
-    {
-        icon: '📞',
-        title: 'Insurance Sales',
-        metrics: '3x Lead Qualification',
-        description: 'Policy renewal reminders, cross-selling opportunities, claim follow-ups'
-    },
-    {
-        icon: '🏠',
-        title: 'Real Estate',
-        metrics: '45% More Appointments',
-        description: 'Property listings, viewing schedules, follow-up with potential buyers'
-    },
-    {
-        icon: '💳',
-        title: 'Banking & Finance',
-        metrics: '60% Cost Reduction',
-        description: 'Credit card sales, loan applications, payment reminders'
-    },
-    {
-        icon: '🎓',
-        title: 'Education',
-        metrics: '2x Enrollment Rate',
-        description: 'Admission inquiries, course registration, fee reminder calls'
-    }
-];
-
-const featureIcons = [
-    { icon: 'target-variant', color: '#007AFF' }, // Smart Lead Prioritization
-    { icon: 'translate', color: '#43a047' },      // Multi-Language Support
-    { icon: 'autorenew', color: '#ff9800' },      // Automated Follow-ups
-    { icon: 'database-sync', color: '#8e24aa' },  // CRM Integration
-];
-
-const AnimatedCard = ({ children, delay = 0, style = {}, ...props }) => {
-    const fadeAnim = React.useRef(new Animated.Value(0)).current;
-    const slideAnim = React.useRef(new Animated.Value(20)).current;
-    useEffect(() => {
-        Animated.parallel([
-            Animated.timing(fadeAnim, { toValue: 1, duration: 500, delay, useNativeDriver: true }),
-            Animated.timing(slideAnim, { toValue: 0, duration: 500, delay, useNativeDriver: true }),
-        ]).start();
-    }, []);
-    return (
-        <Animated.View style={[{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }, style]} {...props}>
-            {children}
-        </Animated.View>
-    );
-};
-
-// Bidirectional FloatingSection: animates in/out on viewable change
-const FloatingSection = ({ children, viewable, style = {}, ...props }) => {
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-    const translateY = useRef(new Animated.Value(40)).current;
-
-    useEffect(() => {
-        if (viewable) {
-            Animated.parallel([
-                Animated.timing(fadeAnim, {
-                    toValue: 1,
-                    duration: 700,
-                    useNativeDriver: true,
-                    easing: Easing.out(Easing.exp),
-                }),
-                Animated.timing(translateY, {
-                    toValue: 0,
-                    duration: 700,
-                    useNativeDriver: true,
-                    easing: Easing.out(Easing.exp),
-                }),
-            ]).start();
-        } else {
-            Animated.parallel([
-                Animated.timing(fadeAnim, {
-                    toValue: 0,
-                    duration: 500,
-                    useNativeDriver: true,
-                    easing: Easing.in(Easing.exp),
-                }),
-                Animated.timing(translateY, {
-                    toValue: 40,
-                    duration: 500,
-                    useNativeDriver: true,
-                    easing: Easing.in(Easing.exp),
-                }),
-            ]).start();
-        }
-    }, [viewable]);
-
-    return (
-        <Animated.View style={[{ opacity: fadeAnim, transform: [{ translateY }] }, style]} {...props}>
-            {children}
-        </Animated.View>
-    );
-};
-
-// Animated frequency bars for speaking animation
-const FrequencyBars = ({ playing }) => {
-    const anims = [useRef(new Animated.Value(1)).current, useRef(new Animated.Value(1)).current, useRef(new Animated.Value(1)).current, useRef(new Animated.Value(1)).current, useRef(new Animated.Value(1)).current];
-
-    useEffect(() => {
-        if (playing) {
-            const animations = anims.map((anim, i) =>
-                Animated.loop(
-                    Animated.sequence([
-                        Animated.timing(anim, {
-                            toValue: 2,
-                            duration: 200 + i * 60,
-                            useNativeDriver: true,
-                            easing: Easing.linear,
-                        }),
-                        Animated.timing(anim, {
-                            toValue: 1,
-                            duration: 200 + i * 60,
-                            useNativeDriver: true,
-                            easing: Easing.linear,
-                        }),
-                    ])
-                )
-            );
-            Animated.stagger(80, animations).start();
-        } else {
-            anims.forEach(anim => anim.setValue(1));
-        }
-    }, [playing]);
-
-    return (
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 24, marginHorizontal: 8 }}>
-            {anims.map((anim, i) => (
-                <Animated.View
-                    key={i}
-                    style={{
-                        width: 4,
-                        marginHorizontal: 2,
-                        borderRadius: 2,
-                        backgroundColor: i === 2 ? '#007AFF' : '#43a047',
-                        height: anim.interpolate({
-                            inputRange: [1, 2],
-                            outputRange: [10, 24],
-                        }),
-                    }}
-                />
-            ))}
-        </View>
-    );
-};
-
-// Voice Call Animation Row
-const VoiceCallAnimation = ({ playing }) => (
-    <View style={styles.voiceCallAnimRow}>
-        <MaterialCommunityIcons name="robot" size={32} color="#007AFF" style={{ marginRight: 8 }} />
-        <Text style={styles.voiceCallText}>Voice Call</Text>
-        <MaterialCommunityIcons name="phone" size={24} color="#222" style={{ marginHorizontal: 8 }} />
-        <FrequencyBars playing={playing} />
-        <MaterialCommunityIcons name="account-circle" size={32} color="#43a047" style={{ marginLeft: 8 }} />
-    </View>
-);
 
 const DragUpHintInline = ({ visible, isMobile, onPress, style }) => {
     const bounceAnim = useRef(new RNAnimated.Value(0)).current;
@@ -492,6 +288,7 @@ const LandingPage = ({ navigation }) => {
     const [sectionLayouts, setSectionLayouts] = useState([]);
     const [showcaseVideoLayout, setShowcaseVideoLayout] = useState(null);
     const [containerHeight, setContainerHeight] = useState(null);
+    const [showAllSections, setShowAllSections] = useState(false);
     const dispatch = useDispatch();
     
     const [addInterest, { 
@@ -720,7 +517,7 @@ const LandingPage = ({ navigation }) => {
                             <audio ref={audioRefs.hindi} src="/assets/audio-sample-hindi.mp3" style={{ display: 'none' }} />
                             <audio ref={audioRefs.english} src="/assets/audio-sample-english.mp3" style={{ display: 'none' }} />
                             <audio ref={audioRefs.british_english} src="/assets/audio-sample-british.mp3" style={{ display: 'none' }} />
-                            {audioPlaying && <VoiceCallAnimation playing={audioPlaying} />}
+                            {audioPlaying && <FrequencyBars playing={audioPlaying} />}
                         </View>
                         {/* YouTube Video - below audio, responsive aspect ratio */}
                         <View
@@ -815,18 +612,22 @@ const LandingPage = ({ navigation }) => {
                             {
                                 title: 'Smart Lead Prioritization',
                                 description: 'AI-driven scoring to call high-potential leads first',
+                                icon: <MaterialIcons name="star" size={36} color="#007AFF" style={{ marginBottom: 8 }} />,
                             },
                             {
                                 title: 'Multi-Language Support',
                                 description: 'Engage customers in their preferred language',
+                                icon: <MaterialIcons name="language" size={36} color="#43a047" style={{ marginBottom: 8 }} />,
                             },
                             {
                                 title: 'Automated Follow-ups',
                                 description: 'Schedule and execute follow-up calls automatically',
+                                icon: <MaterialIcons name="autorenew" size={36} color="#ff9800" style={{ marginBottom: 8 }} />,
                             },
                             {
                                 title: 'CRM Integration',
                                 description: 'Seamless integration with your existing CRM',
+                                icon: <MaterialIcons name="link" size={36} color="#8e24aa" style={{ marginBottom: 8 }} />,
                             }
                         ].map((feature, idx) => (
                             <AnimatedCard key={idx} delay={idx * 120}>
@@ -835,12 +636,7 @@ const LandingPage = ({ navigation }) => {
                                     isMobile && styles.featureModernCardMobile,
                                     pressed && { backgroundColor: '#e3e8fd' }
                                 ]}>
-                                    <MaterialCommunityIcons
-                                        name={featureIcons[idx].icon}
-                                        size={36}
-                                        color={featureIcons[idx].color}
-                                        style={styles.featureIconModern}
-                                    />
+                                    <View style={{ alignItems: 'center', marginBottom: 8 }}>{feature.icon}</View>
                                     <Text style={styles.featureTitleModern}>{feature.title}</Text>
                                     <Text style={styles.featureDescriptionModern}>{feature.description}</Text>
                                 </Pressable>
@@ -935,6 +731,10 @@ const LandingPage = ({ navigation }) => {
         setTimeout(() => {
             setActiveSection(found);
             setSectionLayouts(layouts);
+            // Auto-load rest of the page if user scrolls past initial sections
+            if (!showAllSections && found >= 2) {
+                setShowAllSections(true);
+            }
         }, 120);
     };
 
@@ -962,8 +762,41 @@ const LandingPage = ({ navigation }) => {
         setShowCookieBanner(false);
     };
 
+    useEffect(() => {
+        if (showAllSections) {
+            setTimeout(() => {
+                if (sectionRefs.current[2] && scrollViewRef.current) {
+                    sectionRefs.current[2].measureLayout(
+                        scrollViewRef.current.getInnerViewNode(),
+                        (x, y) => {
+                            scrollViewRef.current.scrollTo({ y, animated: true });
+                            setActiveSection(2);
+                        }
+                    );
+                }
+            }, 400); // Slightly longer delay to ensure rendering
+        }
+    }, [showAllSections]);
+
     return (
         <View style={[styles.container, isMobile && styles.containerMobile]} onLayout={handleContainerLayout}>
+            {/* Header Section */}
+            <View style={[styles.header, isMobile && styles.headerMobile]}>
+                <View style={[styles.logoContainer, isMobile && styles.logoContainerMobile]}>
+                    <Image source={require('../assets/logo.png')} style={styles.headerLogo} />
+                    <Text style={styles.headerTitle}>Dalai Llama</Text>
+                </View>
+                <View style={styles.navLinks}>
+\
+                    <TouchableOpacity
+                        onPress={handleLogin}
+                        style={[styles.loginButton, isMobile && styles.loginButtonMobile]}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={[styles.loginButtonText, isMobile && styles.loginButtonTextMobile]}>Login</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
             {/* Cookie Consent Banner */}
             {showCookieBanner && (
                 <View style={{
@@ -1006,59 +839,55 @@ const LandingPage = ({ navigation }) => {
                     <FloatingSection viewable={true}>
                         {sections[0].render()}
                     </FloatingSection>
-                    <View style={[
-                        styles.showcaseSection,
-                        isMobile && styles.showcaseSectionMobile,
-                        !isMobile && styles.showcaseSectionWeb,
-                        { marginBottom: 0 }
-                    ]}>
-
-                    </View>
                 </View>
-
-                {/* Remaining sections */}
-                {sections.slice(1).map((section, idx) => (
-                    <View
-                        key={section.key}
-                        ref={ref => sectionRefs.current[idx + 1] = ref}
-                        onLayout={() => {}}
-                        style={{ position: 'relative', marginBottom: 24 }}
-                    >
-                        <FloatingSection viewable={true}>
-                            {section.render()}
-                        </FloatingSection>
-                    </View>
-                ))}
+                {/* Showcase Section (See Dalai Llama in Action, voice demo, video) */}
+                <View
+                    ref={ref => sectionRefs.current[1] = ref}
+                    onLayout={() => {}}
+                    style={{ position: 'relative', marginBottom: 24 }}
+                >
+                    <FloatingSection viewable={true}>
+                        {sections[1].render()}
+                    </FloatingSection>
+                </View>
+                {/* Load rest of the sections on drag up, lazy loaded */}
+                {showAllSections && (
+                    <Suspense fallback={<View style={{height: 200, justifyContent: 'center', alignItems: 'center'}}><Text>Loading...</Text></View>}>
+                        <LazySections
+                            isMobile={isMobile}
+                            styles={styles}
+                            sectionRefs={sectionRefs}
+                            handleScheduleDemo={handleScheduleDemo}
+                        />
+                    </Suspense>
+                )}
             </ScrollView>
-            {/* Single floating drag up button: at bottom border for hero, floating for others (now always visible) */}
-            <DragUpHintFloating
-                visible={true}
-                isMobile={isMobile}
-                onPress={() => handleDragUpHint(activeSection)}
-                y={currentLayout.y}
-                height={currentLayout.h}
-                containerHeight={containerHeight}
-                mode={dragMode}
-            />
+            {/* Drag up button: show unless on last section */}
+            {activeSection < (showAllSections ? 5 : 1) && (
+                <DragUpHintFloating
+                    visible={true}
+                    isMobile={isMobile}
+                    onPress={() => {
+                        if (!showAllSections) {
+                            setShowAllSections(true);
+                        } else {
+                            handleDragUpHint(activeSection);
+                        }
+                    }}
+                    y={currentLayout.y}
+                    height={currentLayout.h}
+                    containerHeight={containerHeight}
+                    mode={dragMode}
+                />
+            )}
             <Suspense fallback={null}>
                 <LeadForm
                     visible={isLeadFormVisible}
                     onClose={() => setLeadFormVisible(false)}
                     onSubmit={handleLeadSubmit}
-                    modalStyle={{ maxHeight: '70vh' }}
+                    modalStyle={{ maxHeight: isMobile ? '70%' : '50vh', minHeight: 320, width: '100%', overflow: 'auto' }} // Reduced height, scrollable
+                    scrollable={isMobile} // Pass a prop to make content scrollable if supported
                 />
-            </Suspense>
-            <Suspense fallback={null}>
-                {/* Only for non-web, wrap WebView in Suspense */}
-                {Platform.OS !== 'web' && (
-                    <WebView
-                        style={isMobile ? styles.youtubeMobile : styles.youtube}
-                        javaScriptEnabled={true}
-                        domStorageEnabled={true}
-                        source={{ uri: 'https://www.youtube.com/embed/Bo_gUCXr8lM' }}
-                        allowsFullscreenVideo
-                    />
-                )}
             </Suspense>
             <FloatingContactSparkle
                 visible={!isLeadFormVisible}
@@ -1066,12 +895,7 @@ const LandingPage = ({ navigation }) => {
                 isMobile={isMobile}
             >
                 <Ionicons name="chatbubbles" size={28} color="#fff" />
-                <Text style={{
-                    color: '#fff',
-                    fontWeight: 'bold',
-                    fontSize: 16,
-                    marginLeft: 10,
-                }}>Contact Us</Text>
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, marginLeft: 10 }}>Contact Us</Text>
             </FloatingContactSparkle>
         </View>
     );
@@ -1128,8 +952,18 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         marginLeft: 10,
     },
+    loginButtonMobile: {
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 10,
+    },
     loginButtonText: {
         fontSize: 16,
+    },
+    loginButtonTextMobile: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#fff',
     },
     heroSection: {
         alignItems: 'center',
