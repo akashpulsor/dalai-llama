@@ -1550,7 +1550,7 @@
   dependencies:
     prop-types "^15.8.1"
 
-"@expo/webpack-config@^19.0.0":
+"@expo/webpack-config@^19.0.1":
   version "19.0.1"
   resolved "https://registry.npmjs.org/@expo/webpack-config/-/webpack-config-19.0.1.tgz"
   integrity sha512-5bSxXTUd/DCF44+1dSyU23YKLOOYCr9pMJ+C5Vw7PAi6v6OEyNp4uOVMk2x5DAEpXtvOsJCxvNZdmtY/IqmO/A==

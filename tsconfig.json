@@ -6,6 +6,9 @@
     "esModuleInterop": true,
     "moduleResolution": "node"
   },
-  "extends": "expo/tsconfig.base",
-  "exclude": ["node_modules", "babel.config.js"]
+  "exclude": [
+    "node_modules",
+    "babel.config.js"
+  ],
+  "extends": "expo/tsconfig.base"
 }
