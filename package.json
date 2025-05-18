@@ -8,7 +8,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build:web": "expo build:web",
-    "analyze": "cross-env ANALYZE=true expo start --web"
+    "analyze": "cross-env ANALYZE=true expo start --web",
+    "analyze:bundle": "expo export:web && npx metro-visualizer ./web-build"
   },
   "dependencies": {
     "@bounceapp/iframe": "^0.2.1",
@@ -70,13 +71,14 @@
   "devDependencies": {
     "@babel/core": "^7.24.0",
     "@babel/plugin-proposal-export-namespace-from": "^7.18.9",
-    "@expo/webpack-config": "^19.0.0",
+    "@expo/webpack-config": "^19.0.1",
     "@react-navigation/native-stack": "^6.9.17",
     "@types/lodash-es": "^4.17.12",
     "@types/react-native-web": "^0.19.0",
     "babel-plugin-module-resolver": "^5.0.0",
     "babel-plugin-transform-remove-console": "^6.9.4",
     "cross-env": "^7.0.3",
+    "metro-visualizer": "^1.5.0",
     "source-map-explorer": "^2.5.3",
     "webpack": "^5.89.0",
     "webpack-bundle-analyzer": "^4.10.1",
