@@ -14,7 +14,7 @@ module.exports = async function(env = {}, argv = {}) {
       openAnalyzer: true,
     })
   );
-  // Enable code splitting for all chunks
+  // Enable code splitting for all chunks and minimize
   config.optimization = {
     ...config.optimization,
     splitChunks: {

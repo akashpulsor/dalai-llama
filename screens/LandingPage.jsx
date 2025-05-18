@@ -279,6 +279,8 @@ const FloatingContactSparkle = ({ visible, onPress, isMobile }) => {
     );
 };
 
+const FrequencyBars = () => <View style={{ height: 24, marginTop: 8 }} />;
+
 const LandingPage = ({ navigation }) => {
     const scrollViewRef = useRef(null);
     const sectionRefs = useRef([]);
