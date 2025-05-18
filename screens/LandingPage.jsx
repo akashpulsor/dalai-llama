@@ -10,6 +10,7 @@ import { useInterestMutation } from '../component/publicApi';
 import { showMessage } from '../component/flashMessageSlice';
 import { industrySolutions, featureIcons, AnimatedCard, FloatingSection } from './LandingPageHelpers';
 import { injectAnalyticsScripts } from '../utils/injectAnalytics';
+import { v4 as uuidv4 } from 'uuid';
 
 const LeadForm = lazy(() => import('../component/LeadForm'));
 const LazySections = lazy(() => import('../LazySections'));
@@ -748,6 +749,83 @@ const LandingPage = ({ navigation }) => {
             }, 400); // Slightly longer delay to ensure rendering
         }
     }, [showAllSections]);
+
+    useEffect(() => {
+        if (Platform.OS === 'web') {
+            const userId = getOrCreateUserId();
+            // Track mouse movement, element click, and browser/user data for analytics
+            const handleMouseMove = (e) => {
+                if (window.gtag) {
+                    window.gtag('event', 'mouse_move', {
+                        x: e.clientX,
+                        y: e.clientY,
+                        userAgent: navigator.userAgent,
+                        language: navigator.language,
+                        platform: navigator.platform,
+                        userId,
+                    });
+                }
+                if (window.clarity) {
+                    window.clarity('event', 'mouse_move', {
+                        x: e.clientX,
+                        y: e.clientY,
+                        userAgent: navigator.userAgent,
+                        language: navigator.language,
+                        platform: navigator.platform,
+                        userId,
+                    });
+                }
+            };
+            const handleClick = (e) => {
+                const element = e.target;
+                const elementInfo = {
+                    tag: element.tagName,
+                    id: element.id,
+                    class: element.className,
+                    name: element.name,
+                    text: element.innerText ? element.innerText.slice(0, 40) : '',
+                };
+                if (window.gtag) {
+                    window.gtag('event', 'element_click', {
+                        ...elementInfo,
+                        x: e.clientX,
+                        y: e.clientY,
+                        userAgent: navigator.userAgent,
+                        language: navigator.language,
+                        platform: navigator.platform,
+                        userId,
+                    });
+                }
+                if (window.clarity) {
+                    window.clarity('event', 'element_click', {
+                        ...elementInfo,
+                        x: e.clientX,
+                        y: e.clientY,
+                        userAgent: navigator.userAgent,
+                        language: navigator.language,
+                        platform: navigator.platform,
+                        userId,
+                    });
+                }
+            };
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('click', handleClick);
+            return () => {
+                window.removeEventListener('mousemove', handleMouseMove);
+                window.removeEventListener('click', handleClick);
+            };
+        }
+    }, []);
+
+    const getOrCreateUserId = () => {
+        if (typeof window === 'undefined') return null;
+        let userId = localStorage.getItem('uniqueUserId');
+        if (!userId) {
+            userId = uuidv4();
+            localStorage.setItem('uniqueUserId', userId);
+        }
+        return userId;
+    };
 
     return (
         <View style={[styles.container, isMobile && styles.containerMobile]} onLayout={handleContainerLayout}>

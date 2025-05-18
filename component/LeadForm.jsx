@@ -59,6 +59,18 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
         }
     }, []);
 
+    useEffect(() => {
+        if (visible && typeof window !== 'undefined' && window.gtag) {
+            window.gtag('event', 'form_open', { form: 'LeadForm' });
+        }
+    }, [visible]);
+
+    const handleFieldFocus = (field) => {
+        if (typeof window !== 'undefined' && window.gtag) {
+            window.gtag('event', 'form_field_focus', { form: 'LeadForm', field });
+        }
+    };
+
     const handleSubmit = async () => {
         if (submitting) return;
         setSubmitting(true);
@@ -76,6 +88,9 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
         setErrors(newErrors);
 
         if (Object.keys(newErrors).length === 0) {
+            if (typeof window !== 'undefined' && window.gtag) {
+                window.gtag('event', 'form_submit', { form: 'LeadForm' });
+            }
             await interest(payload);
             onClose();
             setSubmitting(false);
@@ -125,6 +140,7 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
                                     placeholder="Enter your full name"
                                     value={formData.name}
                                     onChangeText={text => setFormData({ ...formData, name: text })}
+                                    onFocus={() => handleFieldFocus('name')}
                                 />
                                 {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
                             </View>
@@ -140,6 +156,7 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
                                     keyboardType="email-address"
                                     value={formData.email}
                                     onChangeText={text => setFormData({ ...formData, email: text })}
+                                    onFocus={() => handleFieldFocus('email')}
                                 />
                                 {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
                             </View>
@@ -151,6 +168,7 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
                                         value={formData.mobileNumber}
                                         onChangeText={text => setFormData({ ...formData, mobileNumber: text })}
                                         selectedCountryCode={formData.countryCode}
+                                        onFocus={() => handleFieldFocus('mobileNumber')}
                                     />
                                 </View>
                                 {errors.mobileNumber && <Text style={styles.errorText}>{errors.mobileNumber}</Text>}
@@ -166,7 +184,10 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
                                                 formData.companySize === size.value && styles.companySizeOptionSelected,
                                                 isMobile && styles.companySizeOptionMobile
                                             ]}
-                                            onPress={() => setFormData({ ...formData, companySize: size.value })}
+                                            onPress={() => {
+                                                setFormData({ ...formData, companySize: size.value });
+                                                handleFieldFocus('companySize');
+                                            }}
                                         >
                                             <Text style={[
                                                 styles.companySizeText,
