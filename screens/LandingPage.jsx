@@ -37,6 +37,30 @@ const injectLinkedInScriptWeb = () => {
     document.body.appendChild(noscript);
 };
 
+// Facebook Pixel (Meta Pixel) inject for web
+const injectFacebookPixelWeb = () => {
+    if (typeof window === 'undefined') return;
+    if (document.getElementById('fb-pixel-script')) return;
+    const script = document.createElement('script');
+    script.id = 'fb-pixel-script';
+    script.innerHTML = `
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', 'YOUR_PIXEL_ID');
+      fbq('track', 'PageView');
+    `;
+    document.head.appendChild(script);
+    const noscript = document.createElement('noscript');
+    noscript.innerHTML = '<img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=YOUR_PIXEL_ID&ev=PageView&noscript=1"/>';
+    document.body.appendChild(noscript);
+};
+
 const CurvedBackground = () => {
     return (
       <View style={styles.backgroundContainer}>
@@ -515,20 +539,52 @@ const LandingPage = ({ navigation }) => {
     useEffect(() => {
         if (Platform.OS === 'web') {
             injectLinkedInScriptWeb();
+            injectFacebookPixelWeb(); // Add Facebook Pixel
+        }
+    }, []);
+
+    useEffect(() => {
+        if (Platform.OS === 'web') {
+            // Google Analytics 4
+            if (!document.getElementById('ga4-script')) {
+                const gaScript = document.createElement('script');
+                gaScript.id = 'ga4-script';
+                gaScript.async = true;
+                gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX'; // Replace with your GA4 ID
+                document.head.appendChild(gaScript);
+                const gaInit = document.createElement('script');
+                gaInit.innerHTML = `window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-XXXXXXXXXX');`;
+                document.head.appendChild(gaInit);
+            }
+            // Microsoft Clarity
+            if (!document.getElementById('clarity-script')) {
+                const clarityScript = document.createElement('script');
+                clarityScript.id = 'clarity-script';
+                clarityScript.type = 'text/javascript';
+                clarityScript.innerHTML = `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/XXXXXXXXXX";y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window, document, "clarity", "script", "XXXXXXXXXX");`;
+                document.head.appendChild(clarityScript);
+            }
         }
     }, []);
 
     // For audio sample
     const [audioPlaying, setAudioPlaying] = useState(false);
-    const audioRef = React.useRef(null);
+    const [selectedLanguage, setSelectedLanguage] = useState('english');
+    const audioRefs = {
+        hindi: useRef(null),
+        english: useRef(null),
+        british_english: useRef(null),
+    };
 
     const handlePlayAudio = () => {
-        if (audioRef.current) {
+        const ref = audioRefs[selectedLanguage];
+        if (ref.current) {
             if (audioPlaying) {
-                audioRef.current.pause();
+                ref.current.pause();
                 setAudioPlaying(false);
             } else {
-                audioRef.current.play();
+                ref.current.play();
+                setAudioPlaying(true);
             }
         }
     };
@@ -571,28 +627,88 @@ const LandingPage = ({ navigation }) => {
                         isMobile && styles.showcaseContentMobile
                     ]}>
                         {/* Voice AI Audio Sample - now above video */}
-                        <View style={[
-                            styles.audioContainer,
-                            isMobile && styles.audioContainerMobile
-                        ]}>
+                        <View style={{
+                            width: '100%',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: 32,
+                        }}>
+                            <View style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: '#f8fafd',
+                                borderRadius: 20,
+                                paddingVertical: 14,
+                                paddingHorizontal: isMobile ? 10 : 32,
+                                boxShadow: Platform.OS === 'web' ? '0 2px 12px #e3e8fd' : undefined,
+                                elevation: 3,
+                                maxWidth: 480,
+                                width: '100%',
+                                minWidth: isMobile ? 220 : 340,
+                                borderWidth: 1,
+                                borderColor: '#e3e8fd',
+                                justifyContent: 'space-between',
+                                gap: 18,
+                            }}>
+                                <TouchableOpacity
+                                    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}
+                                    onPress={handlePlayAudio}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name={audioPlaying ? "stop-circle" : "play-circle"} size={isMobile ? 36 : 44} color="#007AFF" />
+                                    <Text style={{ fontSize: 18, color: '#1a237e', fontWeight: '700', letterSpacing: 0.2 }}>
+                                        {audioPlaying ? "Stop" : "Play"} Sample
+                                    </Text>
+                                </TouchableOpacity>
+                                {/* Modern Language dropdown with custom SVG chevron */}
+                                {Platform.OS === 'web' ? (
+                                    <div style={{ position: 'relative', minWidth: 140, width: 160 }}>
+                                        <select
+                                            style={{
+                                                width: '100%',
+                                                fontSize: isMobile ? 15 : 17,
+                                                padding: '10px 36px 10px 14px',
+                                                borderRadius: 14,
+                                                border: '1.5px solid #d1d5db',
+                                                background: '#fff',
+                                                color: '#1a237e',
+                                                fontWeight: 600,
+                                                appearance: 'none',
+                                                outline: 'none',
+                                                boxShadow: '0 1px 4px #e3e8fd',
+                                                transition: 'border 0.2s',
+                                            }}
+                                            value={selectedLanguage}
+                                            onChange={e => setSelectedLanguage(e.target.value)}
+                                        >
+                                            <option value="hindi">Hindi</option>
+                                            <option value="english">English</option>
+                                            <option value="british_english">British English</option>
+                                        </select>
+                                        {/* Custom SVG chevron */}
+                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+                                            <path d="M6 8l4 4 4-4" stroke="#007AFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </svg>
+                                    </div>
+                                ) : (
+                                    <TouchableOpacity
+                                        style={{ borderWidth: 1.5, borderColor: '#d1d5db', borderRadius: 14, backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 8, minWidth: 120, alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }}
+                                        onPress={() => {/* open language picker modal for mobile if needed */}}
+                                    >
+                                        <Text style={{ fontSize: isMobile ? 15 : 17, color: '#1a237e', fontWeight: '600' }}>
+                                            {selectedLanguage === 'hindi' ? 'Hindi' : selectedLanguage === 'english' ? 'English' : 'British English'}
+                                        </Text>
+                                        <Svg width={18} height={18} viewBox="0 0 20 20" style={{ marginLeft: 6 }}>
+                                            <Path d="M6 8l4 4 4-4" stroke="#007AFF" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+                                        </Svg>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                            {/* Dummy audio elements for each language */}
+                            <audio ref={audioRefs.hindi} src="/assets/audio-sample-hindi.mp3" style={{ display: 'none' }} />
+                            <audio ref={audioRefs.english} src="/assets/audio-sample-english.mp3" style={{ display: 'none' }} />
+                            <audio ref={audioRefs.british_english} src="/assets/audio-sample-british.mp3" style={{ display: 'none' }} />
                             {audioPlaying && <VoiceCallAnimation playing={audioPlaying} />}
-                            <Text style={styles.audioTitleModern}>Voice AI Demo</Text>
-                            <TouchableOpacity
-                                style={styles.audioPlayButtonModern}
-                                onPress={handlePlayAudio}
-                                activeOpacity={0.7}
-                            >
-                                <Ionicons name={audioPlaying ? "pause-circle" : "play-circle"} size={isMobile ? 36 : 48} color="#007AFF" />
-                                <Text style={styles.audioPlayTextModern}>
-                                    {audioPlaying ? "Pause" : "Play"} Sample
-                                </Text>
-                            </TouchableOpacity>
-                            <audio
-                                ref={audioRef}
-                                src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-                                onEnded={() => setAudioPlaying(false)}
-                                style={{ display: 'none' }}
-                            />
                         </View>
                         {/* YouTube Video - below audio, responsive aspect ratio */}
                         <View
@@ -767,12 +883,29 @@ const LandingPage = ({ navigation }) => {
 
     // Scroll to the next section when drag up is pressed
     const handleDragUpHint = (idx) => {
-        const nextIdx = idx + 1;
+        let nextIdx;
+        if (idx >= sections.length - 1) {
+            // If last section, go to hero (first section)
+            nextIdx = 0;
+        } else {
+            nextIdx = idx + 1;
+        }
         if (sectionRefs.current[nextIdx]) {
             sectionRefs.current[nextIdx].measureLayout(
                 scrollViewRef.current.getInnerViewNode(),
                 (x, y) => {
-                    scrollViewRef.current.scrollTo({ y, animated: true });
+                    // If moving from hero to showcase, scroll to just above the YouTube video
+                    if (idx === 0 && nextIdx === 1 && showcaseVideoRef.current) {
+                        showcaseVideoRef.current.measureLayout(
+                            scrollViewRef.current.getInnerViewNode(),
+                            (vx, vy) => {
+                                // Scroll to the top of the showcase section, not skipping any content
+                                scrollViewRef.current.scrollTo({ y: vy - 32, animated: true });
+                            }
+                        );
+                    } else {
+                        scrollViewRef.current.scrollTo({ y, animated: true });
+                    }
                 }
             );
         }
@@ -811,8 +944,46 @@ const LandingPage = ({ navigation }) => {
     // Determine drag button mode: 'hero' for first section, 'float' for others
     let dragMode = activeSection === 0 ? 'hero' : 'float';
 
+    // Cookie Consent Banner
+    const [showCookieBanner, setShowCookieBanner] = useState(false);
+    useEffect(() => {
+        if (Platform.OS === 'web') {
+            const consent = localStorage.getItem('cookieConsent');
+            if (!consent) setShowCookieBanner(true);
+        }
+    }, []);
+    const handleAcceptCookies = () => {
+        localStorage.setItem('cookieConsent', 'true');
+        setShowCookieBanner(false);
+    };
+
     return (
         <View style={[styles.container, isMobile && styles.containerMobile]} onLayout={handleContainerLayout}>
+            {/* Cookie Consent Banner */}
+            {showCookieBanner && (
+                <View style={{
+                    position: 'fixed',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    backgroundColor: '#222',
+                    padding: 18,
+                    zIndex: 9999,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}>
+                    <Text style={{ color: '#fff', fontSize: 15, marginRight: 18 }}>
+                        This website uses cookies to ensure you get the best experience on our website.
+                    </Text>
+                    <TouchableOpacity
+                        style={{ backgroundColor: '#007AFF', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 22 }}
+                        onPress={handleAcceptCookies}
+                    >
+                        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>Accept</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
             <ScrollView
                 ref={scrollViewRef}
                 style={{ flex: 1 }}
@@ -836,7 +1007,7 @@ const LandingPage = ({ navigation }) => {
                         !isMobile && styles.showcaseSectionWeb,
                         { marginBottom: 0 }
                     ]}>
-                        <Text style={styles.sectionTitleModern}>See Dalai Llama in Action</Text>
+
                     </View>
                 </View>
 
@@ -870,6 +1041,7 @@ const LandingPage = ({ navigation }) => {
                 visible={isLeadFormVisible}
                 onClose={() => setLeadFormVisible(false)}
                 onSubmit={handleLeadSubmit}
+                modalStyle={{ maxHeight: '70vh' }} // Reduce modal height
             />
             <FloatingContactSparkle
                 visible={!isLeadFormVisible}

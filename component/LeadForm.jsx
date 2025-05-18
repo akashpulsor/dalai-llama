@@ -49,6 +49,30 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
         }
     }, [isSuccess, dispatch]);
 
+    useEffect(() => {
+        if (Platform.OS === 'web') {
+            // Google Analytics 4
+            if (!document.getElementById('ga4-script')) {
+                const gaScript = document.createElement('script');
+                gaScript.id = 'ga4-script';
+                gaScript.async = true;
+                gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX'; // Replace with your GA4 ID
+                document.head.appendChild(gaScript);
+                const gaInit = document.createElement('script');
+                gaInit.innerHTML = `window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-XXXXXXXXXX');`;
+                document.head.appendChild(gaInit);
+            }
+            // Microsoft Clarity
+            if (!document.getElementById('clarity-script')) {
+                const clarityScript = document.createElement('script');
+                clarityScript.id = 'clarity-script';
+                clarityScript.type = 'text/javascript';
+                clarityScript.innerHTML = `(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/XXXXXXXXXX";y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window, document, "clarity", "script", "XXXXXXXXXX");`;
+                document.head.appendChild(clarityScript);
+            }
+        }
+    }, []);
+
     const handleSubmit = async () => {
         if (submitting) return;
         setSubmitting(true);
