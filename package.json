@@ -8,7 +8,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build:web": "expo build:web",
-    "analyze": "cross-env ANALYZE=true expo start --web",
+    "build": "if not exist build mkdir build && webpack --config webpack.config.js --profile --json > build/bundle-stats.json",
+    "analyze": "npm run build && npx webpack-bundle-analyzer ./build/bundle-stats.json",
+    "profile": "npm run build && npx webpack-bundle-analyzer ./build/bundle-stats.json",
     "analyze:bundle": "expo export:web && npx metro-visualizer ./web-build"
   },
   "dependencies": {
