@@ -115,13 +115,14 @@ const styles = StyleSheet.create({
   },
   input: {
     width: '150%',
-    borderWidth: 1,
+    borderWidth: 1.5, // make border more visible
     marginTop: 15,
-    borderColor: 'white',
+    borderColor: '#8e24aa', // purple border for focus/clarity
     borderRadius: 8,
     padding: 12,
     marginBottom: 10,
     fontSize: 16,
+    backgroundColor: '#fff',
   },
   inputError: {
     borderColor: 'red',
