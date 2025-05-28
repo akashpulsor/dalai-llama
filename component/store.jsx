@@ -1,7 +1,7 @@
 import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import authReducer from './authSlice';
 import { authApi } from './authApi';
-import { websocketApi } from './websocketApi'; // Add this import
+// Add this import
 import { publicApi } from './publicApi'; // Add this import
 import { setupListeners } from '@reduxjs/toolkit/query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,7 +23,7 @@ const rootReducer = combineReducers({
   auth: authReducer,
   flashMessage: flashMessageReducer,
   [authApi.reducerPath]: authApi.reducer,
-  [websocketApi.reducerPath]: websocketApi.reducer, // Add this line
+   // Add this line
   [publicApi.reducerPath]: publicApi.reducer, // Add this line
 });
 
@@ -32,7 +32,7 @@ const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: false,
-    }).concat(authApi.middleware, websocketApi.middleware, publicApi.middleware), // Add publicApi.middleware
+    }).concat(authApi.middleware,  publicApi.middleware), // Add publicApi.middleware
 });
 
 setupListeners(store.dispatch);
