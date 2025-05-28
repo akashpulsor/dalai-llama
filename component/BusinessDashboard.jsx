@@ -111,6 +111,8 @@ const BusinessDashboard = ({ navigation }) => {
 
   return (
     <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+      {/* Exotic Gradient Background */}
+      <View style={styles.gradientBg} />
       <View
         style={[
           styles.outerContainer,
@@ -120,7 +122,53 @@ const BusinessDashboard = ({ navigation }) => {
           },
         ]}
       >
-        <View style={[styles.pickerContainer, { width: isSmallScreen ? '98%' : 300, alignSelf: 'flex-end', marginBottom: 12 }]}>
+        {/* Business Info Card with Avatar and Glassmorphism */}
+        <View style={styles.infoCardGlass}>
+          <View style={styles.avatarRow}>
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarText}>{(businessData?.businessName?.[0] || 'B').toUpperCase()}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.businessNameBig}>{businessData?.businessName || 'Business Name'}</Text>
+              <View style={styles.infoRow}>
+                <Text style={styles.label}>Email: </Text>
+                <Text style={styles.value}>{businessData?.email || '-'}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+        <View style={[
+          styles.gridContainer,
+          { flexDirection: isSmallScreen ? 'column' : 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: 18 }
+        ]}>
+          {/* Metric Tiles with Icons, Accent Colors, Glassmorphism, and Animation */}
+          <View style={[styles.metricTile, styles.tileCalls, { width: tileWidth, height: tileHeight, minHeight: 180, marginBottom: isSmallScreen ? 16 : 24 }]}>  
+            <View style={styles.iconCircleCalls}><Text style={styles.metricIcon}>📞</Text></View>
+            <Text style={styles.cardValue}>{dashboardData?.totalCall || 0}</Text>
+            <Text style={styles.cardLabel}>Total Calls</Text>
+          </View>
+          <View style={[styles.metricTile, styles.tileCost, { width: tileWidth, height: tileHeight, minHeight: 180, marginBottom: isSmallScreen ? 16 : 24 }]}>  
+            <View style={styles.iconCircleCost}><Text style={styles.metricIcon}>💸</Text></View>
+            <Text style={styles.cardValue}>${dashboardData?.totalCharges?.toFixed(4) || '0.00'}</Text>
+            <Text style={styles.cardLabel}>Total Cost</Text>
+          </View>
+          <View style={[styles.metricTile, styles.tileTokens, { width: tileWidth, height: tileHeight, minHeight: 180, marginBottom: isSmallScreen ? 16 : 24 }]}>  
+            <View style={styles.iconCircleTokens}><Text style={styles.metricIcon}>🪙</Text></View>
+            <Text style={styles.cardValue}>{dashboardData?.totalToken || 0}</Text>
+            <Text style={styles.cardLabel}>Total Tokens</Text>
+          </View>
+          <View style={[styles.metricTile, styles.tileLeads, { width: tileWidth, height: tileHeight, minHeight: 180, marginBottom: isSmallScreen ? 16 : 24 }]}>  
+            <View style={styles.iconCircleLeads}><Text style={styles.metricIcon}>👥</Text></View>
+            <Text style={styles.cardValue}>{dashboardData?.totalLeads || 0}</Text>
+            <Text style={styles.cardLabel}>Total Leads</Text>
+          </View>
+          <View style={[styles.metricTile, styles.tileCampaigns, { width: tileWidth, height: tileHeight, minHeight: 180, marginBottom: isSmallScreen ? 16 : 24 }]}>  
+            <View style={styles.iconCircleCampaigns}><Text style={styles.metricIcon}>🚀</Text></View>
+            <Text style={styles.cardValue}>{dashboardData?.totalCampaigns || 0}</Text>
+            <Text style={styles.cardLabel}>Total Campaigns</Text>
+          </View>
+        </View>
+        <View style={[styles.pickerContainer, { width: isSmallScreen ? '98%' : 300, alignSelf: 'flex-end', marginBottom: 12 }]}> 
           <Picker
             style={styles.picker}
             selectedValue={selectedDuration}
@@ -133,98 +181,21 @@ const BusinessDashboard = ({ navigation }) => {
             <Picker.Item label="Custom" value="custom" />
           </Picker>
         </View>
-        <View style={[
-          styles.gridContainer,
-          { flexDirection: isSmallScreen ? 'column' : 'row', flexWrap: 'wrap', justifyContent: 'space-between' }
-        ]}>
-          <View style={[
-            styles.tile,
-            {
-              width: tileWidth,
-              height: tileHeight,
-              minHeight: 180,
-              alignSelf: 'flex-start',
-              marginBottom: isSmallScreen ? 16 : 24,
-              flexDirection: isSmallScreen ? 'column' : 'row',
-              alignItems: isSmallScreen ? 'flex-start' : 'stretch',
-              position: 'relative',
-            }
-          ]}>
-            <View style={{ flex: 1, justifyContent: 'center' }}>
-              <View style={styles.infoSection}>
-                <Text style={styles.businessName}>
-                  {businessData?.businessName || 'Business Name'}
-                </Text>
-                <View style={styles.infoRow}>
-                  <Text style={styles.label}>Email: </Text>
-                  <Text style={styles.value}>{businessData?.email || '-'}</Text>
-                </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.label}>Inbound: </Text>
-                  <Text style={styles.value}>{businessData?.inbound || '-'}</Text>
-                </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.label}>Outbound: </Text>
-                  <Text style={styles.value}>{businessData?.outbound || '-'}</Text>
-                </View>
-              </View>
-            </View>
-            {isSmallScreen ? (
-              <View style={[styles.buttonSection, { marginTop: 10, width: '100%' }]}>
-                <PhoneModal onClose={setPhoneDataModal} openModal={PhoneDataModal} />
-                <LlmModal onClose={setLlmDataModal} openModal={llmDataModel} />
-                <TouchableOpacity
-                  style={[styles.generateButton, { width: '100%', alignSelf: 'center', marginBottom: 8 }]}
-                  onPress={openPhoneModal}
-                >
-                  <Text style={styles.generateButtonText}>Configure Phone</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.generateButton, { width: '100%', alignSelf: 'center' }]}
-                  onPress={openLlmModal}
-                >
-                  <Text style={styles.generateButtonText}>Configure LLM</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.buttonSectionWeb}>
-                <PhoneModal onClose={setPhoneDataModal} openModal={PhoneDataModal} />
-                <LlmModal onClose={setLlmDataModal} openModal={llmDataModel} />
-                <TouchableOpacity
-                  style={[styles.generateButton, { minWidth: 140, marginBottom: 12 }]}
-                  onPress={openPhoneModal}
-                >
-                  <Text style={styles.generateButtonText}>Configure Phone</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.generateButton, { minWidth: 140 }]}
-                  onPress={openLlmModal}
-                >
-                  <Text style={styles.generateButtonText}>Configure LLM</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-          <View style={[styles.tile, { width: tileWidth, height: tileHeight, minHeight: 180, marginBottom: isSmallScreen ? 16 : 24 }]}>
-            <Text style={styles.cardValue}>{dashboardData?.totalCall || 0}</Text>
-            <Text style={styles.cardLabel}>Total Calls</Text>
-          </View>
-          <View style={[styles.tile, { width: tileWidth, height: tileHeight, minHeight: 180, marginBottom: isSmallScreen ? 16 : 24 }]}>
-            <Text style={styles.cardValue}>${dashboardData?.totalCharges?.toFixed(4) || '0.00'}</Text>
-            <Text style={styles.cardLabel}>Total Cost</Text>
-          </View>
-          <View style={[styles.tile, { width: tileWidth, height: tileHeight, minHeight: 180, marginBottom: isSmallScreen ? 16 : 24 }]}>
-            <Text style={styles.cardValue}>{dashboardData?.totalToken || 0}</Text>
-            <Text style={styles.cardLabel}>Total Tokens</Text>
-          </View>
-          <View style={[styles.tile, { width: tileWidth, height: tileHeight, minHeight: 180, marginBottom: isSmallScreen ? 16 : 24 }]}>
-            <Text style={styles.cardValue}>{dashboardData?.totalLeads || 0}</Text>
-            <Text style={styles.cardLabel}>Total Leads</Text>
-          </View>
-          <View style={[styles.tile, { width: tileWidth, height: tileHeight, minHeight: 180, marginBottom: isSmallScreen ? 16 : 24 }]}>
-            <Text style={styles.cardValue}>{dashboardData?.totalCampaigns || 0}</Text>
-            <Text style={styles.cardLabel}>Total Campaigns</Text>
-          </View>
+        <View style={styles.buttonSection}>
+          <PhoneModal onClose={setPhoneDataModal} openModal={PhoneDataModal} />
+          <LlmModal onClose={setLlmDataModal} openModal={llmDataModel} />
+          <TouchableOpacity
+            style={[styles.generateButton, { width: '100%', alignSelf: 'center', marginBottom: 8 }]}
+            onPress={openPhoneModal}
+          >
+            <Text style={styles.generateButtonText}>Configure Phone</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.generateButton, { width: '100%', alignSelf: 'center' }]}
+            onPress={openLlmModal}
+          >
+            <Text style={styles.generateButtonText}>Configure LLM</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </ScrollView>
@@ -367,5 +338,152 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
+  },
+  gradientBg: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: -1,
+    backgroundColor: 'transparent',
+    // fallback for web: exotic gradient
+    backgroundImage: 'linear-gradient(135deg, #f3e7e9 0%, #e3eeff 100%, #a7bfe8 100%)',
+  },
+  infoCardGlass: {
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 18,
+    shadowColor: '#8e24aa',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 8,
+    borderWidth: 1.5,
+    borderColor: 'rgba(140, 82, 255, 0.12)',
+    backdropFilter: 'blur(8px)', // for web
+  },
+  avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18,
+  },
+  avatarCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#7c3aed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 18,
+    shadowColor: '#7c3aed',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  avatarText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 28,
+    letterSpacing: 1,
+  },
+  businessNameBig: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#222',
+    marginBottom: 2,
+    textAlign: 'left',
+    letterSpacing: 0.5,
+  },
+  // Metric Tiles
+  metricTile: {
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    borderRadius: 20,
+    padding: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 0,
+    marginTop: 0,
+    marginHorizontal: 0,
+    shadowColor: '#7c3aed',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.13,
+    shadowRadius: 12,
+    elevation: 7,
+    borderWidth: 1.2,
+    borderColor: 'rgba(140, 82, 255, 0.09)',
+    position: 'relative',
+    overflow: 'hidden',
+    transition: 'transform 0.18s',
+  },
+  metricIcon: {
+    fontSize: 32,
+    marginBottom: 6,
+  },
+  iconCircleCalls: {
+    backgroundColor: '#e1bee7',
+    borderRadius: 18,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  iconCircleCost: {
+    backgroundColor: '#ffe0b2',
+    borderRadius: 18,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  iconCircleTokens: {
+    backgroundColor: '#b2dfdb',
+    borderRadius: 18,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  iconCircleLeads: {
+    backgroundColor: '#c5e1a5',
+    borderRadius: 18,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  iconCircleCampaigns: {
+    backgroundColor: '#b3e5fc',
+    borderRadius: 18,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  tileCalls: {
+    borderLeftWidth: 6,
+    borderLeftColor: '#8e24aa',
+  },
+  tileCost: {
+    borderLeftWidth: 6,
+    borderLeftColor: '#ff9800',
+  },
+  tileTokens: {
+    borderLeftWidth: 6,
+    borderLeftColor: '#009688',
+  },
+  tileLeads: {
+    borderLeftWidth: 6,
+    borderLeftColor: '#689f38',
+  },
+  tileCampaigns: {
+    borderLeftWidth: 6,
+    borderLeftColor: '#0288d1',
   },
 });

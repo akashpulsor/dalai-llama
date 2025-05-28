@@ -12,6 +12,7 @@ module.exports = function(api) {
           '@screens': './screens',
         },
       }],
+      'react-native-reanimated/plugin', // <-- Add this as the LAST plugin
     ],
   };
 };

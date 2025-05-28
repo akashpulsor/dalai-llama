@@ -14,25 +14,19 @@
     "analyze:bundle": "expo export:web && npx metro-visualizer ./web-build"
   },
   "dependencies": {
-    "@bounceapp/iframe": "^0.2.1",
     "@expo/vector-icons": "^14.0.3",
-    "@fortawesome/fontawesome-svg-core": "^6.6.0",
-    "@fortawesome/free-solid-svg-icons": "^6.6.0",
-    "@fortawesome/react-native-fontawesome": "^0.3.2",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@react-native-async-storage/async-storage": "1.23.1",
     "@react-native-community/blur": "^4.4.1",
     "@react-native-community/checkbox": "^0.5.17",
+    "@react-native-community/datetimepicker": "^8.3.0",
     "@react-native-picker/picker": "^2.7.5",
-    "@react-navigation/drawer": "^6.6.7",
+    "@react-navigation/drawer": "^6.7.2",
     "@react-navigation/elements": "^1.3.25",
-    "@react-navigation/native": "^6.1.9",
-    "@react-navigation/stack": "^6.3.20",
+    "@react-navigation/native": "^6.1.18",
+    "@react-navigation/stack": "^6.4.1",
     "@reduxjs/toolkit": "^2.2.1",
-    "@stomp/stompjs": "^7.1.1",
     "axios": "^1.6.2",
-    "cors": "^2.8.5",
-    "eventsource-polyfill": "^0.9.6",
     "expo": "^49.0.23",
     "expo-av": "^15.0.2",
     "expo-clipboard": "^7.0.1",
@@ -42,32 +36,21 @@
     "expo-web-browser": "~13.0.3",
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
-    "lodash-es": "^4.17.21",
-    "moment": "^2.30.1",
     "prop-types": "^15.8.1",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "react-iframe": "^1.8.5",
     "react-native": "0.74.5",
-    "react-native-dropdown-menu": "^2.0.0",
     "react-native-dropdown-picker": "^5.4.6",
-    "react-native-dropdown-select-list": "^2.0.5",
-    "react-native-element-dropdown": "^2.10.1",
-    "react-native-elements": "^3.4.3",
     "react-native-flash-message": "^0.4.2",
     "react-native-gesture-handler": "~2.12.0",
-    "react-native-ionicons": "^4.6.5",
-    "react-native-paper": "^5.12.5",
-    "react-native-picker": "^4.3.7",
-    "react-native-reanimated": "~3.10.1",
+    "react-native-paper": "^5.14.5",
+    "react-native-reanimated": "^3.17.5",
     "react-native-safe-area-context": "4.10.5",
     "react-native-screens": "~3.22.0",
     "react-native-svg": "^15.2.0",
-    "react-native-vector-icons": "^10.2.0",
     "react-native-web": "~0.19.10",
     "react-native-webview": "^13.13.5",
     "react-redux": "^9.1.0",
-    "sockjs-client": "^1.6.1",
     "typescript": "^5.1.3"
   },
   "devDependencies": {
@@ -86,5 +69,11 @@
     "webpack-cli": "^5.1.4",
     "webpack-dev-server": "^4.15.1"
   },
-  "private": true
+  "private": true,
+  "babel": {
+    "plugins": [
+      "react-native-paper/babel",
+      "react-native-reanimated/plugin"
+    ]
+  }
 }
