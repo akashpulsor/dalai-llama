@@ -14,6 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 const LeadForm = lazy(() => import('../component/LeadForm'));
 const LazySections = lazy(() => import('../LazySections'));
+const NewsletterForm = lazy(() => import('../component/NewsletterForm'));
 
 import { injectLinkedInScriptWeb, injectFacebookPixelWeb } from '../utils/injectScripts';
 
@@ -293,6 +294,8 @@ const LandingPage = ({ navigation }) => {
     const [showcaseVideoLayout, setShowcaseVideoLayout] = useState(null);
     const [containerHeight, setContainerHeight] = useState(null);
     const [showAllSections, setShowAllSections] = useState(false);
+    const [showNewsletterForm, setShowNewsletterForm] = useState(false);
+    const [loginLoading, setLoginLoading] = useState(false);
     const dispatch = useDispatch();
     
     const [addInterest, { 
@@ -305,7 +308,9 @@ const LandingPage = ({ navigation }) => {
     const isMobile = screenWidth < 600;
 
     const handleLogin = () => {
+        setLoginLoading(true);
         navigation.navigate('Login');
+        setTimeout(() => setLoginLoading(false), 1200); // fallback in case navigation is slow
     };
 
     const handleScheduleDemo = () => {
@@ -707,6 +712,13 @@ const LandingPage = ({ navigation }) => {
             if (!showAllSections && found >= 2) {
                 setShowAllSections(true);
             }
+            // Open newsletter popup if at end of scroll
+            if (
+                scrollViewRef.current &&
+                event.nativeEvent.layoutMeasurement.height + scrollY >= event.nativeEvent.contentSize.height - 10
+            ) {
+                setShowNewsletterForm(true);
+            }
         }, 120);
     };
 
@@ -827,6 +839,50 @@ const LandingPage = ({ navigation }) => {
         return userId;
     };
 
+    useEffect(() => {
+        // Open lead form if #leadform is present on load or hash changes
+        function checkLeadFormHash() {
+            if (window.location.hash === '#leadform') {
+                setLeadFormVisible(true);
+            }
+        }
+        checkLeadFormHash();
+        window.addEventListener('hashchange', checkLeadFormHash);
+        return () => window.removeEventListener('hashchange', checkLeadFormHash);
+    }, []);
+
+    useEffect(() => {
+        // Open newsletter form if #newsletter is present on load or hash changes
+        function checkNewsletterHash() {
+            if (window.location.hash === '#newsletter') {
+                setShowNewsletterForm(true);
+            }
+        }
+        checkNewsletterHash();
+        window.addEventListener('hashchange', checkNewsletterHash);
+        function handleScroll() {
+            if (
+                window.location.hash === '#newsletter' &&
+                (window.innerHeight + window.scrollY) >= (document.body.offsetHeight - 10)
+            ) {
+                setShowNewsletterForm(true);
+                window.removeEventListener('scroll', handleScroll);
+            }
+        }
+        if (window.location.hash === '#newsletter') {
+            window.addEventListener('scroll', handleScroll);
+            // If already at bottom on load, open immediately
+            if ((window.innerHeight + window.scrollY) >= (document.body.offsetHeight - 10)) {
+                setShowNewsletterForm(true);
+                window.removeEventListener('scroll', handleScroll);
+            }
+        }
+        return () => {
+            window.removeEventListener('hashchange', checkNewsletterHash);
+            window.removeEventListener('scroll', handleScroll);
+        };
+    }, []);
+
     return (
         <View style={[styles.container, isMobile && styles.containerMobile]} onLayout={handleContainerLayout}>
             {/* Header Section */}
@@ -836,7 +892,6 @@ const LandingPage = ({ navigation }) => {
                     <Text style={styles.headerTitle}>Dalai Llama</Text>
                 </View>
                 <View style={styles.navLinks}>
-\
                     <TouchableOpacity
                         onPress={handleLogin}
                         style={[styles.loginButton, isMobile && styles.loginButtonMobile]}
@@ -938,6 +993,9 @@ const LandingPage = ({ navigation }) => {
                     scrollable={isMobile} // Pass a prop to make content scrollable if supported
                 />
             </Suspense>
+            <Suspense fallback={null}>
+                {showNewsletterForm && <NewsletterForm onClose={() => setShowNewsletterForm(false)} />}
+            </Suspense>
             <FloatingContactSparkle
                 visible={!isLeadFormVisible}
                 onPress={handleScheduleDemo}
@@ -946,6 +1004,21 @@ const LandingPage = ({ navigation }) => {
                 <Ionicons name="chatbubbles" size={28} color="#fff" />
                 <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, marginLeft: 10 }}>Contact Us</Text>
             </FloatingContactSparkle>
+            {loginLoading && (
+                <View style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(255,255,255,0.85)',
+                    zIndex: 9999,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}>
+                    <Text style={{ fontSize: 22, color: '#7c3aed', fontWeight: 'bold' }}>Loading...</Text>
+                </View>
+            )}
         </View>
     );
 }
