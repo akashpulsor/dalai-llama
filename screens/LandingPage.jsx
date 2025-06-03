@@ -10,6 +10,7 @@ import { useInterestMutation } from '../component/publicApi';
 import { showMessage } from '../component/flashMessageSlice';
 import { industrySolutions, featureIcons, AnimatedCard, FloatingSection } from './LandingPageHelpers';
 import { injectAnalyticsScripts } from '../utils/injectAnalytics';
+import { Audio } from 'expo-av';
 import { v4 as uuidv4 } from 'uuid';
 
 const LeadForm = lazy(() => import('../component/LeadForm'));
@@ -31,98 +32,6 @@ const CurvedBackground = () => {
     );
 };
 
-const DragUpHintInline = ({ visible, isMobile, onPress, style }) => {
-    const bounceAnim = useRef(new RNAnimated.Value(0)).current;
-    const pulseAnim = useRef(new RNAnimated.Value(1)).current;
-
-    useEffect(() => {
-        let bounceLoop, pulseLoop;
-        if (visible) {
-            bounceLoop = RNAnimated.loop(
-                RNAnimated.sequence([
-                    RNAnimated.timing(bounceAnim, {
-                        toValue: -18,
-                        duration: 600,
-                        useNativeDriver: true,
-                    }),
-                    RNAnimated.timing(bounceAnim, {
-                        toValue: 0,
-                        duration: 600,
-                        useNativeDriver: true,
-                    }),
-                ])
-            );
-            bounceLoop.start();
-            pulseLoop = RNAnimated.loop(
-                RNAnimated.sequence([
-                    RNAnimated.timing(pulseAnim, { toValue: 1.13, duration: 700, useNativeDriver: true }),
-                    RNAnimated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
-                ])
-            );
-            pulseLoop.start();
-        } else {
-            pulseAnim.setValue(1);
-        }
-        return () => {
-            bounceLoop && bounceLoop.stop();
-            pulseLoop && pulseLoop.stop();
-        };
-    }, [visible]);
-
-    if (!visible) return null;
-
-    return (
-        <RNAnimated.View
-            style={[
-                {
-                    alignItems: 'center',
-                    opacity: 1,
-                    transform: [{ translateY: bounceAnim }, { scale: pulseAnim }],
-                    marginTop: 0,
-                    marginBottom: -24,
-                    position: 'absolute',
-                    left: 0,
-                    right: 0,
-                    zIndex: 10,
-                },
-                style,
-            ]}
-        >
-            <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={onPress}
-                style={{
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderRadius: 32,
-                    padding: isMobile ? 12 : 18,
-                    backgroundColor: 'transparent',
-                }}
-            >
-                <Image
-                    source={require('../assets/search-logo.png')}
-                    style={{
-                        width: isMobile ? 44 : 60,
-                        height: isMobile ? 44 : 60,
-                        marginBottom: 6,
-                        opacity: 0.95,
-                    }}
-                    resizeMode="contain"
-                />
-                <Ionicons name="chevron-up-circle" size={isMobile ? 36 : 48} color="#007AFF" style={{ marginBottom: 2 }} />
-                <Text style={{
-                    fontSize: isMobile ? 15 : 18,
-                    color: '#007AFF',
-                    fontWeight: 'bold',
-                    marginTop: 2,
-                    letterSpacing: 0.5,
-                }}>
-                    Drag up to explore
-                </Text>
-            </TouchableOpacity>
-        </RNAnimated.View>
-    );
-};
 
 const DragUpHintFloating = ({ visible, isMobile, onPress, y, height, containerHeight, mode }) => {
     const bounceAnim = useRef(new RNAnimated.Value(0)).current;
@@ -356,24 +265,83 @@ const LandingPage = ({ navigation }) => {
     // For audio sample
     const [audioPlaying, setAudioPlaying] = useState(false);
     const [selectedLanguage, setSelectedLanguage] = useState('english');
+    const [sound, setSound] = useState(null);
+
     const audioRefs = {
         hindi: useRef(null),
         english: useRef(null),
         british_english: useRef(null),
     };
 
-    const handlePlayAudio = () => {
-        const ref = audioRefs[selectedLanguage];
-        if (ref.current) {
-            if (audioPlaying) {
-                ref.current.pause();
-                setAudioPlaying(false);
+        // Audio files mapping
+    const audioFiles = {
+        hindi: require('../assets/audio-sample-hindi.mp3'),
+        english: require('../assets/audio-sample-english.mp3'),
+        british_english: require('../assets/audio-sample-british.mp3'), // if you have this file
+    };
+
+    const handlePlayAudio = async () => {
+        try {
+            if (Platform.OS === 'web') {
+                // Web implementation
+                if (audioPlaying && sound) {
+                    await sound.pauseAsync();
+                    setAudioPlaying(false);
+                } else {
+                    // Unload previous sound if exists
+                    if (sound) {
+                        await sound.unloadAsync();
+                    }
+                    // Load and play new sound
+                    const { sound: newSound } = await Audio.Sound.createAsync(
+                        audioFiles[selectedLanguage],
+                        { shouldPlay: true }
+                    );
+                    setSound(newSound);
+                    setAudioPlaying(true);
+                    // Set up playback status listener
+                    newSound.setOnPlaybackStatusUpdate((status) => {
+                        if (status.didJustFinish) {
+                            setAudioPlaying(false);
+                        }
+                    });
+                }
             } else {
-                ref.current.play();
-                setAudioPlaying(true);
+                // React Native implementation
+                if (audioPlaying && sound) {
+                    await sound.pauseAsync();
+                    setAudioPlaying(false);
+                } else {
+                    if (sound) {
+                        await sound.unloadAsync();
+                    }
+                    const { sound: newSound } = await Audio.Sound.createAsync(
+                        audioFiles[selectedLanguage]
+                    );
+                    setSound(newSound);
+                    await newSound.playAsync();
+                    setAudioPlaying(true);
+                    newSound.setOnPlaybackStatusUpdate((status) => {
+                        if (status.didJustFinish) {
+                            setAudioPlaying(false);
+                        }
+                    });
+                }
             }
+        } catch (error) {
+            console.error('Error playing audio:', error);
+            setAudioPlaying(false);
         }
     };
+
+        // Cleanup function
+    useEffect(() => {
+        return sound
+            ? () => {
+                sound.unloadAsync();
+            }
+            : undefined;
+    }, [sound]);
 
     // All sections in one array, in order (without "See Dalai Llama in Action" as a section)
     const sections = [
@@ -465,11 +433,17 @@ const LandingPage = ({ navigation }) => {
                                                 transition: 'border 0.2s',
                                             }}
                                             value={selectedLanguage}
-                                            onChange={e => setSelectedLanguage(e.target.value)}
+                                            onChange={async (e) => {
+                                                // Stop current audio if playing
+                                                if (audioPlaying && sound) {
+                                                    await sound.pauseAsync();
+                                                    setAudioPlaying(false);
+                                                }
+                                                setSelectedLanguage(e.target.value);
+                                            }}
                                         >
                                             <option value="hindi">Hindi</option>
                                             <option value="english">English</option>
-                                            <option value="british_english">British English</option>
                                         </select>
                                         {/* Custom SVG chevron */}
                                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
@@ -479,10 +453,19 @@ const LandingPage = ({ navigation }) => {
                                 ) : (
                                     <TouchableOpacity
                                         style={{ borderWidth: 1.5, borderColor: '#d1d5db', borderRadius: 14, backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 8, minWidth: 120, alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }}
-                                        onPress={() => {/* open language picker modal for mobile if needed */}}
+                                        onPress={async () => {
+                                            // Stop current audio if playing
+                                            if (audioPlaying && sound) {
+                                                await sound.pauseAsync();
+                                                setAudioPlaying(false);
+                                            }
+                                            // Toggle language (you can implement a picker modal here)
+                                            const nextLanguage = selectedLanguage === 'hindi' ? 'english' : 'hindi';
+                                            setSelectedLanguage(nextLanguage);
+                                        }}
                                     >
                                         <Text style={{ fontSize: isMobile ? 15 : 17, color: '#1a237e', fontWeight: '600' }}>
-                                            {selectedLanguage === 'hindi' ? 'Hindi' : selectedLanguage === 'english' ? 'English' : 'British English'}
+                                            {selectedLanguage === 'hindi' ? 'Hindi' : 'English'}
                                         </Text>
                                         <Svg width={18} height={18} viewBox="0 0 20 20" style={{ marginLeft: 6 }}>
                                             <Path d="M6 8l4 4 4-4" stroke="#007AFF" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
@@ -490,10 +473,7 @@ const LandingPage = ({ navigation }) => {
                                     </TouchableOpacity>
                                 )}
                             </View>
-                            {/* Dummy audio elements for each language */}
-                            <audio ref={audioRefs.hindi} src="/assets/audio-sample-hindi.mp3" style={{ display: 'none' }} />
-                            <audio ref={audioRefs.english} src="/assets/audio-sample-english.mp3" style={{ display: 'none' }} />
-                            <audio ref={audioRefs.british_english} src="/assets/audio-sample-british.mp3" style={{ display: 'none' }} />
+
                             {audioPlaying && <FrequencyBars playing={audioPlaying} />}
                         </View>
                         {/* YouTube Video - below audio, responsive aspect ratio */}
@@ -844,6 +824,32 @@ const LandingPage = ({ navigation }) => {
         function checkLeadFormHash() {
             if (window.location.hash === '#leadform') {
                 setLeadFormVisible(true);
+                const urlParams = new URLSearchParams(window.location.search);
+                const uniqueIdParam = urlParams.get('uniqueId');
+                const sourceParam = urlParams.get('source');
+                const campaignParam = urlParams.get('campaign');
+
+                if (uniqueIdParam) {
+                    setUniqueId(uniqueIdParam);
+                    cookies.set('uniqueId', uniqueIdParam);
+                }
+
+                if (sourceParam) {
+                    setSource(sourceParam);
+                    cookies.set('source', sourceParam);
+                }
+
+                if (campaignParam) {
+                    setCampaign(campaignParam);
+                    cookies.set('campaign', campaignParam);
+                }
+
+                setLeadFormData(prevData => ({
+                    ...prevData,
+                    uniqueId: uniqueIdParam || prevData.uniqueId,
+                    source: sourceParam || prevData.source,
+                    campaign: campaignParam || prevData.campaign
+                }));
             }
         }
         checkLeadFormHash();

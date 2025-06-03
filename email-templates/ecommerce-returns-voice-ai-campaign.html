@@ -82,7 +82,7 @@
 </head>
 <body>
   <div class="container">
-    <img src="https://dalai-llama.ai/logo.png" alt="Dalai Llama Logo" class="logo" />
+    <img src="https://dalaillama.in/static/media/llama-mascot.313b3ce1fc123c392738.png" alt="Dalai Llama Logo" class="logo" />
     <div class="headline">Hi, I'm Akash from Dalai Llama</div>
     <div class="subtitle">Is Ecommerce Returns Eating Your Margins?</div>
     <div class="section">
@@ -104,32 +104,44 @@
     </div>
     <div class="section" style="text-align:center; font-weight:bold; color:#7c3aed;">
       Curious how this works? Wondering if it could help your business?<br>
-      <a href="#leadform" class="cta-btn" target="_blank">Let's Talk</a>
+      <a href="https://dalaillama.in/#leadform" class="cta-btn" target="_blank">Let's Talk</a>
     </div>
     <div class="footer">
       &copy; 2024 Dalai Llama. All rights reserved.<br>
-      <span style="color:#7c3aed;">Want updates on Voice AI for ecommerce? <a href="https://dalai-llama.ai/#newsletter" style="color:#7c3aed;text-decoration:underline;">Subscribe to our newsletter</a></span>
+      <span style="color:#7c3aed;">Want updates on Voice AI for ecommerce? <a href="http://localhost:19006/#newsletter" style="color:#7c3aed;text-decoration:underline;">Subscribe to our newsletter</a></span>
     </div>
   </div>
   <!-- Email Open Pixel (for tracking) -->
-  <img src="https://dalai-llama.ai/api/email/open-pixel?campaign=ecommerce-returns" width="1" height="1" style="display:none;" alt="" />
+  <img src="https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api/auth/email/open-pixel?campaign=ecommerce-returns&uniqueId={{ uniqueId }}&source={{ source }}&event={{ event }}" width="1" height="1" style="display:none;" alt="" />
+  
   <!-- Google Analytics Pixel Example -->
-  <img src="https://www.google-analytics.com/collect?v=1&t=event&tid=G-KCK0RY0YPP&cid=EMAIL_CAMPAIGN_USER_ID&ec=email&ea=open&el=ecommerce-returns" width="1" height="1" style="display:none;" alt="" />
-  <!-- Facebook Pixel Example (if needed) -->
-  <img src="https://www.facebook.com/tr?id=YOUR_PIXEL_ID&ev=PageView&noscript=1" width="1" height="1" style="display:none;" alt="" />
+  <img src="https://www.google-analytics.com/collect?v=1&t=event&tid=G-KCK0RY0YPP&cid={{ uniqueId }}&ec=email&ea=open&el={{ campaign }}-{{ source }}" width="1" height="1" style="display:none;" alt="" />
+ 
   <!-- Add this script for LeadForm trigger -->
-  <script>
+   <script>
     document.addEventListener('DOMContentLoaded', function() {
-      var cta = document.querySelector('.cta-btn');
-      if (cta) {
-        cta.addEventListener('click', function(e) {
-          if (window.LandingPage && typeof window.LandingPage.openLeadForm === 'function') {
-            e.preventDefault();
-            window.LandingPage.openLeadForm();
-          }
+        const letsTalkButton = document.querySelector('.cta-btn');
+
+        letsTalkButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        const url = window.location.href.includes('localhost') ? 'https://dalaillama.in/#leadform' : 'https://dalaillama.in/#leadform';
+        const emailId = '{{emailId}}';
+        const uniqueId = '{{uniqueId}}';
+        const source = '{{source}}';
+        const campaign = '{{campaign}}';
+        // Assuming you have these variables available in your template
+
+        const params = new URLSearchParams({
+            uniqueId,
+            source,
+            campaign,
         });
-      }
+
+        window.open(`${url}?${params.toString()}`, '_self');
+        });
     });
-  </script>
+
+
+    </script>
 </body>
 </html>
