@@ -905,15 +905,15 @@ const LandingPage = ({ navigation }) => {
                 type: 'error'
             }));
         }
-    }, [interestDataError]);
-
-    useEffect(() => {
-        function checkLeadFormHash() {
-            if (window.location.hash === '#leadform') {
+    }, [interestDataError]);    useEffect(() => {
+        function checkLeadFormHash() {            if (window.location.hash === '#leadform') {
+                // Get URL parameters before the hash
                 const urlParams = new URLSearchParams(window.location.search);
                 const uniqueIdParam = urlParams.get('uniqueId');
                 const sourceParam = urlParams.get('source');
                 const campaignParam = urlParams.get('campaign');
+
+                console.log('Lead form params:', { uniqueIdParam, sourceParam, campaignParam });
 
                 setLeadFormData(prevData => ({
                     ...prevData,
@@ -921,7 +921,20 @@ const LandingPage = ({ navigation }) => {
                     source: sourceParam || 'web',
                     campaign: campaignParam || 'direct'
                 }));
-                setLeadFormVisible(true);
+
+                // Add delay to ensure state updates and allow hash change to complete
+                setTimeout(() => {
+                    setLeadFormVisible(true);
+                    // Track lead form open in GA
+                    if (window.gtag) {
+                        window.gtag('event', 'lead_form_open', {
+                            event_category: 'Lead Form',
+                            event_label: campaignParam || 'direct',
+                            source: sourceParam || 'web',
+                            uniqueId: uniqueIdParam
+                        });
+                    }
+                }, 300);
             }
         }
         checkLeadFormHash();
@@ -931,15 +944,28 @@ const LandingPage = ({ navigation }) => {
 
     useEffect(() => {
         // Open newsletter form if #newsletter is present on load or hash changes
-        function checkNewsletterHash() {
-            if (window.location.hash === '#newsletter') {
+        function checkNewsletterHash() {            if (window.location.hash === '#newsletter') {
                 const urlParams = new URLSearchParams(window.location.search);
+                const uniqueId = urlParams.get('uniqueId') || uuidv4();
+                const source = urlParams.get('source') || 'web';
+                
                 setLeadFormData(prevData => ({
                     ...prevData,
-                    uniqueId: urlParams.get('uniqueId') || uuidv4(),
-                    source: urlParams.get('source') || 'web',
+                    uniqueId,
+                    source,
                     campaign: 'newsletter'
                 }));
+                
+                // Track newsletter form view
+                if (window.gtag) {
+                    window.gtag('event', 'newsletter_form_view', {
+                        event_category: 'Newsletter',
+                        event_label: 'Form Viewed',
+                        source,
+                        uniqueId
+                    });
+                }
+                
                 setShowNewsletterForm(true);
             }
         }

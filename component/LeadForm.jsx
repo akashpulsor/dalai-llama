@@ -60,9 +60,7 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
                 gaId: 'G-KCK0RY0YPP'
             });
         }
-    }, []);
-
-    useEffect(() => {
+    }, []);    useEffect(() => {
         if (visible) {
             // Set uniqueId if not already set
             if (!formData.uniqueId) {
@@ -73,10 +71,15 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
             }
             // Track form open event
             if (typeof window !== 'undefined' && window.gtag) {
-                window.gtag('event', 'form_open', { form: 'LeadForm' });
+                window.gtag('event', 'lead_form_open', {
+                    event_category: 'Lead Form',
+                    event_label: formData.campaign || 'direct',
+                    source: formData.source || 'web',
+                    uniqueId: formData.uniqueId
+                });
             }
         }
-    }, [visible, formData.uniqueId]);
+    }, [visible, formData.uniqueId, formData.campaign, formData.source]);
 
     const handleFieldFocus = (field) => {
         if (typeof window !== 'undefined' && window.gtag) {
