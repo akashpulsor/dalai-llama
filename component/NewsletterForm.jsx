@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { showMessage } from './flashMessageSlice';
-import { useInterestMutation } from './publicApi';
+import { useNewsletterMutation } from './publicApi';
 import { v4 as uuidv4 } from 'uuid';
 
 const NewsletterForm = ({ onClose, initialData }) => {
@@ -10,8 +10,8 @@ const NewsletterForm = ({ onClose, initialData }) => {
   const [submitted, setSubmitted] = useState(false);
   const [closing, setClosing] = useState(false);
   const dispatch = useDispatch();
-  const [addInterest] = useInterestMutation();
-
+  const [addNewsletter, { isSuccess, isLoading, error }] = useNewsletterMutation(); 
+  
   useEffect(() => {
     // Track newsletter form view on mount
     if (typeof window !== 'undefined' && window.gtag) {
@@ -19,27 +19,47 @@ const NewsletterForm = ({ onClose, initialData }) => {
         event_category: 'Newsletter',
         event_label: 'Form Viewed',
         source: initialData?.source || 'web',
-        uniqueId: initialData?.uniqueId || uuidv4()
+        uniqueId: initialData?.uniqueId || uuidv4(),
+        campaign: initialData?.campaign || 'newsletter'
       });
     }
-  }, []);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault && e.preventDefault();
-    
-    try {
-      await addInterest({
-        email,
-        uniqueId: uuidv4(),
-        source: 'web',
-        campaign: 'newsletter'
-      });
+  }, [initialData]);
+  useEffect(() => {
+    if (isSuccess) {
+      // Track successful newsletter submission
+      if (window.gtag) {
+        window.gtag('event', 'newsletter_submitted', {
+          event_category: 'Newsletter',
+          event_label: 'Success',
+          email_domain: email.split('@')[1],
+          source: initialData?.source || 'web',
+          uniqueId: initialData?.uniqueId,
+          campaign: 'newsletter'
+        });
+      }
       
       setSubmitted(true);
       dispatch(showMessage({
         message: 'Successfully subscribed to newsletter!',
         type: 'success'
       }));
+      setTimeout(() => {
+        onClose && onClose();
+      }, 2000); // Close after 2 seconds
+    }
+  }, [isSuccess, email, initialData]);const handleSubmit = async (e) => {
+    e.preventDefault && e.preventDefault();
+    if (!email) return;
+    
+    try {
+      const submissionData = {
+        email,
+        uniqueId: initialData?.uniqueId || uuidv4(),
+        source: initialData?.source || 'web',
+        campaign: 'newsletter'
+      };
+
+      await addNewsletter(submissionData);
     } catch (error) {
       dispatch(showMessage({
         message: 'Failed to subscribe. Please try again.',

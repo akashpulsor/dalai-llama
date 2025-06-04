@@ -847,27 +847,45 @@ const LandingPage = ({ navigation }) => {
                 });
             }
         }
-    };
-
-    const handleNewsletterSubmit = async (email) => {
+    };    const handleNewsletterSubmit = async (email) => {
+        if (!email) return;
+        
         try {
+            const uniqueId = leadFormData.uniqueId || uuidv4();
+            const source = leadFormData.source || 'web';
+            const campaign = 'newsletter';
+            
             const submissionData = {
                 email,
-                uniqueId: leadFormData.uniqueId || uuidv4(),
-                source: leadFormData.source || 'web',
-                campaign: 'newsletter'
+                uniqueId,
+                source,
+                campaign
             };
-            await addInterest(submissionData);
+
+            // Track newsletter submission attempt in Google Analytics
+            if (window.gtag) {
+                window.gtag('event', 'newsletter_submission_start', {
+                    event_category: 'Newsletter',
+                    event_label: campaign,
+                    source,
+                    uniqueId
+                });
+            }
+
+            const response = await addInterest(submissionData);
             
-            // Track newsletter submission in Google Analytics
+            // Track successful newsletter submission
             if (window.gtag) {
                 window.gtag('event', 'newsletter_subscription', {
                     event_category: 'Newsletter',
-                    event_label: submissionData.campaign,
-                    source: submissionData.source,
-                    uniqueId: submissionData.uniqueId
+                    event_label: campaign,
+                    source,
+                    uniqueId,
+                    email_domain: email.split('@')[1]
                 });
             }
+
+            return response;
         } catch(err) {
             console.error("Newsletter submission failed:", err);
             if (window.gtag) {
@@ -876,6 +894,7 @@ const LandingPage = ({ navigation }) => {
                     event_label: err.message
                 });
             }
+            throw err;
         }
     };
 
