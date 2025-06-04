@@ -88,8 +88,8 @@
     <div class="section">
       <strong>Did you know?</strong><br>
       <ul style="margin: 10px 0 10px 18px; padding: 0; color: #7c3aed;">
-        <li>In 2023, U.S. retail returns reached <b>$743 billion</b> (<a href="https://nrf.com/media-center/press-releases/2023-us-retail-returns-total-743-billion" style="color:#7c3aed;">NRF</a>).</li>
-        <li>Online purchases are returned at a rate of <b>16.5%</b> vs. 10% for in-store (<a href="https://nrf.com/media-center/press-releases/2023-us-retail-returns-total-743-billion" style="color:#7c3aed;">NRF</a>).</li>
+        <li>In 2023, U.S. retail returns reached <b>$743 billion</b> (<a href="https://nrf.com/research/2023-consumer-returns-retail-industry" style="color:#7c3aed;">NRF</a>).</li>
+        <li>Online purchases are returned at a rate of <b>16.5%</b> vs. 10% for in-store (<a href="https://nrf.com/research/2023-consumer-returns-retail-industry" style="color:#7c3aed;">NRF</a>).</li>
         <li>Returns cost retailers an average of <b>21% of order value</b> (<a href="https://www.shopify.com/enterprise/ecommerce-returns" style="color:#7c3aed;">Shopify</a>).</li>
       </ul>
       Returns are a silent profit killer for ecommerce brands. But what if you could address the root cause—before it even becomes a return?
@@ -108,7 +108,7 @@
     </div>
     <div class="footer">
       &copy; 2024 Dalai Llama. All rights reserved.<br>
-      <span style="color:#7c3aed;">Want updates on Voice AI for ecommerce? <a href="http://localhost:19006/#newsletter" style="color:#7c3aed;text-decoration:underline;">Subscribe to our newsletter</a></span>
+      <span style="color:#7c3aed;">Want updates on Voice AI for ecommerce? <a href="https://dalaillama.in/#newsletter" style="color:#7c3aed;text-decoration:underline;">Subscribe to our newsletter</a></span>
     </div>
   </div>
   <!-- Email Open Pixel (for tracking) -->
@@ -117,31 +117,25 @@
   <!-- Google Analytics Pixel Example -->
   <img src="https://www.google-analytics.com/collect?v=1&t=event&tid=G-KCK0RY0YPP&cid={{ uniqueId }}&ec=email&ea=open&el={{ campaign }}-{{ source }}" width="1" height="1" style="display:none;" alt="" />
  
-  <!-- Add this script for LeadForm trigger -->
-   <script>
+  <!-- Add this script for LeadForm trigger -->   <script>
     document.addEventListener('DOMContentLoaded', function() {
         const letsTalkButton = document.querySelector('.cta-btn');
 
         letsTalkButton.addEventListener('click', function(e) {
-        e.preventDefault();
-        const url = window.location.href.includes('localhost') ? 'https://dalaillama.in/#leadform' : 'https://dalaillama.in/#leadform';
-        const emailId = '{{emailId}}';
-        const uniqueId = '{{uniqueId}}';
-        const source = '{{source}}';
-        const campaign = '{{campaign}}';
-        // Assuming you have these variables available in your template
+            e.preventDefault();
+            const baseUrl = 'https://dalaillama.in/';
+            const uniqueId = '{{uniqueId}}';
+            const source = '{{source}}';
+            const campaign = '{{campaign}}';
 
-        const params = new URLSearchParams({
-            uniqueId,
-            source,
-            campaign,
-        });
-
-        window.open(`${url}?${params.toString()}`, '_self');
+            const params = new URLSearchParams();
+            if (uniqueId) params.set('uniqueId', uniqueId);
+            if (source) params.set('source', source);
+            if (campaign) params.set('campaign', campaign);            // Construct URL with params first, then hash
+            const finalUrl = `${baseUrl}${params.toString() ? '?' + params.toString() : ''}#leadform`;
+            window.open(finalUrl, '_blank');
         });
     });
-
-
     </script>
 </body>
 </html>

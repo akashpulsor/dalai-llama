@@ -5,12 +5,24 @@ import { showMessage } from './flashMessageSlice';
 import { useInterestMutation } from './publicApi';
 import { v4 as uuidv4 } from 'uuid';
 
-const NewsletterForm = ({ onClose }) => {
+const NewsletterForm = ({ onClose, initialData }) => {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [closing, setClosing] = useState(false);
   const dispatch = useDispatch();
   const [addInterest] = useInterestMutation();
+
+  useEffect(() => {
+    // Track newsletter form view on mount
+    if (typeof window !== 'undefined' && window.gtag) {
+      window.gtag('event', 'newsletter_form_view', {
+        event_category: 'Newsletter',
+        event_label: 'Form Viewed',
+        source: initialData?.source || 'web',
+        uniqueId: initialData?.uniqueId || uuidv4()
+      });
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault && e.preventDefault();
