@@ -15,7 +15,6 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import PropTypes from 'prop-types';
-import Button from './Button';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAddLeadMutation } from './authApi';
 import { Picker } from '@react-native-picker/picker';
@@ -28,7 +27,7 @@ import {
   isValidPhone,
   cleanContactData,
 } from '../helper/utils';
-import CountryPicker from './CountryPicker';
+
 
 const AddLeadModal = ({ onClose, openModal }) => {
   const user = useSelector(selectUser);

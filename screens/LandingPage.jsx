@@ -1,127 +1,24 @@
 import React, { createRef, useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { View, ScrollView, Text, StyleSheet, TouchableOpacity, Image, Animated, Platform, Modal, Pressable } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
 import { useWindowDimensions } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { Easing } from 'react-native';
 import { Animated as RNAnimated } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { useInterestMutation } from '../component/publicApi';
 import { showMessage } from '../component/flashMessageSlice';
 import { industrySolutions, featureIcons, AnimatedCard, FloatingSection } from './LandingPageHelpers';
 import { injectAnalyticsScripts } from '../utils/injectAnalytics';
+import { Audio } from 'expo-av';
+import * as ExpoAV from 'expo-av';
 import { v4 as uuidv4 } from 'uuid';
+
 
 const LeadForm = lazy(() => import('../component/LeadForm'));
 const LazySections = lazy(() => import('../LazySections'));
+const NewsletterForm = lazy(() => import('../component/NewsletterForm'));
 
 import { injectLinkedInScriptWeb, injectFacebookPixelWeb } from '../utils/injectScripts';
 
-const CurvedBackground = () => {
-    return (
-      <View style={styles.backgroundContainer}>
-        <Svg style={styles.curve} viewBox="0 0 375 280">
-          <Path
-            d="M375 0H0v280c93.75 0 187.5 0 281.25 0C375 280 375 0 375 0z"
-            fill="#EBF0FF"
-          />
-        </Svg>
-      </View>
-    );
-};
-
-const DragUpHintInline = ({ visible, isMobile, onPress, style }) => {
-    const bounceAnim = useRef(new RNAnimated.Value(0)).current;
-    const pulseAnim = useRef(new RNAnimated.Value(1)).current;
-
-    useEffect(() => {
-        let bounceLoop, pulseLoop;
-        if (visible) {
-            bounceLoop = RNAnimated.loop(
-                RNAnimated.sequence([
-                    RNAnimated.timing(bounceAnim, {
-                        toValue: -18,
-                        duration: 600,
-                        useNativeDriver: true,
-                    }),
-                    RNAnimated.timing(bounceAnim, {
-                        toValue: 0,
-                        duration: 600,
-                        useNativeDriver: true,
-                    }),
-                ])
-            );
-            bounceLoop.start();
-            pulseLoop = RNAnimated.loop(
-                RNAnimated.sequence([
-                    RNAnimated.timing(pulseAnim, { toValue: 1.13, duration: 700, useNativeDriver: true }),
-                    RNAnimated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
-                ])
-            );
-            pulseLoop.start();
-        } else {
-            pulseAnim.setValue(1);
-        }
-        return () => {
-            bounceLoop && bounceLoop.stop();
-            pulseLoop && pulseLoop.stop();
-        };
-    }, [visible]);
-
-    if (!visible) return null;
-
-    return (
-        <RNAnimated.View
-            style={[
-                {
-                    alignItems: 'center',
-                    opacity: 1,
-                    transform: [{ translateY: bounceAnim }, { scale: pulseAnim }],
-                    marginTop: 0,
-                    marginBottom: -24,
-                    position: 'absolute',
-                    left: 0,
-                    right: 0,
-                    zIndex: 10,
-                },
-                style,
-            ]}
-        >
-            <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={onPress}
-                style={{
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderRadius: 32,
-                    padding: isMobile ? 12 : 18,
-                    backgroundColor: 'transparent',
-                }}
-            >
-                <Image
-                    source={require('../assets/search-logo.png')}
-                    style={{
-                        width: isMobile ? 44 : 60,
-                        height: isMobile ? 44 : 60,
-                        marginBottom: 6,
-                        opacity: 0.95,
-                    }}
-                    resizeMode="contain"
-                />
-                <Ionicons name="chevron-up-circle" size={isMobile ? 36 : 48} color="#007AFF" style={{ marginBottom: 2 }} />
-                <Text style={{
-                    fontSize: isMobile ? 15 : 18,
-                    color: '#007AFF',
-                    fontWeight: 'bold',
-                    marginTop: 2,
-                    letterSpacing: 0.5,
-                }}>
-                    Drag up to explore
-                </Text>
-            </TouchableOpacity>
-        </RNAnimated.View>
-    );
-};
 
 const DragUpHintFloating = ({ visible, isMobile, onPress, y, height, containerHeight, mode }) => {
     const bounceAnim = useRef(new RNAnimated.Value(0)).current;
@@ -280,7 +177,17 @@ const FloatingContactSparkle = ({ visible, onPress, isMobile }) => {
     );
 };
 
-const FrequencyBars = () => <View style={{ height: 24, marginTop: 8 }} />;
+const FrequencyBars = ({ playing }) => (
+    <View style={{ 
+        height: 24,
+        marginTop: 8,
+        opacity: playing ? 1 : 0,
+        position: 'absolute',
+        bottom: -32,
+        left: 0,
+        right: 0
+    }} />
+);
 
 const LandingPage = ({ navigation }) => {
     const scrollViewRef = useRef(null);
@@ -293,6 +200,8 @@ const LandingPage = ({ navigation }) => {
     const [showcaseVideoLayout, setShowcaseVideoLayout] = useState(null);
     const [containerHeight, setContainerHeight] = useState(null);
     const [showAllSections, setShowAllSections] = useState(false);
+    const [showNewsletterForm, setShowNewsletterForm] = useState(false);
+    const [loginLoading, setLoginLoading] = useState(false);
     const dispatch = useDispatch();
     
     const [addInterest, { 
@@ -301,41 +210,34 @@ const LandingPage = ({ navigation }) => {
         error: interestDataError 
     }] = useInterestMutation();
 
+    const [leadFormData, setLeadFormData] = useState({
+        uniqueId: '',
+        source: 'web',
+        campaign: 'direct'
+    });
+    
+    useEffect(() => {
+        if(isInterestDataSuccess){
+            dispatch(showMessage({
+                message: 'Your interest is submitted, Team will contact you',
+                type: 'info'
+            }));
+            setLeadFormVisible(false);
+        }
+    }, [isInterestDataSuccess]);
+
     const { width: screenWidth } = useWindowDimensions();
     const isMobile = screenWidth < 600;
 
     const handleLogin = () => {
+        setLoginLoading(true);
         navigation.navigate('Login');
+        setTimeout(() => setLoginLoading(false), 1200); // fallback in case navigation is slow
     };
 
     const handleScheduleDemo = () => {
         setLeadFormVisible(true);
     };
-
-    const handleLeadSubmit = async (leadData) => {
-        try{
-            await addInterest(leadData);
-            setLeadFormVisible(false);
-            console.log('interest submitted:', leadData);
-        } 
-        catch(err) {
-            console.error("Interest failed:", err);
-        }
-    };
-
-    useEffect(() => {
-        
-        if(isInterestDataSuccess){
-            
-            dispatch(showMessage({
-                message: 'Your interest is submitted, Team will contact you',
-                type: 'info'
-              }));
-              
-              setLeadFormVisible(false);
-        }
-    
-      }, [isInterestDataSuccess]);
 
     useEffect(() => {
         if (Platform.OS === 'web') {
@@ -343,7 +245,6 @@ const LandingPage = ({ navigation }) => {
             injectFacebookPixelWeb();
             injectAnalyticsScripts({
                 gaId: 'G-KCK0RY0YPP', // TODO: Replace with your real GA4 ID
-                clarityId: 'XXXXXXXXXX', // TODO: Replace with your real Clarity ID
             });
         }
     }, []);
@@ -351,24 +252,63 @@ const LandingPage = ({ navigation }) => {
     // For audio sample
     const [audioPlaying, setAudioPlaying] = useState(false);
     const [selectedLanguage, setSelectedLanguage] = useState('english');
+    const [sound, setSound] = useState(null);
+
     const audioRefs = {
         hindi: useRef(null),
         english: useRef(null),
         british_english: useRef(null),
     };
 
-    const handlePlayAudio = () => {
-        const ref = audioRefs[selectedLanguage];
-        if (ref.current) {
-            if (audioPlaying) {
-                ref.current.pause();
+    // Audio files mapping
+    const audioFiles = {
+        hindi: require('../assets/hindi-sample.mp3'),
+        english: require('../assets/english-sample.mp3')
+    };
+
+    const AudioPlayer = Platform.select({
+        web: () => import('../component/AudioPlayer.web'),
+        default: () => import('../component/AudioPlayer.native'),
+    });
+
+    const handlePlayAudio = async () => {
+        try {
+            if (audioPlaying && sound) {
+                sound.stop();
+                setSound(null);
                 setAudioPlaying(false);
-            } else {
-                ref.current.play();
-                setAudioPlaying(true);
+                return;
             }
+
+            const AudioPlayerModule = await AudioPlayer();
+            const player = new AudioPlayerModule.default({
+                source: audioFiles[selectedLanguage],
+                onPlaybackStatusUpdate: (status) => {
+                    if (status.didJustFinish) {
+                        setAudioPlaying(false);
+                        setSound(null);
+                    }
+                }
+            });
+            
+            await player.play();
+            setSound(player);
+            setAudioPlaying(true);
+        } catch (error) {
+            console.error('Error playing audio:', error);
+            setAudioPlaying(false);
+            setSound(null);
         }
     };
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (sound) {
+                sound.cleanup();
+            }
+        };
+    }, [sound]);
 
     // All sections in one array, in order (without "See Dalai Llama in Action" as a section)
     const sections = [
@@ -413,6 +353,8 @@ const LandingPage = ({ navigation }) => {
                             alignItems: 'center',
                             justifyContent: 'center',
                             marginBottom: 32,
+                            position: 'relative',
+                            minHeight: 110,  // Fixed height to prevent jumping
                         }}>
                             <View style={{
                                 flexDirection: 'row',
@@ -432,12 +374,28 @@ const LandingPage = ({ navigation }) => {
                                 gap: 18,
                             }}>
                                 <TouchableOpacity
-                                    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}
+                                    style={{ 
+                                        flexDirection: 'row', 
+                                        alignItems: 'center', 
+                                        gap: 10, 
+                                        flex: 1,
+                                        minWidth: 140 // Fix for width inconsistency
+                                    }}
                                     onPress={handlePlayAudio}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name={audioPlaying ? "stop-circle" : "play-circle"} size={isMobile ? 36 : 44} color="#007AFF" />
-                                    <Text style={{ fontSize: 18, color: '#1a237e', fontWeight: '700', letterSpacing: 0.2 }}>
+                                    <Ionicons 
+                                        name={audioPlaying ? "stop-circle" : "play-circle"} 
+                                        size={isMobile ? 36 : 44} 
+                                        color="#007AFF" 
+                                    />
+                                    <Text style={{ 
+                                        fontSize: 18, 
+                                        color: '#1a237e', 
+                                        fontWeight: '700', 
+                                        letterSpacing: 0.2,
+                                        whiteSpace: 'nowrap' // Prevent text wrapping
+                                    }}>
                                         {audioPlaying ? "Stop" : "Play"} Sample
                                     </Text>
                                 </TouchableOpacity>
@@ -460,11 +418,31 @@ const LandingPage = ({ navigation }) => {
                                                 transition: 'border 0.2s',
                                             }}
                                             value={selectedLanguage}
-                                            onChange={e => setSelectedLanguage(e.target.value)}
+                                            onChange={async (e) => {
+                                                if (audioPlaying && sound) {
+                                                    sound.stop();
+                                                    setSound(null);
+                                                    setAudioPlaying(false);
+                                                }
+                                                setSelectedLanguage(e.target.value);
+                                                // Auto-play new language selection
+                                                const AudioPlayerModule = await AudioPlayer();
+                                                const player = new AudioPlayerModule.default({
+                                                    source: audioFiles[e.target.value],
+                                                    onPlaybackStatusUpdate: (status) => {
+                                                        if (status.didJustFinish) {
+                                                            setAudioPlaying(false);
+                                                            setSound(null);
+                                                        }
+                                                    }
+                                                });
+                                                await player.play();
+                                                setSound(player);
+                                                setAudioPlaying(true);
+                                            }}
                                         >
                                             <option value="hindi">Hindi</option>
                                             <option value="english">English</option>
-                                            <option value="british_english">British English</option>
                                         </select>
                                         {/* Custom SVG chevron */}
                                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
@@ -474,10 +452,19 @@ const LandingPage = ({ navigation }) => {
                                 ) : (
                                     <TouchableOpacity
                                         style={{ borderWidth: 1.5, borderColor: '#d1d5db', borderRadius: 14, backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 8, minWidth: 120, alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }}
-                                        onPress={() => {/* open language picker modal for mobile if needed */}}
+                                        onPress={async () => {
+                                            // Stop current audio if playing
+                                            if (audioPlaying && sound) {
+                                                await sound.pauseAsync();
+                                                setAudioPlaying(false);
+                                            }
+                                            // Toggle language (you can implement a picker modal here)
+                                            const nextLanguage = selectedLanguage === 'hindi' ? 'english' : 'hindi';
+                                            setSelectedLanguage(nextLanguage);
+                                        }}
                                     >
                                         <Text style={{ fontSize: isMobile ? 15 : 17, color: '#1a237e', fontWeight: '600' }}>
-                                            {selectedLanguage === 'hindi' ? 'Hindi' : selectedLanguage === 'english' ? 'English' : 'British English'}
+                                            {selectedLanguage === 'hindi' ? 'Hindi' : 'English'}
                                         </Text>
                                         <Svg width={18} height={18} viewBox="0 0 20 20" style={{ marginLeft: 6 }}>
                                             <Path d="M6 8l4 4 4-4" stroke="#007AFF" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
@@ -485,10 +472,7 @@ const LandingPage = ({ navigation }) => {
                                     </TouchableOpacity>
                                 )}
                             </View>
-                            {/* Dummy audio elements for each language */}
-                            <audio ref={audioRefs.hindi} src="/assets/audio-sample-hindi.mp3" style={{ display: 'none' }} />
-                            <audio ref={audioRefs.english} src="/assets/audio-sample-english.mp3" style={{ display: 'none' }} />
-                            <audio ref={audioRefs.british_english} src="/assets/audio-sample-british.mp3" style={{ display: 'none' }} />
+
                             {audioPlaying && <FrequencyBars playing={audioPlaying} />}
                         </View>
                         {/* YouTube Video - below audio, responsive aspect ratio */}
@@ -707,6 +691,13 @@ const LandingPage = ({ navigation }) => {
             if (!showAllSections && found >= 2) {
                 setShowAllSections(true);
             }
+            // Open newsletter popup if at end of scroll
+            if (
+                scrollViewRef.current &&
+                event.nativeEvent.layoutMeasurement.height + scrollY >= event.nativeEvent.contentSize.height - 10
+            ) {
+                setShowNewsletterForm(true);
+            }
         }, 120);
     };
 
@@ -827,6 +818,156 @@ const LandingPage = ({ navigation }) => {
         return userId;
     };
 
+    const handleLeadSubmit = async (formData) => {
+        try {
+            const submissionData = {
+                ...formData,
+                uniqueId: leadFormData.uniqueId || uuidv4(),
+                source: leadFormData.source || 'web',
+                campaign: leadFormData.campaign || 'direct'
+            };
+            await addInterest(submissionData);
+            
+            // Track form submission in Google Analytics
+            if (window.gtag) {
+                window.gtag('event', 'form_submission', {
+                    event_category: 'Lead Form',
+                    event_label: submissionData.campaign,
+                    source: submissionData.source,
+                    uniqueId: submissionData.uniqueId
+                });
+            }
+        } catch(err) {
+            console.error("Interest submission failed:", err);
+            // Track form error in Google Analytics
+            if (window.gtag) {
+                window.gtag('event', 'form_error', {
+                    event_category: 'Lead Form',
+                    event_label: err.message
+                });
+            }
+        }
+    };
+
+    const handleNewsletterSubmit = async (email) => {
+        try {
+            const submissionData = {
+                email,
+                uniqueId: leadFormData.uniqueId || uuidv4(),
+                source: leadFormData.source || 'web',
+                campaign: 'newsletter'
+            };
+            await addInterest(submissionData);
+            
+            // Track newsletter submission in Google Analytics
+            if (window.gtag) {
+                window.gtag('event', 'newsletter_subscription', {
+                    event_category: 'Newsletter',
+                    event_label: submissionData.campaign,
+                    source: submissionData.source,
+                    uniqueId: submissionData.uniqueId
+                });
+            }
+        } catch(err) {
+            console.error("Newsletter submission failed:", err);
+            if (window.gtag) {
+                window.gtag('event', 'newsletter_error', {
+                    event_category: 'Newsletter',
+                    event_label: err.message
+                });
+            }
+        }
+    };
+
+    useEffect(() => {
+        if(isInterestDataSuccess){
+            // Track successful submission
+            if (window.gtag) {
+                window.gtag('event', 'form_success', {
+                    event_category: leadFormData.campaign === 'newsletter' ? 'Newsletter' : 'Lead Form',
+                    event_label: leadFormData.campaign,
+                    source: leadFormData.source
+                });
+            }
+            dispatch(showMessage({
+                message: 'Your interest is submitted successfully!',
+                type: 'success'
+            }));
+            setLeadFormVisible(false);
+            setShowNewsletterForm(false);
+        }
+    }, [isInterestDataSuccess]);
+
+    useEffect(() => {
+        if(interestDataError){
+            dispatch(showMessage({
+                message: 'Failed to submit. Please try again.',
+                type: 'error'
+            }));
+        }
+    }, [interestDataError]);
+
+    useEffect(() => {
+        function checkLeadFormHash() {
+            if (window.location.hash === '#leadform') {
+                const urlParams = new URLSearchParams(window.location.search);
+                const uniqueIdParam = urlParams.get('uniqueId');
+                const sourceParam = urlParams.get('source');
+                const campaignParam = urlParams.get('campaign');
+
+                setLeadFormData(prevData => ({
+                    ...prevData,
+                    uniqueId: uniqueIdParam || uuidv4(),
+                    source: sourceParam || 'web',
+                    campaign: campaignParam || 'direct'
+                }));
+                setLeadFormVisible(true);
+            }
+        }
+        checkLeadFormHash();
+        window.addEventListener('hashchange', checkLeadFormHash);
+        return () => window.removeEventListener('hashchange', checkLeadFormHash);
+    }, []);
+
+    useEffect(() => {
+        // Open newsletter form if #newsletter is present on load or hash changes
+        function checkNewsletterHash() {
+            if (window.location.hash === '#newsletter') {
+                const urlParams = new URLSearchParams(window.location.search);
+                setLeadFormData(prevData => ({
+                    ...prevData,
+                    uniqueId: urlParams.get('uniqueId') || uuidv4(),
+                    source: urlParams.get('source') || 'web',
+                    campaign: 'newsletter'
+                }));
+                setShowNewsletterForm(true);
+            }
+        }
+        checkNewsletterHash();
+        window.addEventListener('hashchange', checkNewsletterHash);
+        function handleScroll() {
+            if (
+                window.location.hash === '#newsletter' &&
+                (window.innerHeight + window.scrollY) >= (document.body.offsetHeight - 10)
+            ) {
+                setShowNewsletterForm(true);
+                window.removeEventListener('scroll', handleScroll);
+            }
+        }
+        if (window.location.hash === '#newsletter') {
+            window.addEventListener('scroll', handleScroll);
+            // If already at bottom on load, open immediately
+            if ((window.innerHeight + window.scrollY) >= (document.body.offsetHeight - 10)) {
+                setShowNewsletterForm(true);
+                window.removeEventListener('scroll', handleScroll);
+            }
+        }
+        return () => {
+            window.removeEventListener('hashchange', checkNewsletterHash);
+            window.removeEventListener('scroll', handleScroll);
+        };
+    }, []);
+
     return (
         <View style={[styles.container, isMobile && styles.containerMobile]} onLayout={handleContainerLayout}>
             {/* Header Section */}
@@ -836,7 +977,6 @@ const LandingPage = ({ navigation }) => {
                     <Text style={styles.headerTitle}>Dalai Llama</Text>
                 </View>
                 <View style={styles.navLinks}>
-\
                     <TouchableOpacity
                         onPress={handleLogin}
                         style={[styles.loginButton, isMobile && styles.loginButtonMobile]}
@@ -933,10 +1073,18 @@ const LandingPage = ({ navigation }) => {
                 <LeadForm
                     visible={isLeadFormVisible}
                     onClose={() => setLeadFormVisible(false)}
+                    initialData={leadFormData}
                     onSubmit={handleLeadSubmit}
-                    modalStyle={{ maxHeight: isMobile ? '70%' : '50vh', minHeight: 320, width: '100%', overflow: 'auto' }} // Reduced height, scrollable
-                    scrollable={isMobile} // Pass a prop to make content scrollable if supported
+                    modalStyle={{ maxHeight: isMobile ? '70%' : '50vh', minHeight: 320, width: '100%', overflow: 'auto' }}
+                    scrollable={isMobile}
                 />
+            </Suspense>
+            <Suspense fallback={null}>
+                {showNewsletterForm && <NewsletterForm 
+                    onClose={() => setShowNewsletterForm(false)} 
+                    onSubmit={handleNewsletterSubmit}
+                    initialData={leadFormData}
+                />}
             </Suspense>
             <FloatingContactSparkle
                 visible={!isLeadFormVisible}
@@ -946,6 +1094,21 @@ const LandingPage = ({ navigation }) => {
                 <Ionicons name="chatbubbles" size={28} color="#fff" />
                 <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, marginLeft: 10 }}>Contact Us</Text>
             </FloatingContactSparkle>
+            {loginLoading && (
+                <View style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(255,255,255,0.85)',
+                    zIndex: 9999,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}>
+                    <Text style={{ fontSize: 22, color: '#7c3aed', fontWeight: 'bold' }}>Loading...</Text>
+                </View>
+            )}
         </View>
     );
 }

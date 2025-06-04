@@ -1,0 +1,147 @@
+<!-- Dalai Llama Ecommerce Returns Voice AI Campaign Email -->
+<!DOCTYPE html>
+<html lang="en" style="background: #f5f3ff;">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reduce Ecommerce Returns with Voice AI | Dalai Llama</title>
+  <style>
+    body {
+      background: #f5f3ff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      color: #1a237e;
+    }
+    .container {
+      max-width: 480px;
+      margin: 32px auto;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 8px 32px rgba(124,58,237,0.10);
+      padding: 32px 24px 24px 24px;
+      border: 1.5px solid #e3e8fd;
+    }
+    .logo {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 18px auto;
+      display: block;
+    }
+    .headline {
+      font-size: 26px;
+      font-weight: bold;
+      color: #7c3aed;
+      text-align: center;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+    .subtitle {
+      font-size: 17px;
+      color: #222;
+      text-align: center;
+      margin-bottom: 18px;
+      font-weight: 500;
+    }
+    .section {
+      margin-bottom: 18px;
+      color: #222;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+    .cta-btn {
+      display: block;
+      width: 100%;
+      background: linear-gradient(90deg, #7c3aed 0%, #a7bfe8 100%);
+      color: #fff;
+      font-size: 18px;
+      font-weight: bold;
+      border: none;
+      border-radius: 12px;
+      padding: 16px 0;
+      margin: 28px 0 0 0;
+      text-align: center;
+      text-decoration: none;
+      box-shadow: 0 4px 16px #e3e8fd;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    }
+    .footer {
+      margin-top: 32px;
+      text-align: center;
+      font-size: 13px;
+      color: #888;
+    }
+    @media (max-width: 600px) {
+      .container { padding: 18px 4vw; }
+      .headline { font-size: 20px; }
+      .subtitle { font-size: 14px; }
+      .cta-btn { font-size: 16px; padding: 12px 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img src="https://dalaillama.in/static/media/llama-mascot.313b3ce1fc123c392738.png" alt="Dalai Llama Logo" class="logo" />
+    <div class="headline">Hi, I'm Akash from Dalai Llama</div>
+    <div class="subtitle">Is Ecommerce Returns Eating Your Margins?</div>
+    <div class="section">
+      <strong>Did you know?</strong><br>
+      <ul style="margin: 10px 0 10px 18px; padding: 0; color: #7c3aed;">
+        <li>In 2023, U.S. retail returns reached <b>$743 billion</b> (<a href="https://nrf.com/media-center/press-releases/2023-us-retail-returns-total-743-billion" style="color:#7c3aed;">NRF</a>).</li>
+        <li>Online purchases are returned at a rate of <b>16.5%</b> vs. 10% for in-store (<a href="https://nrf.com/media-center/press-releases/2023-us-retail-returns-total-743-billion" style="color:#7c3aed;">NRF</a>).</li>
+        <li>Returns cost retailers an average of <b>21% of order value</b> (<a href="https://www.shopify.com/enterprise/ecommerce-returns" style="color:#7c3aed;">Shopify</a>).</li>
+      </ul>
+      Returns are a silent profit killer for ecommerce brands. But what if you could address the root cause—before it even becomes a return?
+    </div>
+    <div class="section">
+      <strong>What if you could change the game?</strong><br>
+      Imagine a way to reach your customers at just the right moment, answer their questions, and gently nudge them away from unnecessary returns—automatically, at scale, and with a human touch.
+    </div>
+    <div class="section">
+      <strong>We're working on something new</strong><br>
+      At Dalai Llama, we're building a Voice AI that engages your customers post-purchase using voice notifications. It's not just another chatbot or email—it's a new way to connect, inform, and reduce returns.
+    </div>
+    <div class="section" style="text-align:center; font-weight:bold; color:#7c3aed;">
+      Curious how this works? Wondering if it could help your business?<br>
+      <a href="https://dalaillama.in/#leadform" class="cta-btn" target="_blank">Let's Talk</a>
+    </div>
+    <div class="footer">
+      &copy; 2024 Dalai Llama. All rights reserved.<br>
+      <span style="color:#7c3aed;">Want updates on Voice AI for ecommerce? <a href="http://localhost:19006/#newsletter" style="color:#7c3aed;text-decoration:underline;">Subscribe to our newsletter</a></span>
+    </div>
+  </div>
+  <!-- Email Open Pixel (for tracking) -->
+  <img src="https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api/auth/email/open-pixel?campaign=ecommerce-returns&uniqueId={{ uniqueId }}&source={{ source }}&event={{ event }}" width="1" height="1" style="display:none;" alt="" />
+  
+  <!-- Google Analytics Pixel Example -->
+  <img src="https://www.google-analytics.com/collect?v=1&t=event&tid=G-KCK0RY0YPP&cid={{ uniqueId }}&ec=email&ea=open&el={{ campaign }}-{{ source }}" width="1" height="1" style="display:none;" alt="" />
+ 
+  <!-- Add this script for LeadForm trigger -->
+   <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const letsTalkButton = document.querySelector('.cta-btn');
+
+        letsTalkButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        const url = window.location.href.includes('localhost') ? 'https://dalaillama.in/#leadform' : 'https://dalaillama.in/#leadform';
+        const emailId = '{{emailId}}';
+        const uniqueId = '{{uniqueId}}';
+        const source = '{{source}}';
+        const campaign = '{{campaign}}';
+        // Assuming you have these variables available in your template
+
+        const params = new URLSearchParams({
+            uniqueId,
+            source,
+            campaign,
+        });
+
+        window.open(`${url}?${params.toString()}`, '_self');
+        });
+    });
+
+
+    </script>
+</body>
+</html>
