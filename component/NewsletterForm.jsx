@@ -1,14 +1,39 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
+import { useDispatch } from 'react-redux';
+import { showMessage } from './flashMessageSlice';
+import { useInterestMutation } from './publicApi';
+import { v4 as uuidv4 } from 'uuid';
 
 const NewsletterForm = ({ onClose }) => {
-  const [email, setEmail] = React.useState('');
-  const [submitted, setSubmitted] = React.useState(false);
-  const [closing, setClosing] = React.useState(false);
+  const [email, setEmail] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const dispatch = useDispatch();
+  const [addInterest] = useInterestMutation();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault && e.preventDefault();
-    setSubmitted(true);
+    
+    try {
+      await addInterest({
+        email,
+        uniqueId: uuidv4(),
+        source: 'web',
+        campaign: 'newsletter'
+      });
+      
+      setSubmitted(true);
+      dispatch(showMessage({
+        message: 'Successfully subscribed to newsletter!',
+        type: 'success'
+      }));
+    } catch (error) {
+      dispatch(showMessage({
+        message: 'Failed to subscribe. Please try again.',
+        type: 'error'
+      }));
+    }
   };
 
   const handleClose = () => {

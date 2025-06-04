@@ -18,6 +18,7 @@ import CountryCodeDropdownPicker from './CountryCodeDropdownPicker';
 import countryData from '../helper/countryData';
 import { useInterestMutation } from './publicApi';
 import { injectAnalyticsScripts } from '../utils/injectAnalytics';
+import { v4 as uuidv4 } from 'uuid';
 
 const companySizes = [
     { label: '0-100', value: '0-100' },
@@ -32,7 +33,10 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
         email: '',
         countryCode: '+1',
         mobileNumber: '',
-        companySize: ''
+        companySize: '',
+        uniqueId: '',
+        source: 'web',
+        campaign: 'direct'
     });
     const [errors, setErrors] = useState({});
     const [submitting, setSubmitting] = useState(false);
@@ -53,17 +57,26 @@ const LeadForm = ({ visible, onClose, onSubmit }) => {
     useEffect(() => {
         if (Platform.OS === 'web') {
             injectAnalyticsScripts({
-                gaId: 'G-XXXXXXXXXX', // TODO: Replace with your real GA4 ID
-                clarityId: 'XXXXXXXXXX', // TODO: Replace with your real Clarity ID
+                gaId: 'G-KCK0RY0YPP'
             });
         }
     }, []);
 
     useEffect(() => {
-        if (visible && typeof window !== 'undefined' && window.gtag) {
-            window.gtag('event', 'form_open', { form: 'LeadForm' });
+        if (visible) {
+            // Set uniqueId if not already set
+            if (!formData.uniqueId) {
+                setFormData(prev => ({
+                    ...prev,
+                    uniqueId: uuidv4()
+                }));
+            }
+            // Track form open event
+            if (typeof window !== 'undefined' && window.gtag) {
+                window.gtag('event', 'form_open', { form: 'LeadForm' });
+            }
         }
-    }, [visible]);
+    }, [visible, formData.uniqueId]);
 
     const handleFieldFocus = (field) => {
         if (typeof window !== 'undefined' && window.gtag) {

@@ -1,9 +1,7 @@
 import React, { createRef, useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { View, ScrollView, Text, StyleSheet, TouchableOpacity, Image, Animated, Platform, Modal, Pressable } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
 import { useWindowDimensions } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { Easing } from 'react-native';
 import { Animated as RNAnimated } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { useInterestMutation } from '../component/publicApi';
@@ -11,26 +9,15 @@ import { showMessage } from '../component/flashMessageSlice';
 import { industrySolutions, featureIcons, AnimatedCard, FloatingSection } from './LandingPageHelpers';
 import { injectAnalyticsScripts } from '../utils/injectAnalytics';
 import { Audio } from 'expo-av';
+import * as ExpoAV from 'expo-av';
 import { v4 as uuidv4 } from 'uuid';
+
 
 const LeadForm = lazy(() => import('../component/LeadForm'));
 const LazySections = lazy(() => import('../LazySections'));
 const NewsletterForm = lazy(() => import('../component/NewsletterForm'));
 
 import { injectLinkedInScriptWeb, injectFacebookPixelWeb } from '../utils/injectScripts';
-
-const CurvedBackground = () => {
-    return (
-      <View style={styles.backgroundContainer}>
-        <Svg style={styles.curve} viewBox="0 0 375 280">
-          <Path
-            d="M375 0H0v280c93.75 0 187.5 0 281.25 0C375 280 375 0 375 0z"
-            fill="#EBF0FF"
-          />
-        </Svg>
-      </View>
-    );
-};
 
 
 const DragUpHintFloating = ({ visible, isMobile, onPress, y, height, containerHeight, mode }) => {
@@ -190,7 +177,17 @@ const FloatingContactSparkle = ({ visible, onPress, isMobile }) => {
     );
 };
 
-const FrequencyBars = () => <View style={{ height: 24, marginTop: 8 }} />;
+const FrequencyBars = ({ playing }) => (
+    <View style={{ 
+        height: 24,
+        marginTop: 8,
+        opacity: playing ? 1 : 0,
+        position: 'absolute',
+        bottom: -32,
+        left: 0,
+        right: 0
+    }} />
+);
 
 const LandingPage = ({ navigation }) => {
     const scrollViewRef = useRef(null);
@@ -213,6 +210,22 @@ const LandingPage = ({ navigation }) => {
         error: interestDataError 
     }] = useInterestMutation();
 
+    const [leadFormData, setLeadFormData] = useState({
+        uniqueId: '',
+        source: 'web',
+        campaign: 'direct'
+    });
+    
+    useEffect(() => {
+        if(isInterestDataSuccess){
+            dispatch(showMessage({
+                message: 'Your interest is submitted, Team will contact you',
+                type: 'info'
+            }));
+            setLeadFormVisible(false);
+        }
+    }, [isInterestDataSuccess]);
+
     const { width: screenWidth } = useWindowDimensions();
     const isMobile = screenWidth < 600;
 
@@ -226,38 +239,12 @@ const LandingPage = ({ navigation }) => {
         setLeadFormVisible(true);
     };
 
-    const handleLeadSubmit = async (leadData) => {
-        try{
-            await addInterest(leadData);
-            setLeadFormVisible(false);
-            console.log('interest submitted:', leadData);
-        } 
-        catch(err) {
-            console.error("Interest failed:", err);
-        }
-    };
-
-    useEffect(() => {
-        
-        if(isInterestDataSuccess){
-            
-            dispatch(showMessage({
-                message: 'Your interest is submitted, Team will contact you',
-                type: 'info'
-              }));
-              
-              setLeadFormVisible(false);
-        }
-    
-      }, [isInterestDataSuccess]);
-
     useEffect(() => {
         if (Platform.OS === 'web') {
             injectLinkedInScriptWeb();
             injectFacebookPixelWeb();
             injectAnalyticsScripts({
                 gaId: 'G-KCK0RY0YPP', // TODO: Replace with your real GA4 ID
-                clarityId: 'XXXXXXXXXX', // TODO: Replace with your real Clarity ID
             });
         }
     }, []);
@@ -273,74 +260,54 @@ const LandingPage = ({ navigation }) => {
         british_english: useRef(null),
     };
 
-        // Audio files mapping
+    // Audio files mapping
     const audioFiles = {
-        hindi: require('../assets/audio-sample-hindi.mp3'),
-        english: require('../assets/audio-sample-english.mp3'),
-        british_english: require('../assets/audio-sample-british.mp3'), // if you have this file
+        hindi: require('../assets/hindi-sample.mp3'),
+        english: require('../assets/english-sample.mp3')
     };
+
+    const AudioPlayer = Platform.select({
+        web: () => import('../component/AudioPlayer.web'),
+        default: () => import('../component/AudioPlayer.native'),
+    });
 
     const handlePlayAudio = async () => {
         try {
-            if (Platform.OS === 'web') {
-                // Web implementation
-                if (audioPlaying && sound) {
-                    await sound.pauseAsync();
-                    setAudioPlaying(false);
-                } else {
-                    // Unload previous sound if exists
-                    if (sound) {
-                        await sound.unloadAsync();
-                    }
-                    // Load and play new sound
-                    const { sound: newSound } = await Audio.Sound.createAsync(
-                        audioFiles[selectedLanguage],
-                        { shouldPlay: true }
-                    );
-                    setSound(newSound);
-                    setAudioPlaying(true);
-                    // Set up playback status listener
-                    newSound.setOnPlaybackStatusUpdate((status) => {
-                        if (status.didJustFinish) {
-                            setAudioPlaying(false);
-                        }
-                    });
-                }
-            } else {
-                // React Native implementation
-                if (audioPlaying && sound) {
-                    await sound.pauseAsync();
-                    setAudioPlaying(false);
-                } else {
-                    if (sound) {
-                        await sound.unloadAsync();
-                    }
-                    const { sound: newSound } = await Audio.Sound.createAsync(
-                        audioFiles[selectedLanguage]
-                    );
-                    setSound(newSound);
-                    await newSound.playAsync();
-                    setAudioPlaying(true);
-                    newSound.setOnPlaybackStatusUpdate((status) => {
-                        if (status.didJustFinish) {
-                            setAudioPlaying(false);
-                        }
-                    });
-                }
+            if (audioPlaying && sound) {
+                sound.stop();
+                setSound(null);
+                setAudioPlaying(false);
+                return;
             }
+
+            const AudioPlayerModule = await AudioPlayer();
+            const player = new AudioPlayerModule.default({
+                source: audioFiles[selectedLanguage],
+                onPlaybackStatusUpdate: (status) => {
+                    if (status.didJustFinish) {
+                        setAudioPlaying(false);
+                        setSound(null);
+                    }
+                }
+            });
+            
+            await player.play();
+            setSound(player);
+            setAudioPlaying(true);
         } catch (error) {
             console.error('Error playing audio:', error);
             setAudioPlaying(false);
+            setSound(null);
         }
     };
 
-        // Cleanup function
+    // Cleanup on unmount
     useEffect(() => {
-        return sound
-            ? () => {
-                sound.unloadAsync();
+        return () => {
+            if (sound) {
+                sound.cleanup();
             }
-            : undefined;
+        };
     }, [sound]);
 
     // All sections in one array, in order (without "See Dalai Llama in Action" as a section)
@@ -386,6 +353,8 @@ const LandingPage = ({ navigation }) => {
                             alignItems: 'center',
                             justifyContent: 'center',
                             marginBottom: 32,
+                            position: 'relative',
+                            minHeight: 110,  // Fixed height to prevent jumping
                         }}>
                             <View style={{
                                 flexDirection: 'row',
@@ -405,12 +374,28 @@ const LandingPage = ({ navigation }) => {
                                 gap: 18,
                             }}>
                                 <TouchableOpacity
-                                    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}
+                                    style={{ 
+                                        flexDirection: 'row', 
+                                        alignItems: 'center', 
+                                        gap: 10, 
+                                        flex: 1,
+                                        minWidth: 140 // Fix for width inconsistency
+                                    }}
                                     onPress={handlePlayAudio}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name={audioPlaying ? "stop-circle" : "play-circle"} size={isMobile ? 36 : 44} color="#007AFF" />
-                                    <Text style={{ fontSize: 18, color: '#1a237e', fontWeight: '700', letterSpacing: 0.2 }}>
+                                    <Ionicons 
+                                        name={audioPlaying ? "stop-circle" : "play-circle"} 
+                                        size={isMobile ? 36 : 44} 
+                                        color="#007AFF" 
+                                    />
+                                    <Text style={{ 
+                                        fontSize: 18, 
+                                        color: '#1a237e', 
+                                        fontWeight: '700', 
+                                        letterSpacing: 0.2,
+                                        whiteSpace: 'nowrap' // Prevent text wrapping
+                                    }}>
                                         {audioPlaying ? "Stop" : "Play"} Sample
                                     </Text>
                                 </TouchableOpacity>
@@ -434,12 +419,26 @@ const LandingPage = ({ navigation }) => {
                                             }}
                                             value={selectedLanguage}
                                             onChange={async (e) => {
-                                                // Stop current audio if playing
                                                 if (audioPlaying && sound) {
-                                                    await sound.pauseAsync();
+                                                    sound.stop();
+                                                    setSound(null);
                                                     setAudioPlaying(false);
                                                 }
                                                 setSelectedLanguage(e.target.value);
+                                                // Auto-play new language selection
+                                                const AudioPlayerModule = await AudioPlayer();
+                                                const player = new AudioPlayerModule.default({
+                                                    source: audioFiles[e.target.value],
+                                                    onPlaybackStatusUpdate: (status) => {
+                                                        if (status.didJustFinish) {
+                                                            setAudioPlaying(false);
+                                                            setSound(null);
+                                                        }
+                                                    }
+                                                });
+                                                await player.play();
+                                                setSound(player);
+                                                setAudioPlaying(true);
                                             }}
                                         >
                                             <option value="hindi">Hindi</option>
@@ -819,37 +818,110 @@ const LandingPage = ({ navigation }) => {
         return userId;
     };
 
+    const handleLeadSubmit = async (formData) => {
+        try {
+            const submissionData = {
+                ...formData,
+                uniqueId: leadFormData.uniqueId || uuidv4(),
+                source: leadFormData.source || 'web',
+                campaign: leadFormData.campaign || 'direct'
+            };
+            await addInterest(submissionData);
+            
+            // Track form submission in Google Analytics
+            if (window.gtag) {
+                window.gtag('event', 'form_submission', {
+                    event_category: 'Lead Form',
+                    event_label: submissionData.campaign,
+                    source: submissionData.source,
+                    uniqueId: submissionData.uniqueId
+                });
+            }
+        } catch(err) {
+            console.error("Interest submission failed:", err);
+            // Track form error in Google Analytics
+            if (window.gtag) {
+                window.gtag('event', 'form_error', {
+                    event_category: 'Lead Form',
+                    event_label: err.message
+                });
+            }
+        }
+    };
+
+    const handleNewsletterSubmit = async (email) => {
+        try {
+            const submissionData = {
+                email,
+                uniqueId: leadFormData.uniqueId || uuidv4(),
+                source: leadFormData.source || 'web',
+                campaign: 'newsletter'
+            };
+            await addInterest(submissionData);
+            
+            // Track newsletter submission in Google Analytics
+            if (window.gtag) {
+                window.gtag('event', 'newsletter_subscription', {
+                    event_category: 'Newsletter',
+                    event_label: submissionData.campaign,
+                    source: submissionData.source,
+                    uniqueId: submissionData.uniqueId
+                });
+            }
+        } catch(err) {
+            console.error("Newsletter submission failed:", err);
+            if (window.gtag) {
+                window.gtag('event', 'newsletter_error', {
+                    event_category: 'Newsletter',
+                    event_label: err.message
+                });
+            }
+        }
+    };
+
     useEffect(() => {
-        // Open lead form if #leadform is present on load or hash changes
+        if(isInterestDataSuccess){
+            // Track successful submission
+            if (window.gtag) {
+                window.gtag('event', 'form_success', {
+                    event_category: leadFormData.campaign === 'newsletter' ? 'Newsletter' : 'Lead Form',
+                    event_label: leadFormData.campaign,
+                    source: leadFormData.source
+                });
+            }
+            dispatch(showMessage({
+                message: 'Your interest is submitted successfully!',
+                type: 'success'
+            }));
+            setLeadFormVisible(false);
+            setShowNewsletterForm(false);
+        }
+    }, [isInterestDataSuccess]);
+
+    useEffect(() => {
+        if(interestDataError){
+            dispatch(showMessage({
+                message: 'Failed to submit. Please try again.',
+                type: 'error'
+            }));
+        }
+    }, [interestDataError]);
+
+    useEffect(() => {
         function checkLeadFormHash() {
             if (window.location.hash === '#leadform') {
-                setLeadFormVisible(true);
                 const urlParams = new URLSearchParams(window.location.search);
                 const uniqueIdParam = urlParams.get('uniqueId');
                 const sourceParam = urlParams.get('source');
                 const campaignParam = urlParams.get('campaign');
 
-                if (uniqueIdParam) {
-                    setUniqueId(uniqueIdParam);
-                    cookies.set('uniqueId', uniqueIdParam);
-                }
-
-                if (sourceParam) {
-                    setSource(sourceParam);
-                    cookies.set('source', sourceParam);
-                }
-
-                if (campaignParam) {
-                    setCampaign(campaignParam);
-                    cookies.set('campaign', campaignParam);
-                }
-
                 setLeadFormData(prevData => ({
                     ...prevData,
-                    uniqueId: uniqueIdParam || prevData.uniqueId,
-                    source: sourceParam || prevData.source,
-                    campaign: campaignParam || prevData.campaign
+                    uniqueId: uniqueIdParam || uuidv4(),
+                    source: sourceParam || 'web',
+                    campaign: campaignParam || 'direct'
                 }));
+                setLeadFormVisible(true);
             }
         }
         checkLeadFormHash();
@@ -861,6 +933,13 @@ const LandingPage = ({ navigation }) => {
         // Open newsletter form if #newsletter is present on load or hash changes
         function checkNewsletterHash() {
             if (window.location.hash === '#newsletter') {
+                const urlParams = new URLSearchParams(window.location.search);
+                setLeadFormData(prevData => ({
+                    ...prevData,
+                    uniqueId: urlParams.get('uniqueId') || uuidv4(),
+                    source: urlParams.get('source') || 'web',
+                    campaign: 'newsletter'
+                }));
                 setShowNewsletterForm(true);
             }
         }
@@ -994,13 +1073,18 @@ const LandingPage = ({ navigation }) => {
                 <LeadForm
                     visible={isLeadFormVisible}
                     onClose={() => setLeadFormVisible(false)}
+                    initialData={leadFormData}
                     onSubmit={handleLeadSubmit}
-                    modalStyle={{ maxHeight: isMobile ? '70%' : '50vh', minHeight: 320, width: '100%', overflow: 'auto' }} // Reduced height, scrollable
-                    scrollable={isMobile} // Pass a prop to make content scrollable if supported
+                    modalStyle={{ maxHeight: isMobile ? '70%' : '50vh', minHeight: 320, width: '100%', overflow: 'auto' }}
+                    scrollable={isMobile}
                 />
             </Suspense>
             <Suspense fallback={null}>
-                {showNewsletterForm && <NewsletterForm onClose={() => setShowNewsletterForm(false)} />}
+                {showNewsletterForm && <NewsletterForm 
+                    onClose={() => setShowNewsletterForm(false)} 
+                    onSubmit={handleNewsletterSubmit}
+                    initialData={leadFormData}
+                />}
             </Suspense>
             <FloatingContactSparkle
                 visible={!isLeadFormVisible}
