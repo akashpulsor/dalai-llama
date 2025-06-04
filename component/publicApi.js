@@ -10,8 +10,7 @@ export const publicApi = createApi({
       // Do NOT set Authorization header
       return headers;
     },
-  }),
-  endpoints: (builder) => ({
+  }),  endpoints: (builder) => ({
     interest: builder.mutation({
       query: (data) => ({
         url: '/auth/interest',
@@ -34,7 +33,29 @@ export const publicApi = createApi({
         }
       },
     }),
+    newsletter: builder.mutation({
+      query: (data) => ({
+        url: '/auth/newsletter/subscription',
+        method: 'POST',
+        body: data,
+      }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(showMessage({
+            message: 'Successfully subscribed to newsletter!',
+            type: 'success'
+          }));
+        } catch (error) {
+          console.log(error);
+          dispatch(showMessage({
+            message: error.error?.data?.message || 'Failed to subscribe to newsletter',
+            type: 'error'
+          }));
+        }
+      },
+    }),
   }),
 });
 
-export const { useInterestMutation } = publicApi;
+export const { useInterestMutation, useNewsletterMutation } = publicApi;
