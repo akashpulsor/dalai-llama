@@ -1004,7 +1004,7 @@ const LandingPage = ({ navigation }) => {
             {/* Header Section */}
             <View style={[styles.header, isMobile && styles.headerMobile]}>
                 <View style={[styles.logoContainer, isMobile && styles.logoContainerMobile]}>
-                    <Image source={require('../assets/logo.png')} style={styles.headerLogo} />
+                    <Image source={require('../assets/llama-mascot.png')} style={styles.headerLogo} />
                     <Text style={styles.headerTitle}>Dalai Llama</Text>
                 </View>
                 <View style={styles.navLinks}>
