@@ -364,7 +364,7 @@ const LandingPage = ({ navigation }) => {
                                 Branded Voice Delivery Updates
                             </Text>
                             <Text style={{ fontSize: 15, color: '#333', textAlign: 'center' }}>
-                                Keep your customers informed and engaged at every stage of delivery with personalized, branded voice notifications. Reduce returns and build trust.
+                                Keep your customers informed and engaged at every stage of delivery with personalized, branded voice notifications. You can brand these notifications to subsidize delivery cost. Reduce returns and build trust.
                             </Text>
                         </View>
                         <View style={{ maxWidth: 340, flex: 1, backgroundColor: '#e6f7ff', borderRadius: 16, padding: 18, marginBottom: isMobile ? 16 : 0 }}>
