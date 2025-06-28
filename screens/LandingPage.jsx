@@ -316,18 +316,28 @@ const LandingPage = ({ navigation }) => {
             key: 'hero',
             render: () => (
                 <AnimatedCard delay={0} style={[styles.heroSection, isMobile && styles.heroSectionMobile]}>
-                    <Text style={styles.heroHeadline}>AI-Powered Outbound Calling</Text>
-                    <Text style={styles.heroSubtext}>Scale Your Sales & Support Operations</Text>
-                    <Text style={styles.heroSubtext}>Increase Revenue by 200%</Text>
-                    <View style={[styles.heroMetricsRow, isMobile && styles.heroMetricsRowMobile]}>
-                        <AnimatedCard delay={200} style={styles.metricCardModern}>
-                            <Text style={styles.metricValueModern}>5000+</Text>
-                            <Text style={styles.metricLabelModern}>Calls/Hour</Text>
-                        </AnimatedCard>
-                        <AnimatedCard delay={400} style={styles.metricCardModern}>
-                            <Text style={styles.metricValueModern}>40%</Text>
-                            <Text style={styles.metricLabelModern}>Higher Conversion</Text>
-                        </AnimatedCard>
+                    <Text style={styles.heroHeadline}>Your D2C Journey, Reimagined</Text>
+                    <Text style={styles.heroSubtext}>Reduce Returns. Lower Logistics Cost. Engage Customers. Earn More.</Text>
+                    <View style={[styles.storyGrid, isMobile && styles.storyGridMobile]}>
+                        <View style={styles.storyCard}>
+                            <Text style={styles.cardLabel}>The Challenge</Text>
+                            <Text style={styles.painPoint}>• 20% returns eating your profits</Text>
+                            <Text style={styles.painPoint}>• Rising logistics costs</Text>
+                            <Text style={styles.painPoint}>• Unengaged customers</Text>
+                            <Text style={styles.painPoint}>• Missed revenue opportunities</Text>
+                        </View>
+                        <View style={styles.storyCardSolution}>
+                            <Text style={styles.cardLabel}>The Solution</Text>
+                            <Text style={styles.solution}>• Branded voice delivery updates</Text>
+                            <Text style={styles.solution}>• Voice agent for website visitors</Text>
+                            <Text style={styles.solution}>• Gamified engagement & ad revenue</Text>
+                        </View>
+                        <View style={styles.storyCardBenefit}>
+                            <Text style={styles.cardLabel}>The Result</Text>
+                            <Text style={styles.benefit}>• Lower costs, higher profit</Text>
+                            <Text style={styles.benefit}>• Happier, loyal customers</Text>
+                            <Text style={styles.benefit}>• New revenue from ads</Text>
+                        </View>
                     </View>
                 </AnimatedCard>
             ),
@@ -340,186 +350,162 @@ const LandingPage = ({ navigation }) => {
                     isMobile && styles.showcaseSectionMobile,
                     !isMobile && styles.showcaseSectionWeb
                 ]}>
-                    <Pressable onPress={() => setShowShowcaseModal(true)} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
-                        <Text style={styles.sectionTitleModern}>See Dalai Llama in Action</Text>
-                    </Pressable>
-                    <View style={[
-                        styles.showcaseContent,
-                        isMobile && styles.showcaseContentMobile
-                    ]}>
-                        {/* Voice AI Audio Sample - now above video */}
+                    <Text style={styles.sectionTitleModern}>How It Works for D2C Brands</Text>
+                    <View style={{
+                        flexDirection: isMobile ? 'column' : 'row',
+                        alignItems: 'stretch',
+                        justifyContent: 'center',
+                        gap: 32,
+                        marginTop: 12,
+                        marginBottom: 24,
+                    }}>
+                        <View style={{ maxWidth: 340, flex: 1, backgroundColor: '#fff7e6', borderRadius: 16, padding: 18, marginBottom: isMobile ? 16 : 0 }}>
+                            <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#1a237e', marginBottom: 6, textAlign: 'center' }}>
+                                Branded Voice Delivery Updates
+                            </Text>
+                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center' }}>
+                                Keep your customers informed and engaged at every stage of delivery with personalized, branded voice notifications. Reduce returns and build trust.
+                            </Text>
+                        </View>
+                        <View style={{ maxWidth: 340, flex: 1, backgroundColor: '#e6f7ff', borderRadius: 16, padding: 18, marginBottom: isMobile ? 16 : 0 }}>
+                            <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#1a237e', marginBottom: 6, textAlign: 'center' }}>
+                                Voice Agent for Website Visitors
+                            </Text>
+                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center' }}>
+                                Greet and assist your website visitors with a smart voice agent. Guide them, answer questions, and recommend products to boost conversions.
+                            </Text>
+                        </View>
+                        <View style={{ maxWidth: 340, flex: 1, backgroundColor: '#f6ffed', borderRadius: 16, padding: 18 }}>
+                            <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#1a237e', marginBottom: 6, textAlign: 'center' }}>
+                                Gamified Engagement & Ad Revenue
+                            </Text>
+                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center' }}>
+                                Engage customers with interactive voice games and experiences. Show ads alongside products and unlock new revenue streams for your D2C brand.
+                            </Text>
+                        </View>
+                    </View>
+                    {/* Voice AI Audio Sample */}
+                    <View style={{
+                        width: '100%',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: 32,
+                        position: 'relative',
+                        minHeight: 110,
+                    }}>
                         <View style={{
-                            width: '100%',
+                            flexDirection: 'row',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            marginBottom: 32,
-                            position: 'relative',
-                            minHeight: 110,  // Fixed height to prevent jumping
+                            backgroundColor: '#f8fafd',
+                            borderRadius: 20,
+                            paddingVertical: 14,
+                            paddingHorizontal: isMobile ? 10 : 32,
+                            boxShadow: Platform.OS === 'web' ? '0 2px 12px #e3e8fd' : undefined,
+                            elevation: 3,
+                            maxWidth: 480,
+                            width: '100%',
+                            minWidth: isMobile ? 220 : 340,
+                            borderWidth: 1,
+                            borderColor: '#e3e8fd',
+                            justifyContent: 'space-between',
+                            gap: 18,
                         }}>
-                            <View style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                backgroundColor: '#f8fafd',
-                                borderRadius: 20,
-                                paddingVertical: 14,
-                                paddingHorizontal: isMobile ? 10 : 32,
-                                boxShadow: Platform.OS === 'web' ? '0 2px 12px #e3e8fd' : undefined,
-                                elevation: 3,
-                                maxWidth: 480,
-                                width: '100%',
-                                minWidth: isMobile ? 220 : 340,
-                                borderWidth: 1,
-                                borderColor: '#e3e8fd',
-                                justifyContent: 'space-between',
-                                gap: 18,
-                            }}>
-                                <TouchableOpacity
-                                    style={{ 
-                                        flexDirection: 'row', 
-                                        alignItems: 'center', 
-                                        gap: 10, 
-                                        flex: 1,
-                                        minWidth: 140 // Fix for width inconsistency
-                                    }}
-                                    onPress={handlePlayAudio}
-                                    activeOpacity={0.8}
-                                >
-                                    <Ionicons 
-                                        name={audioPlaying ? "stop-circle" : "play-circle"} 
-                                        size={isMobile ? 36 : 44} 
-                                        color="#007AFF" 
-                                    />
-                                    <Text style={{ 
-                                        fontSize: 18, 
-                                        color: '#1a237e', 
-                                        fontWeight: '700', 
-                                        letterSpacing: 0.2,
-                                        whiteSpace: 'nowrap' // Prevent text wrapping
-                                    }}>
-                                        {audioPlaying ? "Stop" : "Play"} Sample
-                                    </Text>
-                                </TouchableOpacity>
-                                {/* Modern Language dropdown with custom SVG chevron */}
-                                {Platform.OS === 'web' ? (
-                                    <div style={{ position: 'relative', minWidth: 140, width: 160 }}>
-                                        <select
-                                            style={{
-                                                width: '100%',
-                                                fontSize: isMobile ? 15 : 17,
-                                                padding: '10px 36px 10px 14px',
-                                                borderRadius: 14,
-                                                border: '1.5px solid #d1d5db',
-                                                background: '#fff',
-                                                color: '#1a237e',
-                                                fontWeight: 600,
-                                                appearance: 'none',
-                                                outline: 'none',
-                                                boxShadow: '0 1px 4px #e3e8fd',
-                                                transition: 'border 0.2s',
-                                            }}
-                                            value={selectedLanguage}
-                                            onChange={async (e) => {
-                                                if (audioPlaying && sound) {
-                                                    sound.stop();
-                                                    setSound(null);
-                                                    setAudioPlaying(false);
-                                                }
-                                                setSelectedLanguage(e.target.value);
-                                                // Auto-play new language selection
-                                                const AudioPlayerModule = await AudioPlayer();
-                                                const player = new AudioPlayerModule.default({
-                                                    source: audioFiles[e.target.value],
-                                                    onPlaybackStatusUpdate: (status) => {
-                                                        if (status.didJustFinish) {
-                                                            setAudioPlaying(false);
-                                                            setSound(null);
-                                                        }
-                                                    }
-                                                });
-                                                await player.play();
-                                                setSound(player);
-                                                setAudioPlaying(true);
-                                            }}
-                                        >
-                                            <option value="hindi">Hindi</option>
-                                            <option value="english">English</option>
-                                        </select>
-                                        {/* Custom SVG chevron */}
-                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-                                            <path d="M6 8l4 4 4-4" stroke="#007AFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </svg>
-                                    </div>
-                                ) : (
-                                    <TouchableOpacity
-                                        style={{ borderWidth: 1.5, borderColor: '#d1d5db', borderRadius: 14, backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 8, minWidth: 120, alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }}
-                                        onPress={async () => {
-                                            // Stop current audio if playing
+                            <TouchableOpacity
+                                style={{ 
+                                    flexDirection: 'row', 
+                                    alignItems: 'center', 
+                                    gap: 10, 
+                                    flex: 1,
+                                    minWidth: 140
+                                }}
+                                onPress={handlePlayAudio}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons 
+                                    name={audioPlaying ? "stop-circle" : "play-circle"} 
+                                    size={isMobile ? 36 : 44} 
+                                    color="#007AFF" 
+                                />
+                                <Text style={{ 
+                                    fontSize: 18, 
+                                    color: '#1a237e', 
+                                    fontWeight: '700', 
+                                    letterSpacing: 0.2,
+                                    whiteSpace: 'nowrap'
+                                }}>
+                                    {audioPlaying ? "Stop" : "Play"} Sample
+                                </Text>
+                            </TouchableOpacity>
+                            {Platform.OS === 'web' ? (
+                                <div style={{ position: 'relative', minWidth: 140, width: 160 }}>
+                                    <select
+                                        style={{
+                                            width: '100%',
+                                            fontSize: isMobile ? 15 : 17,
+                                            padding: '10px 36px 10px 14px',
+                                            borderRadius: 14,
+                                            border: '1.5px solid #d1d5db',
+                                            background: '#fff',
+                                            color: '#1a237e',
+                                            fontWeight: 600,
+                                            appearance: 'none',
+                                            outline: 'none',
+                                            boxShadow: '0 1px 4px #e3e8fd',
+                                            transition: 'border 0.2s',
+                                        }}
+                                        value={selectedLanguage}
+                                        onChange={async (e) => {
                                             if (audioPlaying && sound) {
-                                                await sound.pauseAsync();
+                                                sound.stop();
+                                                setSound(null);
                                                 setAudioPlaying(false);
                                             }
-                                            // Toggle language (you can implement a picker modal here)
-                                            const nextLanguage = selectedLanguage === 'hindi' ? 'english' : 'hindi';
-                                            setSelectedLanguage(nextLanguage);
+                                            setSelectedLanguage(e.target.value);
+                                            // Auto-play new language selection
+                                            const AudioPlayerModule = await AudioPlayer();
+                                            const player = new AudioPlayerModule.default({
+                                                source: audioFiles[e.target.value],
+                                                onPlaybackStatusUpdate: (status) => {
+                                                    if (status.didJustFinish) {
+                                                        setAudioPlaying(false);
+                                                        setSound(null);
+                                                    }
+                                                }
+                                            });
+                                            await player.play();
+                                            setSound(player);
+                                            setAudioPlaying(true);
                                         }}
                                     >
-                                        <Text style={{ fontSize: isMobile ? 15 : 17, color: '#1a237e', fontWeight: '600' }}>
-                                            {selectedLanguage === 'hindi' ? 'Hindi' : 'English'}
-                                        </Text>
-                                        <Svg width={18} height={18} viewBox="0 0 20 20" style={{ marginLeft: 6 }}>
-                                            <Path d="M6 8l4 4 4-4" stroke="#007AFF" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
-                                        </Svg>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-
-                            {audioPlaying && <FrequencyBars playing={audioPlaying} />}
-                        </View>
-                        {/* YouTube Video - below audio, responsive aspect ratio */}
-                        <View
-                            ref={showcaseVideoRef}
-                            onLayout={e => setShowcaseVideoLayout(e.nativeEvent.layout)}
-                            style={[
-                                styles.videoContainer,
-                                isMobile && styles.videoContainerMobile
-                            ]}
-                        >
-                            {Platform.OS === 'web' ? (
-                                <div style={{
-                                    position: 'relative',
-                                    width: '100%',
-                                    paddingBottom: '56.25%',
-                                    borderRadius: isMobile ? 8 : 12,
-                                    overflow: 'hidden',
-                                    background: '#000'
-                                }}>
-                                    <iframe
-                                        title="Dalai Llama Demo"
-                                        style={{
-                                            position: 'absolute',
-                                            top: 0,
-                                            left: 0,
-                                            width: '100%',
-                                            height: '100%',
-                                            border: 0,
-                                            borderRadius: isMobile ? 8 : 12,
-                                            background: '#000'
-                                        }}
-                                        src="https://www.youtube.com/embed/Bo_gUCXr8lM"
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                        allowFullScreen
-                                    />
+                                        <option value="hindi">Hindi</option>
+                                        <option value="english">English</option>
+                                    </select>
+                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+                                        <path d="M6 8l4 4 4-4" stroke="#007AFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
                                 </div>
                             ) : (
-                                <WebView
-                                    style={isMobile ? styles.youtubeMobile : styles.youtube}
-                                    javaScriptEnabled={true}
-                                    domStorageEnabled={true}
-                                    source={{ uri: 'https://www.youtube.com/embed/Bo_gUCXr8lM' }}
-                                    allowsFullscreenVideo
-                                />
+                                <TouchableOpacity
+                                    style={{ borderWidth: 1.5, borderColor: '#d1d5db', borderRadius: 14, backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 8, minWidth: 120, alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }}
+                                    onPress={async () => {
+                                        if (audioPlaying && sound) {
+                                            await sound.pauseAsync();
+                                            setAudioPlaying(false);
+                                        }
+                                        const nextLanguage = selectedLanguage === 'hindi' ? 'english' : 'hindi';
+                                        setSelectedLanguage(nextLanguage);
+                                    }}
+                                >
+                                    <Text style={{ fontSize: isMobile ? 15 : 17, color: '#1a237e', fontWeight: '600' }}>
+                                        {selectedLanguage === 'hindi' ? 'Hindi' : 'English'}
+                                    </Text>
+                                    <Svg width={18} height={18} viewBox="0 0 20 20" style={{ marginLeft: 6 }}>
+                                        <Path d="M6 8l4 4 4-4" stroke="#007AFF" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+                                    </Svg>
+                                </TouchableOpacity>
                             )}
                         </View>
+                        {audioPlaying && <FrequencyBars playing={audioPlaying} />}
                     </View>
                 </View>
             ),
@@ -1225,7 +1211,7 @@ const styles = StyleSheet.create({
     heroSection: {
         alignItems: 'center',
         padding: 0,
-        marginTop: 24,
+        marginTop: 8, // Reduced top margin
         marginBottom: 8,
     },
     heroSectionMobile: {
@@ -1247,42 +1233,96 @@ const styles = StyleSheet.create({
         marginBottom: 4,
         fontWeight: '500',
     },
-    heroMetricsRow: {
+    heroImage: {
+        width: 220,
+        height: 120,
+        resizeMode: 'cover',
+        borderRadius: 18,
+        marginBottom: 24,
+    },
+    storyGrid: {
         flexDirection: 'row',
+        gap: 18,
+        marginTop: 32,
+        width: '100%',
+        maxWidth: 900,
         justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 18,
-        gap: 24,
     },
-    heroMetricsRowMobile: {
+    storyGridMobile: {
         flexDirection: 'column',
-        gap: 10,
-        marginTop: 12,
+        gap: 12,
     },
-    metricCardModern: {
-        backgroundColor: '#e3e8fd',
-        borderRadius: 14,
-        paddingVertical: 18,
-        paddingHorizontal: 32,
+    storyCard: {
+        backgroundColor: '#fff7e6',
+        borderRadius: 16,
+        padding: 18,
+        flex: 1,
+        maxWidth: 320,
         alignItems: 'center',
-        marginHorizontal: 8,
-        minWidth: 140,
-        marginBottom: 0,
-        shadowColor: '#1a237e',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 4,
+        shadowColor: '#faad14',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
         elevation: 2,
     },
-    metricValueModern: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: '#1a237e',
-        marginBottom: 2,
+    storyCardSolution: {
+        backgroundColor: '#e6f7ff',
+        borderRadius: 16,
+        padding: 18,
+        flex: 1,
+        maxWidth: 320,
+        alignItems: 'center',
+        shadowColor: '#1890ff',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
+        elevation: 2,
     },
-    metricLabelModern: {
+    storyCardBenefit: {
+        backgroundColor: '#f6ffed',
+        borderRadius: 16,
+        padding: 18,
+        flex: 1,
+        maxWidth: 320,
+        alignItems: 'center',
+        shadowColor: '#52c41a',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    cardLabel: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 12,
+        color: '#1a237e',
+        textAlign: 'center',
+    },
+    illustrationImage: {
+        width: 90,
+        height: 90,
+        resizeMode: 'cover',
+        borderRadius: 12,
+        marginBottom: 10,
+    },
+    painPoint: {
         fontSize: 15,
-        color: '#222',
+        color: '#d48806',
+        marginBottom: 6,
+        fontWeight: '500',
+        textAlign: 'center',
+    },
+    solution: {
+        fontSize: 15,
+        color: '#096dd9',
+        marginBottom: 6,
+        fontWeight: '500',
+        textAlign: 'center',
+    },
+    benefit: {
+        fontSize: 15,
+        color: '#389e0d',
+        marginBottom: 6,
         fontWeight: '500',
         textAlign: 'center',
     },

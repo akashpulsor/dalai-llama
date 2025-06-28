@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en" style="background: #f5f3ff;">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seeking Insights on Ecommerce Product Returns | Dalai Llama</title>
+  <style>
+    body {
+      background: #f5f3ff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      color: #1a237e;
+    }
+    .container {
+      max-width: 480px;
+      margin: 32px auto;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 8px 32px rgba(124,58,237,0.10);
+      padding: 32px 24px 24px 24px;
+      border: 1.5px solid #e3e8fd;
+    }
+    .logo {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 18px auto;
+      display: block;
+    }
+    .headline {
+      font-size: 26px;
+      font-weight: bold;
+      color: #7c3aed;
+      text-align: center;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+    .subtitle {
+      font-size: 17px;
+      color: #222;
+      text-align: center;
+      margin-bottom: 18px;
+      font-weight: 500;
+    }
+    .section {
+      margin-bottom: 18px;
+      color: #222;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+    .cta-btn {
+      display: block;
+      width: 100%;
+      background: linear-gradient(90deg, #7c3aed 0%, #a7bfe8 100%);
+      color: #fff;
+      font-size: 18px;
+      font-weight: bold;
+      border: none;
+      border-radius: 12px;
+      padding: 16px 0;
+      margin: 28px 0 0 0;
+      text-align: center;
+      text-decoration: none;
+      box-shadow: 0 4px 16px #e3e8fd;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+    }
+    .footer {
+      margin-top: 32px;
+      text-align: center;
+      font-size: 13px;
+      color: #888;
+    }
+    @media (max-width: 600px) {
+      .container { padding: 18px 4vw; }
+      .headline { font-size: 20px; }
+      .subtitle { font-size: 14px; }
+      .cta-btn { font-size: 16px; padding: 12px 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img src="https://dalaillama.in/static/media/llama-mascot.313b3ce1fc123c392738.png" alt="Dalai Llama Logo" class="logo" />
+    <div class="headline">Hi, I'm Akash from Dalai Llama</div>
+    <div class="subtitle">Would Love Your Perspective on Product Returns in Ecommerce</div>
+    <div class="section">
+      Given your experience investing in ecommerce companies, I'd greatly value your insights on a critical problem we're tackling: product returns.
+    </div>
+    <div class="section">
+      <strong>The Challenge We're Addressing:</strong><br>
+      <ul style="margin: 10px 0 10px 18px; padding: 0; color: #7c3aed;">
+        <li>16.5% online return rate vs 10% in-store (<a href="https://nrf.com/research/2023-consumer-returns-retail-industry" style="color:#7c3aed;">NRF</a>)</li>
+        <li>Returns cost retailers 21% of order value (<a href="https://www.shopify.com/enterprise/ecommerce-returns" style="color:#7c3aed;">Shopify</a>)</li>
+        <li>$743B in U.S. retail returns in 2023 alone</li>
+      </ul>
+    </div>
+    <div class="section">
+      <strong>Our Approach:</strong><br>
+      We're building Voice AI technology that proactively engages customers post-purchase to address concerns before they lead to returns. Based on your portfolio experience, I'd love to:
+      <ul style="margin: 10px 0 10px 18px; padding: 0;">
+        <li>Get your perspective on this problem space</li>
+        <li>Learn if your portfolio companies face similar challenges</li>
+        <li>Connect with relevant portfolio companies to validate our solution</li>
+      </ul>
+    </div>
+    <div class="section" style="text-align:center; font-weight:bold; color:#7c3aed;">
+      Would you be open to a brief conversation?<br>
+      <a href="https://dalaillama.in/#leadform" class="cta-btn" target="_blank">Let's Connect</a>
+    </div>
+    <div class="footer">
+      &copy; 2024 Dalai Llama. All rights reserved.<br>
+      <span style="color:#7c3aed;">Want updates on Voice AI for ecommerce? <a href="https://dalaillama.in/#newsletter" style="color:#7c3aed;text-decoration:underline;">Subscribe to our newsletter</a></span>
+    </div>
+  </div>
+  <!-- Email Open Pixel (for tracking) -->
+  <img src="https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api/auth/email/open-pixel?campaign=investor-insights&uniqueId={{ uniqueId }}&source={{ source }}&event={{ event }}" width="1" height="1" style="display:none;" alt="" />
+  
+  <!-- Google Analytics Pixel -->
+  <img src="https://www.google-analytics.com/collect?v=1&t=event&tid=G-KCK0RY0YPP&cid={{ uniqueId }}&ec=email&ea=open&el={{ campaign }}-{{ source }}" width="1" height="1" style="display:none;" alt="" />
+ 
+  <!-- LeadForm trigger script -->   
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const letsTalkButton = document.querySelector('.cta-btn');
+
+        letsTalkButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            const baseUrl = 'https://dalaillama.in/';
+            const uniqueId = '{{uniqueId}}';
+            const source = '{{source}}';
+            const campaign = '{{campaign}}';
+
+            const params = new URLSearchParams();
+            if (uniqueId) params.set('uniqueId', uniqueId);
+            if (source) params.set('source', source);
+            if (campaign) params.set('campaign', campaign);
+            const finalUrl = `${baseUrl}${params.toString() ? '?' + params.toString() : ''}#leadform`;
+            window.open(finalUrl, '_blank');
+        });
+    });
+  </script>
+</body>
+</html>
