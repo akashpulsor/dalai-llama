@@ -316,27 +316,28 @@ const LandingPage = ({ navigation }) => {
             key: 'hero',
             render: () => (
                 <AnimatedCard delay={0} style={[styles.heroSection, isMobile && styles.heroSectionMobile]}>
-                    <Text style={styles.heroHeadline}>Your D2C Journey, Reimagined</Text>
-                    <Text style={styles.heroSubtext}>Reduce Returns. Lower Logistics Cost. Engage Customers. Earn More.</Text>
+                    <Text style={styles.heroHeadline}>Your D2C Copilot: Automate, Save, and Scale</Text>
+                    <Text style={styles.heroSubtext}>AI automates returns, fraud, logistics, competitor analysis, and more—so you can focus on growth.</Text>
                     <View style={[styles.storyGrid, isMobile && styles.storyGridMobile]}>
                         <View style={styles.storyCard}>
                             <Text style={styles.cardLabel}>The Challenge</Text>
-                            <Text style={styles.painPoint}>• 20% returns eating your profits</Text>
-                            <Text style={styles.painPoint}>• Rising logistics costs</Text>
-                            <Text style={styles.painPoint}>• Unengaged customers</Text>
-                            <Text style={styles.painPoint}>• Missed revenue opportunities</Text>
+                            <Text style={[styles.painPoint, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>Too many apps for RTO, fraud, notifications = high costs, complexity, and data sharing.</Text>
+                            <Text style={[styles.painPoint, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>Every new problem adds another app, creating more risk and dependency.</Text>
+                            <Text style={[styles.painPoint, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>Hard to scale like big brands due to tool limitations.</Text>
+                            <Text style={[styles.painPoint, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>Vendor lock-in limits your control and flexibility.</Text>
                         </View>
                         <View style={styles.storyCardSolution}>
                             <Text style={styles.cardLabel}>The Solution</Text>
-                            <Text style={styles.solution}>• Branded voice delivery updates</Text>
-                            <Text style={styles.solution}>• Voice agent for website visitors</Text>
-                            <Text style={styles.solution}>• Gamified engagement & ad revenue</Text>
+                            <Text style={[styles.solution, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• D2C Copilot: AI + Email + Shopify webhooks = one smart system.</Text>
+                            <Text style={[styles.solution, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• Unified automation: fraud, RTO, competition, notifications.</Text>
+                            <Text style={[styles.solution, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• Branded voice notifications: engage & subsidize logistics.</Text>
+                            <Text style={[styles.solution, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• Open, flexible platform: no vendor lock-in.</Text>
                         </View>
                         <View style={styles.storyCardBenefit}>
                             <Text style={styles.cardLabel}>The Result</Text>
-                            <Text style={styles.benefit}>• Lower costs, higher profit</Text>
-                            <Text style={styles.benefit}>• Happier, loyal customers</Text>
-                            <Text style={styles.benefit}>• New revenue from ads</Text>
+                            <Text style={[styles.benefit, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• 1/10th the cost, fewer apps, less admin.</Text>
+                            <Text style={[styles.benefit, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• More control, less risk, no vendor lock-in.</Text>
+                            <Text style={[styles.benefit, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• Scale like a house of brands—focus on growth.</Text>
                         </View>
                     </View>
                 </AnimatedCard>
@@ -359,29 +360,41 @@ const LandingPage = ({ navigation }) => {
                         marginTop: 12,
                         marginBottom: 24,
                     }}>
-                        <View style={{ maxWidth: 340, flex: 1, backgroundColor: '#fff7e6', borderRadius: 16, padding: 18, marginBottom: isMobile ? 16 : 0 }}>
-                            <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#1a237e', marginBottom: 6, textAlign: 'center' }}>
-                                Branded Voice Delivery Updates
-                            </Text>
-                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center' }}>
-                                Keep your customers informed and engaged at every stage of delivery with personalized, branded voice notifications. You can brand these notifications to subsidize delivery cost. Reduce returns and build trust.
-                            </Text>
+                        <View
+                          style={[
+                            { maxWidth: isMobile ? '98%' : 340, flex: 1, backgroundColor: '#fff7e6', borderRadius: 16, padding: isMobile ? 10 : 18, marginBottom: isMobile ? 12 : 0 },
+                          ]}
+                        >
+                          <Text style={{ fontSize: isMobile ? 15 : 17, fontWeight: 'bold', color: '#1a237e', marginBottom: 6, textAlign: 'center' }}>
+                              Copilot for Delivery Updates
+                          </Text>
+                          <Text style={{ fontSize: isMobile ? 13 : 15, color: '#333', textAlign: 'center', lineHeight: isMobile ? 17 : 20 }}>
+                              Copilot reads all delivery updates from mail and takes action. It categorizes, prioritizes, and assigns the right agent.
+                          </Text>
                         </View>
-                        <View style={{ maxWidth: 340, flex: 1, backgroundColor: '#e6f7ff', borderRadius: 16, padding: 18, marginBottom: isMobile ? 16 : 0 }}>
-                            <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#1a237e', marginBottom: 6, textAlign: 'center' }}>
-                                Voice Agent for Website Visitors
-                            </Text>
-                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center' }}>
-                                Greet and assist your website visitors with a smart voice agent. Guide them, answer questions, and recommend products to boost conversions.
-                            </Text>
+                        <View
+                          style={[
+                            { maxWidth: isMobile ? '98%' : 340, flex: 1, backgroundColor: '#e6f7ff', borderRadius: 16, padding: isMobile ? 10 : 18, marginBottom: isMobile ? 12 : 0 },
+                          ]}
+                        >
+                          <Text style={{ fontSize: isMobile ? 15 : 17, fontWeight: 'bold', color: '#1a237e', marginBottom: 6, textAlign: 'center' }}>
+                              AI Agent for Website Visitors
+                          </Text>
+                          <Text style={{ fontSize: isMobile ? 13 : 15, color: '#333', textAlign: 'center', lineHeight: isMobile ? 17 : 20 }}>
+                              AI agent completes tasks and notifies your team. For example, detects cart abandonment and can call to increase sales.
+                          </Text>
                         </View>
-                        <View style={{ maxWidth: 340, flex: 1, backgroundColor: '#f6ffed', borderRadius: 16, padding: 18 }}>
-                            <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#1a237e', marginBottom: 6, textAlign: 'center' }}>
-                                Gamified Engagement & Ad Revenue
-                            </Text>
-                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center' }}>
-                                Engage customers with interactive voice games and experiences. Show ads alongside products and unlock new revenue streams for your D2C brand.
-                            </Text>
+                        <View
+                          style={[
+                            { maxWidth: isMobile ? '98%' : 340, flex: 1, backgroundColor: '#f6ffed', borderRadius: 16, padding: isMobile ? 10 : 18 },
+                          ]}
+                        >
+                          <Text style={{ fontSize: isMobile ? 15 : 17, fontWeight: 'bold', color: '#1a237e', marginBottom: 6, textAlign: 'center' }}>
+                              Configure Multiple Stores
+                          </Text>
+                          <Text style={{ fontSize: isMobile ? 13 : 15, color: '#333', textAlign: 'center', lineHeight: isMobile ? 17 : 20 }}>
+                              D2C Copilot is decoupled from store, so you can manage orders, inventory, and shipping for multiple stores in one place.
+                          </Text>
                         </View>
                     </View>
                     {/* Voice AI Audio Sample */}
@@ -433,7 +446,7 @@ const LandingPage = ({ navigation }) => {
                                     letterSpacing: 0.2,
                                     whiteSpace: 'nowrap'
                                 }}>
-                                    {audioPlaying ? "Stop" : "Play"} Sample
+                                    {audioPlaying ? "Stop" : "Play"} Sample 
                                 </Text>
                             </TouchableOpacity>
                             {Platform.OS === 'web' ? (
@@ -626,6 +639,81 @@ const LandingPage = ({ navigation }) => {
                     >
                         <Text style={styles.contactButtonText}>Contact</Text>
                     </TouchableOpacity>
+                </View>
+            ),
+        },
+        {
+            key: 'copilot',
+            render: () => (
+                <View style={[
+                    styles.showcaseSection,
+                    isMobile && styles.showcaseSectionMobile,
+                    !isMobile && styles.showcaseSectionWeb
+                ]}>
+                    <Text style={styles.sectionTitleModern}>Meet Your D2C Copilot</Text>
+                    <View style={{
+                        flexDirection: isMobile ? 'column' : 'row',
+                        alignItems: 'stretch',
+                        justifyContent: 'center',
+                        gap: 32,
+                        marginTop: 12,
+                        marginBottom: 24,
+                    }}>
+                        <View style={{ maxWidth: 340, flex: 1, backgroundColor: '#fff7e6', borderRadius: 16, padding: 18, marginBottom: isMobile ? 16 : 0 }}>
+                            <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#1a237e', marginBottom: 6, textAlign: 'center' }}>
+                                The Problem
+                            </Text>
+                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
+                                • $2K–$13K/month on apps for RTO, fraud, notifications, analysis
+                            </Text>
+                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
+                                • Every new problem = another app, more complexity, more data sharing
+                            </Text>
+                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
+                                • Big brands protect revenue with “house of brands,” but current tools make this hard for you
+                            </Text>
+                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
+                                • Manual work: fraud checks, RTO prevention, competitive analysis, plagiarism checks
+                            </Text>
+                        </View>
+                        <View style={{ maxWidth: 340, flex: 1, backgroundColor: '#e6f7ff', borderRadius: 16, padding: 18, marginBottom: isMobile ? 16 : 0 }}>
+                            <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#1a237e', marginBottom: 6, textAlign: 'center' }}>
+                                The Solution: D2C Copilot
+                            </Text>
+                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
+                                • AI + Email + Shopify webhooks = no more endless apps
+                            </Text>
+                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
+                                • Fraud detection: AI reads transaction emails, flags issues, can prompt a call
+                            </Text>
+                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
+                                • RTO prevention: AI reads RTO requests, calls customers, manages inventory, creates discounts
+                            </Text>
+                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
+                                • Competitive analysis: AI monitors competitors’ prices/products automatically
+                            </Text>
+                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
+                                • Plagiarism check: AI scans for copied creatives/products daily
+                            </Text>
+                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center' }}>
+                                • Logistics cost: Voice bot delivers notifications with jokes, keeps customers happy, and can subsidize costs with ad revenue
+                            </Text>
+                        </View>
+                        <View style={{ maxWidth: 340, flex: 1, backgroundColor: '#f6ffed', borderRadius: 16, padding: 18 }}>
+                            <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#1a237e', marginBottom: 6, textAlign: 'center' }}>
+                                The Result
+                            </Text>
+                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
+                                • Manage multiple stores at 1/10th the cost
+                            </Text>
+                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
+                                • Fewer apps, less admin, more profit
+                            </Text>
+                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center' }}>
+                                • Focus on growth, not firefighting
+                            </Text>
+                        </View>
+                    </View>
                 </View>
             ),
         },
@@ -1242,61 +1330,74 @@ const styles = StyleSheet.create({
     },
     storyGrid: {
         flexDirection: 'row',
-        gap: 18,
-        marginTop: 32,
+        gap: 10, // reduced gap
+        marginTop: 18, // reduced margin
         width: '100%',
         maxWidth: 900,
         justifyContent: 'center',
     },
     storyGridMobile: {
         flexDirection: 'column',
-        gap: 12,
+        gap: 8, // reduced gap
+        marginTop: 10, // reduced margin
     },
     storyCard: {
         backgroundColor: '#fff7e6',
         borderRadius: 16,
-        padding: 18,
+        paddingVertical: 10,
+        paddingHorizontal: 10,
         flex: 1,
-        maxWidth: 320,
-        alignItems: 'center',
+        minHeight: 220, // increased for better visual balance
+        maxWidth: 360, // slightly wider for web
+        width: '100%',
+        alignItems: 'flex-start',
         shadowColor: '#faad14',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.12,
         shadowRadius: 8,
         elevation: 2,
+        marginBottom: 24, // more space between cards
     },
     storyCardSolution: {
         backgroundColor: '#e6f7ff',
         borderRadius: 16,
-        padding: 18,
+        paddingVertical: 10,
+        paddingHorizontal: 10,
         flex: 1,
-        maxWidth: 320,
-        alignItems: 'center',
+        minHeight: 220, // increased for better visual balance
+        maxWidth: 360,
+        width: '100%',
+        alignItems: 'flex-start',
         shadowColor: '#1890ff',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.12,
         shadowRadius: 8,
         elevation: 2,
+        marginBottom: 24,
     },
     storyCardBenefit: {
         backgroundColor: '#f6ffed',
         borderRadius: 16,
-        padding: 18,
+        paddingVertical: 10,
+        paddingHorizontal: 10,
         flex: 1,
-        maxWidth: 320,
-        alignItems: 'center',
+        minHeight: 220, // increased for better visual balance
+        maxWidth: 360,
+        width: '100%',
+        alignItems: 'flex-start',
         shadowColor: '#52c41a',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.12,
         shadowRadius: 8,
         elevation: 2,
+        marginBottom: 24,
     },
     cardLabel: {
-        fontSize: 18,
+        fontSize: 16, // reduced font size
         fontWeight: 'bold',
-        marginBottom: 12,
+        marginBottom: 8, // reduced margin
         color: '#1a237e',
-        textAlign: 'center',
+        textAlign: 'left', // left align for mobile
     },
     illustrationImage: {
         width: 90,
@@ -1306,25 +1407,34 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     painPoint: {
-        fontSize: 15,
+        fontSize: 14,
         color: '#d48806',
-        marginBottom: 6,
+        marginBottom: 14, // more space between points
         fontWeight: '500',
-        textAlign: 'center',
+        textAlign: 'left',
+        alignSelf: 'flex-start',
+        width: '100%',
+        lineHeight: 20, // slightly more line height
     },
     solution: {
-        fontSize: 15,
+        fontSize: 14,
         color: '#096dd9',
-        marginBottom: 6,
+        marginBottom: 14, // more space between points
         fontWeight: '500',
-        textAlign: 'center',
+        textAlign: 'left',
+        alignSelf: 'flex-start',
+        width: '100%',
+        lineHeight: 20,
     },
     benefit: {
-        fontSize: 15,
+        fontSize: 14,
         color: '#389e0d',
-        marginBottom: 6,
+        marginBottom: 14, // more space between points
         fontWeight: '500',
-        textAlign: 'center',
+        textAlign: 'left',
+        alignSelf: 'flex-start',
+        width: '100%',
+        lineHeight: 20,
     },
     sectionTitleModern: {
         fontSize: 28,
@@ -1722,6 +1832,9 @@ const styles = StyleSheet.create({
         letterSpacing: 1,
         textTransform: 'uppercase',
     },
+  bold: {
+    fontWeight: 'bold',
+  },
 });
 
 export default LandingPage;
