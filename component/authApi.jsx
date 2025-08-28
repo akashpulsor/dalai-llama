@@ -69,10 +69,10 @@ export const authApi = createApi({
   reducerPath: 'authApi',
   baseQuery: fetchBaseQuery({
 
-    //baseUrl: 'http://localhost:8080/api',
+    baseUrl: 'http://localhost:8080/api',
 
 
-    baseUrl: process.env.REACT_APP_API_BASE_URL ||'https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api',
+    //baseUrl: process.env.REACT_APP_API_BASE_URL ||'https://dalai-llama-backend-drd2b6e7a6gsa5e4.canadacentral-01.azurewebsites.net/api',
     prepareHeaders: async (headers) => {
       try {
         const token = await AsyncStorage.getItem('token');
@@ -276,6 +276,42 @@ export const authApi = createApi({
     startCampaign: builder.mutation({
       query: (data) => ({
         url: '/campaign/start',
+        method: 'POST',
+        body: data
+      }),
+      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+        try {
+          const { data } = await queryFulfilled;
+        }
+        catch (error) {
+          dispatch(showMessage({
+            message: error.error?.data?.message || 'Operation failed',
+            type: 'error'
+          }));
+        }
+      },
+    }),
+    startCampaign: builder.mutation({
+      query: (data) => ({
+        url: '/campaign/start',
+        method: 'POST',
+        body: data
+      }),
+      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+        try {
+          const { data } = await queryFulfilled;
+        }
+        catch (error) {
+          dispatch(showMessage({
+            message: error.error?.data?.message || 'Operation failed',
+            type: 'error'
+          }));
+        }
+      },
+    }),
+    startInBoundCampaign: builder.mutation({
+      query: (data) => ({
+        url: '/campaign/start-inbound',
         method: 'POST',
         body: data
       }),
@@ -578,6 +614,6 @@ export const { useLoginMutation, useRegisterMutation, useVerificationCodeMutatio
   useAddLLMDataMutation, useRunCampaignMutation, useAddLeadMutation, useAddAgentMutation, useRefreshTokenQuery,
   useOnBoardMutation, useGetOnBoardingDataQuery, useGetBusinessDataQuery, useGenerateNumberMutation, useGetPortalsQuery, useAddPortalMutation, useValidateUrlMutation, useGenerateContextMutation, useInitlializeBrowserAutomationMutation, useGetDashboardDataQuery,
   useLazyGetDashboardDataQuery, useRegisterBotMutation, useGetCampaignRunLogsQuery, useGetCallLogsQuery,
-  useGetCallLogByCallIdQuery, useLazyGetCallLogByCallIdQuery, useCheckEventStatusQuery,useLazyGetRecordingBytesQuery
+  useGetCallLogByCallIdQuery, useLazyGetCallLogByCallIdQuery, useCheckEventStatusQuery,useLazyGetRecordingBytesQuery,useStartInBoundCampaignMutation
 } = authApi;
 

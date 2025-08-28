@@ -21,7 +21,7 @@ import {selectUser } from './authSlice';
 import { useDispatch } from 'react-redux';
 import { showMessage } from './flashMessageSlice';
 import { CheckBox } from 'react-native';
-import { useGetAgentListQuery, useAddCampaignMutation, useGetLeadDataQuery,useGetLlmDataListQuery,useGetPhoneDataListQuery, useStartCampaignMutation, useRunCampaignMutation } from './authApi';
+import { useGetAgentListQuery, useAddCampaignMutation, useGetLeadDataQuery,useGetLlmDataListQuery,useGetPhoneDataListQuery, useStartCampaignMutation, useRunCampaignMutation, useStartInBoundCampaignMutation } from './authApi';
 
 const CampaignRun = ({ onClose, openModal, campaignData }) => {
   const user =  useSelector(selectUser);  
@@ -36,7 +36,8 @@ const CampaignRun = ({ onClose, openModal, campaignData }) => {
     language: '',
     llmId:'',
     phoneId:'',
-    businessId:user?.id
+    businessId:user?.id,
+    campaignType:'OUT_BOUND'
   });
 
   const [campaignFormData, setCampaignFormData] = useState(
@@ -63,6 +64,15 @@ const CampaignRun = ({ onClose, openModal, campaignData }) => {
     error: runCampaignResponseError, 
     reset: resetRunCampaignResponse 
   }] = useRunCampaignMutation();
+
+  const [configureInBoundCampaign, { 
+    data: inboundCampaignResponseData, 
+    isLoading: inboundCampaignResponseLoading, 
+    isSuccess: inboundampaignResponseSuccess, 
+    isError: isInboundCampaignResponseError, 
+    error: inboundCampaignResponseError, 
+
+  }] = useStartInBoundCampaignMutation();
   
   const { data: testLeadDataList, isSuccess:isTestListSuccess, error: testListError, isLoading: isTestListLoading, isError: isTestListError,} = useGetLeadDataQuery({
     businessId: user?.id,
@@ -98,7 +108,8 @@ const CampaignRun = ({ onClose, openModal, campaignData }) => {
           language: '',
           llmId: '',
           phoneId: '',
-          businessId: user?.id
+          businessId: user?.id,
+          campaignType:'OUT_BOUND'
         });
         setSelectedLeads([]);
         setIsMainFlowVisible(false);
@@ -169,6 +180,14 @@ const CampaignRun = ({ onClose, openModal, campaignData }) => {
     startCampaign(campaignData);
   };
 
+  const handleInbuoundCampaign = () => {
+    const campaignData = {
+      ...formData,
+      all: !isMainFlowVisible
+    };
+    configureInBoundCampaign(campaignData);
+  };
+
   const handleRunCampaign = () => {
     runCampaign(campignRunFormData);
   };
@@ -199,7 +218,8 @@ const CampaignRun = ({ onClose, openModal, campaignData }) => {
           language: '',
           llmId: '',
           phoneId: '',
-          businessId: user?.id
+          businessId: user?.id,
+          campaignType:'OUT_BOUND'
         });
         setSelectedLeads([]);
         setIsMainFlowVisible(false);
@@ -365,73 +385,87 @@ useEffect(() => {
                         )}
                     </View>
                 </View>
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Test Mode</Text>
+                {formData.campaignType === 'out_bound' ? (
+    <>
+        <View style={styles.inputGroup}>
+            <Text style={styles.label}>Test Mode</Text>
 
-                    <Switch
-                        trackColor={{ false: "#767577", true: "#81b0ff" }}
-                        thumbColor={isMainFlowVisible ? "#007AFF" : "#f4f3f4"}
-                        ios_backgroundColor="#3e3e3e"
-                        onValueChange={testToggleSwitch}
-                        value={isMainFlowVisible}
-                        style={styles.switch}
-                    />
-                  <Pressable onPress={testToggleSwitch}>
-                    <Text style={styles.label}>Run With Test Users</Text>
-                  </Pressable>
-                </View>
+            <Switch
+                trackColor={{ false: "#767577", true: "#81b0ff" }}
+                thumbColor={isMainFlowVisible ? "#007AFF" : "#f4f3f4"}
+                ios_backgroundColor="#3e3e3e"
+                onValueChange={testToggleSwitch}
+                value={isMainFlowVisible}
+                style={styles.switch}
+            />
+            <Pressable onPress={testToggleSwitch}>
+                <Text style={styles.label}>Run With Test Users</Text>
+            </Pressable>
+        </View>
 
-                {isMainFlowVisible && (
-                    <View style={styles.userList}>
-                    {isTestListLoading && <Text>Loading users...</Text>}
-                    {isTestListError && <Text>Error loading users</Text>}
-                    
-                    {testList?.map(lead => (
-                        <View key={lead.leadId} style={styles.leadItem}>
-                            <CheckBox
-                                value={selectedLeads.includes(lead.leadId)}
-                                onValueChange={() => handleLeadSelect(lead.leadId)}
-                                style={{ marginLeft: '2%' }}
-                            />
-                            <View style={styles.leadInfo}>
-                                {console.log(lead)}
-                            <Text style={[styles.leadName, {marginRight: '5%', marginLeft: '5%'}]}>
-                            {lead.leadName} - ID: {lead.leadId}
+        {isMainFlowVisible && (
+            <View style={styles.userList}>
+                {isTestListLoading && <Text>Loading users...</Text>}
+                {isTestListError && <Text>Error loading users</Text>}
+
+                {testList?.map(lead => (
+                    <View key={lead.leadId} style={styles.leadItem}>
+                        <CheckBox
+                            value={selectedLeads.includes(lead.leadId)}
+                            onValueChange={() => handleLeadSelect(lead.leadId)}
+                            style={{ marginLeft: '2%' }}
+                        />
+                        <View style={styles.leadInfo}>
+                            {console.log(lead)}
+                            <Text style={[styles.leadName, { marginRight: '5%', marginLeft: '5%' }]}>
+                                {lead.leadName} - ID: {lead.leadId}
                             </Text>
                             {lead.leadEmail && (
-                                <Text style={[styles.leadEmail, {marginRight: '5%', marginLeft: '5%'}]}>
+                                <Text style={[styles.leadEmail, { marginRight: '5%', marginLeft: '5%' }]}>
                                     {lead.leadEmail}
                                 </Text>
                             )}
                             {lead.leadPhone && (
-                                <Text style={[styles.leadData, {marginRight: '5%', marginLeft: '5%'}]}>
+                                <Text style={[styles.leadData, { marginRight: '5%', marginLeft: '5%' }]}>
                                     {lead.leadPhone}
                                 </Text>
                             )}
                             {lead.leadgender && (
-                                <Text style={[styles.leadData, {marginRight: '5%', marginLeft: '5%'}]}>
+                                <Text style={[styles.leadData, { marginRight: '5%', marginLeft: '5%' }]}>
                                     {lead.leadGender}
                                 </Text>
                             )}
-                            </View>
                         </View>
-                    ))}
                     </View>
-                )}
-                <View style={[styles.inputGroup,{width:'20%'}]}>
-                    {!playCampaign?      <Button 
-                        mode="contained" 
-                        onPress={() => handleStartCampaign()}
-                        disabled={isStartButtonDisabled()}
-                        style={isStartButtonDisabled() ? styles.disabledButton : null}
-                    >
-                        Start Campaign
-                    </Button>:
-                    <Button mode="contained" onPress={() => handleRunCampaign()}>
-                        Play Campaign
-                    </Button>
-                    }
-              </View>
+                ))}
+            </View>
+        )}
+        <View style={[styles.inputGroup, { width: '20%' }]}>
+            {!playCampaign ?
+                <Button
+                    mode="contained"
+                    onPress={() => handleStartCampaign()}
+                    disabled={isStartButtonDisabled()}
+                    style={isStartButtonDisabled() ? styles.disabledButton : null}
+                >
+                    Start Campaign
+                </Button> :
+                <Button mode="contained" onPress={() => handleRunCampaign()}>
+                    Play Campaign
+                </Button>
+            }
+        </View>
+    </>
+) : (
+    <Button
+        mode="contained"
+        onPress={() => handleInbuoundCampaign()}
+        disabled={isStartButtonDisabled()}
+        style={isStartButtonDisabled() ? styles.disabledButton : null}
+    >
+        Configure Campaign
+    </Button>
+)}
             </View>
           </ScrollView>
         </View>

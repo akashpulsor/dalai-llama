@@ -36,7 +36,8 @@ const CreateCampaignModal = ({ onClose, openModal }) => {
     handlingFaq: '',
     placingOrder: '',
     language: '',
-    duration: 2
+    duration: 2,
+    campaignType: 'OUT_BOUND'
   });
   const dispatch = useDispatch();
   const { width: screenWidth } = useWindowDimensions();
@@ -60,7 +61,8 @@ const CreateCampaignModal = ({ onClose, openModal }) => {
         handlingFaq: '',
         placingOrder: '',
         language: '',
-        duration: 2
+        duration: 2,
+        campaignType: 'OUT_BOUND'
       });
       onClose(false);
     }
@@ -122,7 +124,8 @@ const CreateCampaignModal = ({ onClose, openModal }) => {
       handlingFaq: '',
       placingOrder: '',
       language: '',
-      duration: 2
+      duration: 2,
+      campaignType: 'OUT_BOUND'
     });
     setErrorMessages({});
     onClose(false);
@@ -230,6 +233,23 @@ const CreateCampaignModal = ({ onClose, openModal }) => {
                       <Picker.Item label="Spanish" value="es" />
                       <Picker.Item label="French" value="fr" />
                       <Picker.Item label="German" value="de" />
+                    </Picker>
+                  </View>
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Campaign Type</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={formData.campaignType}
+                      onValueChange={(value) =>
+                        setFormData(prev => ({ ...prev, campaignType: value }))
+                      }
+                      style={[styles.picker, errorMessages.language ? styles.inputError : null]}
+                    >
+                      <Picker.Item label="Select a campaign type" value="" />
+                      <Picker.Item label="OUT_BOUND" value="OUT_BOUND" />
+                      <Picker.Item label="IN_BOUND" value="IN_BOUND" />
+                  
                     </Picker>
                   </View>
                 </View>
