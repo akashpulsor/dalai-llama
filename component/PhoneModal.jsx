@@ -92,6 +92,7 @@ const PhoneModal = ({ onClose, openModal }) => {
       callSecret: '',
       logoImage: '',
       status: '',
+      phoneNumberSid:'',
       active: isActive,
     });
     setErrorMessages({});
@@ -129,6 +130,7 @@ const PhoneModal = ({ onClose, openModal }) => {
         logoImage: selectedPhone.logoImage,
         status: selectedPhone.status,
         active: selectedPhone.active,
+        phoneNumberSid: selectedPhone.phoneNumberSid
       });
       setIsActiveToggleSwitch(true);
     }
@@ -252,6 +254,15 @@ const PhoneModal = ({ onClose, openModal }) => {
                     placeholder="Business Number"
                     value={formData.businessNumber}
                     onChangeText={(text) => handleChange('businessNumber', text)}
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Phone Sid</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Phone SID"
+                    value={formData.phoneNumberSid}
+                    onChangeText={(text) => handleChange('phoneNumberSid', text)}
                   />
                 </View>
                 <View style={styles.inputGroup}>
