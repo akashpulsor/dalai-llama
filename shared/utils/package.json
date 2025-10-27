@@ -1,0 +1,10 @@
+{
+  "name": "@dalaillama/shared-utils",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "jwt-decode": "^4.0.0",
+    "@dalaillama/shared-config": "1.0.0"
+  }
+}
