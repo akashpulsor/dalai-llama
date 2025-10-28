@@ -13,16 +13,17 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
 
+
     "paths": {
-      "@dalaillama/shared-store": ["shared/store/index.js"],
-      "@dalaillama/shared-ui": ["shared/ui/index.js"],
-      "@dalaillama/shared-hooks": ["shared/hooks/index.js"],
-      "@dalaillama/shared-utils": ["shared/utils/index.js"],
-      "@dalaillama/shared-config": ["shared/config/index.js"],
-      "@dalaillama/shared-types/*": ["shared/types/*"],
-       "@dalaillama/shared-types": ["shared/types/index.d.ts"]
-      
-    },
+  "@dalaillama/shared-types/*": ["shared/types/*"],
+  "@dalaillama/shared-types": ["shared/types/index.d.ts"],
+  "@dalaillama/shared-store": ["shared/store/index.js"],
+  "@dalaillama/shared-ui": ["shared/ui/index.js"],
+  "@dalaillama/shared-hooks": ["shared/hooks/index.js"],
+  "@dalaillama/shared-utils": ["shared/utils/index.js"],
+  "@dalaillama/shared-config": ["shared/config/index.js"]
+}
+,
     "typeRoots": ["./types", "./node_modules/@types"],
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
