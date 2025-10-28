@@ -4,18 +4,25 @@ import { jwtDecode } from "jwt-decode";
 import { appConfig } from "@dalaillama/shared-config";
 import { prometheusClient } from "@dalaillama/shared-utils";
 
+/**
+ * Check whether JWT token is expired
+ * @param {string} token
+ * @returns {boolean}
+ */
 const tokenExpired = (token) => {
   try {
+    /** @type {{ exp?: number }} */
     const { exp } = jwtDecode(token);
-    return exp * 1000 < Date.now();
+    return !exp || exp * 1000 < Date.now(); // ✅ Fix undefined exp
   } catch {
     return true;
   }
 };
 
+/** @type {{ user: any, token: string | null }} */
 const initialState = {
   user: null,
-  token: localStorage.getItem("auth_token") || null
+  token: localStorage.getItem("auth_token") || null,
 };
 
 const slice = createSlice({

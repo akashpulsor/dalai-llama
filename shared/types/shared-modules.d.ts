@@ -6,6 +6,7 @@ declare module "@dalaillama/shared-config" {
     METRICS_ENDPOINT: string;
     METRICS_INTERVAL_MS: number;
     LOG_LEVEL: string;
+    PLATFORM_URL: string;
   };
 }
 
@@ -18,6 +19,9 @@ declare module "@dalaillama/shared-utils" {
   };
   export const prometheusClient: {
     pushHeartbeat: () => Promise<void>;
+    pushLatency: (...args: any[]) => Promise<void>;
+    pushTokenStatus: (valid: boolean) => Promise<void>;
+    push: (...args: any[]) => Promise<void>;
   };
 }
 
