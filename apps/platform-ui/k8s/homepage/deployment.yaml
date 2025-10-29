@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: platform-ui
-          image: docker.io/akashtripathi/platform-ui:dev  # Jenkins will bump this tag
+          image: docker.io/akashtripathi/platform-ui:latest  # Jenkins will bump this tag
           imagePullPolicy: Always
           ports: [ { containerPort: 80 } ]
           env:
