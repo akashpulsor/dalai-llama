@@ -1,19 +1,46 @@
-# apps/platform-ui/Dockerfile
-
-# ---- build stage ----
+# ------------------------------------------------------------
+# Stage 1: Build platform-ui (React/Vite)
+# ------------------------------------------------------------
 FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-# Install deps (no lock file available)
-RUN npm install
 
-COPY . .
+# Set working directory inside container
+WORKDIR /app
+
+# Copy monorepo root package files for dependency resolution
+COPY package*.json ./
+
+# Copy shared packages (used by platform-ui)
+COPY shared ./shared
+
+# Copy the platform-ui app
+COPY apps/platform-ui ./apps/platform-ui
+
+# Move into app directory
+WORKDIR /app/apps/platform-ui
+
+# Install dependencies (monorepo-safe)
+RUN npm install --legacy-peer-deps
+
+# Build app
 RUN npm run build
 
-# ---- runtime stage ----
+# ------------------------------------------------------------
+# Stage 2: Serve with nginx
+# ------------------------------------------------------------
 FROM nginx:1.27-alpine
-# only copy static build; nginx.conf will come from infra repo
-COPY --from=builder /app/dist /usr/share/nginx/html
-# default nginx.conf will be mounted later via ConfigMap
+
+# Copy build output
+COPY --from=builder /app/apps/platform-ui/dist /usr/share/nginx/html
+
+# Copy your NGINX config (optional, if mounted by K8s you can skip this)
+COPY apps/platform-ui/k8s/nginx.conf /etc/nginx/conf.d/default.conf
+
+# Expose HTTP port
 EXPOSE 80
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:80/ || exit 1
+
+# Start nginx
 CMD ["nginx", "-g", "daemon off;"]
