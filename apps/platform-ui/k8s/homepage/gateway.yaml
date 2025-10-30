@@ -8,9 +8,8 @@ spec:
     istio: ingress
   servers:
   - port:
-      number: 8080  # ✅ Changed to 8080
+      number: 80
       name: http
       protocol: HTTP
     hosts:
-    - "platform-ui.dev.localhost"
-    - "platform-ui.dev.localhost:8080"  # ✅ Add this to match the port
+    - "platform-ui.dev.localhost"  # Should match both with and without :8080
