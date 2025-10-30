@@ -5,9 +5,9 @@ metadata:
   namespace: front-dev
 spec:
   hosts:
-  - LAPTOP-L2KMRIN8
+  - platform-ui.dev.localhost
   gateways:
-  - istio-ingress/platform-ui-gateway
+  - platform-ui-gateway
   http:
   - route:
     - destination:

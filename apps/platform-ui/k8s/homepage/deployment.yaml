@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: platform-ui
+  namespace: front-dev
   labels:
     app: platform-ui
 spec:
@@ -15,8 +16,14 @@ spec:
         app: platform-ui
     spec:
       containers:
-      - name: platform-ui
-        image: docker.io/akashtripathi/platform-ui:latest
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 80
+        - name: platform-ui
+          image: docker.io/akashtripathi/platform-ui:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          env:
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: platform-config
+                  key: NODE_ENV
