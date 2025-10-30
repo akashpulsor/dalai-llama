@@ -1,19 +1,16 @@
-apiVersion: networking.istio.io/v1alpha3
+apiVersion: networking.istio.io/v1
 kind: VirtualService
 metadata:
   name: platform-ui
   namespace: front-dev
 spec:
-  hosts: 
-    - "platform-ui.dev.localhost"
-  gateways: 
-    - istio-ingress/platform-ui-gateway  # ✅ Reference the gateway in istio-ingress namespace
+  hosts:
+  - LAPTOP-L2KMRIN8
+  gateways:
+  - istio-ingress/platform-ui-gateway
   http:
-    - match:
-        - uri:
-            prefix: /
-      route:
-        - destination:
-            host: platform-ui.front-dev.svc.cluster.local
-            port: 
-              number: 80
+  - route:
+    - destination:
+        host: platform-ui.front-dev.svc.cluster.local
+        port:
+          number: 80

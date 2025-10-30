@@ -2,22 +2,21 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: platform-ui
-  namespace: front-dev
-  labels: { app: platform-ui }
+  labels:
+    app: platform-ui
 spec:
   replicas: 1
   selector:
-    matchLabels: { app: platform-ui }
+    matchLabels:
+      app: platform-ui
   template:
     metadata:
-      labels: { app: platform-ui }
+      labels:
+        app: platform-ui
     spec:
       containers:
-        - name: platform-ui
-          image: docker.io/akashtripathi/platform-ui:latest  # Jenkins will bump this tag
-          imagePullPolicy: Always
-          ports: [ { containerPort: 80 } ]
-          env:
-            - { name: NODE_ENV, value: "development" }
-            - { name: ENVIRONMENT, value: "dev" }
-            - { name: REACT_APP_API_BASE, value: "https://api-dev.dalailama.localhost" }
+      - name: platform-ui
+        image: docker.io/akashtripathi/platform-ui:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80

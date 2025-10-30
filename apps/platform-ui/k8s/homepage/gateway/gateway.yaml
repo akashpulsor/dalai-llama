@@ -12,4 +12,4 @@ spec:
       name: http
       protocol: HTTP
     hosts:
-    - "platform-ui.dev.localhost"  # Should match both with and without :8080
+    - LAPTOP-L2KMRIN8
