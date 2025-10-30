@@ -4,10 +4,16 @@ metadata:
   name: platform-ui
   namespace: front-dev
 spec:
-  hosts: [ "platform-ui.dev.localhost" ]
-  gateways: [ platform-ui-gateway ]
+  hosts: 
+    - "platform-ui.dev.localhost"
+  gateways: 
+    - istio-ingress/platform-ui-gateway  # ✅ Reference the gateway in istio-ingress namespace
   http:
-    - route:
+    - match:
+        - uri:
+            prefix: /
+      route:
         - destination:
             host: platform-ui.front-dev.svc.cluster.local
-            port: { number: 80 }
+            port: 
+              number: 80

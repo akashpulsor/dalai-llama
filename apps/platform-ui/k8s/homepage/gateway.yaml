@@ -2,14 +2,14 @@ apiVersion: networking.istio.io/v1
 kind: Gateway
 metadata:
   name: platform-ui-gateway
-  namespace: front-dev
+  namespace: istio-ingress  # ✅ Gateway should be in the same namespace as the ingress pod
 spec:
   selector:
-    istio: ingress           # ✅ updated to match actual label
+    istio: ingress
   servers:
   - port:
       number: 80
       name: http
       protocol: HTTP
     hosts:
-    - platform-ui.dev.localhost
+    - "platform-ui.dev.localhost"
