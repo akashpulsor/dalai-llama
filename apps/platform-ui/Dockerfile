@@ -33,7 +33,7 @@ FROM nginx:1.27-alpine
 COPY --from=builder /app/apps/platform-ui/dist /usr/share/nginx/html
 
 # Copy your NGINX config (optional, if mounted by K8s you can skip this)
-COPY apps/platform-ui/k8s/homepage/nginx.conf /etc/nginx/conf.d/default.conf
+COPY /apps/platform-ui/k8s/homepage/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose HTTP port
 EXPOSE 80
