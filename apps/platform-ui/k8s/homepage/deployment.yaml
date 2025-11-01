@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: platform-ui
-        image: docker.io/akashtripathi/platform-ui:14-310e3fc
+        image: docker.io/akashtripathi/platform-ui:15-565c859
         imagePullPolicy: Always
         ports:
         - containerPort: 80
