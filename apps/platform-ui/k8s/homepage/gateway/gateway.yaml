@@ -13,3 +13,5 @@ spec:
       protocol: HTTP
     hosts:
     - platform-ui.dev.localhost
+    - admin.dashboard.dev.localhost
+    - auth.dev.localhost
