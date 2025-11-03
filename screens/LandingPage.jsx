@@ -8,6 +8,7 @@ import { useInterestMutation } from '../component/publicApi';
 import { showMessage } from '../component/flashMessageSlice';
 import { industrySolutions, featureIcons, AnimatedCard, FloatingSection } from './LandingPageHelpers';
 import { injectAnalyticsScripts } from '../utils/injectAnalytics';
+import { Helmet } from 'react-helmet';
 import { Audio } from 'expo-av';
 import * as ExpoAV from 'expo-av';
 import { v4 as uuidv4 } from 'uuid';
@@ -171,7 +172,7 @@ const FloatingContactSparkle = ({ visible, onPress, isMobile }) => {
                     fontWeight: 'bold',
                     fontSize: 16,
                     marginLeft: 10,
-                }}>Contact Us</Text>
+                }}>Request Early Access</Text>
             </TouchableOpacity>
         </RNAnimated.View>
     );
@@ -316,28 +317,39 @@ const LandingPage = ({ navigation }) => {
             key: 'hero',
             render: () => (
                 <AnimatedCard delay={0} style={[styles.heroSection, isMobile && styles.heroSectionMobile]}>
-                    <Text style={styles.heroHeadline}>Your D2C Copilot: Automate, Save, and Scale</Text>
-                    <Text style={styles.heroSubtext}>AI automates returns, fraud, logistics, competitor analysis, and more—so you can focus on growth.</Text>
+                    <Text style={styles.heroHeadline}>Reinventing Business Communication with AI-Native PBX</Text>
+                    <Text style={styles.heroSubtext}>Our Unique AI native pbx brings real-time transcription, emotion intelligence and automation directly into your PBX — democratizing voice communication for small businesses.</Text>
                     <View style={[styles.storyGrid, isMobile && styles.storyGridMobile]}>
                         <View style={styles.storyCard}>
                             <Text style={styles.cardLabel}>The Challenge</Text>
-                            <Text style={[styles.painPoint, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>Too many apps for RTO, fraud, notifications = high costs, complexity, and data sharing.</Text>
-                            <Text style={[styles.painPoint, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>Every new problem adds another app, creating more risk and dependency.</Text>
-                            <Text style={[styles.painPoint, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>Hard to scale like big brands due to tool limitations.</Text>
-                            <Text style={[styles.painPoint, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>Vendor lock-in limits your control and flexibility.</Text>
+                            <Text style={[styles.painPoint, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>
+                            Legacy PBX systems are manual, fragmented, and disconnected from CRM or analytics tools.
+                            </Text>
+                            <Text style={[styles.painPoint, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>
+                            Businesses waste hours manually dialing, logging calls, and switching between tools.
+                            </Text>
+                            <Text style={[styles.painPoint, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>
+                            AI integrations today run separately from PBX, consuming high tokens for simple calls and adding cloud latency.
+                            </Text>
+                            <Text style={[styles.painPoint, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>
+                            Existing PBX systems offer no real-time guidance or automation — they only record what already went wrong.
+                            </Text>
+
                         </View>
                         <View style={styles.storyCardSolution}>
                             <Text style={styles.cardLabel}>The Solution</Text>
-                            <Text style={[styles.solution, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• D2C Copilot: AI + Email + Shopify webhooks = one smart system.</Text>
-                            <Text style={[styles.solution, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• Unified automation: fraud, RTO, competition, notifications.</Text>
-                            <Text style={[styles.solution, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• Branded voice notifications: engage & subsidize logistics.</Text>
+                            <Text style={[styles.solution, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• An AI-First PBX with native speech recognition, sentiment, and automation.</Text>
+                            <Text style={[styles.solution, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• Unified system for calling, transcription, CRM sync, and insights.</Text>
+                            <Text style={[styles.solution, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• Smart routing and auto-summaries powered by on-device AI.</Text>
+                            <Text style={[styles.solution, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• Optimised token usage, telling next action based on policy configured.</Text>
                             <Text style={[styles.solution, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• Open, flexible platform: no vendor lock-in.</Text>
                         </View>
                         <View style={styles.storyCardBenefit}>
                             <Text style={styles.cardLabel}>The Result</Text>
-                            <Text style={[styles.benefit, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• 1/10th the cost, fewer apps, less admin.</Text>
-                            <Text style={[styles.benefit, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• More control, less risk, no vendor lock-in.</Text>
-                            <Text style={[styles.benefit, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• Scale like a house of brands—focus on growth.</Text>
+                            <Text style={[styles.benefit, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• 90% lower AI cost with CPU-based edge inference.</Text>
+                            <Text style={[styles.benefit, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• Real-time conversation intelligence without low latency.</Text>
+                            <Text style={[styles.benefit, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• Empowered teams, faster response, and happier customers.</Text>
+                            <Text style={[styles.benefit, isMobile && { fontSize: 14, marginBottom: 12, lineHeight: 20 }]}>• No vendor locking.</Text>
                         </View>
                     </View>
                 </AnimatedCard>
@@ -351,7 +363,7 @@ const LandingPage = ({ navigation }) => {
                     isMobile && styles.showcaseSectionMobile,
                     !isMobile && styles.showcaseSectionWeb
                 ]}>
-                    <Text style={styles.sectionTitleModern}>How It Works for D2C Brands</Text>
+                    <Text style={styles.sectionTitleModern}>How Our AI PBX Works</Text>
                     <View style={{
                         flexDirection: isMobile ? 'column' : 'row',
                         alignItems: 'stretch',
@@ -366,10 +378,10 @@ const LandingPage = ({ navigation }) => {
                           ]}
                         >
                           <Text style={{ fontSize: isMobile ? 15 : 17, fontWeight: 'bold', color: '#1a237e', marginBottom: 6, textAlign: 'center' }}>
-                              Copilot for Delivery Updates
+                              Real-Time Speech Intelligence
                           </Text>
                           <Text style={{ fontSize: isMobile ? 13 : 15, color: '#333', textAlign: 'center', lineHeight: isMobile ? 17 : 20 }}>
-                              Copilot reads all delivery updates from mail and takes action. It categorizes, prioritizes, and assigns the right agent.
+Our PBX natively transcribes, identifies speakers, and detects emotions and suggested next actions— all processed locally on edge servers.
                           </Text>
                         </View>
                         <View
@@ -378,10 +390,10 @@ const LandingPage = ({ navigation }) => {
                           ]}
                         >
                           <Text style={{ fontSize: isMobile ? 15 : 17, fontWeight: 'bold', color: '#1a237e', marginBottom: 6, textAlign: 'center' }}>
-                              AI Agent for Website Visitors
+                              Smart Call Automation
                           </Text>
                           <Text style={{ fontSize: isMobile ? 13 : 15, color: '#333', textAlign: 'center', lineHeight: isMobile ? 17 : 20 }}>
-                              AI agent completes tasks and notifies your team. For example, detects cart abandonment and can call to increase sales.
+                              Outbound AI dialer detects voicemail, optimizes retries, and triggers CRM updates automatically — boosting call throughput 3×.
                           </Text>
                         </View>
                         <View
@@ -390,10 +402,10 @@ const LandingPage = ({ navigation }) => {
                           ]}
                         >
                           <Text style={{ fontSize: isMobile ? 15 : 17, fontWeight: 'bold', color: '#1a237e', marginBottom: 6, textAlign: 'center' }}>
-                              Configure Multiple Stores
+                              Unified Interface
                           </Text>
                           <Text style={{ fontSize: isMobile ? 13 : 15, color: '#333', textAlign: 'center', lineHeight: isMobile ? 17 : 20 }}>
-                              D2C Copilot is decoupled from store, so you can manage orders, inventory, and shipping for multiple stores in one place.
+                              Agents, managers, and AI agents operate on one seamless system — calls, transcripts, and analytics under one roof.
                           </Text>
                         </View>
                     </View>
@@ -449,74 +461,7 @@ const LandingPage = ({ navigation }) => {
                                     {audioPlaying ? "Stop" : "Play"} Sample 
                                 </Text>
                             </TouchableOpacity>
-                            {Platform.OS === 'web' ? (
-                                <div style={{ position: 'relative', minWidth: 140, width: 160 }}>
-                                    <select
-                                        style={{
-                                            width: '100%',
-                                            fontSize: isMobile ? 15 : 17,
-                                            padding: '10px 36px 10px 14px',
-                                            borderRadius: 14,
-                                            border: '1.5px solid #d1d5db',
-                                            background: '#fff',
-                                            color: '#1a237e',
-                                            fontWeight: 600,
-                                            appearance: 'none',
-                                            outline: 'none',
-                                            boxShadow: '0 1px 4px #e3e8fd',
-                                            transition: 'border 0.2s',
-                                        }}
-                                        value={selectedLanguage}
-                                        onChange={async (e) => {
-                                            if (audioPlaying && sound) {
-                                                sound.stop();
-                                                setSound(null);
-                                                setAudioPlaying(false);
-                                            }
-                                            setSelectedLanguage(e.target.value);
-                                            // Auto-play new language selection
-                                            const AudioPlayerModule = await AudioPlayer();
-                                            const player = new AudioPlayerModule.default({
-                                                source: audioFiles[e.target.value],
-                                                onPlaybackStatusUpdate: (status) => {
-                                                    if (status.didJustFinish) {
-                                                        setAudioPlaying(false);
-                                                        setSound(null);
-                                                    }
-                                                }
-                                            });
-                                            await player.play();
-                                            setSound(player);
-                                            setAudioPlaying(true);
-                                        }}
-                                    >
-                                        <option value="hindi">Hindi</option>
-                                        <option value="english">English</option>
-                                    </select>
-                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-                                        <path d="M6 8l4 4 4-4" stroke="#007AFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                    </svg>
-                                </div>
-                            ) : (
-                                <TouchableOpacity
-                                    style={{ borderWidth: 1.5, borderColor: '#d1d5db', borderRadius: 14, backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 8, minWidth: 120, alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }}
-                                    onPress={async () => {
-                                        if (audioPlaying && sound) {
-                                            await sound.pauseAsync();
-                                            setAudioPlaying(false);
-                                        }
-                                        const nextLanguage = selectedLanguage === 'hindi' ? 'english' : 'hindi';
-                                        setSelectedLanguage(nextLanguage);
-                                    }}
-                                >
-                                    <Text style={{ fontSize: isMobile ? 15 : 17, color: '#1a237e', fontWeight: '600' }}>
-                                        {selectedLanguage === 'hindi' ? 'Hindi' : 'English'}
-                                    </Text>
-                                    <Svg width={18} height={18} viewBox="0 0 20 20" style={{ marginLeft: 6 }}>
-                                        <Path d="M6 8l4 4 4-4" stroke="#007AFF" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
-                                    </Svg>
-                                </TouchableOpacity>
-                            )}
+                            
                         </View>
                         {audioPlaying && <FrequencyBars playing={audioPlaying} />}
                     </View>
@@ -565,25 +510,25 @@ const LandingPage = ({ navigation }) => {
                     ]}>
                         {[
                             {
-                                title: 'Smart Lead Prioritization',
-                                description: 'AI-driven scoring to call high-potential leads first',
-                                icon: <MaterialIcons name="star" size={36} color="#007AFF" style={{ marginBottom: 8 }} />,
+                            title: 'AI Voice Intelligence',
+                            description: 'Real-time speech recognition, intent detection, and sentiment analytics on every call.',
+                            icon: <MaterialIcons name="mic" size={36} color="#007AFF" style={{ marginBottom: 8 }} />,
                             },
                             {
-                                title: 'Multi-Language Support',
-                                description: 'Engage customers in their preferred language',
-                                icon: <MaterialIcons name="language" size={36} color="#43a047" style={{ marginBottom: 8 }} />,
+                            title: 'Smart Dialer & Automation',
+                            description: 'Auto-dials, detects voicemail, and triggers follow-ups — no manual effort.',
+                            icon: <MaterialIcons name="autorenew" size={36} color="#ff9800" style={{ marginBottom: 8 }} />,
                             },
                             {
-                                title: 'Automated Follow-ups',
-                                description: 'Schedule and execute follow-up calls automatically',
-                                icon: <MaterialIcons name="autorenew" size={36} color="#ff9800" style={{ marginBottom: 8 }} />,
+                            title: 'CRM Integration',
+                            description: 'Bi-directional sync with HubSpot, Salesforce, or Zoho CRM.',
+                            icon: <MaterialIcons name="link" size={36} color="#8e24aa" style={{ marginBottom: 8 }} />,
                             },
                             {
-                                title: 'CRM Integration',
-                                description: 'Seamless integration with your existing CRM',
-                                icon: <MaterialIcons name="link" size={36} color="#8e24aa" style={{ marginBottom: 8 }} />,
-                            }
+                            title: 'Multi-Tenant Deployment',
+                            description: 'Designed for resellers and SaaS partners to run isolated AI PBX environments.',
+                            icon: <MaterialIcons name="business" size={36} color="#43a047" style={{ marginBottom: 8 }} />,
+                            },
                         ].map((feature, idx) => (
                             <AnimatedCard key={idx} delay={idx * 120}>
                                 <Pressable style={({ pressed }) => [
@@ -608,10 +553,10 @@ const LandingPage = ({ navigation }) => {
                     <Text style={styles.sectionTitleModern}>Performance Metrics</Text>
                     <View style={styles.metricsGridModern}>
                         {[
-                            { metric: '98%', label: 'Call Completion Rate' },
-                            { metric: '45%', label: 'Cost Reduction' },
-                            { metric: '3x', label: 'Lead Coverage' },
-                            { metric: '24/7', label: 'Operation Hours' }
+                          { metric: '90%', label: 'AI Cost Reduction' },
+                          { metric: '3×', label: 'Outbound Call Throughput' },
+                          { metric: '100%', label: 'Data Privacy — On-Device Processing' },
+                          { metric: '24/7', label: 'Automated Availability' },
                         ].map((stat, index) => (
                             <AnimatedCard key={index} delay={index * 100}>
                                 <View style={[styles.metricsModernCard, isMobile && styles.metricsModernCardMobile]}>
@@ -628,7 +573,7 @@ const LandingPage = ({ navigation }) => {
             key: 'contact',
             render: () => (
                 <View ref={scrollViewRef} style={[styles.sectionCardModern, isMobile && styles.sectionCardMobile, styles.contactSection, isMobile && styles.contactSectionMobile]}>
-                    <Text style={styles.sectionTitleModern}>Contact Us</Text>
+                    <Text style={styles.sectionTitleModern}>Get Early Access</Text>
                     <TouchableOpacity
                         style={[
                             styles.contactButton,
@@ -637,7 +582,7 @@ const LandingPage = ({ navigation }) => {
                         onPress={handleScheduleDemo}
                         activeOpacity={0.85}
                     >
-                        <Text style={styles.contactButtonText}>Contact</Text>
+                        <Text style={styles.contactButtonText}>Request Early Access</Text>
                     </TouchableOpacity>
                 </View>
             ),
@@ -650,7 +595,7 @@ const LandingPage = ({ navigation }) => {
                     isMobile && styles.showcaseSectionMobile,
                     !isMobile && styles.showcaseSectionWeb
                 ]}>
-                    <Text style={styles.sectionTitleModern}>Meet Your D2C Copilot</Text>
+                    <Text style={styles.sectionTitleModern}>Meet Your AI Communication Companion</Text>
                     <View style={{
                         flexDirection: isMobile ? 'column' : 'row',
                         alignItems: 'stretch',
@@ -661,56 +606,49 @@ const LandingPage = ({ navigation }) => {
                     }}>
                         <View style={{ maxWidth: 340, flex: 1, backgroundColor: '#fff7e6', borderRadius: 16, padding: 18, marginBottom: isMobile ? 16 : 0 }}>
                             <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#1a237e', marginBottom: 6, textAlign: 'center' }}>
-                                The Problem
+                             The Problem
                             </Text>
                             <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
-                                • $2K–$13K/month on apps for RTO, fraud, notifications, analysis
+                            • Outdated PBX logic still drives thousands of business calls every day.
                             </Text>
                             <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
-                                • Every new problem = another app, more complexity, more data sharing
+                            • Agents manually dial, log, and follow up without automation.
                             </Text>
                             <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
-                                • Big brands protect revenue with “house of brands,” but current tools make this hard for you
+                            • No speech analytics or sentiment tracking, so missed insights pile up.
                             </Text>
-                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
-                                • Manual work: fraud checks, RTO prevention, competitive analysis, plagiarism checks
-                            </Text>
+
                         </View>
                         <View style={{ maxWidth: 340, flex: 1, backgroundColor: '#e6f7ff', borderRadius: 16, padding: 18, marginBottom: isMobile ? 16 : 0 }}>
                             <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#1a237e', marginBottom: 6, textAlign: 'center' }}>
-                                The Solution: D2C Copilot
+                            The Solution: AI-Native PBX
                             </Text>
                             <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
-                                • AI + Email + Shopify webhooks = no more endless apps
+                            • Real-time speech-to-text, sentiment, and diarization directly inside your PBX.
                             </Text>
                             <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
-                                • Fraud detection: AI reads transaction emails, flags issues, can prompt a call
+                            • Auto-dialing, voicemail detection, and CRM updates powered by AI.
                             </Text>
                             <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
-                                • RTO prevention: AI reads RTO requests, calls customers, manages inventory, creates discounts
+                            • Multi-tenant, secure, and 90% cheaper than cloud AI APIs.
                             </Text>
-                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
-                                • Competitive analysis: AI monitors competitors’ prices/products automatically
-                            </Text>
-                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
-                                • Plagiarism check: AI scans for copied creatives/products daily
-                            </Text>
-                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center' }}>
-                                • Logistics cost: Voice bot delivers notifications with jokes, keeps customers happy, and can subsidize costs with ad revenue
-                            </Text>
+
                         </View>
                         <View style={{ maxWidth: 340, flex: 1, backgroundColor: '#f6ffed', borderRadius: 16, padding: 18 }}>
                             <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#1a237e', marginBottom: 6, textAlign: 'center' }}>
-                                The Result
+                            The Result
                             </Text>
                             <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
-                                • Manage multiple stores at 1/10th the cost
+                            • Automated, intelligent call handling with real-time insights.
                             </Text>
                             <Text style={{ fontSize: 15, color: '#333', textAlign: 'center', marginBottom: 6 }}>
-                                • Fewer apps, less admin, more profit
+                            • Empowered agents and delighted customers.
                             </Text>
                             <Text style={{ fontSize: 15, color: '#333', textAlign: 'center' }}>
-                                • Focus on growth, not firefighting
+                            • Enterprise-grade AI telephony accessible to small teams.
+                            </Text>
+                            <Text style={{ fontSize: 15, color: '#333', textAlign: 'center' }}>
+                            • Reduced Token Usage with models
                             </Text>
                         </View>
                     </View>
@@ -1087,13 +1025,61 @@ const LandingPage = ({ navigation }) => {
         };
     }, []);
 
+<Helmet>
+  <title>Dalaillama.in – AI-Native PBX for Smart Business Communication</title>
+  <meta
+    name="description"
+    content="India’s first AI-first PBX platform that brings real-time transcription, sentiment, and automation directly into your PBX — democratizing voice communication for small businesses and startups."
+  />
+  <meta
+    name="keywords"
+    content="AI PBX, AI telephony, voice AI, call automation, PBX India, business communication, small business phone, real-time transcription, sentiment AI, edge AI, CRM telephony, Dalaillama"
+  />
+  <meta property="og:title" content="Dalaillama.in – AI-Native PBX for Smart Business Communication" />
+  <meta
+    property="og:description"
+    content="Empowering Indian SMBs with affordable AI-driven PBX. Real-time transcription, call intelligence, and automation with 90% lower cost than cloud APIs."
+  />
+  <meta property="og:image" content="https://dalaillama.in/assets/llama-mascot.png" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://dalaillama.in" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Dalaillama.in – AI PBX for Small Businesses" />
+  <meta
+    name="twitter:description"
+    content="AI-Native PBX bringing transcription, analytics, and automation to small business communication."
+  />
+  <meta name="twitter:image" content="https://dalaillama.in/assets/llama-mascot.png" />
+  <link rel="canonical" href="https://dalaillama.in" />
+  <meta name="robots" content="index, follow" />
+
+  {/* ✅ Add JSON-LD structured data like this */}
+  <script type="application/ld+json">
+    {JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Dalaillama.in",
+      "url": "https://dalaillama.in",
+      "logo": "https://dalaillama.in/assets/llama-mascot.png",
+      "description":
+        "Dalaillama.in provides AI-Native PBX solutions with real-time transcription, sentiment analysis, and intelligent call automation for small businesses.",
+      "sameAs": [
+        "https://www.linkedin.com/in/akashtripathi-2801/",
+        "https://twitter.com/dalaillama"
+      ],
+    })}
+  </script>
+</Helmet>
+
     return (
+        
         <View style={[styles.container, isMobile && styles.containerMobile]} onLayout={handleContainerLayout}>
             {/* Header Section */}
             <View style={[styles.header, isMobile && styles.headerMobile]}>
                 <View style={[styles.logoContainer, isMobile && styles.logoContainerMobile]}>
                     <Image source={require('../assets/llama-mascot.png')} style={styles.headerLogo} />
                     <Text style={styles.headerTitle}>Dalai Llama</Text>
+                        
                 </View>
                 <View style={styles.navLinks}>
                     <TouchableOpacity
@@ -1228,6 +1214,7 @@ const LandingPage = ({ navigation }) => {
                     <Text style={{ fontSize: 22, color: '#7c3aed', fontWeight: 'bold' }}>Loading...</Text>
                 </View>
             )}
+ 
         </View>
     );
 }
