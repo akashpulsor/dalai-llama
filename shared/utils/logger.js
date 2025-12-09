@@ -8,7 +8,7 @@ import { appConfig } from "@dalaillama/shared-config";
 const levels = ["debug", "info", "warn", "error"];
 
 /**
- * Type guard to check if a value is a valid LogLevel
+ * Type guard for valid log levels
  * @param {string} value
  * @returns {value is LogLevel}
  */
@@ -17,7 +17,7 @@ function isLogLevel(value) {
 }
 
 /**
- * Safely resolve the configured log level.
+ * Ensure configured log level is valid
  * @param {string} level
  * @returns {LogLevel}
  */
@@ -31,18 +31,49 @@ const configuredLevel = resolveLogLevel(appConfig.LOG_LEVEL || "info");
 const currentLevelIndex = levels.indexOf(configuredLevel);
 
 /**
- * Log message if allowed by configured log level.
+ * Optional: send logs to backend collector
+ * @param {string} url
+ * @param {Record<string, unknown>} payload
+ */
+async function postLog(url, payload) {
+  try {
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // swallow error
+  }
+}
+
+/**
+ * Central log writer (console + optional backend)
+ *
  * @param {LogLevel} level
  * @param {...unknown} args
  */
 function log(level, ...args) {
-  if (levels.indexOf(level) >= currentLevelIndex) {
-    const prefix = `[${new Date().toISOString()}] [${level.toUpperCase()}]`;
+  if (levels.indexOf(level) < currentLevelIndex) return;
 
-    /** @type {"log" | "info" | "warn" | "error"} */
-    const consoleMethod = level === "debug" ? "log" : level;
+  const timestamp = new Date().toISOString();
+  const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
 
-    console[consoleMethod](prefix, ...args);
+  /** @type {"log"|"info"|"warn"|"error"} */
+  const consoleMethod = level === "debug" ? "log" : level;
+
+  console[consoleMethod](prefix, ...args);
+
+  // Backend collector (optional)
+  if (appConfig.LOG_COLLECTOR_URL) {
+    const payload = {
+      level,
+      ts: timestamp,
+      message: String(args[0] ?? ""),
+      meta: args.length > 1 ? args.slice(1) : undefined,
+    };
+
+    postLog(appConfig.LOG_COLLECTOR_URL, payload);
   }
 }
 
@@ -51,4 +82,9 @@ function log(level, ...args) {
 /** @param {...unknown} args */ export const logWarn = (...args) => log("warn", ...args);
 /** @param {...unknown} args */ export const logError = (...args) => log("error", ...args);
 
-export const logger = { debug: logDebug, info: logInfo, warn: logWarn, error: logError };
+export const logger = {
+  debug: logDebug,
+  info: logInfo,
+  warn: logWarn,
+  error: logError,
+};

@@ -4,34 +4,44 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "jsx": "react-jsx",
+
     "allowJs": true,
     "checkJs": true,
+
     "strict": true,
     "isolatedModules": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
+
     "baseUrl": ".",
 
-
     "paths": {
-  "@dalaillama/shared-types/*": ["shared/types/*"],
-  "@dalaillama/shared-types": ["shared/types/index.d.ts"],
-  "@dalaillama/shared-store": ["shared/store/index.js"],
-  "@dalaillama/shared-ui": ["shared/ui/index.js"],
-  "@dalaillama/shared-hooks": ["shared/hooks/index.js"],
-  "@dalaillama/shared-utils": ["shared/utils/index.js"],
-  "@dalaillama/shared-config": ["shared/config/index.js"]
-}
-,
-    "typeRoots": ["./types", "./node_modules/@types"],
+      "@dalaillama/shared-types": ["shared/types"],
+      "@dalaillama/shared-types/*": ["shared/types/*"],
+
+      "@dalaillama/shared-store": ["shared/store/index.js"],
+      "@dalaillama/shared-ui": ["shared/ui/index.js"],
+      "@dalaillama/shared-hooks": ["shared/hooks/index.js"],
+      "@dalaillama/shared-utils": ["shared/utils/index.js"],
+      "@dalaillama/shared-config": ["shared/config/index.js"]
+    },
+
+    "typeRoots": [
+      "./types",
+      "./shared/types",
+      "./node_modules/@types"
+    ],
+
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
 
-    /* ✅ Type check only, don't emit JS */
+    /* Only type-check, don’t emit any JS */
     "noEmit": true,
-    
+    "emitDeclarationOnly": false,
+    "allowUmdGlobalAccess": true
   },
+
   "include": [
     "apps/**/*",
     "shared/**/*",
@@ -39,5 +49,6 @@
     "vite.config.*",
     "package.json"
   ],
+
   "exclude": ["node_modules", "dist", "build"]
 }

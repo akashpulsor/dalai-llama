@@ -7,7 +7,7 @@ import authReducer, {
   validateToken
 } from "./slices/authSlice.js";
 import flashReducer from "./slices/flashSlice.js";
-
+import { keycloakApi } from "../../shared/hooks/keycloakApi.js";
 /**
  * @typedef {import('@reduxjs/toolkit').EnhancedStore} EnhancedStore
  */
@@ -20,10 +20,11 @@ export const createStore = () =>
   configureStore({
     reducer: {
       [api.reducerPath]: api.reducer,
+      [keycloakApi.reducerPath]: keycloakApi.reducer,
       auth: authReducer,
       flash: flashReducer,
     },
-    middleware: (getDefault) => getDefault().concat(api.middleware),
+    middleware: (getDefault) => getDefault().concat(api.middleware).concat(keycloakApi.middleware),
   });
 
 /** @type {EnhancedStore} */
@@ -34,4 +35,5 @@ export default store;
 export * from "./slices/apiSlice.js";
 export * from "./slices/authSlice.js";
 export * from "./slices/flashSlice.js";
+
 export { setUser, logout, validateToken };

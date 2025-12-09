@@ -1,9 +1,37 @@
 import React from "react";
-export default function App(){
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+
+import ProductPage from "./pages/ProductPage.jsx";
+import PartnerLayout from "./pages/components/PartnerLayout.jsx";
+import TenantOnboarding from "./pages/TenantOnboarding.jsx";
+//import TenantsPage from "./pages/TenantsPage.jsx";
+/**
+ * Simple placeholder to avoid router errors until you add real file
+ */
+const OnboardingPage = () => (
+  <div className="p-10 text-center text-xl font-semibold text-gray-700">
+    Onboarding Flow Placeholder (Step 1)
+  </div>
+);
+
+export default function App() {
+  const demo = localStorage.getItem("demo_mode") === "true";
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-purple-700 text-2xl font-bold">
-      🦙 Dashboard-ui UI Ready
-      <p className="text-base text-gray-600 mt-2">Add your pages in src/pages/</p>
-    </div>
+    <Router>
+      <Routes>
+        {/* Product selection page */}
+        <Route path="/" element={<ProductPage demo={demo} />} />
+
+        <Route path="/partner" element={<PartnerLayout />}>
+            
+        </Route>
+        {/* Onboarding flow */}
+        <Route path="/onboarding/*" element={<TenantOnboarding />} />
+
+        {/* Catch-all */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
   );
 }

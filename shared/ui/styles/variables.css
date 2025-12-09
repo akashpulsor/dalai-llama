@@ -1,0 +1,51 @@
+/* --------------------------------------------------------------
+   Global Design Variables for Dalai Llama Platform
+   -------------------------------------------------------------- */
+
+:root {
+  /* Brand Colors */
+  --color-primary: #7c3aed;         /* purple-600 */
+  --color-primary-hover: #6d28d9;   /* purple-700 */
+
+  --color-accent-blue: #2563eb;       /* blue-600 */
+  --color-accent-blue-hover: #1d4ed8; /* blue-700 */
+
+  --color-accent-purple-light: #e9d8fd; /* purple-200 */
+
+  /* Backgrounds & Surfaces */
+  --color-bg-base: #f8fafc;          /* gray-50 */
+  --color-bg-muted: #d1d5db;         /* gray-300 */
+  --color-bg-card: #ffffff;
+
+  /* Text Colors */
+  --color-text-primary: #1f2937;     /* gray-800 */
+  --color-text-secondary: #374151;   /* gray-700 */
+  --color-text-muted: #6b7280;       /* gray-500 */
+  --color-text-inverse: #ffffff;
+
+  /* Status Colors */
+  --color-success-bg: #d1fae5;
+  --color-success-text: #065f46;
+
+  --color-error-bg: #fee2e2;
+  --color-error-text: #991b1b;
+
+  --color-info-bg: #dbeafe;
+  --color-info-text: #1e3a8a;
+
+  /* Border + Shadows */
+  --border-radius-sm: 8px;
+  --border-radius-md: 16px;
+  --border-radius-lg: 24px;
+  --border-radius-full: 9999px;
+
+  /* Common Shadows */
+  --shadow-soft: 0 4px 12px rgba(0,0,0,0.06);
+  --shadow-medium: 0 6px 20px rgba(0,0,0,0.12);
+  --shadow-strong: 0 10px 28px rgba(0,0,0,0.18);
+
+  /* Animation */
+  --transition-fast: 150ms ease;
+  --transition-medium: 250ms ease;
+  --transition-slow: 500ms ease;
+}

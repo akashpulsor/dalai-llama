@@ -2,6 +2,39 @@
 import React, { useState, useEffect } from "react";
 import { ChevronUp, Play, StopCircle, MessageCircle, X } from "lucide-react";
 
+
+/**
+ * Floating Demo Mode Toggle
+ * Appears at top center with a soft glowing UI button.
+ */
+const DemoModeToggle = () => {
+  const [isDemo, setIsDemo] = useState(
+    localStorage.getItem("demo_mode") === "true"
+  );
+
+  const toggleDemo = () => {
+    const newState = !isDemo;
+    setIsDemo(newState);
+    localStorage.setItem("demo_mode", String(newState));
+
+    // reload the entire UI so hooks, RTK queries, and routing pick correct mode
+    window.location.reload();
+  };
+
+  return (
+    <button
+      onClick={toggleDemo}
+      className={`fixed top-4 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-full shadow-lg border 
+        ${isDemo ? "bg-green-600 text-white" : "bg-white text-gray-700"} 
+        hover:shadow-xl hover:scale-105 transition-all duration-200 z-50
+      `}
+    >
+      {isDemo ? "Demo Mode: ON" : "Enable Demo Mode"}
+    </button>
+  );
+};
+
+
 /**
  * @typedef {object} AnimatedCardProps
  * @property {React.ReactNode} children
@@ -175,6 +208,7 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-300">
+      <DemoModeToggle />
       <header className="bg-transparent p-5 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <div className="w-20 h-20 bg-purple-200 rounded-full flex items-center justify-center text-4xl">

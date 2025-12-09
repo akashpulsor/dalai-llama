@@ -1,0 +1,15 @@
+{
+  "name": "@dalaillama/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./config": "./config/index.js",
+    "./hooks": "./hooks/index.js",
+    "./store": "./store/index.js",
+    "./ui": "./ui/index.js",
+    "./utils": "./utils/index.js"
+  }
+}

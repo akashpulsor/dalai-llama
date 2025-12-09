@@ -1,3 +1,23 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Global app styles */
+:root {
+  --brand-primary: #6b4eff;
+  --brand-secondary: #4c3ae0;
+
+  --bg-light: #f8fafd;
+  --bg-dark: #0f1117;
+
+  --card-radius: 1.25rem;
+}
+
+/* Smooth fade */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.35s ease-out;
+}

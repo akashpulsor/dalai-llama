@@ -1,0 +1,11 @@
+{
+  "routes": {
+    "/agent": "http://localhost:5174",
+    "/dashboard": "http://localhost:5175",
+    "/analytics": "http://localhost:5176",
+    "/subscription": "http://localhost:5177"
+  },
+  "publicRoutes": ["/", "/login"],
+  "demoMode": false,
+  "mockMode": false
+}

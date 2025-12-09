@@ -1,22 +1,32 @@
 {
   "name": "dalaillama-ui",
   "private": true,
+  "type": "module",
   "workspaces": [
     "apps/*",
     "shared/*"
   ],
-  "type": "module",
-  "dependencies": {
-     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
   "scripts": {
     "dev:platform": "npm run dev --workspace=platform-ui",
     "dev:dashboard": "npm run dev --workspace=dashboard-ui",
+    "dev:agent": "npm run dev --workspace=agent-ui",
+    "dev:analytics": "npm run dev --workspace=analytics-ui",
+    "dev:subscription": "npm run dev --workspace=subscription-ui",
     "build:platform": "npm run build --workspace=platform-ui",
-    "build:dashboard": "npm run build --workspace=dashboard-ui"
+    "build:dashboard": "npm run build --workspace=dashboard-ui",
+    "build:agent": "npm run build --workspace=agent-ui",
+    "build:analytics": "npm run build --workspace=analytics-ui",
+    "build:subscription": "npm run build --workspace=subscription-ui",
+    "dev:all": "npm run dev --workspaces",
+    "build:all": "npm run build --workspaces"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.47",
