@@ -1073,6 +1073,129 @@ export const api = createApi({
     /* ---------------- BILLING & LICENSE ---------------- */
     getAuditLogs: builder.query({
       query: (userId) => `/audit/log/${userId}`
+    }),
+    /* ---------------- BILLING & LICENSE ---------------- */
+    getQueueHealth: builder.query({
+      query: (userId) => `/queue/${userId}`
+    }),
+    /* ---------------- BILLING & LICENSE ---------------- */
+    getAgentStatus: builder.query({
+      query: (userId) => `/agent/${userId}`
+    }),
+    /* ---------------- BILLING & LICENSE ---------------- */
+    getAIInsights: builder.query({
+      query: (userId) => `/agent/${userId}`
+    }),
+    /* ---------------- BILLING & LICENSE ---------------- GetQueueMonitor*/
+    getAlerts: builder.query({
+      query: (userId) => `/alerts/${userId}`
+    }),
+    /* ---------------- BILLING & LICENSE ---------------- GetLiveAgents*/
+    getQueueMonitor: builder.query({
+      query: (userId) => `/alerts/${userId}`
+    }),
+    /* ---------------- BILLING & LICENSE -------  useGetLiveCallsQuery,
+  useMonitorCallMutation,
+  useWhisperToAgentMutation,
+  useBargeInCallMutation,
+  useTakeoverCallMutation*/
+    getLiveAgents: builder.query({
+      query: (userId) => `/agents/${userId}`
+    }),
+    /* ---------------- BILLING & LICENSE -------  */
+    getLiveCalls: builder.query({
+      query: (userId) => `/calls/${userId}`
+    }),
+    monitorCall:builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/monitor/call",
+        method: "POST",
+        body
+      })
+    }),
+    whisperToAgent:builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/whisper/agent",
+        method: "POST",
+        body
+      })
+    }),
+    bargeInCall:builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/barge/call",
+        method: "POST",
+        body
+      })
+    }),
+    takeoverCall:builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/takeover/call",
+        method: "POST",
+        body
+      })
+    }),
+    /* GenerateFeedbackMutation---------------- BILLING & LICENSE -------  */
+    getFlaggedCalls: builder.query({
+      query: (userId) => `/flagged/calls/${userId}`
+    }),
+    generateFeedback:builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/generate/feedback",
+        method: "POST",
+        body
+      })
+    }),
+    /* ---------------- BILLING & LICENSE -------  */
+    getTeamMetrics: builder.query({
+      query: (userId) => `/team/metrics/${userId}`
+    }),
+    /* GetAgentLeaderboard---------------- BILLING & LICENSE -------  */
+    getAgentLeaderboard: builder.query({
+      query: (userId) => `/agent/leaderboard/${userId}`
+    }),
+    /*    useGetForecastQuery,
+  useApplyRecommendationMutation---------------- BILLING & LICENSE -------  */
+    getCallReview: builder.query({
+      query: (userId) => `/call/review/${userId}`
+    }),
+    generateCoaching:builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/generate/coaching",
+        method: "POST",
+        body
+      })
+    }),
+
+    getForecast: builder.query({
+      query: (userId) => `/forecast/${userId}`
+    }),
+    applyRecommendation:builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/recommendation/apply",
+        method: "POST",
+        body
+      })
     })
   }),
 });
@@ -1185,7 +1308,30 @@ export const {
   useGetSubscriptionQuery,
   usePurchaseAddonMutation,
 
-  useGetAuditLogsQuery
+  useGetAuditLogsQuery,
+
+  useGetQueueHealthQuery,
+  useGetAgentStatusQuery,
+  useGetAIInsightsQuery,
+  useGetAlertsQuery,
+
+  useGetQueueMonitorQuery,
+  useGetLiveAgentsQuery,
+  useGetLiveCallsQuery,
+  useMonitorCallMutation,
+  useWhisperToAgentMutation,
+  useBargeInCallMutation,
+  useTakeoverCallMutation,
+    useGetFlaggedCallsQuery,
+    useGenerateFeedbackMutation,
+    useGetTeamMetricsQuery,
+    useGetAgentLeaderboardQuery,
+    
+    useGetCallReviewQuery,
+   useGenerateCoachingMutation,
+
+   useGetForecastQuery,
+  useApplyRecommendationMutation
 } = api;
 
 

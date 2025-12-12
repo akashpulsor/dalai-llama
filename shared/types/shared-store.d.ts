@@ -163,6 +163,33 @@ declare module "@dalaillama/shared-store" {
     purchaseAddonMutation: MutationEndpoint;
 
     getAuditLogsQuery: QueryEndpoint;
+
+    getQueueHealthQuery: QueryEndpoint;
+    getAgentStatusQuery: QueryEndpoint;
+    getAIInsightsQuery: QueryEndpoint;
+    getAlertsQuery: QueryEndpoint;
+    getLiveAgentsQuery: QueryEndpoint;
+    getQueueMonitorQuery: QueryEndpoint;
+
+    getLiveCallsQuery: QueryEndpoint;
+    monitorCallMutation: MutationEndpoint;
+    whisperToAgentMutation: MutationEndpoint;
+    bargeInCallMutation: MutationEndpoint;
+    takeoverCallMutation: MutationEndpoint;
+
+    getFlaggedCallsQuery: QueryEndpoint;
+    generateFeedbackMutation: MutationEndpoint;
+
+    getTeamMetricsQuery: QueryEndpoint;
+    getAgentLeaderboardQuery: QueryEndpoint;
+
+    getCallReviewQuery: QueryEndpoint;
+
+    generateCoachingMutation: MutationEndpoint;
+
+    getForecastQuery: QueryEndpoint;
+
+    applyRecommendationMutation: MutationEndpoint;
     /* Allow any additional endpoints RTK may generate */
     [key: string]: any;
   }
@@ -296,4 +323,32 @@ declare module "@dalaillama/shared-store" {
   export const   usePurchaseAddonMutation: any;
 
   export const useGetAuditLogsQuery: any;
+
+  export const   useGetQueueHealthQuery: any;
+  export const   useGetAgentStatusQuery: any;
+  export const   useGetAIInsightsQuery: any;
+  export const   useGetAlertsQuery: any;
+
+  export const useGetQueueMonitorQuery: any;
+
+  export const useGetLiveAgentsQuery: any;
+
+
+  export const useGetLiveCallsQuery: any;
+  export const useMonitorCallMutation: any;
+  export const useWhisperToAgentMutation: any;
+  export const useBargeInCallMutation: any;
+  export const useTakeoverCallMutation: any;
+
+  export const useGetFlaggedCallsQuery: any;
+  export const useGenerateFeedbackMutation: any;
+
+  export const useGetTeamMetricsQuery: any;
+  export const useGetAgentLeaderboardQuery: any;
+  
+  export const   useGetCallReviewQuery: any;
+  export const   useGenerateCoachingMutation: any;
+
+  export const   useGetForecastQuery: any;
+  export const   useApplyRecommendationMutation: any;
 }

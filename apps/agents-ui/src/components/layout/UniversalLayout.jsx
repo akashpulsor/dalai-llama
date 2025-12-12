@@ -21,7 +21,11 @@ import {
   CreditCard,
   FileText,
   Library,
-  History
+  History,
+  MonitorCheck,
+  TrendingUp,
+  ScanEye,
+  CalendarClock   
 } from "lucide-react";
 
 import { useSelector, useDispatch } from "react-redux";
@@ -74,10 +78,16 @@ export default function UniversalLayout() {
       icon: <History size={20} />,
     },
     ],
-
+    //supervisor/dashboard
     supervisor: [
-      { to: "/supervisor/cockpit", label: "Cockpit", icon: <Gauge size={20} /> },
-      { to: "/supervisor/heatmap", label: "Queue Heatmap", icon: <Activity size={20} /> },
+      { to: "/supervisor/dashboard", label: "Dashboard", icon: <Gauge size={20} /> },
+      { to: "/supervisor/queues", label: "Queues", icon: <MonitorCheck  size={20} /> },  
+      { to: "/supervisor/agents", label: "Live Agents", icon: <Gauge size={20} /> },
+      { to: "/supervisor/livecalls", label: "Live Calls", icon: <PhoneCall  size={20} /> },
+      { to: "/supervisor/quality", label: "Quality", icon: <Activity  size={20} /> },
+      { to: "/supervisor/performance", label: "Performance", icon: <TrendingUp   size={20} /> },
+      { to: "/supervisor/call-review", label: "Call Review", icon: <ScanEye   size={20} /> },
+      { to: "/supervisor/forecasting", label: "Work Force Forecasting", icon: <CalendarClock  size={20} /> },
     ],
 
     admin: [{
@@ -106,6 +116,8 @@ export default function UniversalLayout() {
    * ----------------------------------*/
   const isAdminRole = role === "admin";
 
+    const isSuperVisorRole = role === "supervisor";
+
   /** ---------------------------------
    * Sidebar Item Component (typed)
    * ----------------------------------*/
@@ -113,7 +125,7 @@ export default function UniversalLayout() {
    * @param {MenuItem} param0
    */
   const NavItem = ({ to, icon, label }) => {
-    if (isAdminRole) {
+    if (isAdminRole || isSuperVisorRole) {
       // New enterprise SaaS design for admin
       return (
         <NavLink
@@ -157,7 +169,7 @@ export default function UniversalLayout() {
   };
 
   // Admin layout with enterprise SaaS design
-  if (isAdminRole) {
+  if (isAdminRole || isSuperVisorRole) {
     return (
       <div className="flex h-screen bg-slate-50 overflow-hidden">
         {/* ----------------- SIDEBAR - ENTERPRISE DESIGN ----------------- */}

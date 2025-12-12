@@ -27,6 +27,17 @@ import CallHistory from "../pages/Agent/CallHistory.jsx";
 import AgentDashboard from "../pages/Agent/AgentDashboard.jsx";
 import Dashboard from "../pages/Admin/Dashboard.jsx";
 import RoutingPlan from "../pages/Admin/RoutingPlan.jsx";
+import SupervisorDashboard from "../pages/Supervisor/SupervisorDashboard.jsx";
+import LiveQueueMonitor from "../pages/Supervisor/LiveQueueMonitor.jsx";
+import LiveAgents from "../pages/Supervisor/LiveAgents.jsx";
+import LiveCalls from "../pages/Supervisor/LiveCalls.jsx";
+import AIQualityCenter from "../pages/Supervisor/AIQualityCenter.jsx";
+
+import PerformanceOverview from "../pages/Supervisor/Performanceoverview.jsx";  
+
+import CallReview from "../pages/Supervisor/CallReview.jsx";
+import WorkforceForecasting from "../pages/Supervisor/WorkforceForecasting.jsx";
+
 
 export default function AppRoutes() {
   return (
@@ -43,9 +54,16 @@ export default function AppRoutes() {
         <Route path="agent/dashboard" element={<AgentDashboard />} />
 
         {/* Supervisor */}
-        <Route path="supervisor/cockpit" element={<SupervisorCockpit />} />
+        <Route path="supervisor/dashboard" element={<SupervisorDashboard />} />
+        <Route path="supervisor/queues" element={<LiveQueueMonitor />} />
+        <Route path="supervisor/agents" element={<LiveAgents />} />
+        <Route path="supervisor/livecalls" element={<LiveCalls />} />
         <Route path="supervisor/heatmap" element={<QueueHeatmap />} />
-
+        <Route path="supervisor/quality" element={<AIQualityCenter />} />
+        <Route path="supervisor/performance" element={< PerformanceOverview/>} />
+        <Route path="supervisor/call-review" element={< CallReview/>} />
+        <Route path="supervisor/forecasting" element={< WorkforceForecasting/>} />
+        
         {/* Admin */}
         <Route path="admin/dashboard" element={<Dashboard />} />
 
