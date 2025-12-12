@@ -1,3 +1,4 @@
+// @ts-check
 
 import { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -5,70 +6,121 @@ import { useDispatch } from "react-redux";
 import { setUser, logout } from "@dalaillama/shared-store";
 import { logger } from "@dalaillama/shared-utils";
 import { appConfig } from "@dalaillama/shared-config";
-/**
- * @typedef {object} StoredUser
- * @property {string} id
- * @property {string} name
- * @property {string} [email]
- * @property {"shared" | "single"} [planType]
- * @property {string} [tenantId]
- */
+import * as KeycloakLib from "keycloak-js";
 
 /**
- * Bootstraps authentication state on app load.
- * - Restores token and user from localStorage
- * - Validates expiry
- * - Dispatches Redux actions
- * - Redirects unauthenticated users
+ * @typedef {import("keycloak-js").KeycloakConfig} KeycloakConfig
+ * @typedef {import("keycloak-js").KeycloakInstance} KeycloakInstance
  */
+
 export const useAuthBootstrap = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-const location = useLocation();
+  const location = useLocation();
 
   useEffect(() => {
     try {
-      logger.info(`[${appConfig.APP_NAME || "Dalai Llama"}] Bootstrapping auth...`);
+      logger.info("Bootstrapping auth...");
+
+      const currentPath = location?.pathname || "/";
+      const publicRoutes = ["/", "/login"];
 
       const token = localStorage.getItem("auth_token");
       const userJson = localStorage.getItem("user");
       const expiryRaw = localStorage.getItem("token_expiry");
-          // ✅ Do NOT redirect on public pages
-    const publicRoutes = ["/", "/login"];
-    const currentPath = location?.pathname || "/";
-    console.log("currentPath", currentPath);
-      // 1️⃣ If no token — redirect to login
+
+      // -----------------------------------------------------------
+      // MOCK MODE — handled by authSlice, so bootstrap does nothing
+      // -----------------------------------------------------------
+      //if (appConfig.MOCK_MODE) {
+      //  return;
+      //}
+
+      // -----------------------------------------------------------
+      // REAL MODE (KEYCLOAK)
+      // -----------------------------------------------------------
       if (!token && !publicRoutes.includes(currentPath)) {
-        logger.info("No auth token found — redirecting to /login");
-        navigate("/login",{replace: true});
+        logger.info("Starting Keycloak login...");
+
+        // FIX: Keycloak has no default constructor in TS type system
+        /** @type {any} */
+        const KeycloakCtor = KeycloakLib.default || KeycloakLib;
+
+        /** @type {KeycloakConfig} */
+        const kcConfig = {
+          url: appConfig.KEYCLOAK_URL,
+          realm: appConfig.KEYCLOAK_REALM,
+          clientId: appConfig.KEYCLOAK_CLIENT,
+        };
+
+        /** @type {KeycloakInstance} */
+        const keycloak = new KeycloakCtor(kcConfig);
+
+        keycloak
+          .init({ onLoad: "login-required" })
+          .then(
+            /**
+             * @param {boolean} authenticated
+             */
+            (authenticated) => {
+              if (!authenticated) {
+                keycloak.login();
+                return;
+              }
+
+              const profile = keycloak.tokenParsed || {};
+
+              const kcUser = {
+                id: profile.sub || "",
+                name: profile.name || "",
+                email: profile.email || "",
+                role: profile.realm_access?.roles?.[0] || "agent",
+                tenantId: profile.tenantId || "",
+              };
+
+              dispatch(setUser({ user: kcUser, token: keycloak.token || "" }));
+
+              localStorage.setItem("user", JSON.stringify(kcUser));
+              localStorage.setItem("auth_token", keycloak.token || "");
+              localStorage.setItem(
+                "token_expiry",
+                `${Date.now() + 3600_000}`
+              );
+            }
+          )
+          .catch(
+            /**
+             * @param {any} err
+             */
+            (err) => {
+              console.error("Keycloak failed:", err);
+              navigate("/login");
+            }
+          );
+
         return;
       }
 
-      
-      if(token){
-                  // 2️⃣ Check expiry (optional local expiry tracking)
-        const isExpired = expiryRaw && Date.now() > Number(expiryRaw);
-        if (isExpired) {
-            logger.info("Auth token expired — logging out");
-            dispatch(logout());
-            navigate("/login");
-            return;
+      // -----------------------------------------------------------
+      // TOKEN VALIDATION
+      // -----------------------------------------------------------
+      if (token) {
+        const expired = expiryRaw && Date.now() > Number(expiryRaw);
+
+        if (expired) {
+          dispatch(logout());
+          navigate("/login");
+          return;
         }
 
-        // 3️⃣ Restore user if available
         if (userJson) {
-            /** @type {StoredUser} */
-            const user = JSON.parse(userJson);
-            dispatch(setUser({ user, token }));
+          dispatch(setUser({ user: JSON.parse(userJson), token }));
         }
-          
       }
-
-      logger.info("✅ Auth bootstrap complete");
     } catch (err) {
-      logger.error("❌ Auth bootstrap failed:", err);
+      console.error("Auth bootstrap crashed", err);
       dispatch(logout());
       navigate("/login");
     }
-  }, [dispatch, navigate]);
+  }, [dispatch, navigate, location]);
 };

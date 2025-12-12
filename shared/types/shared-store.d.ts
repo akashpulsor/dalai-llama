@@ -16,6 +16,7 @@ declare module "@dalaillama/shared-store" {
   export const logout: () => AnyAction;
   export const validateToken: () => AnyAction;
 
+  export const login: (payload: string) => AnyAction;
   /* -----------------------------------------------------------------------
    * RTK QUERY API DECLARATIONS
    * ---------------------------------------------------------------------*/
@@ -113,9 +114,55 @@ declare module "@dalaillama/shared-store" {
     updateBrandingSettings: MutationEndpoint;
   
 
-
+    getKeycloakConfig: QueryEndpoint;
     
 
+    addAgentMutation:  MutationEndpoint;
+    addQueueMutation: MutationEndpoint;
+    buyDidMutation: MutationEndpoint;
+    createBotMutation: MutationEndpoint;
+    saveDidMutation: MutationEndpoint;
+    saveSipMutation: MutationEndpoint;
+    publishIvrMutation: MutationEndpoint;
+
+    updateAgentMutation: MutationEndpoint;
+    disableAgentMutation: MutationEndpoint;
+    updateQueue: MutationEndpoint;
+    getQueues: QueryEndpoint;
+
+    addRoutingRuleMutation: MutationEndpoint;
+    updateRoutingRuleMutation: MutationEndpoint;
+  
+    getBotsQuery: QueryEndpoint;
+    getIvrsQuery: QueryEndpoint;
+
+    getRoutingRulesQuery: QueryEndpoint;
+    deleteRoutingRuleMutation: QueryEndpoint;
+
+    getIVRQuery: QueryEndpoint;
+    saveIVRDraftMutation: MutationEndpoint;
+
+    publishIVRMutation: MutationEndpoint;
+
+    getIVRVersionsQuery: QueryEndpoint;
+
+    getRecordingPoliciesQuery: QueryEndpoint;
+    updateGlobalPoliciesMutation: MutationEndpoint;
+    getQueueOverridesQuery: QueryEndpoint;
+    updateQueueOverrideMutation: MutationEndpoint;
+    deleteQueueOverrideMutation: MutationEndpoint;
+    
+
+    getBillingSummaryQuery: QueryEndpoint;
+    getPaymentMethodsQuery: QueryEndpoint;
+    addPaymentMethodMutation: MutationEndpoint;
+    updateAutoDebitMutation: MutationEndpoint;
+    downloadInvoiceMutation: MutationEndpoint;
+
+    getSubscriptionQuery: QueryEndpoint;
+    purchaseAddonMutation: MutationEndpoint;
+
+    getAuditLogsQuery: QueryEndpoint;
     /* Allow any additional endpoints RTK may generate */
     [key: string]: any;
   }
@@ -195,4 +242,58 @@ declare module "@dalaillama/shared-store" {
 
   export const useGetPlansQuery:any;
   export const useAddPlansMutation:any;
+
+  export const useGetKeycloakConfigQuery: any;
+
+  export const useAddAgentMutation: any;
+  export const useAddQueueMutation: any;
+  export const useBuyDidMutation: any;
+  export const useCreateBotMutation: any;
+  export const useSaveDidMutation: any;
+  export const useSaveSipMutation: any;
+  export const usePublishIvrMutation: any;
+
+  export const   useUpdateAgentMutation: any;
+  export const   useDisableAgentMutation: any;
+
+  export const   useUpdateQueueMutation: any;
+
+  export const useGetQueuesQuery: any;
+  export const useAddRoutingRuleMutation: any;
+  export const useUpdateRoutingRuleMutation: any;
+  export const useGetQueuesQuery: any;
+  export const useGetBotsQuery: any;
+  export const useGetIvrsQuery: any;
+
+  export const   useGetRoutingRulesQuery: any;
+  export const   useDeleteRoutingRuleMutation: any;
+
+  export const   useGetIVRQuery: any;
+  export const   useSaveIVRDraftMutation: any;
+  export const   usePublishIVRMutation: any;
+  export const   useGetIVRVersionsQuery: any;
+
+  export const   useGetRecordingPoliciesQuery: any;
+  export const   useUpdateGlobalPoliciesMutation: any;
+  export const   useGetQueueOverridesQuery: any;
+  export const   useUpdateQueueOverrideMutation: any;
+  export const   useDeleteQueueOverrideMutation: any;
+
+  export const   useGetCompliancePoliciesQuery: any;
+  export const   useUpdateCompliancePoliciesMutation: any;
+  export const   useUploadDNCListMutation: any;
+  export const   useAddDNCNumberMutation: any;
+  export const   useGetDNCListQuery: any;
+  export const   useDeleteDNCNumberMutation: any;
+
+  export const   useGetBillingSummaryQuery: any;
+  export const   useGetPaymentMethodsQuery: any;
+  export const   useAddPaymentMethodMutation: any;
+  export const   useUpdateAutoDebitMutation: any;
+  export const   useDownloadInvoiceMutation: any;
+
+  export const   useGetSubscriptionQuery: any;
+  export const   usePurchaseAddonMutation: any;
+
+  export const useGetAuditLogsQuery: any;
 }

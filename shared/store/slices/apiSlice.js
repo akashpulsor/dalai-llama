@@ -4,6 +4,7 @@ import { appConfig } from "@dalaillama/shared-config";
 import { logout } from "./authSlice.js";
 import { showFlash } from "./flashSlice.js";
 import { prometheusClient } from "@dalaillama/shared-utils";
+import { use } from "react";
 
 /* -------------------------------------------------------------------------- */
 /*                               TYPE HELPERS                                 */
@@ -355,6 +356,15 @@ const MOCK_RESPONSES = {
   status: "success",
   message: "Branding updated successfully"
 },
+"/auth/keycloak-config": {
+  keycloakUrl: "https://mock-kc.dalaillama.in",
+  realm: "mock-realm",
+  clientId: "mock-client",
+
+  // ⭐ NEW → Branding fields
+  brandName: "Demo Contact Center",
+  brandLogo: "https://via.placeholder.com/200x60?text=Demo+Logo"
+}
 
 };
 
@@ -731,7 +741,339 @@ export const api = createApi({
         body
       })
     }),
+    /* ---------------- KEYCLOAK CONFIG ---------------- */
+    getKeycloakConfig: builder.query({
+      /**
+       * @param {string} domain - e.g. window.location.hostname
+       */
+      query: (domain) => `/auth/keycloak-config?domain=${domain}`,
+    }),
+    addAgent: builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/agent/add",
+        method: "POST",
+        body
+      })
+    }),
+    updateAgent: builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/agent/update",
+        method: "PUT",
+        body
+      })
+    }),
+    disableAgent: builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/agent/disable",
+        method: "post",
+        body
+      })
+    }),
+    addQueue: builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/queue/add",
+        method: "POST",
+        body
+      })
+    }),
+    updateQueue: builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/queue/add",
+        method: "POST",
+        body
+      })
+    }),
 
+    /* ---------------- BILLING & LICENSE ---------------- */
+    getQueues: builder.query({
+      query: (userId) => `/queue/${userId}`
+    }),
+    buyDid: builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/did/buy",
+        method: "POST",
+        body
+      })
+    }),
+      saveDid: builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/did/save",
+        method: "POST",
+        body
+      })
+    }),
+    createBot: builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/did/buy",
+        method: "POST",
+        body
+      })
+    }),
+
+    /* ---------------- BILLING & LICENSE ---------------- */
+    getBots: builder.query({
+      query: (userId) => `/queue/${userId}`
+    }),
+
+    /* ---------------- BILLING & LICENSE ---------------- */
+    getIvrs: builder.query({
+      query: (userId) => `/queue/${userId}`
+    }),
+    publishIvr: builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/ivr/publish",
+        method: "POST",
+        body
+      })
+    }),
+    saveSip: builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/sip/save",
+        method: "POST",
+        body
+      })
+    }),
+    addRoutingRule: builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/routingrule/save",
+        method: "POST",
+        body
+      })
+    }),
+
+    /* ---------------- BILLING & LICENSE ---------------- */
+    getRoutingRules: builder.query({
+      query: (userId) => `/routingrule/${userId}`
+    }),
+    updateRoutingRule: builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/routingrule/save",
+        method: "POST",
+        body
+      })
+    }),
+    deleteRoutingRule: builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/routingrule/save",
+        method: "delete",
+        body
+      })
+    }),
+
+    /* ---------------- BILLING & LICENSE ---------------- */
+    getIVR: builder.query({
+      query: (userId) => `/ivr/${userId}`
+    }),
+
+    /* ---------------- BILLING & LICENSE ---------------- */
+    getIVRVersions: builder.query({
+      query: (userId) => `/ivr/versions/${userId}`
+    }),
+    saveIVRDraft: builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/ivr-draft/save",
+        method: "POST",
+        body
+      })
+    }),
+    publishIVR: builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/ivr/publish",
+        method: "POST",
+        body
+      })
+    }),
+
+    /* ---------------- BILLING & LICENSE ---------------- */
+    getRecordingPolicies: builder.query({
+      query: (userId) => `/recording/policy/${userId}`
+    }),
+
+    /* ---------------- BILLING & LICENSE ---------------- */
+    getQueueOverrides: builder.query({
+      query: (userId) => `/recording/policy/${userId}`
+    }),
+    updateGlobalPolicies:builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/global/policies/save",
+        method: "POST",
+        body
+      })
+    }),
+    updateQueueOverride:builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/queue/override/save",
+        method: "POST",
+        body
+      })
+    }),
+    deleteQueueOverride:builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/queue/override",
+        method: "DELETE",
+        body
+      })
+    }),
+
+    /* ---------------- BILLING & LICENSE ---------------- */
+    getCompliancePolicies: builder.query({
+      query: (userId) => `/compliance/policy/${userId}`
+    }),
+
+    /* ---------------- BILLING & LICENSE ---------------- */
+    getDNCList: builder.query({
+      query: (userId) => `/dnc/${userId}`
+    }),
+    updateCompliancePolicies:builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/compliance/policies/save",
+        method: "POST",
+        body
+      })
+    }),
+    uploadDNCList:builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/dnc/list",
+        method: "POST",
+        body
+      })
+    }),
+    addDNCNumber:builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/dnc/number",
+        method: "POST",
+        body
+      })
+    }),
+    deleteDNCNumber:builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/dnc/number",
+        method: "DELETE",
+        body
+      })
+    }),
+    /* ---------------- BILLING & LICENSE ---------------- */
+    getBillingSummary: builder.query({
+      query: (userId) => `/billing/${userId}`
+    }),
+    /* ---------------- BILLING & LICENSE ---------------- */
+    getPaymentMethods: builder.query({
+      query: (userId) => `/payment/${userId}`
+    }),
+    addPaymentMethod:builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/payment/method",
+        method: "POST",
+        body
+      })
+    }),
+    updateAutoDebit:builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/update/autodebit",
+        method: "POST",
+        body
+      })
+    }),
+    downloadInvoice:builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/download/invoice",
+        method: "POST",
+        body
+      })
+    }),
+    /* ---------------- BILLING & LICENSE ---------------- */
+    getSubscription: builder.query({
+      query: (userId) => `/subscription/${userId}`
+    }),
+    purchaseAddon:builder.mutation({
+      /**
+       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       */
+      query: (body) => ({
+        url: "/subscription/add-on",
+        method: "POST",
+        body
+      })
+    }),
+    /* ---------------- BILLING & LICENSE ---------------- */
+    getAuditLogs: builder.query({
+      query: (userId) => `/audit/log/${userId}`
+    })
   }),
 });
 
@@ -766,7 +1108,7 @@ export const {
   useTenantEnableAIMutation,
   useTenantGetSummaryQuery,
   useGetDidInventoryQuery,
-useUploadDidInventoryMutation,
+  useUploadDidInventoryMutation,
  // New exports
   useGetTenantsListQuery,
   useGetTenantAnalyticsQuery,
@@ -794,6 +1136,56 @@ useUploadDidInventoryMutation,
 
   useAddPlansMutation,
   useGetPlansQuery,
-  
+  useGetKeycloakConfigQuery,
 
+  useAddAgentMutation,
+  useAddQueueMutation,
+  useBuyDidMutation,
+  useCreateBotMutation,
+  usePublishIvrMutation,
+  useSaveDidMutation,
+  useSaveSipMutation,
+  useDisableAgentMutation,
+  useUpdateAgentMutation,
+  useUpdateQueueMutation,
+  useGetQueuesQuery,
+
+
+  useAddRoutingRuleMutation,
+  useUpdateRoutingRuleMutation,
+  useGetBotsQuery,
+  useGetIvrsQuery,
+
+  useGetRoutingRulesQuery,
+  useDeleteRoutingRuleMutation,
+  useGetIVRQuery,
+  useSaveIVRDraftMutation,
+  usePublishIVRMutation,
+  useGetIVRVersionsQuery,
+
+  useGetRecordingPoliciesQuery,
+  useUpdateGlobalPoliciesMutation,
+  useGetQueueOverridesQuery,
+  useUpdateQueueOverrideMutation,
+  useDeleteQueueOverrideMutation,
+
+  useGetCompliancePoliciesQuery,
+  useUpdateCompliancePoliciesMutation,
+  useUploadDNCListMutation,
+  useAddDNCNumberMutation,
+  useGetDNCListQuery,
+  useDeleteDNCNumberMutation,
+
+  useGetBillingSummaryQuery,
+  useGetPaymentMethodsQuery,
+  useAddPaymentMethodMutation,
+  useUpdateAutoDebitMutation,
+  useDownloadInvoiceMutation,
+
+  useGetSubscriptionQuery,
+  usePurchaseAddonMutation,
+
+  useGetAuditLogsQuery
 } = api;
+
+

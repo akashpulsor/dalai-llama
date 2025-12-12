@@ -31,6 +31,9 @@
  * @property {boolean} DEMO_MODE
  * @property {string} MOCK_API_BASE_URL
  *
+ * ---------- RUNTIME AUTH -------------
+ * @property {{url:string, realm:string, clientId:string} | null} [RUNTIME_KEYCLOAK]
+ *
  * ---------- ROUTING (LOCAL ROUTES) ----
  * @property {{
  *   ROOT: string,
@@ -85,16 +88,26 @@ const resolvedDemoMode = env.VITE_DEMO_MODE === "true";
 const resolvedMockApiBaseUrl =
   env.VITE_MOCK_API_BASE_URL || "http://localhost:9999";
 
-/* -------------------------------------------------------------------------- */
-/*                               FINAL CONFIG                                 */
-/* -------------------------------------------------------------------------- */
+/* ----------------------------------------------------------
+ *  RUNTIME KEYCLOAK CONFIG (Loaded from localStorage)
+ * ---------------------------------------------------------- */
+let runtimeKeycloak = null;
+try {
+  runtimeKeycloak = JSON.parse(localStorage.getItem("kc_cfg") || "null");
+} catch {
+  runtimeKeycloak = null;
+}
+
+/* --------------------------------------------------------------------------
+ *                               FINAL CONFIG
+ * -------------------------------------------------------------------------- */
 
 /** @type {AppConfig} */
 export const appConfig = {
-  APP_NAME: "Dalai Llama",
+  APP_NAME: env.VITE_APP_NAME || "Dalai llama",
   ENV: fallback(env.VITE_ENV, "development"),
 
-  PLATFORM_URL: "https://dalaillama.in",
+  PLATFORM_URL: env.VITE_BASE_URL || "http://localhost:4100",
   API_BASE_URL: fallback(env.VITE_API_BASE_URL, "https://api.dalaillama.in"),
 
   DASHBOARD_DOMAIN: "dash.dalaillama.in",
@@ -116,6 +129,10 @@ export const appConfig = {
   WS_STT_URL: "wss://api.dalaillama.in/stt",
   MOCK_WS_URL: "ws://localhost:7777/mock",
 
+  /* ---------------------------------------------------
+     RUNTIME KEYCLOAK (Injected after provisioning)
+     --------------------------------------------------- */
+  RUNTIME_KEYCLOAK: runtimeKeycloak,
 
   /* LOCAL ROUTES INSIDE PLATFORM-UI */
   APP_ROUTES: {
@@ -132,7 +149,7 @@ export const appConfig = {
 
   /* REMOTE APP URLS FOR REDIRECTS — supports DEV & PROD */
   REMOTE_APPS: {
-    agent: env.VITE_AGENT_APP_URL || "http://localhost:5174",
+    agent: env.VITE_AGENT_APP_URL || "http://localhost:4100",
     dashboard: env.VITE_DASHBOARD_APP_URL || "http://localhost:5174",
     analytics: env.VITE_ANALYTICS_APP_URL || "http://localhost:5176",
     subscription: env.VITE_SUBSCRIPTION_APP_URL || "http://localhost:5177",
@@ -140,7 +157,7 @@ export const appConfig = {
 
   /* TENANT-BASED URLS (fetched from backend, override later) */
   getTenantDashboardUrl(tenantId) {
-    return undefined; // platform-ui will override dynamically
+    return undefined;
   },
 
   getTenantAgentUrl(tenantId) {
@@ -152,6 +169,69 @@ export const appConfig = {
   DEMO_MODE: demoOverride || resolvedDemoMode,
   MOCK_API_BASE_URL: resolvedMockApiBaseUrl,
 };
+
+/* --------------------------------------------------------------------------
+ *   RUNTIME CONFIG MUTATOR (Called after provisioning)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * @param {{url:string, realm:string, clientId:string}} cfg
+ */
+/**
+ * @param {{
+ *   url: string,
+ *   realm: string,
+ *   clientId: string,
+ *   brandName?: string,
+ *   brandLogo?: string,
+ *   tenantId?: string
+ * }} cfg
+ */
+export function setRuntimeKeycloakConfig(cfg) {
+  runtimeKeycloak = cfg;
+
+  try {
+    localStorage.setItem("kc_cfg", JSON.stringify(cfg));
+  } catch {}
+
+  appConfig.RUNTIME_KEYCLOAK = cfg;
+
+  // ------------------------------------------------------
+  // MODE 1: DEMO / MOCK → Agent UI Login Screen (LOCAL)
+  // ------------------------------------------------------
+  if (appConfig.MOCK_MODE || appConfig.DEMO_MODE) {
+    const agentUrl = appConfig.REMOTE_APPS.agent || "http://localhost:5174";
+
+    const q = new URLSearchParams({
+      kc_url: cfg.url,
+      kc_realm: cfg.realm,
+      kc_client: cfg.clientId,
+      brand: cfg.brandName || "Demo Company",
+      logo: cfg.brandLogo || "",
+      tenantId: cfg.tenantId || "",
+      mock: "true"
+    });
+
+    const targetUrl = `${agentUrl}/login?${q.toString()}`;
+
+    console.log("🌐 DEMO MODE → Redirecting to Agent-UI:", targetUrl);
+    window.location.href = targetUrl;
+    return;
+  }
+
+  // ------------------------------------------------------
+  // MODE 2: REAL WORLD → DIRECT KEYCLOAK LOGIN
+  // ------------------------------------------------------
+  const kcLoginUrl =
+    `${cfg.url}/realms/${cfg.realm}/protocol/openid-connect/auth` +
+    `?client_id=${encodeURIComponent(cfg.clientId)}` +
+    `&response_type=code` +
+    `&redirect_uri=${encodeURIComponent(appConfig.REMOTE_APPS.agent + "/auth/callback")}`;
+
+  console.log("🔐 REAL MODE → Redirecting to Keycloak login:", kcLoginUrl);
+
+  window.location.href = kcLoginUrl;
+}
 
 /* Legacy named exports */
 export const MOCK_MODE = appConfig.MOCK_MODE;

@@ -31,6 +31,7 @@ import {
   useTenantGetSummaryQuery,
   useGetPlansQuery,
   useGetDidInventoryQuery,
+  useGetKeycloakConfigQuery
 } from "@dalaillama/shared-store";
 
 /**
@@ -101,6 +102,7 @@ const [state, setState] = useState(
 
   const { data: tenantSummarySample } = useTenantGetSummaryQuery();
 
+  const { data: keycloakConfig } = useGetKeycloakConfigQuery();
   /**
  * Update the auto-generated realm based on company name.
  * @param {string} name
@@ -167,67 +169,88 @@ const handleAddCard = async (card) => {
   };
 
   /* ---------------- Final Launch / Provision ---------------- */
-  const onLaunch = async () => {
-    try {
-      const reg = await tenantRegister({
-        tenant: {
-          companyName: state.companyName,
-          realm: state.realm,
-          contactEmail: state.contactEmail,
-        },
-      }).unwrap?.();
+const onLaunch = async () => {
+  try {
+    const reg = await tenantRegister({
+      tenant: {
+        companyName: state.companyName,
+        realm: state.realm,
+        contactEmail: state.contactEmail,
+      },
+    }).unwrap?.();
 
-      const tenantId = reg?.tenantId ?? "tenant_local";
+    const tenantId = reg?.tenantId ?? "tenant_local";
 
-      /* purchase DID if needed */
-      if (state.selectedDid && !state.purchasedDids.includes(state.selectedDid)) {
-        await tenantPhonePurchase({ didId: state.selectedDid }).unwrap?.();
-      }
-
-      if (state.selectedDid) {
-        await tenantAssignDID({ tenantId, did: state.selectedDid }).unwrap?.();
-      }
-
-      if (state.planId) {
-        await tenantPlanSelection({ tenantId, planId: state.planId }).unwrap?.();
-      }
-
-      if (state.card?.number) {
-        await tenantBillingAddCard({ tenantId, card: state.card }).unwrap?.();
-      }
-
-      if (state.enableWallet) {
-        await tenantToggleWallet({ tenantId }).unwrap?.();
-      }
-
-      await tenantConfigureTrunk({
-        tenantId,
-        sipHost: state.sipHost,
-        adminEmail: state.adminEmail,
-        defaultDid:
-          state.defaultDid ||
-          state.selectedDid ||
-          state.purchasedDids[0] ||
-          null,
-      }).unwrap?.();
-
-      await tenantEnableAI({ tenantId }).unwrap?.();
-
-      const summary =
-        tenantSummarySample ?? {
-          tenantId,
-          companyName: state.companyName,
-          realm: state.realm,
-          planId: state.planId,
-        };
-
-      onFinished?.(summary);
-      alert("Tenant launched 🎉");
-    } catch (err) {
-      console.error(err);
-      alert("Launch failed");
+    if (state.selectedDid && !state.purchasedDids.includes(state.selectedDid)) {
+      await tenantPhonePurchase({ didId: state.selectedDid }).unwrap?.();
     }
-  };
+
+    if (state.selectedDid) {
+      await tenantAssignDID({ tenantId, did: state.selectedDid }).unwrap?.();
+    }
+
+    if (state.planId) {
+      await tenantPlanSelection({ tenantId, planId: state.planId }).unwrap?.();
+    }
+
+    if (state.card?.number) {
+      await tenantBillingAddCard({ tenantId, card: state.card }).unwrap?.();
+    }
+
+    if (state.enableWallet) {
+      await tenantToggleWallet({ tenantId }).unwrap?.();
+    }
+
+    await tenantConfigureTrunk({
+      tenantId,
+      sipHost: state.sipHost,
+      adminEmail: state.adminEmail,
+      defaultDid:
+        state.defaultDid ||
+        state.selectedDid ||
+        state.purchasedDids[0] ||
+        null,
+    }).unwrap?.();
+
+    await tenantEnableAI({ tenantId }).unwrap?.();
+
+    const summary =
+      tenantSummarySample ?? {
+        tenantId,
+        companyName: state.companyName,
+        realm: state.realm,
+        planId: state.planId,
+        agentDomain: `${state.realm}.agent.dalaillama.io`, // mock fallback
+      };
+
+    // ---------------- GET TENANT DOMAIN ----------------
+    const domain = summary.agentDomain;
+
+    // ---------------- GET KEYCLOAK CONFIG ----------------
+    const keycloakCfg = await keycloakConfig(domain).unwrap();
+
+    // ---------------- STORE KEYCLOAK CONFIG ----------------
+    setRuntimeKeycloakConfig({
+      url: keycloakCfg.keycloakUrl,
+      realm: keycloakCfg.realm,
+      clientId: keycloakCfg.clientId,
+    });
+
+    // Store for second login
+    localStorage.setItem("kc_cfg", JSON.stringify(keycloakCfg));
+
+    onFinished?.(summary);
+
+    alert("Tenant launched 🎉");
+
+    // ---------------- REDIRECT TO TENANT LOGIN ----------------
+    window.location.href = `https://${domain}/login`;
+
+  } catch (err) {
+    console.error(err);
+    alert("Launch failed");
+  }
+};
 
   /* ---------------- Render Step ---------------- */
   const renderStep = useMemo(() => {
