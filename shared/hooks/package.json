@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@dalaillama/shared-store": "1.0.0",
-    "@dalaillama/shared-utils": "1.0.0",
-    "@dalaillama/shared-config": "1.0.0",
+    "@dalaillama/shared-store": "workspace:*",
+    "@dalaillama/shared-utils": "workspace:*",
+    "@dalaillama/shared-config": "workspace:*",
     "react": "^18.3.1"
   }
 }

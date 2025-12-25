@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@dalaillama/shared-store": "1.0.0",
-    "@dalaillama/shared-utils": "1.0.0",
+    "@dalaillama/shared-store": "workspace:*",
+    "@dalaillama/shared-utils": "workspace:*",
     "react": "^18.3.1",
     "react-redux": "^9.1.2",
     "lucide-react": "^0.452.0"

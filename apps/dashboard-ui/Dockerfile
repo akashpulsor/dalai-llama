@@ -1,46 +1,21 @@
-# ------------------------------------------------------------
-# Stage 1: Build platform-ui (React/Vite)
-# ------------------------------------------------------------
 FROM node:20-alpine AS builder
-
-# Set working directory inside container
+RUN npm install -g pnpm
 WORKDIR /app
 
-# Copy monorepo root package files for dependency resolution
-COPY package*.json ./
-
-# Copy shared packages (used by platform-ui)
+COPY package.json pnpm-workspace.yaml ./
 COPY shared ./shared
-
-# Copy the platform-ui app
 COPY apps/dashboard-ui ./apps/dashboard-ui
 
-# Move into app directory
+RUN pnpm install --ignore-scripts
+
 WORKDIR /app/apps/dashboard-ui
+RUN npx vite build
 
-# Install dependencies (monorepo-safe)
-RUN npm install --legacy-peer-deps
-
-# Build app
-RUN npm run build
-
-# ------------------------------------------------------------
-# Stage 2: Serve with nginx
-# ------------------------------------------------------------
-FROM nginx:1.27-alpine
-
-# Copy build output
+FROM nginx:alpine
 COPY --from=builder /app/apps/dashboard-ui/dist /usr/share/nginx/html
-
-# Copy your NGINX config (optional, if mounted by K8s you can skip this)
-COPY /apps/platform-ui/k8s/homepage/nginx.conf /etc/nginx/conf.d/default.conf
-
-# Expose HTTP port
+COPY --from=builder /app/apps/dashboard-ui/nginx.conf /etc/nginx/conf.d/default.conf
+COPY apps/dashboard-ui/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 EXPOSE 80
-
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:80/ || exit 1
-
-# Start nginx
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]

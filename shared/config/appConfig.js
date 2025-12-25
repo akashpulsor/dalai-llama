@@ -70,7 +70,12 @@ try {
   demoOverride = false;
 }
 
+// @ts-ignore
+const runtimeEnv = typeof window !== 'undefined' && window.__ENV__ ? window.__ENV__ : {};
+
+
 const env = import.meta.env ?? {};
+
 
 /**
  * @template T
@@ -104,15 +109,16 @@ try {
  *                               FINAL CONFIG
  * -------------------------------------------------------------------------- */
 
+
 /** @type {AppConfig} */
 export const appConfig = {
   APP_NAME: env.VITE_APP_NAME || "Dalai llama",
   ENV: fallback(env.VITE_ENV, "development"),
 
-  PLATFORM_URL: env.VITE_BASE_URL || "http://localhost:5173",
-  API_BASE_URL: fallback(env.VITE_API_BASE_URL, "https://api.dalaillama.in"),
+  PLATFORM_URL: runtimeEnv.PLATFORM_URL || env.VITE_PLATFORM_URL || "http://localhost:5173",
+  API_BASE_URL: fallback(runtimeEnv.API_BASE_URL || env.VITE_API_BASE_URL, "https://api.dalaillama.in"),
 
-  DASHBOARD_DOMAIN: "dash.dalaillama.in",
+  DASHBOARD_DOMAIN: runtimeEnv.DASHBOARD_APP_URL || env.VITE_DASHBOARD_APP_URL || "dash.dalaillama.in",
 
   /* Logging / Metrics */
   METRICS_ENDPOINT: fallback(
@@ -128,9 +134,9 @@ export const appConfig = {
   LOG_COLLECTOR_URL: "https://log.dalaillama.in",
 
     // 👇 ADD THESE 3 LINES
-  KEYCLOAK_URL: env.VITE_KEYCLOAK_URL || "http://auth.localhost:8081",
-  KEYCLOAK_REALM: env.VITE_KEYCLOAK_REALM || "dalai-llama",
-  KEYCLOAK_CLIENT: env.VITE_KEYCLOAK_CLIENT_ID || "platform-ui",
+  KEYCLOAK_URL: runtimeEnv.KEYCLOAK_URL || env.VITE_KEYCLOAK_URL || "http://auth.localhost:8081",
+  KEYCLOAK_REALM: runtimeEnv.KEYCLOAK_REALM || env.VITE_KEYCLOAK_REALM || "dalai-llama",
+  KEYCLOAK_CLIENT: runtimeEnv.KEYCLOAK_CLIENT_ID || env.VITE_KEYCLOAK_CLIENT_ID || "platform-ui",
   /* WebSocket STT */
   WS_STT_URL: "wss://api.dalaillama.in/stt",
   MOCK_WS_URL: "ws://localhost:7777/mock",
@@ -152,11 +158,11 @@ export const appConfig = {
     SUBSCRIPTION: "/subscription",
     TENANT: "/tenant",
   },
-
+  
   /* REMOTE APP URLS FOR REDIRECTS — supports DEV & PROD */
   REMOTE_APPS: {
     agent: env.VITE_AGENT_APP_URL || "http://localhost:4100",
-    dashboard: env.VITE_DASHBOARD_APP_URL || "http://localhost:5174",
+    dashboard: runtimeEnv.DASHBOARD_APP_URL || env.VITE_DASHBOARD_APP_URL || "http://localhost:5174",
     analytics: env.VITE_ANALYTICS_APP_URL || "http://localhost:5176",
     subscription: env.VITE_SUBSCRIPTION_APP_URL || "http://localhost:5177",
   },

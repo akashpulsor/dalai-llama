@@ -7,7 +7,7 @@
     "@reduxjs/toolkit": "^2.2.7",
     "react-redux": "^9.1.2",
     "jwt-decode": "^4.0.0",
-    "@dalaillama/shared-config": "1.0.0",
-    "@dalaillama/shared-utils": "1.0.0"
+    "@dalaillama/shared-config": "workspace:*",
+    "@dalaillama/shared-utils": "workspace:*"
   }
 }
