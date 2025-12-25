@@ -1,126 +1,102 @@
 // @ts-check
-
-import { useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+// shared/hooks/useAuthBootstrap.js
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { setUser, logout } from "@dalaillama/shared-store";
-import { logger } from "@dalaillama/shared-utils";
 import { appConfig } from "@dalaillama/shared-config";
-import * as KeycloakLib from "keycloak-js";
+import { useExchangeTokenMutation, isAuthenticated, getUser, getAccessToken, isTokenExpired } from "./keycloakApi.js";
 
 /**
- * @typedef {import("keycloak-js").KeycloakConfig} KeycloakConfig
- * @typedef {import("keycloak-js").KeycloakInstance} KeycloakInstance
+ * @typedef {"loading"|"authenticated"|"unauthenticated"} AuthStatus
  */
 
-export const useAuthBootstrap = () => {
+/**
+ * Auth bootstrap hook - handles OAuth callback and session restore
+ * @param {{ redirectToDashboard?: boolean }} [options]
+ * @returns {{ status: AuthStatus, error: string | null }}
+ */
+export const useAuthBootstrap = (options = {}) => {
+  const { redirectToDashboard = false } = options;
   const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const [exchangeToken] = useExchangeTokenMutation();
+
+  const [status, setStatus] = useState(/** @type {AuthStatus} */ ("loading"));
+  const [error, setError] = useState(/** @type {string | null} */ (null));
 
   useEffect(() => {
-    try {
-      logger.info("Bootstrapping auth...");
+    const bootstrap = async () => {
+      try {
+        const code = searchParams.get("code");
+        const state = searchParams.get("state");
+        const oauthError = searchParams.get("error");
 
-      const currentPath = location?.pathname || "/";
-      const publicRoutes = ["/", "/login"];
-
-      const token = localStorage.getItem("auth_token");
-      const userJson = localStorage.getItem("user");
-      const expiryRaw = localStorage.getItem("token_expiry");
-
-      // -----------------------------------------------------------
-      // MOCK MODE — handled by authSlice, so bootstrap does nothing
-      // -----------------------------------------------------------
-      //if (appConfig.MOCK_MODE) {
-      //  return;
-      //}
-
-      // -----------------------------------------------------------
-      // REAL MODE (KEYCLOAK)
-      // -----------------------------------------------------------
-      if (!token && !publicRoutes.includes(currentPath)) {
-        logger.info("Starting Keycloak login...");
-
-        // FIX: Keycloak has no default constructor in TS type system
-        /** @type {any} */
-        const KeycloakCtor = KeycloakLib.default || KeycloakLib;
-
-        /** @type {KeycloakConfig} */
-        const kcConfig = {
-          url: appConfig.KEYCLOAK_URL,
-          realm: appConfig.KEYCLOAK_REALM,
-          clientId: appConfig.KEYCLOAK_CLIENT,
-        };
-
-        /** @type {KeycloakInstance} */
-        const keycloak = new KeycloakCtor(kcConfig);
-
-        keycloak
-          .init({ onLoad: "login-required" })
-          .then(
-            /**
-             * @param {boolean} authenticated
-             */
-            (authenticated) => {
-              if (!authenticated) {
-                keycloak.login();
-                return;
-              }
-
-              const profile = keycloak.tokenParsed || {};
-
-              const kcUser = {
-                id: profile.sub || "",
-                name: profile.name || "",
-                email: profile.email || "",
-                role: profile.realm_access?.roles?.[0] || "agent",
-                tenantId: profile.tenantId || "",
-              };
-
-              dispatch(setUser({ user: kcUser, token: keycloak.token || "" }));
-
-              localStorage.setItem("user", JSON.stringify(kcUser));
-              localStorage.setItem("auth_token", keycloak.token || "");
-              localStorage.setItem(
-                "token_expiry",
-                `${Date.now() + 3600_000}`
-              );
-            }
-          )
-          .catch(
-            /**
-             * @param {any} err
-             */
-            (err) => {
-              console.error("Keycloak failed:", err);
-              navigate("/login");
-            }
-          );
-
-        return;
-      }
-
-      // -----------------------------------------------------------
-      // TOKEN VALIDATION
-      // -----------------------------------------------------------
-      if (token) {
-        const expired = expiryRaw && Date.now() > Number(expiryRaw);
-
-        if (expired) {
-          dispatch(logout());
-          navigate("/login");
+        // OAuth error from Keycloak
+        if (oauthError) {
+          console.error("[Auth] OAuth error:", oauthError);
+          setError(searchParams.get("error_description") || oauthError);
+          setStatus("unauthenticated");
+          window.history.replaceState({}, "", window.location.pathname);
           return;
         }
 
-        if (userJson) {
-          dispatch(setUser({ user: JSON.parse(userJson), token }));
+        // OAuth callback - exchange code for token
+        if (code && state) {
+          console.log("[Auth] Exchanging code for token...");
+          const result = await exchangeToken({ code, state }).unwrap();
+          console.log("[Auth] Login successful:", result.user?.email);
+
+          // Clean URL
+          window.history.replaceState({}, "", window.location.pathname);
+
+          // Redirect to Dashboard if requested (Platform UI uses this)
+          if (redirectToDashboard) {
+            const dashboardUrl = appConfig.REMOTE_APPS?.dashboard || "/dashboard";
+            console.log("[Auth] Redirecting to dashboard:", dashboardUrl);
+            window.location.href = dashboardUrl;
+            return;
+          }
+
+          setStatus("authenticated");
+          return;
         }
+
+        // Check existing session
+        const token = getAccessToken();
+        const user = getUser();
+
+        if (token && user) {
+          // Check if token is expired
+          if (isTokenExpired(token)) {
+            console.log("[Auth] Token expired, clearing session");
+            setStatus("unauthenticated");
+            return;
+          }
+
+          // Restore session to Redux
+          dispatch(setUser({ user, token }));
+          setStatus("authenticated");
+          console.log("[Auth] Session restored:", user.email);
+          return;
+        }
+
+        // No session
+        setStatus("unauthenticated");
+
+      } catch (e) {
+        console.error("[Auth] Bootstrap error:", e);
+        const err = /** @type {{ data?: string, message?: string }} */ (e);
+        setError(err.data || err.message || "Authentication failed");
+        setStatus("unauthenticated");
+        dispatch(logout());
       }
-    } catch (err) {
-      console.error("Auth bootstrap crashed", err);
-      dispatch(logout());
-      navigate("/login");
-    }
-  }, [dispatch, navigate, location]);
+    };
+
+    bootstrap();
+  }, [dispatch, searchParams, exchangeToken, redirectToDashboard]);
+
+  return { status, error };
 };
+
+export default useAuthBootstrap;

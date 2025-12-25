@@ -7,7 +7,7 @@ import authReducer, {
   validateToken
 } from "./slices/authSlice.js";
 import flashReducer from "./slices/flashSlice.js";
-import { keycloakApi } from "../../shared/hooks/keycloakApi.js";
+import { keycloakApi } from "../hooks/keycloakApi.js";
 /**
  * @typedef {import('@reduxjs/toolkit').EnhancedStore} EnhancedStore
  */

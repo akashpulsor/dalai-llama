@@ -13,10 +13,10 @@ COPY package*.json ./
 COPY shared ./shared
 
 # Copy the platform-ui app
-COPY apps/admin-dashboard-ui ./apps/admin-dashboard-ui
+COPY apps/agents-ui ./apps/agents-ui
 
 # Move into app directory
-WORKDIR /app/apps/admin-dashboard-ui
+WORKDIR /app/apps/agents-ui
 
 # Install dependencies (monorepo-safe)
 RUN npm install --legacy-peer-deps
@@ -30,7 +30,7 @@ RUN npm run build
 FROM nginx:1.27-alpine
 
 # Copy build output
-COPY --from=builder /app/apps/admin-dashboard-ui/dist /usr/share/nginx/html
+COPY --from=builder /app/apps/agents-ui/dist /usr/share/nginx/html
 
 # Copy your NGINX config (optional, if mounted by K8s you can skip this)
 COPY /apps/platform-ui/k8s/homepage/nginx.conf /etc/nginx/conf.d/default.conf

@@ -17,7 +17,8 @@ import { Step2NumberPurchase } from "./components/Step2NumberPurchase.jsx";
 import { Step3PlanSelection } from "./components/Step3PlanSelection.jsx";
 import { Step4Billing } from "./components/Step4Billing.jsx";
 import { Step5AdminTelephony } from "./components/Step5AdminTelephony.jsx";
-
+import store, { api } from "@dalaillama/shared-store";
+import { setRuntimeKeycloakConfig } from "@dalaillama/shared-config";
 /* Shared API Hooks */
 import {
   useTenantRegisterMutation,
@@ -102,7 +103,7 @@ const [state, setState] = useState(
 
   const { data: tenantSummarySample } = useTenantGetSummaryQuery();
 
-  const { data: keycloakConfig } = useGetKeycloakConfigQuery();
+  
   /**
  * Update the auto-generated realm based on company name.
  * @param {string} name
@@ -227,8 +228,11 @@ const onLaunch = async () => {
     const domain = summary.agentDomain;
 
     // ---------------- GET KEYCLOAK CONFIG ----------------
-    const keycloakCfg = await keycloakConfig(domain).unwrap();
+    const result = await store.dispatch(
+      api.endpoints.getKeycloakConfig.initiate(domain)
+    );
 
+    const keycloakCfg = result.data;
     // ---------------- STORE KEYCLOAK CONFIG ----------------
     setRuntimeKeycloakConfig({
       url: keycloakCfg.keycloakUrl,

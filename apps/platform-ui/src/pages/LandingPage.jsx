@@ -1,42 +1,12 @@
+// @ts-check
 // apps/platform-ui/src/pages/LandingPage.jsx
 import React, { useState, useEffect } from "react";
-import { ChevronUp, Play, StopCircle, MessageCircle, X } from "lucide-react";
-
-
-/**
- * Floating Demo Mode Toggle
- * Appears at top center with a soft glowing UI button.
- */
-const DemoModeToggle = () => {
-  const [isDemo, setIsDemo] = useState(
-    localStorage.getItem("demo_mode") === "true"
-  );
-
-  const toggleDemo = () => {
-    const newState = !isDemo;
-    setIsDemo(newState);
-    localStorage.setItem("demo_mode", String(newState));
-
-    // reload the entire UI so hooks, RTK queries, and routing pick correct mode
-    window.location.reload();
-  };
-
-  return (
-    <button
-      onClick={toggleDemo}
-      className={`fixed top-4 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-full shadow-lg border 
-        ${isDemo ? "bg-green-600 text-white" : "bg-white text-gray-700"} 
-        hover:shadow-xl hover:scale-105 transition-all duration-200 z-50
-      `}
-    >
-      {isDemo ? "Demo Mode: ON" : "Enable Demo Mode"}
-    </button>
-  );
-};
-
+import { Play, StopCircle, MessageCircle, X } from "lucide-react";
+import { useInitiateLoginMutation } from "@dalaillama/shared-hooks/keycloakApi";
+import { appConfig } from "@dalaillama/shared-config";
 
 /**
- * @typedef {object} AnimatedCardProps
+ * @typedef {Object} AnimatedCardProps
  * @property {React.ReactNode} children
  * @property {number} [delay]
  * @property {string} [className]
@@ -45,6 +15,7 @@ const DemoModeToggle = () => {
 /**
  * Animated fade-in wrapper
  * @param {AnimatedCardProps} props
+ * @returns {React.ReactElement}
  */
 const AnimatedCard = ({ children, delay = 0, className = "" }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -55,37 +26,44 @@ const AnimatedCard = ({ children, delay = 0, className = "" }) => {
   }, [delay]);
 
   return (
-    <div
-      className={`transition-all duration-700 ${
-        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-      } ${className}`}
-    >
+    <div className={`transition-all duration-700 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"} ${className}`}>
       {children}
     </div>
   );
 };
 
-// ✅ Hero Section (no prop typing needed)
+
 const HeroSection = () => (
   <AnimatedCard className="text-center py-8 px-4">
     <h1 className="text-4xl md:text-5xl font-bold text-indigo-900 mb-4 tracking-tight">
       Your D2C Copilot: Automate, Save, and Scale
     </h1>
     <p className="text-xl text-gray-700 mb-8 font-medium max-w-4xl mx-auto">
-      AI automates returns, fraud, logistics, competitor analysis, and more—so
-      you can focus on growth.
+      AI automates returns, fraud, logistics, competitor analysis, and more—so you can focus on growth.
     </p>
   </AnimatedCard>
 );
 
-// ✅ AudioPlayer component
+
 const AudioPlayer = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState("english");
 
+  /**
+   * Toggle play/pause state
+   * @returns {void}
+   */
   const handlePlayPause = () => {
-    setIsPlaying(!isPlaying);
-    console.log("Audio playback:", !isPlaying ? "playing" : "stopped");
+    setIsPlaying((prev) => !prev);
+  };
+
+  /**
+   * Handle language change
+   * @param {React.ChangeEvent<HTMLSelectElement>} e
+   * @returns {void}
+   */
+  const handleLanguageChange = (e) => {
+    setSelectedLanguage(e.target.value);
   };
 
   return (
@@ -93,18 +71,15 @@ const AudioPlayer = () => {
       <div className="flex items-center justify-between gap-4">
         <button
           onClick={handlePlayPause}
-          className="flex items-center gap-3 bg-blue-600 text-white px-6 py-3 rounded-full hover:bg-blue-700 transition-all duration-200 hover:scale-105"
+          className="flex items-center gap-3 bg-blue-600 text-white px-6 py-3 rounded-full hover:bg-blue-700 transition-all"
         >
           {isPlaying ? <StopCircle size={32} /> : <Play size={32} />}
-          <span className="font-bold text-lg">
-            {isPlaying ? "Stop" : "Play"} Sample
-          </span>
+          <span className="font-bold text-lg">{isPlaying ? "Stop" : "Play"} Sample</span>
         </button>
-
         <select
           value={selectedLanguage}
-          onChange={(e) => setSelectedLanguage(e.target.value)}
-          className="px-4 py-3 border-2 border-gray-300 rounded-xl bg-white text-indigo-900 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+          onChange={handleLanguageChange}
+          className="px-4 py-3 border-2 border-gray-300 rounded-xl bg-white text-indigo-900 font-semibold"
         >
           <option value="hindi">Hindi</option>
           <option value="english">English</option>
@@ -115,51 +90,75 @@ const AudioPlayer = () => {
 };
 
 /**
- * @typedef {object} FloatingContactButtonProps
+ * @typedef {Object} FloatingContactButtonProps
  * @property {() => void} onClick
  */
 
-/** @param {FloatingContactButtonProps} props */
-const FloatingContactButton = (props) => {
-  const { onClick } = props;
-
-  return (
-    <button
-      onClick={onClick}
-      className="fixed bottom-6 right-6 bg-blue-600 text-white rounded-full px-6 py-3 shadow-2xl hover:bg-blue-700 transition-all duration-200 flex items-center gap-2 z-50 hover:scale-105"
-    >
-      <MessageCircle size={24} />
-      <span className="font-bold">Contact Us</span>
-    </button>
-  );
-};
+/**
+ * Floating contact button
+ * @param {FloatingContactButtonProps} props
+ 
+ */
+const FloatingContactButton = ({ onClick }) => (
+  <button
+    onClick={onClick}
+    className="fixed bottom-6 right-6 bg-blue-600 text-white rounded-full px-6 py-3 shadow-2xl hover:bg-blue-700 transition-all flex items-center gap-2 z-50"
+  >
+    <MessageCircle size={24} />
+    <span className="font-bold">Contact Us</span>
+  </button>
+);
 
 /**
- * @typedef {object} ContactModalProps
+ * @typedef {Object} ContactModalProps
  * @property {boolean} isOpen
  * @property {() => void} onClose
  */
 
+/**
+ * @typedef {Object} ContactFormData
+ * @property {string} name
+ * @property {string} email
+ * @property {string} message
+ */
 
-/** @param {ContactModalProps} props */
-const ContactModal = (props) => {
-  const { isOpen, onClose } = props;
-  const [formData, setFormData] = useState({ name: "", email: "", message: "" });
+/**
+ * Contact modal component
+ * @param {ContactModalProps} props
+ 
+ */
+const ContactModal = ({ isOpen, onClose }) => {
+  /** @type {ContactFormData} */
+  const initialFormData = { name: "", email: "", message: "" };
+  const [formData, setFormData] = useState(initialFormData);
 
   if (!isOpen) return null;
 
   /**
- * @param {React.FormEvent<HTMLFormElement>} e
- */
+   * Handle form submission
+   * @param {React.FormEvent<HTMLFormElement>} e
+   * @returns {void}
+   */
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log("Form submitted:", formData);
+    setFormData(initialFormData);
     onClose();
+  };
+
+  /**
+   * Handle input change
+   * @param {React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>} e
+   * @returns {void}
+   */
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative animate-fadeIn">
+      <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative">
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
           <X size={28} />
         </button>
@@ -167,29 +166,29 @@ const ContactModal = (props) => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
             type="text"
+            name="name"
             placeholder="Your Name"
             value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onChange={handleChange}
+            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl"
           />
           <input
             type="email"
+            name="email"
             placeholder="Your Email"
             value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onChange={handleChange}
+            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl"
           />
           <textarea
+            name="message"
             placeholder="Your Message"
             rows={4}
             value={formData.message}
-            onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onChange={handleChange}
+            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl"
           />
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition-colors"
-          >
+          <button type="submit" className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700">
             Send Message
           </button>
         </form>
@@ -198,17 +197,41 @@ const ContactModal = (props) => {
   );
 };
 
-// ✅ Main Landing Page
+
 const LandingPage = () => {
   const [showContactModal, setShowContactModal] = useState(false);
+  const [initiateLogin] = useInitiateLoginMutation();
 
+  /**
+   * Handle login - redirects to Keycloak
+   * @returns {void}
+   */
   const handleLogin = () => {
-    window.location.href = "/login";
+      console.log("Login clicked");
+  console.log("Keycloak URL:", appConfig.KEYCLOAK_URL);
+  console.log("Realm:", appConfig.KEYCLOAK_REALM);
+  console.log("Client:", appConfig.KEYCLOAK_CLIENT);
+    initiateLogin({});
+  };
+
+  /**
+   * Open contact modal
+   * @returns {void}
+   */
+  const openContactModal = () => {
+    setShowContactModal(true);
+  };
+
+  /**
+   * Close contact modal
+   * @returns {void}
+   */
+  const closeContactModal = () => {
+    setShowContactModal(false);
   };
 
   return (
     <div className="min-h-screen bg-gray-300">
-      <DemoModeToggle />
       <header className="bg-transparent p-5 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <div className="w-20 h-20 bg-purple-200 rounded-full flex items-center justify-center text-4xl">
@@ -229,8 +252,8 @@ const LandingPage = () => {
         <AudioPlayer />
       </main>
 
-      <FloatingContactButton onClick={() => setShowContactModal(true)} />
-      <ContactModal isOpen={showContactModal} onClose={() => setShowContactModal(false)} />
+      <FloatingContactButton onClick={openContactModal} />
+      <ContactModal isOpen={showContactModal} onClose={closeContactModal} />
     </div>
   );
 };

@@ -30,7 +30,9 @@
  * @property {boolean} MOCK_MODE
  * @property {boolean} DEMO_MODE
  * @property {string} MOCK_API_BASE_URL
- *
+ * @property {string} KEYCLOAK_URL
+ * @property {string} KEYCLOAK_REALM
+ * @property {string} KEYCLOAK_CLIENT
  * ---------- RUNTIME AUTH -------------
  * @property {{url:string, realm:string, clientId:string} | null} [RUNTIME_KEYCLOAK]
  *
@@ -107,7 +109,7 @@ export const appConfig = {
   APP_NAME: env.VITE_APP_NAME || "Dalai llama",
   ENV: fallback(env.VITE_ENV, "development"),
 
-  PLATFORM_URL: env.VITE_BASE_URL || "http://localhost:4100",
+  PLATFORM_URL: env.VITE_BASE_URL || "http://localhost:5173",
   API_BASE_URL: fallback(env.VITE_API_BASE_URL, "https://api.dalaillama.in"),
 
   DASHBOARD_DOMAIN: "dash.dalaillama.in",
@@ -125,6 +127,10 @@ export const appConfig = {
   LOG_LEVEL: fallback(env.VITE_LOG_LEVEL, "info"),
   LOG_COLLECTOR_URL: "https://log.dalaillama.in",
 
+    // 👇 ADD THESE 3 LINES
+  KEYCLOAK_URL: env.VITE_KEYCLOAK_URL || "http://auth.localhost:8081",
+  KEYCLOAK_REALM: env.VITE_KEYCLOAK_REALM || "dalai-llama",
+  KEYCLOAK_CLIENT: env.VITE_KEYCLOAK_CLIENT_ID || "platform-ui",
   /* WebSocket STT */
   WS_STT_URL: "wss://api.dalaillama.in/stt",
   MOCK_WS_URL: "ws://localhost:7777/mock",

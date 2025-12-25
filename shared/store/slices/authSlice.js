@@ -1,17 +1,12 @@
 // @ts-check
-
+// shared/store/slices/authSlice.js
 import { createSlice } from "@reduxjs/toolkit";
 import { jwtDecode } from "jwt-decode";
 import { appConfig } from "@dalaillama/shared-config";
-import { prometheusClient } from "@dalaillama/shared-utils";
-import KeycloakPkg from "keycloak-js";
 
-/** @type {any} */
-const KeycloakCtor = KeycloakPkg.default || KeycloakPkg;
-
-/* ---------------------------------------------
- * TOKEN HELPERS
- --------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                               TOKEN HELPERS                                */
+/* -------------------------------------------------------------------------- */
 /**
  * @param {string} token
  * @returns {boolean}
@@ -26,29 +21,29 @@ const tokenExpired = (token) => {
   }
 };
 
-/* ---------------------------------------------
- * STATE
- --------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                   STATE                                    */
+/* -------------------------------------------------------------------------- */
 /**
- * @typedef {"agent"|"supervisor"|"admin"} MockRole
+ * @typedef {"agent"|"supervisor"|"admin"} UserRole
  */
 
 /**
- * @typedef {{ id: string, name: string, role: MockRole, email: string, tenantId: string }} MockUser
+ * @typedef {{ id: string, name: string, role: UserRole, email: string, tenantId: string }} User
  */
 
 /**
- * @type {{ user: MockUser | null, token: string | null }}
+ * @type {{ user: User | null, token: string | null }}
  */
 const initialState = {
   user: JSON.parse(localStorage.getItem("user") || "null"),
   token: localStorage.getItem("auth_token"),
 };
 
-/* ---------------------------------------------
- * MOCK USERS
- --------------------------------------------- */
-/** @type {Record<MockRole, MockUser>} */
+/* -------------------------------------------------------------------------- */
+/*                                MOCK USERS                                  */
+/* -------------------------------------------------------------------------- */
+/** @type {Record<UserRole, User>} */
 const MOCK_USERS = {
   agent: {
     id: "mock-agent-1",
@@ -75,7 +70,7 @@ const MOCK_USERS = {
 
 /**
  * @param {string} email
- * @returns {MockRole}
+ * @returns {UserRole}
  */
 const getRoleFromEmail = (email) => {
   const e = email.toLowerCase();
@@ -84,127 +79,106 @@ const getRoleFromEmail = (email) => {
   return "agent";
 };
 
-/* ---------------------------------------------
- * SLICE
- --------------------------------------------- */
+/**
+ * Get dashboard URL for role
+ * @param {UserRole} role
+ * @returns {string}
+ */
+const getDashboardUrl = (role) => {
+  const routes = {
+    admin: "/admin/dashboard",
+    supervisor: "/supervisor/cockpit",
+    agent: "/agent/live",
+  };
+  return routes[role] || "/agent/live";
+};
+
+/* -------------------------------------------------------------------------- */
+/*                                   SLICE                                    */
+/* -------------------------------------------------------------------------- */
 const slice = createSlice({
   name: "auth",
   initialState,
   reducers: {
     /**
-     * @param {typeof initialState} state
-     * @param {{ payload: { user: MockUser, token: string } }} action
+     * Set user and token (used by keycloakApi after login)
      */
     setUser(state, action) {
       const { user, token } = action.payload;
       state.user = user;
       state.token = token;
-
-      localStorage.setItem("auth_token", token);
-      localStorage.setItem("user", JSON.stringify(user));
+      // Note: localStorage is handled in keycloakApi to keep it in sync
     },
 
     /**
-     * @param {typeof initialState} state
+     * Logout - clear state only (redirect handled by caller)
      */
     logout(state) {
       state.user = null;
       state.token = null;
-
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("user");
-
-      window.location.href = `${appConfig.PLATFORM_URL}`;
+      // Note: localStorage clearing is handled in keycloakApi.clearAuthState()
     },
 
     /**
-     * @param {typeof initialState} state
+     * Validate token - check expiry
      */
     validateToken(state) {
       const token = state.token;
-      const expired = !token || tokenExpired(token);
-
-      prometheusClient.pushTokenStatus(!expired);
-
-      if (expired) {
+      if (!token || tokenExpired(token)) {
         state.user = null;
         state.token = null;
-
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("user");
-
-        window.location.href = `${appConfig.PLATFORM_URL}/login`;
       }
     },
 
     /**
-     * MOCK LOGIN
-     * @param {typeof initialState} state
-     * @param {{ payload: string }} action
+     * Mock login - for demo mode
      */
     loginMock(state, action) {
-      const  email  = action.payload;
-      console.log("MOCK LOGIN:", email);
+      const email = action.payload;
       const role = getRoleFromEmail(email);
-
       const user = MOCK_USERS[role];
-      const token = `mock-token-${role}`;
+      const token = `mock-token-${role}-${Date.now()}`;
 
       state.user = user;
       state.token = token;
-
       localStorage.setItem("auth_token", token);
       localStorage.setItem("user", JSON.stringify(user));
 
-      if (role === "admin") window.location.href = "/admin/dashboard";
-      else if (role === "supervisor") window.location.href = "/supervisor/cockpit";
-      else window.location.href = "/agent/live";
+      if (typeof window !== "undefined") {
+        window.location.href = getDashboardUrl(role);
+      }
     },
 
     /**
-     * REAL LOGIN
-     * @param {typeof initialState} _state
+     * Mock login by role directly
      */
-    loginReal(_state) {
-      // @ts-ignore constructor signature mismatch
-      const keycloak = new KeycloakCtor({
-        url: appConfig.KEYCLOAK_URL,
-        realm: appConfig.KEYCLOAK_REALM,
-        clientId: appConfig.KEYCLOAK_CLIENT,
-      });
+    loginMockByRole(state, action) {
+      /** @type {UserRole} */
+      const role = action.payload;
+      const user = MOCK_USERS[role] || MOCK_USERS.agent;
+      const token = `mock-token-${role}-${Date.now()}`;
 
-      keycloak.login();
-    },
+      state.user = user;
+      state.token = token;
+      localStorage.setItem("auth_token", token);
+      localStorage.setItem("user", JSON.stringify(user));
 
-   /**
-     * Main login entry point — delegates to mock or real implementation.
-     * NOTE: we forward the original action to loginMock, and call loginReal with only state.
-     *
-     * @param {typeof initialState} state
-     * @param {{ payload: string }} action
-     */
-    login(state, action) {
-      if (appConfig.MOCK_MODE) {
-        // loginMock expects (state, action) where action has payload (email)
-        slice.caseReducers.loginMock(state, action);
-      } else {
-        // loginReal expects only state
-        slice.caseReducers.loginReal(state);
+      if (typeof window !== "undefined") {
+        window.location.href = getDashboardUrl(role);
       }
     },
   },
 });
 
-/* ---------------------------------------------
- * EXPORTS
- --------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/*                                  EXPORTS                                   */
+/* -------------------------------------------------------------------------- */
 export const {
   setUser,
   logout,
   validateToken,
-  login,
   loginMock,
-  loginReal,
+  loginMockByRole,
 } = slice.actions;
 
 export default slice.reducer;

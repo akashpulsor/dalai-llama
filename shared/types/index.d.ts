@@ -7,3 +7,4 @@
  */
 
 export * from "./react-props";
+export * from "./domain";

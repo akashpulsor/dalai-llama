@@ -12,8 +12,11 @@ import {
   UploadCloud,
   LogOut,
   Menu,
+  Loader2,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useKeycloakLogoutMutation } from "@dalaillama/shared-hooks";
+import { appConfig } from "@dalaillama/shared-config";
 
 /**
  * Collapsible Partner Sidebar
@@ -22,6 +25,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 export default function PartnerSideNav({ open, setOpen }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [keycloakLogout, { isLoading: isLoggingOut }] = useKeycloakLogoutMutation();
 
   const items = [
     { label: "Manage Tenants", path: "/partner/tenants", icon: Users },
@@ -34,9 +38,15 @@ export default function PartnerSideNav({ open, setOpen }) {
     { label: "Branding / Domain", path: "/partner/branding", icon: Globe },
   ];
 
-  const handleLogout = () => {
-    localStorage.removeItem("auth_token");
-    navigate("/");
+  const handleLogout = async () => {
+    try {
+      await keycloakLogout().unwrap();
+    } catch (err) {
+      console.error("[Logout] Error:", err);
+    } finally {
+      // Redirect to platform landing page
+      window.location.href = appConfig.PLATFORM_URL || "http://localhost:5173";
+    }
   };
 
   return (
@@ -103,10 +113,11 @@ export default function PartnerSideNav({ open, setOpen }) {
         {/* Logout */}
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100 mt-4"
+          disabled={isLoggingOut}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100 mt-4 disabled:opacity-50"
         >
-          <LogOut size={16} />
-          {open && <span>Logout</span>}
+          {isLoggingOut ? <Loader2 size={16} className="animate-spin" /> : <LogOut size={16} />}
+          {open && <span>{isLoggingOut ? "Logging out..." : "Logout"}</span>}
         </button>
 
         <div className="mt-4 text-xs text-gray-500 text-center">
