@@ -47,6 +47,21 @@ declare module "@dalaillama/shared-utils" {
 declare module "@dalaillama/shared-hooks" {
   import type { MutationTrigger } from "@reduxjs/toolkit/query/react";
 
+    // User type
+  export interface User {
+    id: string;
+    name: string;
+    email: string;
+    role: "admin" | "supervisor" | "agent";
+    tenantId: string;
+  }
+  // Auth Guard
+  export function useAuthGuard(): {
+    status: "checking" | "authenticated" | "redirecting";
+    user: User | null;
+  };
+
+
   // Existing
   export function useMetricsHeartbeat(): void;
   export function useAuthBootstrap(options?: { redirectToDashboard?: boolean }): {
@@ -80,13 +95,7 @@ declare module "@dalaillama/shared-hooks" {
 
   // Auth utilities
   export function getAccessToken(): string | null;
-  export function getUser(): {
-    id: string;
-    name: string;
-    email: string;
-    role: "admin" | "supervisor" | "agent";
-    tenantId: string;
-  } | null;
+  export function getUser(): User | null;
   export function isAuthenticated(): boolean;
   export function isTokenExpired(token: string): boolean;
   export function clearAuthState(): void;

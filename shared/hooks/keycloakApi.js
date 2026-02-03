@@ -18,7 +18,10 @@ const clientId = appConfig.KEYCLOAK_CLIENT;
 const AUTH_SET_USER = "auth/setUser";
 const AUTH_LOGOUT = "auth/logout";
 /** Get redirect URI dynamically based on current app */
-const getRedirectUri = () => `${window.location.origin}/auth/callback`;
+const getRedirectUri = () => {
+  const base = window.location.pathname.startsWith('/platform') ? '/platform' : '';
+  return `${window.location.origin}${base}/auth/callback`;
+};
 
 /* -------------------------------------------------------------------------- */
 /*                         🧠 In-Memory Token Store                           */
@@ -121,10 +124,16 @@ export const keycloakApi = createApi({
     initiateLogin: builder.mutation({
       async queryFn() {
         try {
+          console.log("[Auth] initiateLogin called");
+          console.log("[Auth] keycloakBaseUrl:", keycloakBaseUrl);
+          console.log("[Auth] realm:", realm);
+          console.log("[Auth] clientId:", clientId);
           const codeVerifier = generateCodeVerifier();
           const codeChallenge = await generateCodeChallenge(codeVerifier);
           const state = generateState();
-
+          console.log("[Auth] codeVerifier:", codeVerifier);
+          console.log("[Auth] code Challenge:", codeChallenge);
+          console.log("[Auth] state:", state);
           sessionStorage.setItem("pkce_verifier", codeVerifier);
           sessionStorage.setItem("oauth_state", state);
 

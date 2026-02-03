@@ -204,14 +204,19 @@ const LandingPage = () => {
 
   /**
    * Handle login - redirects to Keycloak
-   * @returns {void}
+   * @returns {Promise<void>}
    */
-  const handleLogin = () => {
+  const handleLogin = async () => {
       console.log("Login clicked");
   console.log("Keycloak URL:", appConfig.KEYCLOAK_URL);
   console.log("Realm:", appConfig.KEYCLOAK_REALM);
   console.log("Client:", appConfig.KEYCLOAK_CLIENT);
-    initiateLogin({});
+      try {
+    const result = await initiateLogin({}).unwrap();
+    console.log("[Auth] initiateLogin result:", result);
+  } catch (error) {
+    console.error("[Auth] initiateLogin error:", error);
+  }
   };
 
   /**

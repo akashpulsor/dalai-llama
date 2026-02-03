@@ -609,7 +609,29 @@ export const api = createApi({
         body,
       }),
     }),
-    /* ---------------- DID INVENTORY ---------------- */
+    /* ---------------- DIDs (Search Available) ---------------- */
+
+    /**
+     * @typedef {Object} SearchAvailableDidsArgs
+     * @property {string} tenantId
+     * @property {string} country
+     * @property {string} [city]
+     * @property {string} [prefix]
+     * @property {string} [type]
+     * @property {number} [limit]
+     */
+
+    searchAvailableDids: builder.query({
+      /**
+       * @param {SearchAvailableDidsArgs} args
+       */
+      query: ({ tenantId, ...params }) => ({
+        url: `/api/v1/tenants/${tenantId}/dids/available`,
+        params,
+      }),
+    }),
+        /* ---------------- DID INVENTORY ---------------- */
+
     getDidInventory: builder.query({
       query: () => "/did/inventory"
     }),
@@ -1057,6 +1079,10 @@ export const api = createApi({
       })
     }),
     /* ---------------- BILLING & LICENSE ---------------- */
+    getProducts: builder.query({
+      query: (userId) => `/products`
+    }),
+    /* ---------------- BILLING & LICENSE ---------------- */
     getSubscription: builder.query({
       query: (userId) => `/subscription/${userId}`
     }),
@@ -1331,7 +1357,9 @@ export const {
    useGenerateCoachingMutation,
 
    useGetForecastQuery,
-  useApplyRecommendationMutation
+  useApplyRecommendationMutation,
+  useGetProductsQuery,
+  useSearchAvailableDidsQuery
 } = api;
 
 

@@ -116,7 +116,7 @@ export const appConfig = {
   ENV: fallback(env.VITE_ENV, "development"),
 
   PLATFORM_URL: runtimeEnv.PLATFORM_URL || env.VITE_PLATFORM_URL || "http://localhost:5173",
-  API_BASE_URL: fallback(runtimeEnv.API_BASE_URL || env.VITE_API_BASE_URL, "https://api.dalaillama.in"),
+  API_BASE_URL: fallback(runtimeEnv.API_BASE_URL || env.VITE_API_BASE_URL, "http://api.localhost:8081"),
 
   DASHBOARD_DOMAIN: runtimeEnv.DASHBOARD_APP_URL || env.VITE_DASHBOARD_APP_URL || "dash.dalaillama.in",
 
@@ -137,6 +137,11 @@ export const appConfig = {
   KEYCLOAK_URL: runtimeEnv.KEYCLOAK_URL || env.VITE_KEYCLOAK_URL || "http://auth.localhost:8081",
   KEYCLOAK_REALM: runtimeEnv.KEYCLOAK_REALM || env.VITE_KEYCLOAK_REALM || "dalai-llama",
   KEYCLOAK_CLIENT: runtimeEnv.KEYCLOAK_CLIENT_ID || env.VITE_KEYCLOAK_CLIENT_ID || "platform-ui",
+
+  //KEYCLOAK_URL:   "http://auth.localhost:8081",
+  //KEYCLOAK_REALM:   "dalai-llama",
+  //KEYCLOAK_CLIENT:   "platform-ui",
+
   /* WebSocket STT */
   WS_STT_URL: "wss://api.dalaillama.in/stt",
   MOCK_WS_URL: "ws://localhost:7777/mock",
@@ -163,6 +168,7 @@ export const appConfig = {
   REMOTE_APPS: {
     agent: env.VITE_AGENT_APP_URL || "http://localhost:4100",
     dashboard: runtimeEnv.DASHBOARD_APP_URL || env.VITE_DASHBOARD_APP_URL || "http://localhost:5174",
+    //dashboard:  "http://localhost:5174",
     analytics: env.VITE_ANALYTICS_APP_URL || "http://localhost:5176",
     subscription: env.VITE_SUBSCRIPTION_APP_URL || "http://localhost:5177",
   },

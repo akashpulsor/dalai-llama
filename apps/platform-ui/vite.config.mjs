@@ -2,7 +2,7 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath } from "url";
 import path from "path";
-
+import fs from "fs";
 // Recreate __dirname for ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,6 +13,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    base: '/platform/',
     resolve: {
       alias: {
         "@dalaillama/shared-ui": path.resolve(__dirname, "../../shared/ui"),
@@ -28,12 +29,15 @@ export default defineConfig(({ mode }) => {
       __KEYCLOAK_URL__: JSON.stringify(env.VITE_KEYCLOAK_URL),
       __KEYCLOAK_REALM__: JSON.stringify(env.VITE_KEYCLOAK_REALM),
       __KEYCLOAK_CLIENT_ID__: JSON.stringify(env.VITE_KEYCLOAK_CLIENT_ID),
-      __API_BASE_URL__: JSON.stringify(env.VITE_API_BASE_URL || "http://api.dev.localhost"),
+      __API_BASE_URL__: JSON.stringify(env.VITE_API_BASE_URL || "https://api.dalaillama-dev.local:8443/api/v1"),
     },
     server: {
       port: 5173,
       host: "0.0.0.0",
-      https: undefined, // ✅ fix: set to undefined (or use object for certs)
+          https: {
+        key: fs.readFileSync(path.resolve(__dirname, "./localhost+2-key.pem")),
+        cert: fs.readFileSync(path.resolve(__dirname, "./localhost+2.pem")),
+      },// ✅ fix: set to undefined (or use object for certs)
       proxy: {
         "/api": {
           target: env.VITE_API_BASE_URL || "http://127.0.0.1:8080",

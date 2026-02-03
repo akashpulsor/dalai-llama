@@ -1,3 +1,5 @@
+import { useGetProductsQuery } from "@dalaillama/shared-store";
+
 declare module "@dalaillama/shared-store" {
   import type {
     EnhancedStore,
@@ -171,6 +173,7 @@ declare module "@dalaillama/shared-store" {
     getLiveAgentsQuery: QueryEndpoint;
     getQueueMonitorQuery: QueryEndpoint;
 
+    getProductsQuery: QueryEndpoint
     getLiveCallsQuery: QueryEndpoint;
     monitorCallMutation: MutationEndpoint;
     whisperToAgentMutation: MutationEndpoint;
@@ -189,8 +192,12 @@ declare module "@dalaillama/shared-store" {
 
     getForecastQuery: QueryEndpoint;
 
+    searchAvailableDids: QueryEndpoint
+    
+
     applyRecommendationMutation: MutationEndpoint;
     /* Allow any additional endpoints RTK may generate */
+
     [key: string]: any;
   }
 
@@ -211,6 +218,7 @@ declare module "@dalaillama/shared-store" {
   export const useGetWalletBalanceQuery: any;
   export const useGetLiveCallQuery: any;
 
+  export const useGetProductsQuery : any;
   export const usePartnerRegisterMutation: any;
   export const usePartnerGetCloudProvidersQuery: any;
   export const usePartnerSetupMTLSMutation: any;
@@ -242,6 +250,7 @@ declare module "@dalaillama/shared-store" {
   export const useHangupCallMutation: any;
   export const useSaveDispositionMutation: any;
 
+  export const useSearchAvailableDidsQuery: any;
   export const useGetDidInventoryQuery: any;
   export const useUploadDidInventoryMutation: any;
 

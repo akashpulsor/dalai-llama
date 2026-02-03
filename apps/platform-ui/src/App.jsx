@@ -103,7 +103,7 @@ export default function App() {
   return (
     <Provider store={store}>
       <ErrorBoundary>
-        <Router>
+        <Router basename="/platform">
           <AppRoutes />
         </Router>
       </ErrorBoundary>
