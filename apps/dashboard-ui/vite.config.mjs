@@ -9,11 +9,18 @@ const __dirname = path.dirname(__filename);
 
 export default defineConfig(({ mode }) => {
   // Load environment variables from .env files
-  const env = loadEnv(mode, process.cwd(), "");
+  const env = loadEnv(mode, __dirname, "");
+  const apiBaseUrl = env.VITE_API_BASE_URL || "https://api.dalaillama.in/api/v1";
+  const proxyTarget = (() => {
+    try {
+      return new URL(apiBaseUrl).origin;
+    } catch {
+      return "https://api.dalaillama.in";
+    }
+  })();
 
   return {
     plugins: [react()],
-    base: '/dashboard/',
     resolve: {
       alias: {
         "@dalaillama/shared-ui": path.resolve(__dirname, "../../shared/ui"),
@@ -29,14 +36,14 @@ export default defineConfig(({ mode }) => {
       __KEYCLOAK_URL__: JSON.stringify(env.VITE_KEYCLOAK_URL),
       __KEYCLOAK_REALM__: JSON.stringify(env.VITE_KEYCLOAK_REALM),
       __KEYCLOAK_CLIENT_ID__: JSON.stringify(env.VITE_KEYCLOAK_CLIENT_ID),
-      __API_BASE_URL__: JSON.stringify(env.VITE_API_BASE_URL || "http://api.dev.localhost"),
+      __API_BASE_URL__: JSON.stringify(env.VITE_API_BASE_URL || "https://api.dalaillama.in/api/v1"),
     },
     server: {
-      port: 5173,
+      port: 5177,
       host: "0.0.0.0", // ✅ fix: set to undefined (or use object for certs)
       proxy: {
         "/api": {
-          target: env.VITE_API_BASE_URL || "http://127.0.0.1:8080",
+          target: proxyTarget,
           changeOrigin: true,
           secure: false,
         },

@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => {
       __KEYCLOAK_URL__: JSON.stringify(env.VITE_KEYCLOAK_URL),
       __KEYCLOAK_REALM__: JSON.stringify(env.VITE_KEYCLOAK_REALM),
       __KEYCLOAK_CLIENT_ID__: JSON.stringify(env.VITE_KEYCLOAK_CLIENT_ID),
-      __API_BASE_URL__: JSON.stringify(env.VITE_API_BASE_URL || "https://api.dalaillama-dev.local:8443/api/v1"),
+      __API_BASE_URL__: JSON.stringify(env.VITE_API_BASE_URL || "https://api.dalaillama.in/api/v1"),
     },
     server: {
       port: 5173,

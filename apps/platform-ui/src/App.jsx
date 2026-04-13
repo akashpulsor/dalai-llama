@@ -50,10 +50,10 @@ const AuthCallback = () => {
   }, [exchangeToken]);
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="bg-white rounded-2xl p-8 shadow-xl text-center">
-        <Loader2 className="w-12 h-12 text-purple-600 animate-spin mx-auto mb-4" />
-        <p className="text-gray-600">Signing you in...</p>
+    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
+      <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-xl sm:p-8">
+        <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin text-purple-600 sm:h-12 sm:w-12" />
+        <p className="text-sm text-gray-600 sm:text-base">Signing you in...</p>
       </div>
     </div>
   );

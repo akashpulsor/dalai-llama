@@ -1,17 +1,11 @@
 // @ts-check
 // apps/dashboard-ui/src/pages/ProductPage.jsx
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
-
-  ArrowLeft,
   Phone,
-  PhoneOutgoing,
-  UserCircle,
   ArrowRight,
   PhoneCall,
-  Headphones,
-  MessageSquare,
   X,
   Search,
   ShoppingBag,
@@ -22,15 +16,11 @@ import {
   LayoutDashboard,
   Settings,
   ShieldCheck,
-  HelpCircle,
   Menu,
   CreditCard,
   UserCheck,
   BarChart3,
-  MapPin,
-  Clock,
   Loader2,
-  AlertCircle,
   Cpu,
   Sparkles,
   Wallet,
@@ -39,25 +29,44 @@ import {
   Plus,
   History,
   AlertTriangle,
-  Globe
+  Globe,
+  RefreshCw
 } from "lucide-react";
 
 import TenantSetupCard from "./components/TenantSetupCard.jsx";
 import NumberPicker from "./components/NumberPicker.jsx";
 import { PaymentGateway } from "./components/PaymentGateway.jsx";
 import { ActivationSuccess } from "./components/ActivationSuccess.jsx";
-import {ProductCard} from "./components/ProductCard.jsx";
+// 1. Import PlanSelector and add PlanPricing type at top
+import { PlanSelector } from "./components/PlanSelector.jsx";
+
 import KYCBadge from "./components/KYCBadge.jsx";
 
 import { useGetProductsQuery } from "@dalaillama/shared-store";
+import { useKeycloakLogoutMutation } from "@dalaillama/shared-hooks/keycloakApi";
+/* ============================================================================
+ * TYPE DEFINITIONS & CONSTANTS
+ * ========================================================================== */
+const MAX_RETRIES = 3;
+const RETRY_DELAY_BASE = 2000; 
 
 /* ============================================================================
  * TYPES
  * ========================================================================== */
+// 2. Add type imports (after existing typedefs)
+/**
+ * @typedef {import('./components/PlanSelector.jsx').PlanPricing} PlanPricing
+ */
+
+/**
+ * @typedef {Object} PlanSelection
+ * @property {PlanPricing} plan
+ * @property {number} agentCount
+ */
 
 /** @typedef {'AI_CONTACT_CENTER'|'CONVERSATIONAL_IVR'|'BASIC_PBX'|'OUTBOUND_DIALER'|'VIRTUAL_RECEPTIONIST'} ProductType */
 /** @typedef {'SHARED'|'DEDICATED'} DeploymentModel */
-/** @typedef {'TENANT_INFO'|'NUMBER_PICKER'|'PAYMENT'|'SUCCESS'} WizardStep */
+/** @typedef {'TENANT_INFO'|'NUMBER_PICKER'|'PLAN_SELECTION'|'PAYMENT'|'SUCCESS'} WizardStep */
 
 /**
  * @typedef {Object} Product
@@ -88,8 +97,12 @@ import { useGetProductsQuery } from "@dalaillama/shared-store";
  * @property {string} country
  * @property {string} city
  * @property {string} type
- * @property {number} monthlyFee
- * @property {number} setupFee
+ * @property {string} monthlyFee
+ * @property {string } setupFee
+ * @property {string} provider
+ * @property {string} currency
+ * @property {string} inboundPrice
+ * @property {string} outboundPrice
  */
 
 /* ============================================================================
@@ -97,7 +110,7 @@ import { useGetProductsQuery } from "@dalaillama/shared-store";
  * ========================================================================== */
 
 /** @type {WizardStep[]} */
-const STEPS = ["TENANT_INFO", "NUMBER_PICKER", "PAYMENT", "SUCCESS"];
+const STEPS = ["TENANT_INFO", "NUMBER_PICKER", "PLAN_SELECTION", "PAYMENT", "SUCCESS"];
 
 /** @type {Record<ProductType, { basePrice: number }>} */
 const PRODUCT_PRICING = {
@@ -107,36 +120,6 @@ const PRODUCT_PRICING = {
   OUTBOUND_DIALER: { basePrice: 30 },
   VIRTUAL_RECEPTIONIST: { basePrice: 10 },
 };
-
-/** @type {Record<ProductType, import('lucide-react').LucideIcon>} */
-const ICONS = {
-  AI_CONTACT_CENTER: Headphones,
-  CONVERSATIONAL_IVR: MessageSquare,
-  BASIC_PBX: Phone,
-  OUTBOUND_DIALER: PhoneOutgoing,
-  VIRTUAL_RECEPTIONIST: UserCircle,
-};
-
-/** @type {Product[]} */
-const MOCK_PRODUCTS = [
-  {
-    id: "1",
-    code: "CONV_IVR",
-    name: "Conversational IVR",
-    description: "Natural language IVR",
-    type: "CONVERSATIONAL_IVR",
-    active: true,
-  },
-  {
-    id: "2",
-    code: "AI_CC",
-    name: "AI Contact Center",
-    description: "AI powered contact center",
-    type: "AI_CONTACT_CENTER",
-    active: true,
-  },
-];
-
 
 /**
  * @returns {TenantInfo}
@@ -174,34 +157,19 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
   const handleTenantCreated = useCallback((id) => {
     localStorage.setItem("tenantId", id);
     setTenantId(id);
-    if (activeProduct) {
-      setWizardStep(1); 
-    }
+    setIsTenantSetupDismissed(false);
+    setIsSettingUpOrg(false);
+    setWizardStep(1);
   }, []);
 
     /* ------------------------------------------------------------------------
    * API
    * ---------------------------------------------------------------------- */
 
-  const { data, isLoading, isError, refetch } = useGetProductsQuery();
+  const { data, isLoading, isError, refetch } = useGetProductsQuery(undefined);
   /** @type {Product[]} */
-  const products = demo ? MOCK_PRODUCTS : data || [];
-
-  if (!tenantId) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center
-                bg-slate-900/40 backdrop-blur-md">
-        <TenantSetupCard
-          authProfile={{
-            email: initialTenantInfo?.primaryContactEmail,
-            username: initialTenantInfo?.name,
-          }}
-          onCreated={handleTenantCreated}
-        />
-      </div>
-    );
-  }
-
+  const products = Array.isArray(data) ? data : [];
+  const [keycloakLogout] = useKeycloakLogoutMutation();
 
 
   /* ------------------------------------------------------------------------
@@ -210,6 +178,38 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
 
   const [search, setSearch] = useState("");
   const [wizardStep, setWizardStep] = useState(0);
+
+    const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  /** @type {React.MutableRefObject<ReturnType<typeof setTimeout> | null>} */
+  const retryTimerRef = useRef(null);
+
+/** @type {[PlanSelection | null, React.Dispatch<React.SetStateAction<PlanSelection | null>>]} */
+  const [planSelection, setPlanSelection] = useState(/** @type {PlanSelection | null} */ (null));
+
+  // Background Auto-Retry Logic
+  useEffect(() => {
+    if (isError && retryCount < MAX_RETRIES) {
+      setIsRetrying(true);
+      const nextDelay = Math.pow(2, retryCount) * RETRY_DELAY_BASE;
+      
+      retryTimerRef.current = setTimeout(() => {
+        setRetryCount((prev) => prev + 1);
+        refetch();
+      }, nextDelay);
+    } else if (!isError) {
+      setRetryCount(0);
+      setIsRetrying(false);
+    }
+
+    return () => {
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+      }
+    };
+  }, [isError, retryCount, refetch]);
+
 
   /** @type {[Product | null, React.Dispatch<React.SetStateAction<Product | null>>]} */
   const [activeProduct, setActiveProduct] = useState(
@@ -237,8 +237,17 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
   const [kycStatus] = useState("action_required"); 
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [isSettingUpOrg, setIsSettingUpOrg] = useState(false);
+  const [isTenantSetupDismissed, setIsTenantSetupDismissed] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  
 
-  const showSetupModal = !tenantId;
+  useEffect(() => {
+    if (!tenantId && !isSettingUpOrg && !isTenantSetupDismissed && !isLoggingOut) {
+      setIsSettingUpOrg(true);
+      setWizardStep(0);
+    }
+  }, [tenantId, isSettingUpOrg, isTenantSetupDismissed, isLoggingOut]);
   /* ------------------------------------------------------------------------
    * HANDLERS
    * ---------------------------------------------------------------------- */
@@ -247,35 +256,63 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
     /** @param {Product} product */
     (product) => {
       setActiveProduct(product);
-          if (!tenantId) {
+      if (!tenantId) {
+      setIsTenantSetupDismissed(false);
+      setIsSettingUpOrg(true);
       setWizardStep(0);
     } else {
       setWizardStep(1);
     };
       setTenantInfo((p) => ({ ...p, productCode: product.code }));
     },
-    []
+    [tenantId]
   );
 
-  /** @type {(did: AvailableDid) => void} */
-  const handleDidSelect = useCallback((did) => {
+  /** @type {(did: AvailableDid, tenantId: string) => void} */
+  const handleDidSelect = useCallback((did, incomingTenantId) => {
+    console.log("Selected DID:", did);
+
+    if (!tenantId && incomingTenantId) {
+      localStorage.setItem("tenantId", incomingTenantId);
+      setTenantId(incomingTenantId);
+    }
+
     setSelectedDid(did);
+    setIsSettingUpOrg(false);
     setWizardStep(2);
+  }, [tenantId]);
+
+  /** @type {(plan: PlanPricing, agentCount: number) => void} */
+  const handlePlanSelect = useCallback((plan, agentCount) => {
+    setPlanSelection({ plan, agentCount });
+    setWizardStep(3);
   }, []);
 
   const handlePaymentComplete = useCallback(() => {
-    setWizardStep(3);
+    setWizardStep(4);
   }, []);
 
   const closeWizard = useCallback(() => {
     setActiveProduct(null);
+    setIsSettingUpOrg(false);
+    setIsTenantSetupDismissed(true);
     setWizardStep(0);
     setSelectedDid(null);
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("tenantId");
-    setTenantId(null);
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await keycloakLogout(undefined).unwrap();
+    } finally {
+      localStorage.removeItem("tenantId");
+      setTenantId(null);
+      setIsTenantSetupDismissed(false);
+      setShowProfileMenu(false);
+      window.location.assign(
+        `${window.location.origin}${import.meta.env.DEV ? "/" : "/dashboard/"}`
+      );
+    }
   };
 
 
@@ -298,33 +335,82 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
     ? PRODUCT_PRICING[activeProduct.type]
     : null;
 
-  const totalAmount =
-    pricing ? pricing.basePrice + (selectedDid?.setupFee || 0) : 0;
+//  const totalAmount =
+ //   pricing ? pricing.basePrice + (Number(selectedDid?.setupFee) || 0) : 0;
+
+  const totalAmount = useMemo(() => {
+    if (!planSelection || !selectedDid) return 0;
+    const plan = planSelection.plan;
+    const agentCount = planSelection.agentCount;
+    const extraAgents = Math.max(0, agentCount - plan.includedAgents);
+    return (
+      plan.platformFee +
+      extraAgents * plan.perAgentFee +
+      Number(selectedDid.setupFee)
+    );
+  }, [planSelection, selectedDid]);
+
+  const currentUser = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const userDisplayName = currentUser?.name || currentUser?.email || "Dashboard User";
+  const userRole = currentUser?.role || "admin";
+  const userInitials = userDisplayName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(/** @param {string} part */ (part) => part[0]?.toUpperCase() || "")
+    .join("") || "DU";
+
+  const handleManualRetry = () => {
+    setRetryCount(0);
+    setIsRetrying(false);
+    refetch();
+  };
+
 
   /* ------------------------------------------------------------------------
    * WIZARD CONTENT
    * ---------------------------------------------------------------------- */
 
   const renderWizard = () => {
-    if (!activeProduct) return null;
+    if (!tenantId || isSettingUpOrg) {
+      return (
+        <TenantSetupCard
+          authProfile={{ email: tenantInfo.primaryContactEmail }}
+          onCreated={handleTenantCreated}
+        />
+      );
+    }
+
     const currentStepName = STEPS[wizardStep];
     switch (currentStepName) {
       case "NUMBER_PICKER":
-        return (
-          <NumberPicker
-            tenantId={tenantId}
-            onSelect={handleDidSelect}
+        return <NumberPicker tenantId={tenantId} onSelect={handleDidSelect} />;
+
+      case "PLAN_SELECTION":
+        return selectedDid && activeProduct ? (
+          <PlanSelector
+            productCode={activeProduct.code}
+            selectedDid={selectedDid}
+            onSelect={handlePlanSelect}
           />
-        );
+        ) : null;
 
       case "PAYMENT":
-        return (
+        return planSelection && selectedDid ? (
           <PaymentGateway
-            amount={totalAmount}
-            planType={tenantInfo.deploymentModel}
+            plan={planSelection.plan}
+            selectedDid={selectedDid}
+            agentCount={planSelection.agentCount}
             onComplete={handlePaymentComplete}
           />
-        );
+        ) : null;
 
       case "SUCCESS":
         return (
@@ -339,7 +425,6 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
     }
   };
 
-
   /* ------------------------------------------------------------------------
    * RENDER
    * ---------------------------------------------------------------------- */
@@ -353,21 +438,54 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
   }
 
   if (isError && !demo) {
-    return (
-      <div className="h-screen flex items-center justify-center">
-        <button onClick={refetch}>Retry</button>
+        return (
+      <div className="h-screen w-full flex items-center justify-center bg-[#F9FAFB] p-6 animate-in fade-in duration-500">
+        <div className="max-w-md w-full text-center">
+            <div className="w-20 h-20 bg-rose-50 rounded-3xl flex items-center justify-center text-rose-500 mx-auto mb-6 shadow-xl shadow-rose-100">
+                <AlertTriangle size={36} />
+            </div>
+            <h2 className="text-2xl font-black text-slate-900 mb-2">Connection Interrupted</h2>
+            <p className="text-slate-500 text-sm font-medium mb-8 leading-relaxed">
+                Our servers are taking longer than usual to respond. We've tried reconnecting 3 times without success.
+            </p>
+            <div className="flex flex-col gap-3">
+                <button 
+                    onClick={handleManualRetry}
+                    className="w-full bg-slate-900 hover:bg-black text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-slate-200"
+                >
+                    <RefreshCw size={18} />
+                    <span>Try One More Time</span>
+                </button>
+                <button 
+                    className="w-full bg-white border border-slate-200 text-slate-600 py-4 rounded-2xl font-bold hover:bg-slate-50 transition-all text-sm"
+                >
+                    System Status
+                </button>
+            </div>
+        </div>
       </div>
     );
   }
 
+    // Combined logic for UI effects (blur/dim)
+  const isAnyOverlayActive = !!activeProduct || isSettingUpOrg;
+  const shouldBlockMainContent = (!tenantId && !isTenantSetupDismissed) || isAnyOverlayActive;
 /* ------------------------------------------------------------------------
    * RENDER
    * ---------------------------------------------------------------------- */
 
   if (isLoading && !demo) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
+  if (isLoggingOut) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[#F9FAFB]">
+        <Loader2 className="animate-spin text-slate-500" />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-[#F9FAFB] text-slate-900 font-sans selection:bg-purple-100 overflow-x-hidden">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-[#F9FAFB] text-[15px] text-slate-900 selection:bg-purple-100 md:flex-row">
       
       {/* SIDEBAR (Desktop) */}
       <aside className={`hidden md:flex flex-col fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-100 transition-all duration-500 ease-in-out ${isExpanded ? 'w-64' : 'w-20'}`}>
@@ -383,7 +501,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
           <div className="w-10 h-10 bg-purple-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-purple-100 shrink-0">
             <PhoneCall size={22} />
           </div>
-          {isExpanded && <span className="ml-3 font-bold text-lg tracking-tight whitespace-nowrap animate-in fade-in duration-500">DALAI LLAMA</span>}
+          {isExpanded && <span className="ml-3 whitespace-nowrap text-base font-bold tracking-tight animate-in fade-in duration-500">DALAI LLAMA</span>}
         </div>
 
         <nav className={`px-3 space-y-1 mt-4 flex-grow transition-all duration-300 ${!isExpanded && 'flex flex-col items-center'}`}>
@@ -404,7 +522,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
               }`}
             >
               <item.icon size={20} className="shrink-0" />
-              {isExpanded && <span className="text-[11px] font-bold uppercase tracking-[0.1em] whitespace-nowrap animate-in fade-in duration-500">{item.label}</span>}
+              {isExpanded && <span className="whitespace-nowrap text-xs font-bold uppercase tracking-[0.08em] animate-in fade-in duration-500">{item.label}</span>}
               {item.highlight && (
                 <div className={`absolute w-2 h-2 bg-rose-500 rounded-full animate-pulse ${isExpanded ? 'right-4' : 'top-2 right-2'}`} />
               )}
@@ -420,14 +538,14 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
                   <div className="p-1.5 bg-purple-500/20 rounded-lg">
                     <Sparkles size={14} className="text-purple-400" />
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Compliance</span>
+                  <span className="text-xs font-bold uppercase tracking-[0.08em] text-slate-300">Compliance</span>
                </div>
-               <p className="text-[13px] font-bold leading-tight mb-2">Upgrade Your Business Limits</p>
-               <p className="text-[11px] text-slate-400 mb-4 font-medium leading-relaxed">Complete KYC to unlock $10,000 monthly spending limit.</p>
+               <p className="mb-2 text-sm font-bold leading-tight">Upgrade Your Business Limits</p>
+               <p className="mb-4 text-xs font-medium leading-relaxed text-slate-300">Complete KYC to unlock $10,000 monthly spending limit.</p>
                <div className="w-full bg-slate-700/50 h-1.5 rounded-full mb-4 overflow-hidden">
                   <div className="w-1/3 h-full bg-purple-500 rounded-full" />
                </div>
-               <button className="w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-purple-900/20">
+               <button className="w-full rounded-xl bg-purple-600 py-3 text-xs font-black uppercase tracking-[0.08em] text-white transition-all shadow-lg shadow-purple-900/20 hover:bg-purple-500">
                  Verify Business
                </button>
             </div>
@@ -453,39 +571,50 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
       </aside>
 
       {/* MOBILE NAV BAR */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 z-50 px-6 py-3 flex justify-between items-center shadow-2xl">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between border-t border-slate-100 bg-white px-4 py-3 shadow-2xl md:hidden">
         <LayoutDashboard className="text-slate-400" size={24} />
         <ShoppingBag className="text-purple-600" size={24} />
-        <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center text-white -mt-8 shadow-xl shadow-purple-200">
-            <Menu size={24} />
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowProfileMenu((prev) => !prev)}
+          className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-600 text-white -mt-8 shadow-xl shadow-purple-200"
+          aria-label="Open account menu"
+        >
+          <Menu size={24} />
+        </button>
         <BarChart3 className="text-slate-400" size={24} />
-        <UserCheck className="text-slate-400" size={24} />
+        <button
+          onClick={handleLogout}
+          className="flex h-10 w-10 items-center justify-center rounded-full text-slate-400"
+          aria-label="Log out"
+        >
+          <LogOut size={22} />
+        </button>
       </nav>
 
       {/* MAIN CONTENT */}
-      <main className={`flex-grow transition-all duration-500 w-full ${isExpanded ? 'md:pl-64' : 'md:pl-20'} ${activeProduct || !tenantId ? 'blur-2xl scale-[0.99] opacity-40 pointer-events-none' : ''}`}>
+      <main className={`w-full flex-grow transition-all duration-500 ${isExpanded ? "md:pl-64" : "md:pl-20"} ${shouldBlockMainContent ? "pointer-events-none scale-[0.99] opacity-40 blur-2xl" : ""}`}>
         
         {/* HEADER */}
-        <header className="h-20 px-6 md:px-12 flex items-center justify-between sticky top-0 bg-[#F9FAFB]/80 backdrop-blur-xl z-40">
-          <div className="relative group w-full max-w-xs">
+        <header className="sticky top-0 z-40 flex min-h-20 flex-col gap-4 bg-[#F9FAFB]/80 px-4 py-4 backdrop-blur-xl sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-12">
+          <div className="relative group w-full lg:max-w-xs">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-purple-600 transition-colors" size={18} />
             <input 
               type="text" 
               placeholder="Search..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-white border border-slate-100 rounded-2xl pl-11 pr-5 py-2.5 text-sm font-medium outline-none focus:ring-4 focus:ring-purple-100 transition-all shadow-sm"
+              className="w-full rounded-2xl border border-slate-100 bg-white py-3 pl-11 pr-5 text-base font-medium outline-none transition-all shadow-sm focus:ring-4 focus:ring-purple-100"
             />
           </div>
-          <div className="flex items-center gap-4 md:gap-6 ml-auto">
+          <div className="flex w-full flex-wrap items-center justify-between gap-3 sm:gap-4 lg:ml-auto lg:w-auto lg:flex-nowrap lg:justify-end lg:gap-6">
             {/* Credit Balance Card */}
-            <div className="hidden lg:flex items-center gap-3 bg-white border border-slate-100 p-1.5 pr-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
+            <div className="hidden items-center gap-3 bg-white border border-slate-100 p-1.5 pr-4 rounded-2xl shadow-sm transition-shadow cursor-pointer group hover:shadow-md xl:flex">
                <div className="w-9 h-9 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-all">
                   <Wallet size={18} />
                </div>
                <div>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Balance</p>
+                  <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] leading-none text-slate-400">Balance</p>
                   <p className="text-sm font-bold text-slate-900">${balance.toLocaleString()}</p>
                </div>
                <div className="ml-2 w-6 h-6 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100">
@@ -497,20 +626,22 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
             <div className="relative">
               <button 
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className={`flex items-center gap-3 p-1.5 pr-3 rounded-2xl transition-all border ${showProfileMenu ? 'bg-slate-50 border-slate-200 shadow-inner' : 'bg-white border-slate-100 shadow-sm hover:shadow-md'}`}
+                className={`flex items-center gap-3 rounded-2xl border p-1.5 pr-3 transition-all ${showProfileMenu ? "border-slate-200 bg-slate-50 shadow-inner" : "border-slate-100 bg-white shadow-sm hover:shadow-md"}`}
               >
-                <div className="h-9 w-9 rounded-xl bg-slate-900 flex items-center justify-center text-white font-bold text-xs">JD</div>
-                <div className="text-left hidden md:block">
-                   <p className="text-[11px] font-bold leading-none mb-1">Jane Doe</p>
-                   <p className="text-[9px] text-slate-400 uppercase font-bold tracking-widest">Admin</p>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white">
+                  {userInitials}
+                </div>
+                <div className="hidden text-left sm:block">
+                   <p className="mb-1 text-xs font-bold leading-none">{userDisplayName}</p>
+                   <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400">{userRole}</p>
                 </div>
                 <ChevronDown size={14} className={`text-slate-300 transition-transform ${showProfileMenu ? 'rotate-180' : ''}`} />
               </button>
 
               {showProfileMenu && (
-                <div className="absolute right-0 mt-3 w-64 bg-white border border-slate-100 rounded-3xl shadow-2xl py-3 z-[60] animate-in fade-in slide-in-from-top-2">
+                <div className="absolute right-0 z-[60] mt-3 w-72 max-w-[calc(100vw-2rem)] rounded-3xl border border-slate-100 bg-white py-3 shadow-2xl animate-in fade-in slide-in-from-top-2">
                    <div className="px-5 py-3 border-b border-slate-50 mb-2">
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Account</p>
+                      <p className="mb-3 text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Account</p>
                       <div className="space-y-3">
                          <div className="flex items-center gap-3 text-slate-600 hover:text-purple-600 cursor-pointer group">
                             <User size={18} className="text-slate-300 group-hover:text-purple-600" />
@@ -538,43 +669,50 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
           </div>
         </header>
 
-        <div className="px-6 md:px-12 py-8 md:py-12 max-w-7xl mx-auto pb-24 md:pb-12">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+        <div className="mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6 lg:px-12 lg:py-10">
+          <div className="mb-8 flex flex-col gap-5 lg:mb-12 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-slate-900 mb-3">Marketplace</h1>
-              <p className="text-lg text-slate-400 font-medium">Provision global voice infrastructure in 60 seconds.</p>
+              <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-slate-500">
+                Service Catalog
+              </p>
+              <h1 className="mb-3 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+                Marketplace
+              </h1>
+              <p className="text-xs font-medium leading-6 text-slate-500 sm:text-sm">
+                Provision global voice infrastructure in 60 seconds.
+              </p>
             </div>
             {kycStatus === 'action_required' && (
-               <div className="flex items-center gap-3 bg-rose-50 border border-rose-100 px-5 py-3 rounded-2xl">
+               <div className="flex w-full items-center gap-3 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 sm:w-auto sm:px-5">
                   <AlertTriangle className="text-rose-500" size={20} />
                   <div>
-                    <p className="text-xs font-bold text-rose-900 leading-none mb-1">KYC REQUIRED</p>
-                    <p className="text-[10px] text-rose-600 font-medium">Some services may be restricted.</p>
+                    <p className="mb-1 text-xs font-bold leading-none text-rose-900">KYC REQUIRED</p>
+                    <p className="text-xs font-medium text-rose-600 sm:text-sm">Some services may be restricted.</p>
                   </div>
-                  <button className="ml-4 text-[10px] font-black uppercase text-rose-500 hover:underline">Fix Now</button>
+                  <button className="ml-2 text-xs font-black uppercase tracking-[0.08em] text-rose-500 hover:underline sm:ml-4">Fix Now</button>
                </div>
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-            {filteredProducts.map(p => (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 xl:gap-8">
+            {filteredProducts.map((p) => (
               <div 
                 key={p.id}
                 onClick={() => selectProduct(p)}
-                className="group bg-white border border-slate-100 rounded-[2.5rem] p-8 md:p-10 hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer flex flex-col"
+                className="group flex min-h-[320px] cursor-pointer flex-col rounded-[2rem] border border-slate-100 bg-white p-6 transition-all hover:-translate-y-1 hover:shadow-xl sm:rounded-[2.25rem] sm:p-8 lg:min-h-[360px] lg:p-10"
               >
-                <div className="flex justify-between items-start mb-10">
-                  <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-purple-600 group-hover:text-white transition-all">
+                <div className="mb-8 flex items-start justify-between sm:mb-10">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 transition-all group-hover:bg-purple-600 group-hover:text-white sm:h-14 sm:w-14">
                     {p.type.includes("AI") ? <Cpu size={28} /> : <PhoneCall size={28} />}
                   </div>
                   <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold uppercase tracking-widest">Active</div>
                 </div>
-                <h3 className="text-2xl font-bold mb-3 text-slate-900 group-hover:text-purple-600 transition-colors">{p.name}</h3>
-                <p className="text-slate-400 font-medium text-sm leading-relaxed mb-10 flex-grow">{p.description}</p>
-                <div className="pt-8 border-t border-slate-50 flex items-center justify-between">
+                <h3 className="mb-3 text-xl font-bold text-slate-900 transition-colors group-hover:text-purple-600 sm:text-2xl">{p.name}</h3>
+                <p className="mb-8 flex-grow text-sm font-medium leading-6 text-slate-500 sm:mb-10">{p.description}</p>
+                <div className="flex items-center justify-between border-t border-slate-50 pt-6 sm:pt-8">
                   <div>
-                    <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest block mb-1">Base Cost</span>
-                    <span className="text-xl font-bold text-slate-900">${PRODUCT_PRICING[p.type]?.basePrice}<span className="text-xs text-slate-300 font-medium ml-1">/mo</span></span>
+                    <span className="mb-1 block text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Base Cost</span>
+                    <span className="text-lg font-bold text-slate-900 sm:text-xl">${PRODUCT_PRICING[p.type]?.basePrice}<span className="ml-1 text-xs font-medium text-slate-400">/mo</span></span>
                   </div>
                   <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-purple-600 group-hover:text-white transition-all">
                     <ArrowRight size={20} />
@@ -587,50 +725,47 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
       </main>
 
 
-      {/* ADAPTIVE OVERLAY WIZARD */}
-      {(activeProduct || showSetupModal) && (
-        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 md:p-6 bg-slate-900/10 backdrop-blur-[2px] animate-in fade-in duration-300">
-          {/* Modal Container: Max width on desktop, full width but not full height on mobile */}
-          <div className="w-full max-w-lg bg-white rounded-t-[2.5rem] md:rounded-[3.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.18)] overflow-hidden flex flex-col animate-in slide-in-from-bottom-12 md:slide-in-from-bottom-8 duration-500 max-h-[90vh] md:max-h-none">
+      {/* OVERLAY WIZARD */}
+      {isAnyOverlayActive && (
+        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/10 p-0 backdrop-blur-sm animate-in fade-in duration-300 md:items-center md:p-6">
+          <div className="flex max-h-[95vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-2xl animate-in slide-in-from-bottom-12 duration-500 md:max-h-[90vh] md:rounded-[3rem]">
             
-            {/* Handle for mobile visual cue */}
-            <div className="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mt-4 md:hidden" />
-
-            <div className="p-6 md:p-8 border-b border-slate-50 flex items-center justify-between bg-white">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-50 p-5 md:p-8">
               <div className="flex items-center gap-3 md:gap-4">
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-purple-600 rounded-xl md:rounded-2xl flex items-center justify-center text-white shadow-lg">
-                  {wizardStep === 0 ? <Globe size={20} className="md:w-6 md:h-6" /> : (activeProduct?.type?.includes('AI') ? <Cpu size={20} className="md:w-6 md:h-6" /> : <PhoneCall size={20} className="md:w-6 md:h-6" />)}
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-purple-600 rounded-xl md:rounded-2xl flex items-center justify-center text-white shadow-lg shrink-0">
+                  {isSettingUpOrg ? <Globe size={20} className="md:w-6 md:h-6" /> : <Sparkles size={20} className="md:w-6 md:h-6" />}
                 </div>
-                <div>
-                  <h4 className="font-bold text-base md:text-lg text-slate-900 leading-tight">
-                    {wizardStep === 0 ? "Account Setup" : activeProduct?.name}
+                <div className="min-w-0">
+                  <h4 className="font-bold text-sm md:text-base text-slate-900 truncate">
+                    {isSettingUpOrg ? "Setup Organization" : activeProduct?.name}
                   </h4>
-                  <div className="flex items-center gap-1.5 md:gap-2 mt-1.5 md:mt-2">
+                  <div className="flex gap-1.5 mt-1.5 md:mt-2">
                     {STEPS.map((s, idx) => (
-                      <div 
-                        key={s} 
-                        className={`h-1 md:h-1.5 rounded-full transition-all duration-700 ${idx === wizardStep ? 'w-6 md:w-8 bg-purple-600' : idx < wizardStep ? 'w-3 md:w-4 bg-emerald-400' : 'w-1.5 md:w-2 bg-slate-100'}`} 
-                      />
+                      <div key={s} className={`h-1 md:h-1.5 rounded-full transition-all duration-700 ${idx === wizardStep ? 'w-6 md:w-8 bg-purple-600' : idx < wizardStep ? 'w-3 md:w-4 bg-emerald-400' : 'w-1.5 md:w-2 bg-slate-100'}`} />
                     ))}
                   </div>
                 </div>
               </div>
-              {tenantId && (
-                <button 
-                  onClick={closeWizard} 
-                  className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-900 active:bg-slate-200 transition-all"
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={closeWizard}
+                  className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 shrink-0"
+                  aria-label="Close setup modal"
                 >
-                  <X size={18} />
+                  <X size={20} />
                 </button>
-              )}
+              </div>
             </div>
 
-            {/* Scrollable content area for smaller mobile screens */}
-            <div className="p-8 md:p-12 overflow-y-auto bg-white flex items-center justify-center min-h-[300px] md:min-h-[420px]">
-              <div className="w-full">
+            <div className="flex flex-grow overflow-y-auto bg-white p-5 touch-pan-y md:p-8">
+              <div className="w-full py-2">
                 {renderWizard()}
               </div>
             </div>
+            
+            {/* Visual indicator for mobile dragging/home bar space */}
+            <div className="h-4 md:hidden shrink-0" />
           </div>
         </div>
       )}
