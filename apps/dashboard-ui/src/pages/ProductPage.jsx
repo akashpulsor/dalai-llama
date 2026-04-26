@@ -42,7 +42,7 @@ import { PlanSelector } from "./components/PlanSelector.jsx";
 
 import KYCBadge from "./components/KYCBadge.jsx";
 
-import { useGetProductsQuery } from "@dalaillama/shared-store";
+import { useAddWalletBalanceMutation, useGetProductsQuery, useGetWalletBalanceQuery } from "@dalaillama/shared-store";
 import { useKeycloakLogoutMutation } from "@dalaillama/shared-hooks/keycloakApi";
 /* ============================================================================
  * TYPE DEFINITIONS & CONSTANTS
@@ -75,7 +75,8 @@ const RETRY_DELAY_BASE = 2000;
  * @property {string} name
  * @property {string} description
  * @property {ProductType} type
- * @property {boolean} active@property {Object.<string, boolean>} [features] - Key-value map of feature flags.
+ * @property {boolean} active
+ * @property {Object.<string, boolean>} [features] - Key-value map of feature flags.
  */
 
 /**
@@ -167,6 +168,9 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
    * ---------------------------------------------------------------------- */
 
   const { data, isLoading, isError, refetch } = useGetProductsQuery(undefined);
+  const walletTenantId = tenantId ?? undefined;
+  const { data: walletData, refetch: refetchWallet } = useGetWalletBalanceQuery(walletTenantId, { skip: !walletTenantId });
+  const [addWalletBalance] = useAddWalletBalanceMutation();
   /** @type {Product[]} */
   const products = Array.isArray(data) ? data : [];
   const [keycloakLogout] = useKeycloakLogoutMutation();
@@ -233,13 +237,16 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
     /** @type {AvailableDid | null} */ (null)
   );
 
-  const [balance] = useState(1240.50);
+  const balance = walletData?.balance ?? 0;
   const [kycStatus] = useState("action_required"); 
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isSettingUpOrg, setIsSettingUpOrg] = useState(false);
   const [isTenantSetupDismissed, setIsTenantSetupDismissed] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showRechargeModal, setShowRechargeModal] = useState(false);
+  const [rechargeAmount, setRechargeAmount] = useState("");
+  const [rechargeLoading, setRechargeLoading] = useState(false);
   
 
   useEffect(() => {
@@ -292,6 +299,35 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
     setWizardStep(4);
   }, []);
 
+  /** @type {(amount?: number | null) => void} */
+  const openRechargeModal = useCallback((amount = null) => {
+    setRechargeAmount(amount ? String(Math.max(100, Math.ceil(amount))) : "");
+    setShowRechargeModal(true);
+  }, []);
+
+  const closeRechargeModal = useCallback(() => {
+    if (rechargeLoading) return;
+    setShowRechargeModal(false);
+    setRechargeAmount("");
+  }, [rechargeLoading]);
+
+  const handleRecharge = useCallback(async () => {
+    const amount = Number(rechargeAmount);
+    if (!tenantId || !Number.isFinite(amount) || amount < 100) return;
+
+    setRechargeLoading(true);
+    try {
+      await addWalletBalance({ tenantId, amount, currency: "INR" }).unwrap();
+      await refetchWallet();
+      setShowRechargeModal(false);
+      setRechargeAmount("");
+    } catch (error) {
+      console.error("Recharge failed:", error);
+    } finally {
+      setRechargeLoading(false);
+    }
+  }, [addWalletBalance, rechargeAmount, refetchWallet, tenantId]);
+
   const closeWizard = useCallback(() => {
     setActiveProduct(null);
     setIsSettingUpOrg(false);
@@ -309,9 +345,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
       setTenantId(null);
       setIsTenantSetupDismissed(false);
       setShowProfileMenu(false);
-      window.location.assign(
-        `${window.location.origin}${import.meta.env.DEV ? "/" : "/dashboard/"}`
-      );
+      window.location.assign(window.location.origin + '/');
     }
   };
 
@@ -325,9 +359,9 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
     const q = search.toLowerCase();
     return products.filter(
       (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q) ||
-        p.code.toLowerCase().includes(q)
+        String(p.name || "").toLowerCase().includes(q) ||
+        String(p.description || "").toLowerCase().includes(q) ||
+        String(p.code || "").toLowerCase().includes(q)
     );
   }, [products, search]);
 
@@ -408,7 +442,10 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
             plan={planSelection.plan}
             selectedDid={selectedDid}
             agentCount={planSelection.agentCount}
+            tenantId={/** @type {string} */ (tenantId)}
+            productCode={activeProduct?.code || tenantInfo.productCode}
             onComplete={handlePaymentComplete}
+            onRechargeRequired={openRechargeModal}
           />
         ) : null;
 
@@ -615,11 +652,16 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
                </div>
                <div>
                   <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] leading-none text-slate-400">Balance</p>
-                  <p className="text-sm font-bold text-slate-900">${balance.toLocaleString()}</p>
+                  <p className="text-sm font-bold text-slate-900">INR {Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                </div>
-               <div className="ml-2 w-6 h-6 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100">
+               <button
+                 type="button"
+                 onClick={() => openRechargeModal()}
+                 className="ml-2 flex h-6 w-6 items-center justify-center rounded-lg bg-slate-50 text-slate-400 hover:bg-slate-100"
+                 aria-label="Recharge wallet"
+               >
                   <Plus size={14} />
-               </div>
+               </button>
             </div>
 
             {/* Profile & Account Actions */}
@@ -703,7 +745,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
               >
                 <div className="mb-8 flex items-start justify-between sm:mb-10">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 transition-all group-hover:bg-purple-600 group-hover:text-white sm:h-14 sm:w-14">
-                    {p.type.includes("AI") ? <Cpu size={28} /> : <PhoneCall size={28} />}
+                    {String(p.type || p.code || "").includes("AI") ? <Cpu size={28} /> : <PhoneCall size={28} />}
                   </div>
                   <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold uppercase tracking-widest">Active</div>
                 </div>
@@ -712,7 +754,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
                 <div className="flex items-center justify-between border-t border-slate-50 pt-6 sm:pt-8">
                   <div>
                     <span className="mb-1 block text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Base Cost</span>
-                    <span className="text-lg font-bold text-slate-900 sm:text-xl">${PRODUCT_PRICING[p.type]?.basePrice}<span className="ml-1 text-xs font-medium text-slate-400">/mo</span></span>
+                    <span className="text-lg font-bold text-slate-900 sm:text-xl">${PRODUCT_PRICING[p.type]?.basePrice ?? 0}<span className="ml-1 text-xs font-medium text-slate-400">/mo</span></span>
                   </div>
                   <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-purple-600 group-hover:text-white transition-all">
                     <ArrowRight size={20} />
@@ -766,6 +808,73 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
             
             {/* Visual indicator for mobile dragging/home bar space */}
             <div className="h-4 md:hidden shrink-0" />
+          </div>
+        </div>
+      )}
+
+      {showRechargeModal && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[2rem] bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Recharge Wallet</h3>
+                <p className="mt-1 text-xs font-medium text-slate-500">Add funds before activating the subscription.</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeRechargeModal}
+                disabled={rechargeLoading}
+                className="rounded-xl p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-600 disabled:opacity-50"
+                aria-label="Close recharge modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-400">Current Wallet Balance</p>
+              <p className="mt-2 text-2xl font-black text-slate-900">
+                INR {Number(balance).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
+
+            <div className="mt-4">
+              <label className="mb-2 block text-[10px] font-bold uppercase text-slate-400">Recharge Amount</label>
+              <input
+                type="number"
+                min="100"
+                value={rechargeAmount}
+                onChange={(e) => setRechargeAmount(e.target.value)}
+                placeholder="Enter amount"
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium outline-none transition-all focus:border-purple-300 focus:ring-4 focus:ring-purple-100"
+              />
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {[500, 1000, 2000].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setRechargeAmount(String(preset))}
+                  className={`rounded-2xl border px-3 py-3 text-xs font-bold transition-all ${
+                    rechargeAmount === String(preset)
+                      ? "border-purple-600 bg-purple-50 text-purple-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                  }`}
+                >
+                  INR {preset.toLocaleString("en-IN")}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleRecharge}
+              disabled={rechargeLoading || Number(rechargeAmount) < 100}
+              className="mt-5 w-full rounded-2xl bg-purple-600 py-4 text-sm font-bold text-white transition-all hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {rechargeLoading ? "Processing..." : "Recharge Wallet"}
+            </button>
           </div>
         </div>
       )}
