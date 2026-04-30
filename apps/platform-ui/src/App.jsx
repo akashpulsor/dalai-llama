@@ -103,7 +103,7 @@ export default function App() {
   return (
     <Provider store={store}>
       <ErrorBoundary>
-        <Router basename="/platform">
+        <Router basename={typeof window !== 'undefined' && !window.location.pathname.startsWith('/platform') ? '/' : '/platform'}>
           <AppRoutes />
         </Router>
       </ErrorBoundary>

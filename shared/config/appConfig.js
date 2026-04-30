@@ -31,8 +31,10 @@
  * @property {boolean} DEMO_MODE
  * @property {string} MOCK_API_BASE_URL
  * @property {string} KEYCLOAK_URL
+ * @property {string} KEYCLOAK_SERVER_URL
+ * @property {"server" | "local" | "auto"} KEYCLOAK_PROFILE
  * @property {string} KEYCLOAK_REALM
- * @property {string} KEYCLOAK_CLIENT
+ * @property {string} KEYCLOAK_CLIENT_ID
  * ---------- RUNTIME AUTH -------------
  * @property {{url:string, realm:string, clientId:string} | null} [RUNTIME_KEYCLOAK]
  *
@@ -71,8 +73,10 @@ try {
 }
 
 // @ts-ignore
-const runtimeEnv = typeof window !== 'undefined' && window.__ENV__ ? window.__ENV__ : {};
-
+const _rawEnv = typeof window !== 'undefined' && window.__ENV__ ? window.__ENV__ : {};
+const runtimeEnv = Object.fromEntries(
+  Object.entries(_rawEnv).filter(([, v]) => typeof v !== 'string' || !v.startsWith('__'))
+);
 
 const env = import.meta.env ?? {};
 
@@ -84,6 +88,59 @@ const env = import.meta.env ?? {};
  * @returns {T}
  */
 const fallback = (v, def) => (v !== undefined ? v : def);
+
+/**
+ * Normalize stale dev/local API hosts to the canonical production API.
+ * This protects runtime/env-config drift and stale dev-server state.
+ * @param {string | undefined} value
+ * @returns {string | undefined}
+ */
+const normalizeApiBaseUrl = (value) => {
+  if (!value) return value;
+
+  const normalized = value.trim().replace(/\/+$/, "");
+  if (
+    normalized.includes("api.dalaillama-dev.local") ||
+    normalized.includes("api.dev.localhost") ||
+    normalized === "https://api.dalaillama.in"
+  ) {
+    return "https://api.dalaillama.in/api/v1";
+  }
+
+  return normalized;
+};
+
+/**
+ * On localhost, only use the Vite proxy for local/dev API targets.
+ * Keep absolute production hosts intact so requests don't get rewritten
+ * to the dashboard dev server origin.
+ * @param {string} value
+ * @returns {string}
+ */
+const resolveBrowserApiBaseUrl = (value) => {
+  if (typeof window === "undefined" || !value) return value;
+
+  const hostname = window.location.hostname;
+  if (hostname !== "localhost" && hostname !== "127.0.0.1") {
+    return value;
+  }
+
+  if (value.startsWith("/")) {
+    return value;
+  }
+
+  try {
+    const target = new URL(value);
+    const isLocalTarget =
+      target.hostname === "localhost" ||
+      target.hostname === "127.0.0.1" ||
+      target.hostname.endsWith(".localhost");
+
+    return isLocalTarget ? "/api/v1" : value;
+  } catch {
+    return value;
+  }
+};
 
 /** MOCK MODE (client-side only) */
 const resolvedMockMode = env.VITE_MOCK_MODE === "true";
@@ -116,7 +173,12 @@ export const appConfig = {
   ENV: fallback(env.VITE_ENV, "development"),
 
   PLATFORM_URL: runtimeEnv.PLATFORM_URL || env.VITE_PLATFORM_URL || "http://localhost:5173",
-  API_BASE_URL: fallback(runtimeEnv.API_BASE_URL || env.VITE_API_BASE_URL, "http://api.localhost:8081"),
+  API_BASE_URL: resolveBrowserApiBaseUrl(
+    fallback(
+      normalizeApiBaseUrl(runtimeEnv.API_BASE_URL || env.VITE_API_BASE_URL),
+      "https://api.dalaillama.in/api/v1"
+    )
+  ),
 
   DASHBOARD_DOMAIN: runtimeEnv.DASHBOARD_APP_URL || env.VITE_DASHBOARD_APP_URL || "dash.dalaillama.in",
 
@@ -135,8 +197,16 @@ export const appConfig = {
 
     // 👇 ADD THESE 3 LINES
   KEYCLOAK_URL: runtimeEnv.KEYCLOAK_URL || env.VITE_KEYCLOAK_URL || "http://auth.localhost:8081",
+  KEYCLOAK_SERVER_URL:
+    runtimeEnv.KEYCLOAK_SERVER_URL ||
+    env.VITE_KEYCLOAK_SERVER_URL ||
+    "https://auth.dalaillama.in",
+  KEYCLOAK_PROFILE:
+    runtimeEnv.KEYCLOAK_PROFILE ||
+    env.VITE_KEYCLOAK_PROFILE ||
+    "auto",
   KEYCLOAK_REALM: runtimeEnv.KEYCLOAK_REALM || env.VITE_KEYCLOAK_REALM || "dalai-llama",
-  KEYCLOAK_CLIENT: runtimeEnv.KEYCLOAK_CLIENT_ID || env.VITE_KEYCLOAK_CLIENT_ID || "platform-ui",
+  KEYCLOAK_CLIENT_ID: runtimeEnv.KEYCLOAK_CLIENT_ID || env.VITE_KEYCLOAK_CLIENT_ID || "platform-ui",
 
   //KEYCLOAK_URL:   "http://auth.localhost:8081",
   //KEYCLOAK_REALM:   "dalai-llama",
@@ -170,7 +240,7 @@ export const appConfig = {
     dashboard: runtimeEnv.DASHBOARD_APP_URL || env.VITE_DASHBOARD_APP_URL || "http://localhost:5174",
     //dashboard:  "http://localhost:5174",
     analytics: env.VITE_ANALYTICS_APP_URL || "http://localhost:5176",
-    subscription: env.VITE_SUBSCRIPTION_APP_URL || "http://localhost:5177",
+    subscription: env.VITE_SUBSCRIPTION_APP_URL || "https://api.dalaillama.in",
   },
 
   /* TENANT-BASED URLS (fetched from backend, override later) */

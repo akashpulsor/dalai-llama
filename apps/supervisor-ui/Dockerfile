@@ -1,46 +1,42 @@
-# ------------------------------------------------------------
-# Stage 1: Build platform-ui (React/Vite)
-# ------------------------------------------------------------
+# ─────────────────────────────────────────────────
+# Stage 1: Build (pnpm monorepo)
+# ─────────────────────────────────────────────────
 FROM node:20-alpine AS builder
-
-# Set working directory inside container
+RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /app
 
-# Copy monorepo root package files for dependency resolution
-COPY package*.json ./
+# Copy monorepo root files
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 
-# Copy shared packages (used by platform-ui)
+# Copy shared packages
 COPY shared ./shared
 
-# Copy the platform-ui app
-COPY apps/agents-ui ./apps/agents-ui
+# Copy this app
+COPY apps/supervisor-ui ./apps/supervisor-ui
 
-# Move into app directory
-WORKDIR /app/apps/agents-ui
+# Install dependencies (monorepo-aware)
+RUN pnpm install --no-frozen-lockfile --filter supervisor-ui...
 
-# Install dependencies (monorepo-safe)
-RUN npm install --legacy-peer-deps
+# Build
+WORKDIR /app/apps/supervisor-ui
+RUN pnpm build
 
-# Build app
-RUN npm run build
-
-# ------------------------------------------------------------
+# ─────────────────────────────────────────────────
 # Stage 2: Serve with nginx
-# ------------------------------------------------------------
+# ─────────────────────────────────────────────────
 FROM nginx:1.27-alpine
 
 # Copy build output
-COPY --from=builder /app/apps/agents-ui/dist /usr/share/nginx/html
+COPY --from=builder /app/apps/supervisor-ui/dist /usr/share/nginx/html
 
-# Copy your NGINX config (optional, if mounted by K8s you can skip this)
-COPY /apps/platform-ui/k8s/homepage/nginx.conf /etc/nginx/conf.d/default.conf
+# Copy shared nginx config + entrypoint
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-# Expose HTTP port
 EXPOSE 80
 
-# Healthcheck
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:80/ || exit 1
+  CMD wget -qO- http://127.0.0.1:80/health || exit 1
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/entrypoint.sh"]

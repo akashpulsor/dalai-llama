@@ -29,6 +29,7 @@ declare module "@dalaillama/shared-hooks/keycloakApi" {
   /** Token exchange request (for PKCE flow) */
   export interface ExchangeTokenRequest {
     code: string;
+    state: string;
   }
 
   /** PKCE initiate login request */
@@ -37,14 +38,10 @@ declare module "@dalaillama/shared-hooks/keycloakApi" {
   }
 
   /** Refresh token request */
-  export interface RefreshTokenRequest {
-    refreshToken: string;
-  }
+  export type RefreshTokenRequest = void;
 
   /** Logout request */
-  export interface LogoutRequest {
-    refreshToken: string;
-  }
+  export type LogoutRequest = void;
 
   /** Generic user info returned from Keycloak */
   export interface KeycloakUserInfo {
@@ -73,7 +70,7 @@ declare module "@dalaillama/shared-hooks/keycloakApi" {
 
   /** Refresh token (both PKCE + legacy) */
   export function useRefreshTokenMutation(): [
-    (args: RefreshTokenRequest) => MutationResult<KeycloakTokenResponse>,
+    (args?: RefreshTokenRequest) => MutationResult<KeycloakTokenResponse>,
     { isLoading: boolean; isError: boolean; error?: unknown }
   ];
 
@@ -95,7 +92,7 @@ declare module "@dalaillama/shared-hooks/keycloakApi" {
 
   /** Step 1: Initiate PKCE login (redirects user to Keycloak) */
   export function useInitiateLoginMutation(): [
-    (args: InitiateLoginRequest) => MutationResult<{ redirecting: boolean }>,
+    (args?: InitiateLoginRequest) => MutationResult<{ redirecting: boolean }>,
     { isLoading: boolean; isError: boolean; error?: unknown }
   ];
 
@@ -106,8 +103,8 @@ declare module "@dalaillama/shared-hooks/keycloakApi" {
   ];
 
   /** Logout from Keycloak session */
-  export function useLogoutMutation(): [
-    (args: LogoutRequest) => MutationResult<{ success?: boolean }>,
+  export function useKeycloakLogoutMutation(): [
+    (args?: LogoutRequest) => MutationResult<{ success?: boolean }>,
     { isLoading: boolean; isError: boolean; error?: unknown }
   ];
 

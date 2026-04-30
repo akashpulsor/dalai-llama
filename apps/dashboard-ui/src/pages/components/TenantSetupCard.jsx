@@ -190,7 +190,7 @@ const FormField = ({ label, field, type = "text", placeholder, icon: Icon, form,
 
 /**
  * @param {Object} props
- * @param {(id: string) => void} props.onCreated
+ * @param {(tenant: any) => void} props.onCreated
  * @param {{ email?: string; username?: string }} [props.authProfile]
  */
 const TenantSetupCard = ({ onCreated, authProfile }) => {
@@ -260,9 +260,9 @@ const TenantSetupCard = ({ onCreated, authProfile }) => {
     });
   };
 
-  useEffect(() => {
+useEffect(() => {
   if (isRegistrationSuccess && registrationResponse) {
-    onCreated(registrationResponse.id ?? registrationResponse.tenantId);
+    onCreated(registrationResponse);
   }
 }, [isRegistrationSuccess, registrationResponse, onCreated]);
 

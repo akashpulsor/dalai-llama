@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import useTenantAuth from '@dalaillama/shared-hooks/useTenantAuth.js';
+import useWallet from '@dalaillama/shared-hooks/useWallet.js';
+import useWalletEvents from '@dalaillama/shared-hooks/useWalletEvents.js';
 import AppLayout from './layouts/AppLayout.jsx';
 import { lazy, Suspense } from 'react';
 
@@ -22,27 +24,9 @@ const PageLoader = () => (
 );
 
 export default function App() {
-  //const auth = useTenantAuth('admin');
-  // TEMPORARY: Comment out real auth, use mock
-// const auth = useTenantAuth('admin');
-
-const auth = {
-  isReady: true,
-  isAuthenticated: true,
-  user: { display_name: 'Akash Admin', email: 'akash@acme.com', role: 'TENANT_ADMIN', extension: '1001' },
-  tenantId: 'demo-tenant-id',
-  productCode: 'AI_CC',
-  features: {
-    ai_bot: true, recording: true, campaigns: true, whisper: true, barge: true,
-    listen: true, live_transcript: true, softphone: true, queue_management: true,
-    bot_management: true, bot_testing: true, routing_policies: true, sip_trunks: true,
-    max_agents: 15, max_queues: 10, max_channels: 30, max_ai_minutes: 5000,
-  },
-  token: 'mock-token',
-  keycloak: null,
-  error: null,
-  logout: () => console.log('logout'),
-};
+  const auth = useTenantAuth('admin');
+  useWallet();
+  useWalletEvents();
 
   if (auth.error) {
     return (

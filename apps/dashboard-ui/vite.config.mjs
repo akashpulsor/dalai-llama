@@ -30,6 +30,7 @@ export default defineConfig(({ mode }) => {
         "@dalaillama/shared-utils": path.resolve(__dirname, "../../shared/utils"),
         "@dalaillama/shared-types": path.resolve(__dirname, "../../shared/types"),
       },
+      preserveSymlinks: true,
     },
     define: {
       __APP_ENV__: JSON.stringify(env.APP_ENV || "development"),
@@ -53,6 +54,9 @@ export default defineConfig(({ mode }) => {
       outDir: "dist",
       sourcemap: mode === "development",
       target: "esnext",
+      rollupOptions: {
+        external: [],
+      },
     },
   };
 });

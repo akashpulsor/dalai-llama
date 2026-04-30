@@ -1,53 +1,6 @@
-declare module "@dalaillama/shared-config" {
-  export const appConfig: {
-    APP_NAME: string;
-    ENV: string;
-    API_BASE_URL: string;
-    METRICS_ENDPOINT: string;
-    METRICS_INTERVAL_MS: number;
-    LOG_LEVEL: string;
-    PLATFORM_URL: string;
-    KEYCLOAK_URL: string;
-    KEYCLOAK_REALM: string;
-    KEYCLOAK_CLIENT: string;
-    REMOTE_APPS?: {
-      dashboard?: string;
-      agent?: string;
-      analytics?: string;
-      subscription?: string;
-    };
-    APP_ROUTES?: {
-      ROOT: string;
-      LOGIN: string;
-      PLATFORM: string;
-      TENANT: string;
-      AGENT: string;
-      DASHBOARD: string;
-      ANALYTICS: string;
-      SUBSCRIPTION: string;
-    };
-  };
-}
-
-declare module "@dalaillama/shared-utils" {
-  export const logger: {
-    info: (...args: any[]) => void;
-    warn: (...args: any[]) => void;
-    error: (...args: any[]) => void;
-    debug: (...args: any[]) => void;
-  };
-  export const prometheusClient: {
-    pushHeartbeat: () => Promise<void>;
-    pushLatency: (...args: any[]) => Promise<void>;
-    pushTokenStatus: (valid: boolean) => Promise<void>;
-    push: (...args: any[]) => Promise<void>;
-  };
-}
-
 declare module "@dalaillama/shared-hooks" {
   import type { MutationTrigger } from "@reduxjs/toolkit/query/react";
 
-    // User type
   export interface User {
     id: string;
     name: string;
@@ -55,24 +8,22 @@ declare module "@dalaillama/shared-hooks" {
     role: "admin" | "supervisor" | "agent";
     tenantId: string;
   }
-  // Auth Guard
+
   export function useAuthGuard(): {
     status: "checking" | "authenticated" | "redirecting";
     user: User | null;
   };
 
-
-  // Existing
   export function useMetricsHeartbeat(): void;
-  export function useAuthBootstrap(options?: { redirectToDashboard?: boolean }): {
+  export function useAuthBootstrap(options?: {
+    redirectToDashboard?: boolean;
+  }): {
     status: string;
     error: string | null;
   };
 
-  // Keycloak API
   export const keycloakApi: any;
 
-  // Keycloak Mutations
   export function useInitiateLoginMutation(): [
     MutationTrigger<any>,
     { isLoading: boolean; error?: any }
@@ -93,24 +44,137 @@ declare module "@dalaillama/shared-hooks" {
     { isLoading: boolean; error?: any }
   ];
 
-  // Auth utilities
   export function getAccessToken(): string | null;
   export function getUser(): User | null;
   export function isAuthenticated(): boolean;
   export function isTokenExpired(token: string): boolean;
   export function clearAuthState(): void;
-}
 
-declare module "@dalaillama/shared-ui" {
-  import * as React from "react";
-  export const Toaster: React.FC;
-  export class ErrorBoundary extends React.Component<
-    { children: React.ReactNode },
-    { hasError: boolean; error: Error | null }
-  > {}
-}
+  export type AppType = "agent" | "supervisor" | "admin";
 
-declare module "@dalaillama/shared-store" {
-  import { Store } from "@reduxjs/toolkit";
-  export function createStore(): Store;
+  export interface TenantAuthResult {
+    isReady: boolean;
+    isAuthenticated: boolean;
+    user: any;
+    tenantId: string | null;
+    productCode: string | null;
+    features: Record<string, any>;
+    token: string | null;
+    keycloak: any;
+    error: string | null;
+    logout: () => void;
+  }
+
+  export function useTenantAuth(appType: AppType): TenantAuthResult;
+
+  export interface StompSubscription {
+    unsubscribe: () => void;
+  }
+
+  export interface StompEventsResult {
+    isConnected: boolean;
+    subscribe: (
+      topic: string,
+      callback: (msg: any) => void
+    ) => StompSubscription;
+    send: (destination: string, body: any) => void;
+    client: any;
+  }
+
+  export function useStompEvents(token: string | null): StompEventsResult;
+
+  export interface SipPhoneResult {
+    isRegistered: boolean;
+    register: () => Promise<void>;
+    unregister: () => Promise<void>;
+    call: (number: string) => Promise<void>;
+    answer: () => Promise<void>;
+    hangup: () => void;
+    hold: () => Promise<void>;
+    unhold: () => Promise<void>;
+    mute: () => void;
+    unmute: () => void;
+    transfer: (target: string) => Promise<void>;
+    sendDtmf: (digit: string) => void;
+    isMuted: boolean;
+  }
+
+  export function useSipPhone(): SipPhoneResult;
+
+  export interface BotTestResult {
+    sendMessage: (text: string) => Promise<void>;
+    startVoice: () => Promise<void>;
+    stopVoice: () => void;
+    startTest: () => Promise<void>;
+    endTest: () => void;
+    transcript: Array<{ role: string; text: string; timestamp?: number }>;
+    intents: Array<{ intent: string; confidence: number; timestamp?: number }>;
+    sentiment: number;
+    escalationEvents: Array<{
+      type: string;
+      target?: string;
+      reason?: string;
+      timestamp?: number;
+    }>;
+    isActive: boolean;
+  }
+
+  export function useBotTest(
+    botId: string | null,
+    options?: { voiceBrainUrl?: string }
+  ): BotTestResult;
+
+  export interface TestCallResult {
+    startCall: (options?: {
+      phone_number?: string;
+      use_softphone?: boolean;
+    }) => Promise<void>;
+    hangup: () => Promise<void>;
+    callId: string | null;
+    pipelineStatus: any;
+    latency: any;
+    transcript: Array<{ role: string; text: string; timestamp?: number }>;
+    intents: Array<{ intent: string; confidence: number; timestamp?: number }>;
+    sentiment: number;
+    escalationEvents: Array<{
+      type: string;
+      target?: string;
+      reason?: string;
+      timestamp?: number;
+    }>;
+    isActive: boolean;
+  }
+
+  export function useTestCall(
+    botId: string | null,
+    deps?: {
+      useStompSubscribe?: (
+        topic: string,
+        callback: (msg: any) => void
+      ) => { unsubscribe: () => void };
+    }
+  ): TestCallResult;
+
+  export type RangePreset =
+    | "today"
+    | "yesterday"
+    | "this_week"
+    | "this_month"
+    | "last_30_days"
+    | "custom";
+
+  export interface AnalyticsRangeResult {
+    fromTs: string;
+    toTs: string;
+    preset: RangePreset;
+    setPreset: (p: RangePreset) => void;
+    setCustomRange: (from: Date, to: Date) => void;
+    label: string;
+  }
+
+  export function useAnalyticsRange(
+    defaultPreset?: RangePreset
+  ): AnalyticsRangeResult;
+  export const RANGE_PRESETS: RangePreset[];
+  export const PRESET_LABELS: Record<RangePreset, string>;
 }

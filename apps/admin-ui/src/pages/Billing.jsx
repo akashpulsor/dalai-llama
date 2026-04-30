@@ -1,13 +1,19 @@
+import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { selectTenantId, selectFeatures } from '@dalaillama/shared-store/slices/tenantSlice.js';
 import useAnalyticsRange, { RANGE_PRESETS, PRESET_LABELS } from '@dalaillama/shared-hooks/useAnalyticsRange.js';
+import useWallet from '@dalaillama/shared-hooks/useWallet.js';
 import {
   useGetOverviewQuery, useGetCustomerAnalyticsQuery,
   useGetBotAnalyticsQuery, useGetAgentAnalyticsQuery,
 } from '@dalaillama/shared-store/slices/analyticsApi.js';
 import {
+  useGetWalletBalanceQuery,
+  useAddWalletBalanceMutation,
+} from '@dalaillama/shared-store';
+import {
   CreditCard, Phone, Bot, Clock, Users, TrendingUp, Wallet,
-  Calendar, BarChart3,
+  Calendar, BarChart3, Plus,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -18,6 +24,23 @@ export default function Billing() {
   const tenantId = useSelector(selectTenantId);
   const features = useSelector(selectFeatures);
   const range = useAnalyticsRange('this_month');
+  useWallet();
+  /** @type {string | undefined} */
+  const walletTenantId = tenantId || undefined;
+  const { data: walletData, isLoading: walletLoading, refetch: refetchWallet } = useGetWalletBalanceQuery(walletTenantId, { skip: !tenantId });
+  const [addWalletBalance] = useAddWalletBalanceMutation();
+  const [showRecharge, setShowRecharge] = useState(false);
+  const [rechargeAmount, setRechargeAmount] = useState('');
+  const [rechargeLoading, setRechargeLoading] = useState(false);
+
+  // Listen for wallet-funded WebSocket event and refetch balance
+  useEffect(() => {
+    const handleWalletFunded = () => {
+      refetchWallet();
+    };
+    window.addEventListener('wallet-funded', handleWalletFunded);
+    return () => window.removeEventListener('wallet-funded', handleWalletFunded);
+  }, [refetchWallet]);
 
   const { data: overview } = useGetOverviewQuery(
     tenantId ? { tenantId, fromTs: range.fromTs, toTs: range.toTs } : /** @type {any} */ (undefined),
@@ -40,6 +63,22 @@ export default function Billing() {
     day: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i],
     cost: Math.floor(Math.random() * 500) + 100,
   }));
+
+  const handleRecharge = async () => {
+    const amt = parseFloat(rechargeAmount);
+    if (isNaN(amt) || amt < 100) return;
+    setRechargeLoading(true);
+    try {
+      await addWalletBalance({ tenantId, amount: amt, currency: 'INR' }).unwrap();
+      refetchWallet();
+      setShowRecharge(false);
+      setRechargeAmount('');
+    } catch (e) {
+      console.error('Recharge failed:', e);
+    } finally {
+      setRechargeLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -70,6 +109,64 @@ export default function Billing() {
         <Kpi icon={Bot} label="AI Minutes" value={ov.ai_minutes.toLocaleString()} iconBg="bg-violet-100" />
         <Kpi icon={TrendingUp} label="Avg Handle" value={`${Math.floor(ov.avg_handle_time / 60)}m`} iconBg="bg-primary-100" />
         <Kpi icon={BarChart3} label="SLA" value={`${ov.sla_percentage}%`} iconBg="bg-emerald-100" />
+      </div>
+
+      {/* Wallet Balance */}
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+              <Wallet className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm">Wallet Balance</h3>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wider">Prepaid balance</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowRecharge(!showRecharge)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add Balance
+          </button>
+        </div>
+        <div className="text-3xl font-bold text-slate-900">
+          {walletLoading ? '...' : `₹${(walletData?.balance ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+        </div>
+        {showRecharge && (
+          <div className="mt-4 pt-4 border-t border-slate-100 flex items-end gap-3">
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-slate-600 mb-1">Amount (min ₹100)</label>
+              <input
+                type="number"
+                min="100"
+                value={rechargeAmount}
+                onChange={(e) => setRechargeAmount(e.target.value)}
+                placeholder="Enter amount"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
+              />
+            </div>
+            <div className="flex gap-2">
+              {[500, 1000, 2000].map((/** @type {number} */ preset) => (
+                <button key={preset} onClick={() => setRechargeAmount(String(preset))}
+                  className={`px-3 py-2 text-xs font-semibold rounded-lg border transition-colors ${
+                    rechargeAmount === String(preset)
+                      ? 'bg-primary-600 text-white border-primary-600'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}>
+                  ₹{preset}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={handleRecharge}
+              disabled={rechargeLoading || isNaN(parseFloat(rechargeAmount)) || parseFloat(rechargeAmount) < 100}
+              className="px-4 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {rechargeLoading ? 'Processing...' : 'Recharge'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Charts */}

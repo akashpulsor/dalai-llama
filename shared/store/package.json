@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "main": "index.js",
+  "types": "index.js",
   "dependencies": {
     "@reduxjs/toolkit": "^2.2.7",
     "react-redux": "^9.1.2",

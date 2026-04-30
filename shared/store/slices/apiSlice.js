@@ -1,10 +1,16 @@
 // shared/store/slices/apiSlice.js
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { appConfig } from "@dalaillama/shared-config";
+import {
+  clearAuthState,
+  redirectToKeycloakLogin,
+  getAccessToken,
+  isTokenExpired,
+  keycloakApi,
+} from "../../hooks/keycloakApi.js";
 import { logout } from "./authSlice.js";
 import { showFlash } from "./flashSlice.js";
 import { prometheusClient } from "@dalaillama/shared-utils";
-import { use } from "react";
 
 /* -------------------------------------------------------------------------- */
 /*                               TYPE HELPERS                                 */
@@ -84,7 +90,20 @@ const MOCK_RESPONSES = {
     { id: "a02", name: "Priya", status: "offline" },
   ],
 
-  "/wallet/balance": { balance: 1200.75, currency: "INR" },
+  "/wallet/balance": { balance: 1200.75, currency: "INR", lastUpdated: Date.now() },
+  "/wallet/add-balance": { success: true, balance: 0, currency: "INR", transactionId: "txn_mock_001" },
+  "/tenants/me": {
+    hasTenant: false,
+    needsOnboarding: true,
+    isActive: false,
+    tenantId: null,
+    slug: null,
+    name: null,
+    dashboardUrl: null,
+    status: null,
+    statusMessage: null,
+    keycloakRealmName: null,
+  },
 
   "/calls/live": {
     id: "call-xyz",
@@ -104,6 +123,48 @@ const MOCK_RESPONSES = {
     avgHandleTimeMs: 312000,
     sentimentScore: 0.78,
   },
+  "/products": [
+    {
+      id: "product-ai-contact-center",
+      code: "AI_CC",
+      name: "AI Contact Center",
+      description: "Voice support automation with AI agents, live supervision, and omnichannel routing.",
+      type: "AI_CONTACT_CENTER",
+      active: true,
+    },
+    {
+      id: "product-conversational-ivr",
+      code: "CONV_IVR",
+      name: "Conversational IVR",
+      description: "Natural language IVR flows for call deflection, self-service, and smart routing.",
+      type: "CONVERSATIONAL_IVR",
+      active: true,
+    },
+    {
+      id: "product-basic-pbx",
+      code: "BASIC_PBX",
+      name: "Basic PBX",
+      description: "Cloud PBX calling, extensions, queues, and phone number management.",
+      type: "BASIC_PBX",
+      active: true,
+    },
+    {
+      id: "product-outbound-dialer",
+      code: "OUTBOUND_DIALER",
+      name: "Outbound Dialer",
+      description: "Campaign calling with agent assignment, queue controls, and performance tracking.",
+      type: "OUTBOUND_DIALER",
+      active: true,
+    },
+    {
+      id: "product-virtual-receptionist",
+      code: "VIRTUAL_RECEPTIONIST",
+      name: "Virtual Receptionist",
+      description: "Automated call answering, appointment routing, and front-office workflows.",
+      type: "VIRTUAL_RECEPTIONIST",
+      active: true,
+    },
+  ],
   /* ---------------- DID INVENTORY ---------------- */
 "/did/inventory": [
   {
@@ -406,6 +467,32 @@ const realBaseQuery = fetchBaseQuery({
   },
 });
 
+let isAuthRedirectInFlight = false;
+/** @type {Promise<any> | null} */
+let refreshTokenPromise = null;
+
+/**
+ * Refresh access token once and fan out concurrent callers to the same promise.
+ * @param {import("@reduxjs/toolkit/query").BaseQueryApi} api
+ * @returns {Promise<any>}
+ */
+const refreshAuthToken = async (api) => {
+  if (!refreshTokenPromise) {
+    const refreshRequest = api.dispatch(
+      keycloakApi.endpoints.refreshToken.initiate(undefined)
+    );
+
+    refreshTokenPromise = refreshRequest
+      .unwrap()
+      .finally(() => {
+        refreshTokenPromise = null;
+        refreshRequest.reset();
+      });
+  }
+
+  return refreshTokenPromise;
+};
+
 /* -------------------------------------------------------------------------- */
 /*                        WRAPPED BASE QUERY (FINAL)                          */
 /* -------------------------------------------------------------------------- */
@@ -417,30 +504,82 @@ const baseQueryWithMetrics = async (args, api, extra) => {
   const start = performance.now();
 
   const queryFn = appConfig.MOCK_MODE ? mockBaseQuery : realBaseQuery;
-  const rawResult = await queryFn(args, api, extra);
+
+  if (!appConfig.MOCK_MODE) {
+    const token = getAccessToken();
+    if (token && isTokenExpired(token)) {
+      try {
+        await refreshAuthToken(api);
+      } catch {
+        // Let the request proceed so the standard 401 redirect path handles it.
+      }
+    }
+  }
+
+  let rawResult = await queryFn(args, api, extra);
 
   const latency = performance.now() - start;
 
-  try {
-    prometheusClient.pushLatency("frontend_api_latency_ms", latency, {
-      endpoint: typeof args === "string" ? args : args.url,
-      mock: appConfig.MOCK_MODE ? "true" : "false",
-    });
-  } catch {}
 
   if (rawResult.data !== undefined) {
     return { data: rawResult.data };
   }
 
   const error = normalizeError(rawResult.error);
-  const status = error.status;
+  let status = error.status;
+
+  if (!appConfig.MOCK_MODE && status === 401 && getAccessToken()) {
+    try {
+      await refreshAuthToken(api);
+      rawResult = await queryFn(args, api, extra);
+
+      if (rawResult.data !== undefined) {
+        return { data: rawResult.data };
+      }
+
+      status = normalizeError(rawResult.error).status;
+    } catch {
+      // Fall through to the existing logout + redirect behavior.
+    }
+  }
 
   if (!appConfig.MOCK_MODE) {
-    if (status === 401 || status === 403) {
+    if (status === 401) {
+      clearAuthState();
       api.dispatch(logout());
       api.dispatch(
         showFlash({ message: "Session expired.", type: "error" })
       );
+
+      if (
+        typeof window !== "undefined" &&
+        !isAuthRedirectInFlight &&
+        !window.location.pathname.includes("/auth/callback")
+      ) {
+        isAuthRedirectInFlight = true;
+        void redirectToKeycloakLogin().catch(() => {
+          isAuthRedirectInFlight = false;
+        });
+      }
+    } else if (status === 403) {
+      // Istio returns 403 "RBAC: access denied" when JWT is missing/invalid.
+      // Treat as auth failure — clear state and redirect to login.
+      clearAuthState();
+      api.dispatch(logout());
+      api.dispatch(
+        showFlash({ message: "Session expired. Redirecting to login…", type: "error" })
+      );
+
+      if (
+        typeof window !== "undefined" &&
+        !isAuthRedirectInFlight &&
+        !window.location.pathname.includes("/auth/callback")
+      ) {
+        isAuthRedirectInFlight = true;
+        void redirectToKeycloakLogin().catch(() => {
+          isAuthRedirectInFlight = false;
+        });
+      }
     }
   }
 
@@ -449,6 +588,39 @@ const baseQueryWithMetrics = async (args, api, extra) => {
   }
 
   return { error };
+};
+
+/**
+ * Backend responses can include Jackson default-typing wrappers:
+ *   ["com.example.Dto", { ... }]
+ *   ["java.util.ImmutableCollections$ListN", [["com.example.Dto", { ... }]]]
+ * Normalize those into plain JSON for UI consumers.
+ * @param {any} value
+ * @returns {any}
+ */
+const unwrapJavaTypedJson = (value) => {
+  if (Array.isArray(value)) {
+    if (
+      value.length === 2 &&
+      typeof value[0] === "string" &&
+      (value[0].startsWith("java.") || value[0].startsWith("com."))
+    ) {
+      return unwrapJavaTypedJson(value[1]);
+    }
+
+    return value.map(unwrapJavaTypedJson);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [
+        key,
+        unwrapJavaTypedJson(nestedValue),
+      ])
+    );
+  }
+
+  return value;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -481,7 +653,7 @@ export const api = createApi({
     }),
     /* ---------------- TENANT ONBOARDING ---------------- */
     tenantRegister: builder.mutation({
-      query: (body) => ({ url: "/tenant/register", method: "POST", body })
+      query: (body) => ({ url: "/tenants", method: "POST", body })
     }),
     tenantVerify: builder.mutation({
       query: (body) => ({ url: "/tenant/verify", method: "POST", body })
@@ -525,6 +697,24 @@ export const api = createApi({
     tenantGetSummary: builder.query({
       query: () => "/tenant/summary"
     }),
+    getMyTenant: builder.query({
+      async queryFn(_arg, api, extraOptions) {
+        const query = appConfig.MOCK_MODE ? mockBaseQuery : realBaseQuery;
+        const result = await query({ url: "/tenants/me" }, api, extraOptions);
+
+        if (result.data !== undefined) {
+          return { data: unwrapJavaTypedJson(result.data) };
+        }
+
+        const error = normalizeError(result.error);
+        if (error.status === 403) {
+          console.warn("[dashboard] /tenants/me returned 403. Falling back to existing tenant heuristics.");
+          return { data: null };
+        }
+
+        return { error };
+      },
+    }),
 
     getTenants: builder.query({ query: () => "/tenants" }),
     getAgents: builder.query({
@@ -532,8 +722,21 @@ export const api = createApi({
       query: (_) => "/agents",
     }),
     getWalletBalance: builder.query({
-      /** @param {void} _ */
-      query: (_) => "/wallet/balance",
+      /**
+       * @param {string | void} tenantId
+       */
+      query: (tenantId) =>
+        tenantId ? `/billing/${tenantId}/wallet` : "/wallet/balance",
+    }),
+    addWalletBalance: builder.mutation({
+      query: (body) => {
+        const { tenantId, ...payload } = body || {};
+        return {
+          url: tenantId ? `/billing/${tenantId}/wallet/recharge` : "/wallet/add-balance",
+          method: "POST",
+          body: payload,
+        };
+      }
     }),
 
     getLiveCall: builder.query({
@@ -588,48 +791,51 @@ export const api = createApi({
         method: "POST",
       }),
     }),
-    /**
-     * Save ACW / disposition notes
-     *
-     * @type {import("@reduxjs/toolkit/query").MutationDefinition<
-     *   { disposition?: string, notes?: string, ts: number },     // arg
-     *   any,                                                      // baseQuery
-     *   any,                                                      // tagTypes
-     *   { success: boolean },                                     // response
-     *   "api"                                                     // reducerPath
-     * >}
-     */
-    saveDisposition: builder.mutation({
-      /**
-       * @param {{ disposition?: string, notes?: string, ts: number }} body
-       */
-      query: (body) => ({
-        url: "/calls/disposition",
-        method: "POST",
-        body,
-      }),
-    }),
+    
     /* ---------------- DIDs (Search Available) ---------------- */
 
     /**
      * @typedef {Object} SearchAvailableDidsArgs
-     * @property {string} tenantId
      * @property {string} country
      * @property {string} [city]
      * @property {string} [prefix]
      * @property {string} [type]
      * @property {number} [limit]
+     * @property {number} [page]
+     * @property {number} [size]
+     * @property {string} [sortField]
+     * @property {string} [sortOrder]
      */
 
     searchAvailableDids: builder.query({
       /**
        * @param {SearchAvailableDidsArgs} args
        */
-      query: ({ tenantId, ...params }) => ({
-        url: `/api/v1/tenants/${tenantId}/dids/available`,
-        params,
+      query: ({
+        country,
+        city,
+        prefix,
+        type,
+        limit = 10,
+        page = 0,
+        size = 20,
+        sortField = "monthlyFee",
+        sortOrder = "asc",
+      }) => ({
+        url: `/did/available`,
+        params: {
+          country,
+          city,
+          prefix,
+          type,
+          limit,
+          page,
+          size,
+          sort: `${sortField},${sortOrder}`, // important format
+        },
       }),
     }),
+
         /* ---------------- DID INVENTORY ---------------- */
 
     getDidInventory: builder.query({
@@ -1080,7 +1286,14 @@ export const api = createApi({
     }),
     /* ---------------- BILLING & LICENSE ---------------- */
     getProducts: builder.query({
-      query: (userId) => `/products`
+      /** @param {void} _ */
+      query: (_) => "/products",
+      transformResponse: (response) => unwrapJavaTypedJson(response),
+    }),
+    getProductPlans: builder.query({
+      /** @param {string} productCode */
+      query: (productCode) => `/products/${productCode}/plans`,
+      transformResponse: (response) => unwrapJavaTypedJson(response),
     }),
     /* ---------------- BILLING & LICENSE ---------------- */
     getSubscription: builder.query({
@@ -1095,6 +1308,22 @@ export const api = createApi({
         method: "POST",
         body
       })
+    }),
+    createSubscription: builder.mutation({
+      query: (body) => ({
+        url: "/subscriptions",
+        method: "POST",
+        body,
+      }),
+    }),
+    simulatePaymentSuccess: builder.mutation({
+      query: (gatewayOrderId) => ({
+        url: `/internal/payments/simulate-success/${gatewayOrderId}`,
+        method: "POST",
+      }),
+    }),
+    getSubscriptionStatus: builder.query({
+      query: (subscriptionId) => `/subscriptions/${subscriptionId}`,
     }),
     /* ---------------- BILLING & LICENSE ---------------- */
     getAuditLogs: builder.query({
@@ -1231,13 +1460,14 @@ export const {
   useGetTenantsQuery,
   useGetAgentsQuery,
   useGetWalletBalanceQuery,
+  useAddWalletBalanceMutation,
   useGetLiveCallQuery,
   useGetInvoicesQuery,
   useGetDashboardStatsQuery,
   useOriginateCallMutation,
   useAcceptCallMutation,
   useHangupCallMutation,
-  useSaveDispositionMutation,
+
   usePartnerRegisterMutation,
   usePartnerGetCloudProvidersQuery,
   usePartnerSetupMTLSMutation,
@@ -1333,6 +1563,9 @@ export const {
 
   useGetSubscriptionQuery,
   usePurchaseAddonMutation,
+  useCreateSubscriptionMutation,
+  useSimulatePaymentSuccessMutation,
+  useLazyGetSubscriptionStatusQuery,
 
   useGetAuditLogsQuery,
 
@@ -1358,8 +1591,8 @@ export const {
 
    useGetForecastQuery,
   useApplyRecommendationMutation,
+  useGetMyTenantQuery,
   useGetProductsQuery,
+  useGetProductPlansQuery,
   useSearchAvailableDidsQuery
 } = api;
-
-

@@ -12,6 +12,11 @@ export {
   isAuthenticated,
   isTokenExpired,
   clearAuthState,
+  getRedirectUri,
+  resolveRealm,
+  resolveClientId,
+  resolveKeycloakConfig,
+  redirectToKeycloakLogin,
 } from "./keycloakApi.js";
 
 // shared/hooks/index.js

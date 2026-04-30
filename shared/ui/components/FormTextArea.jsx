@@ -7,20 +7,31 @@ import React from "react";
  * @property {string} value
  * @property {(value: string) => void} onChange
  * @property {string} [placeholder]
+ * @property {string} [wrapperClassName]
+ * @property {string} [labelClassName]
+ * @property {string} [textAreaClassName]
  */
 
 /**
  * @param {FormTextAreaProps} props
  */
 export default function FormTextArea(props) {
-  const { label, value, onChange, placeholder = "" } = props;
+  const {
+    label,
+    value,
+    onChange,
+    placeholder = "",
+    wrapperClassName = "",
+    labelClassName = "",
+    textAreaClassName = "",
+  } = props;
 
   return (
-    <div className="flex flex-col gap-1 mb-3">
-      <label className="text-sm font-medium text-gray-700">{label}</label>
+    <div className={`mb-3 flex flex-col gap-1 ${wrapperClassName}`.trim()}>
+      <label className={`text-sm font-medium text-gray-700 ${labelClassName}`.trim()}>{label}</label>
 
       <textarea
-        className="border p-2 rounded h-24 resize-none focus:ring focus:border-blue-400"
+        className={`h-24 resize-none rounded border p-2 focus:border-blue-400 focus:ring ${textAreaClassName}`.trim()}
         value={value}
         placeholder={placeholder}
         /**

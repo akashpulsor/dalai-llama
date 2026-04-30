@@ -5,7 +5,13 @@ import { useSearchParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { setUser, logout } from "@dalaillama/shared-store";
 import { appConfig } from "@dalaillama/shared-config";
-import { useExchangeTokenMutation, getUser, getAccessToken, isTokenExpired } from "./keycloakApi.js";
+import {
+  useExchangeTokenMutation,
+  getUser,
+  getAccessToken,
+  isTokenExpired,
+  clearAuthState,
+} from "./keycloakApi.js";
 
 /**
  * @typedef {"loading"|"authenticated"|"unauthenticated"} AuthStatus
@@ -96,6 +102,8 @@ export const useAuthBootstrap = (options = {}) => {
         if (token && user) {
           if (isTokenExpired(token)) {
             console.log("[Auth] Token expired, clearing session");
+            clearAuthState();
+            dispatch(logout());
             setStatus("unauthenticated");
             return;
           }
@@ -117,6 +125,12 @@ export const useAuthBootstrap = (options = {}) => {
           return;
         }
 
+        if (token || user) {
+          console.log("[Auth] Incomplete session found, clearing auth state");
+          clearAuthState();
+          dispatch(logout());
+        }
+
         // No session
         setStatus("unauthenticated");
 
@@ -125,6 +139,7 @@ export const useAuthBootstrap = (options = {}) => {
         const err = /** @type {{ data?: string, message?: string }} */ (e);
         setError(err.data || err.message || "Authentication failed");
         setStatus("unauthenticated");
+        clearAuthState();
         dispatch(logout());
       }
     };

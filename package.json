@@ -26,8 +26,18 @@
     "react-redux": "^9.1.2",
     "@reduxjs/toolkit": "^2.2.7",
     "react-router-dom": "^6.26.2",
+    "react-router": "^6.26.2",
+    "@remix-run/router": "^1.19.0",
     "lucide-react": "^0.452.0",
-    "jwt-decode": "^4.0.0"
+    "jwt-decode": "^4.0.0",
+    "@stomp/stompjs": "^7.3.0",
+    "sockjs-client": "^1.6.1",
+    "use-sync-external-store": "^1.2.2",
+    "redux": "^5.0.1",
+    "immer": "^10.1.1",
+    "reselect": "^5.1.0",
+    "redux-thunk": "^3.1.0",
+    "@standard-schema/utils": "^0.1.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.7",

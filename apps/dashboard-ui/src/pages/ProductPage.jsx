@@ -2,6 +2,7 @@
 // apps/dashboard-ui/src/pages/ProductPage.jsx
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import {
   Phone,
   ArrowRight,
@@ -42,7 +43,16 @@ import { PlanSelector } from "./components/PlanSelector.jsx";
 
 import KYCBadge from "./components/KYCBadge.jsx";
 
-import { useAddWalletBalanceMutation, useGetProductsQuery, useGetWalletBalanceQuery } from "@dalaillama/shared-store";
+import {
+  clearTenant,
+  selectTenantId,
+  setTenantIdentity,
+  useAddWalletBalanceMutation,
+  useGetMyTenantQuery,
+  useGetProductsQuery,
+  useGetProductPlansQuery,
+  useGetWalletBalanceQuery,
+} from "@dalaillama/shared-store";
 import { useKeycloakLogoutMutation } from "@dalaillama/shared-hooks/keycloakApi";
 /* ============================================================================
  * TYPE DEFINITIONS & CONSTANTS
@@ -113,15 +123,6 @@ const RETRY_DELAY_BASE = 2000;
 /** @type {WizardStep[]} */
 const STEPS = ["TENANT_INFO", "NUMBER_PICKER", "PLAN_SELECTION", "PAYMENT", "SUCCESS"];
 
-/** @type {Record<ProductType, { basePrice: number }>} */
-const PRODUCT_PRICING = {
-  AI_CONTACT_CENTER: { basePrice: 25 },
-  CONVERSATIONAL_IVR: { basePrice: 15 },
-  BASIC_PBX: { basePrice: 5 },
-  OUTBOUND_DIALER: { basePrice: 30 },
-  VIRTUAL_RECEPTIONIST: { basePrice: 10 },
-};
-
 /**
  * @returns {TenantInfo}
  */
@@ -137,6 +138,138 @@ const createInitialTenantInfo = () => ({
   deploymentModel: /** @type {DeploymentModel} */ ("SHARED"),
 });
 
+const DEFAULT_CURRENCY = "INR";
+const sanitizeTenantId = (tenantId) => {
+  if (!tenantId) return null;
+  const normalized = String(tenantId).trim();
+  return normalized && normalized.toLowerCase() !== "default" ? normalized : null;
+};
+
+const BRANDED_SPINNER = "h-10 w-10 animate-spin rounded-full border-[3px] border-purple-600/20 border-t-purple-600 shadow-[0_0_0_6px_rgba(168,85,247,0.08)]";
+
+const formatCurrencyAmount = (amount, currency = DEFAULT_CURRENCY) => {
+  try {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: amount >= 1000 ? 0 : 2,
+    }).format(Number(amount || 0));
+  } catch {
+    return `${currency} ${Number(amount || 0).toLocaleString("en-IN")}`;
+  }
+};
+
+const extractNumericPrice = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
+const extractProductStartingPrice = (product, plans) => {
+  const productCandidates = [
+    product?.minimumPrice,
+    product?.minimum_price,
+    product?.minPrice,
+    product?.min_price,
+    product?.startingPrice,
+    product?.starting_price,
+    product?.monthlyPrice,
+    product?.monthly_price,
+    product?.price,
+    product?.amount,
+    product?.pricing?.minimumPrice,
+    product?.pricing?.minimum_price,
+    product?.pricing?.startingPrice,
+    product?.pricing?.starting_price,
+    product?.pricing?.monthlyPrice,
+    product?.pricing?.monthly_price,
+    product?.pricing?.price,
+    product?.pricing?.amount,
+  ]
+    .map(extractNumericPrice)
+    .filter((value) => value != null);
+
+  if (productCandidates.length) {
+    return {
+      amount: Math.min(...productCandidates),
+      currency:
+        product?.currency ||
+        product?.pricing?.currency ||
+        DEFAULT_CURRENCY,
+    };
+  }
+
+  const planPrices = (Array.isArray(plans) ? plans : [])
+    .map((plan) => {
+      const candidate =
+        extractNumericPrice(plan?.minimumPrice) ??
+        extractNumericPrice(plan?.minimum_price) ??
+        extractNumericPrice(plan?.platformFee) ??
+        extractNumericPrice(plan?.platform_fee) ??
+        extractNumericPrice(plan?.monthlyFee) ??
+        extractNumericPrice(plan?.monthly_fee) ??
+        extractNumericPrice(plan?.price) ??
+        extractNumericPrice(plan?.amount);
+
+      if (candidate == null) return null;
+
+      return {
+        amount: candidate,
+        currency:
+          plan?.currency ||
+          plan?.billingCurrency ||
+          plan?.billing_currency ||
+          DEFAULT_CURRENCY,
+      };
+    })
+    .filter(Boolean);
+
+  if (!planPrices.length) return null;
+
+  return planPrices.reduce((lowest, current) =>
+    current.amount < lowest.amount ? current : lowest
+  );
+};
+
+const BrandedLoaderScreen = ({ title, description }) => (
+  <div className="flex min-h-screen items-center justify-center bg-[#F9FAFB] px-4">
+    <div className="w-full max-w-sm rounded-[2rem] border border-purple-100 bg-white p-8 text-center shadow-[0_24px_80px_rgba(88,28,135,0.08)]">
+      <div className={`mx-auto mb-5 ${BRANDED_SPINNER}`} />
+      <h1 className="mb-2 text-lg font-bold text-slate-900">{title}</h1>
+      <p className="text-sm leading-6 text-slate-500">{description}</p>
+    </div>
+  </div>
+);
+
+const ProductStartingPrice = ({ product }) => {
+  const { data: plansData = [] } = useGetProductPlansQuery(product.code, {
+    skip: !product?.code,
+  });
+
+  const startingPrice = useMemo(
+    () => extractProductStartingPrice(product, plansData),
+    [plansData, product]
+  );
+
+  if (!startingPrice) {
+    return (
+      <>
+        <span className="mb-1 block text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Pricing</span>
+        <span className="text-sm font-bold text-slate-500 sm:text-base">View plans</span>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <span className="mb-1 block text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Starts At</span>
+      <span className="text-lg font-bold text-slate-900 sm:text-xl">
+        {formatCurrencyAmount(startingPrice.amount, startingPrice.currency)}
+        <span className="ml-1 text-xs font-medium text-slate-400">/mo</span>
+      </span>
+    </>
+  );
+};
+
 /* ============================================================================
  * MAIN PAGE
  * ========================================================================== */
@@ -145,35 +278,81 @@ const createInitialTenantInfo = () => ({
  * @param {{ demo?: boolean; initialTenantInfo?: Partial<TenantInfo> }} props
  */
 export default function ProductPage({ demo = true, initialTenantInfo }) {
+  const dispatch = useDispatch();
+  const reduxTenantId = sanitizeTenantId(useSelector(selectTenantId));
+  const authTenantId = sanitizeTenantId(useSelector((s) => s.auth.user?.tenantId || null));
   /* ------------------------------------------------------------------------
    * TENANT GATE (MOST IMPORTANT PART)
    * ---------------------------------------------------------------------- */
 
   /** @type {[string|null, React.Dispatch<React.SetStateAction<string|null>>]} */
-  const [tenantId, setTenantId] = useState(() => {
-    return localStorage.getItem("tenantId");
+  const [localTenantId, setLocalTenantId] = useState(() => {
+    return sanitizeTenantId(localStorage.getItem("tenantId"));
   });
+  const tenantId = reduxTenantId || sanitizeTenantId(localTenantId) || authTenantId;
 
-  /** @type {(id: string) => void} */
-  const handleTenantCreated = useCallback((id) => {
-    localStorage.setItem("tenantId", id);
-    setTenantId(id);
-    setIsTenantSetupDismissed(false);
-    setIsSettingUpOrg(false);
-    setWizardStep(1);
-  }, []);
+  useEffect(() => {
+    const resolvedTenantId = sanitizeTenantId(reduxTenantId || authTenantId);
+    if (!resolvedTenantId || resolvedTenantId === localTenantId) return;
 
-    /* ------------------------------------------------------------------------
+    localStorage.setItem("tenantId", resolvedTenantId);
+    setLocalTenantId(resolvedTenantId);
+    dispatch(setTenantIdentity({ tenantId: resolvedTenantId }));
+  }, [authTenantId, dispatch, localTenantId, reduxTenantId]);
+
+  /* ------------------------------------------------------------------------
    * API
    * ---------------------------------------------------------------------- */
 
   const { data, isLoading, isError, refetch } = useGetProductsQuery(undefined);
+  const {
+    data: myTenant,
+    isFetching: isMyTenantLoading,
+    refetch: refetchMyTenant,
+  } = useGetMyTenantQuery();
   const walletTenantId = tenantId ?? undefined;
   const { data: walletData, refetch: refetchWallet } = useGetWalletBalanceQuery(walletTenantId, { skip: !walletTenantId });
   const [addWalletBalance] = useAddWalletBalanceMutation();
   /** @type {Product[]} */
   const products = Array.isArray(data) ? data : [];
   const [keycloakLogout] = useKeycloakLogoutMutation();
+
+  /** @type {(tenant: any) => Promise<void>} */
+  const handleTenantCreated = useCallback(async (tenant) => {
+    const nextTenantId = tenant?.id ?? tenant?.tenantId ?? tenant;
+    const nextSlug = tenant?.slug ?? null;
+
+    if (!nextTenantId) return;
+
+    localStorage.setItem("tenantId", nextTenantId);
+    if (nextSlug) {
+      localStorage.setItem("tenant_slug", nextSlug);
+      localStorage.setItem(
+        "dashboard_tenant_context",
+        JSON.stringify({ tenantId: nextTenantId, slug: nextSlug })
+      );
+    }
+
+    dispatch(
+      setTenantIdentity({
+        tenantId: nextTenantId,
+        slug: nextSlug,
+        name: tenant?.name ?? null,
+        companyName: tenant?.company_name ?? tenant?.companyName ?? null,
+      })
+    );
+    setLocalTenantId(nextTenantId);
+    setIsTenantSetupDismissed(false);
+    setWizardStep(1);
+    try {
+      const refreshed = await refetchMyTenant();
+      if (refreshed?.data?.hasTenant && !refreshed?.data?.needsOnboarding) {
+        setIsSettingUpOrg(false);
+      }
+    } catch (error) {
+      console.error("Failed to refresh /tenants/me after tenant setup:", error);
+    }
+  }, [dispatch, refetchMyTenant]);
 
 
   /* ------------------------------------------------------------------------
@@ -238,6 +417,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
   );
 
   const balance = walletData?.balance ?? 0;
+  const balanceCurrency = walletData?.currency || DEFAULT_CURRENCY;
   const [kycStatus] = useState("action_required"); 
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -247,14 +427,60 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
   const [showRechargeModal, setShowRechargeModal] = useState(false);
   const [rechargeAmount, setRechargeAmount] = useState("");
   const [rechargeLoading, setRechargeLoading] = useState(false);
-  
+  const needsOnboarding = Boolean(myTenant?.needsOnboarding);
 
   useEffect(() => {
-    if (!tenantId && !isSettingUpOrg && !isTenantSetupDismissed && !isLoggingOut) {
+    if (!myTenant) return;
+
+    if (myTenant.hasTenant && myTenant.tenantId) {
+      const nextTenantId = sanitizeTenantId(myTenant.tenantId);
+      const nextSlug = myTenant.slug ?? null;
+
+      if (nextTenantId) {
+        localStorage.setItem("tenantId", nextTenantId);
+        setLocalTenantId(nextTenantId);
+      }
+      if (nextSlug) {
+        localStorage.setItem("tenant_slug", nextSlug);
+        localStorage.setItem(
+          "dashboard_tenant_context",
+          JSON.stringify({ tenantId: nextTenantId, slug: nextSlug })
+        );
+      }
+
+      dispatch(
+        setTenantIdentity({
+          tenantId: nextTenantId,
+          slug: nextSlug,
+          name: myTenant.name ?? null,
+        })
+      );
+      return;
+    }
+
+    if (myTenant.hasTenant === false) {
+      localStorage.removeItem("tenantId");
+      localStorage.removeItem("tenant_slug");
+      localStorage.removeItem("dashboard_tenant_context");
+      setLocalTenantId(null);
+      dispatch(clearTenant());
+    }
+  }, [dispatch, myTenant]);
+
+  useEffect(() => {
+    if (isMyTenantLoading) return;
+
+    if (needsOnboarding && !isSettingUpOrg && !isTenantSetupDismissed && !isLoggingOut) {
       setIsSettingUpOrg(true);
       setWizardStep(0);
     }
-  }, [tenantId, isSettingUpOrg, isTenantSetupDismissed, isLoggingOut]);
+  }, [isLoggingOut, isMyTenantLoading, isSettingUpOrg, isTenantSetupDismissed, needsOnboarding]);
+
+  useEffect(() => {
+    if (!needsOnboarding && (tenantId || myTenant?.hasTenant) && isSettingUpOrg && wizardStep === 0) {
+      setIsSettingUpOrg(false);
+    }
+  }, [isSettingUpOrg, myTenant?.hasTenant, needsOnboarding, tenantId, wizardStep]);
   /* ------------------------------------------------------------------------
    * HANDLERS
    * ---------------------------------------------------------------------- */
@@ -281,13 +507,14 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
 
     if (!tenantId && incomingTenantId) {
       localStorage.setItem("tenantId", incomingTenantId);
-      setTenantId(incomingTenantId);
+      setLocalTenantId(incomingTenantId);
+      dispatch(setTenantIdentity({ tenantId: incomingTenantId }));
     }
 
     setSelectedDid(did);
     setIsSettingUpOrg(false);
     setWizardStep(2);
-  }, [tenantId]);
+  }, [dispatch, tenantId]);
 
   /** @type {(plan: PlanPricing, agentCount: number) => void} */
   const handlePlanSelect = useCallback((plan, agentCount) => {
@@ -317,7 +544,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
 
     setRechargeLoading(true);
     try {
-      await addWalletBalance({ tenantId, amount, currency: "INR" }).unwrap();
+      await addWalletBalance({ tenantId, amount, currency: balanceCurrency }).unwrap();
       await refetchWallet();
       setShowRechargeModal(false);
       setRechargeAmount("");
@@ -326,7 +553,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
     } finally {
       setRechargeLoading(false);
     }
-  }, [addWalletBalance, rechargeAmount, refetchWallet, tenantId]);
+  }, [addWalletBalance, balanceCurrency, rechargeAmount, refetchWallet, tenantId]);
 
   const closeWizard = useCallback(() => {
     setActiveProduct(null);
@@ -342,7 +569,10 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
       await keycloakLogout(undefined).unwrap();
     } finally {
       localStorage.removeItem("tenantId");
-      setTenantId(null);
+      localStorage.removeItem("tenant_slug");
+      localStorage.removeItem("dashboard_tenant_context");
+      setLocalTenantId(null);
+      dispatch(clearTenant());
       setIsTenantSetupDismissed(false);
       setShowProfileMenu(false);
       window.location.assign(window.location.origin + '/');
@@ -364,13 +594,6 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
         String(p.code || "").toLowerCase().includes(q)
     );
   }, [products, search]);
-
-  const pricing = activeProduct
-    ? PRODUCT_PRICING[activeProduct.type]
-    : null;
-
-//  const totalAmount =
- //   pricing ? pricing.basePrice + (Number(selectedDid?.setupFee) || 0) : 0;
 
   const totalAmount = useMemo(() => {
     if (!planSelection || !selectedDid) return 0;
@@ -467,11 +690,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
    * ---------------------------------------------------------------------- */
 
   if (isLoading && !demo) {
-    return (
-      <div className="h-screen flex items-center justify-center">
-        <Loader2 className="animate-spin" />
-      </div>
-    );
+    return <BrandedLoaderScreen title="Loading marketplace" description="Fetching the latest products and pricing for your workspace." />;
   }
 
   if (isError && !demo) {
@@ -511,14 +730,8 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
    * RENDER
    * ---------------------------------------------------------------------- */
 
-  if (isLoading && !demo) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
-
   if (isLoggingOut) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-[#F9FAFB]">
-        <Loader2 className="animate-spin text-slate-500" />
-      </div>
-    );
+    return <BrandedLoaderScreen title="Signing you out" description="Closing your session and returning to the login screen." />;
   }
 
   return (
@@ -652,7 +865,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
                </div>
                <div>
                   <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] leading-none text-slate-400">Balance</p>
-                  <p className="text-sm font-bold text-slate-900">INR {Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  <p className="text-sm font-bold text-slate-900">{formatCurrencyAmount(balance, balanceCurrency)}</p>
                </div>
                <button
                  type="button"
@@ -709,6 +922,25 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
               )}
             </div>
           </div>
+
+          <div className="flex w-full items-center gap-3 rounded-2xl border border-purple-100 bg-white px-3 py-3 shadow-sm xl:hidden">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
+              <Wallet size={18} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-400">Wallet Balance</p>
+              <p className="truncate text-sm font-bold text-slate-900 sm:text-base">
+                {formatCurrencyAmount(balance, balanceCurrency)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => openRechargeModal()}
+              className="shrink-0 rounded-xl bg-purple-600 px-4 py-2.5 text-[11px] font-black uppercase tracking-[0.08em] text-white shadow-lg shadow-purple-200 transition-all hover:bg-purple-700"
+            >
+              Recharge
+            </button>
+          </div>
         </header>
 
         <div className="mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6 lg:px-12 lg:py-10">
@@ -737,31 +969,33 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
           </div>
 
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 xl:gap-8">
-            {filteredProducts.map((p) => (
-              <div 
-                key={p.id}
-                onClick={() => selectProduct(p)}
-                className="group flex min-h-[320px] cursor-pointer flex-col rounded-[2rem] border border-slate-100 bg-white p-6 transition-all hover:-translate-y-1 hover:shadow-xl sm:rounded-[2.25rem] sm:p-8 lg:min-h-[360px] lg:p-10"
-              >
-                <div className="mb-8 flex items-start justify-between sm:mb-10">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 transition-all group-hover:bg-purple-600 group-hover:text-white sm:h-14 sm:w-14">
-                    {String(p.type || p.code || "").includes("AI") ? <Cpu size={28} /> : <PhoneCall size={28} />}
+            {filteredProducts.map((p, index) => {
+              const productKey = p.id || p.code || `${p.name || "product"}-${index}`;
+              return (
+                <div 
+                  key={productKey}
+                  onClick={() => selectProduct(p)}
+                  className="group flex min-h-[320px] cursor-pointer flex-col rounded-[2rem] border border-slate-100 bg-white p-6 transition-all hover:-translate-y-1 hover:shadow-xl sm:rounded-[2.25rem] sm:p-8 lg:min-h-[360px] lg:p-10"
+                >
+                  <div className="mb-8 flex items-start justify-between sm:mb-10">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 transition-all group-hover:bg-purple-600 group-hover:text-white sm:h-14 sm:w-14">
+                      {String(p.type || p.code || "").includes("AI") ? <Cpu size={28} /> : <PhoneCall size={28} />}
+                    </div>
+                    <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold uppercase tracking-widest">Active</div>
                   </div>
-                  <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold uppercase tracking-widest">Active</div>
+                  <h3 className="mb-3 text-xl font-bold text-slate-900 transition-colors group-hover:text-purple-600 sm:text-2xl">{p.name}</h3>
+                  <p className="mb-8 flex-grow text-sm font-medium leading-6 text-slate-500 sm:mb-10">{p.description}</p>
+                  <div className="flex items-center justify-between border-t border-slate-50 pt-6 sm:pt-8">
+                    <div>
+                      <ProductStartingPrice product={p} />
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-purple-600 group-hover:text-white transition-all">
+                      <ArrowRight size={20} />
+                    </div>
+                  </div>
                 </div>
-                <h3 className="mb-3 text-xl font-bold text-slate-900 transition-colors group-hover:text-purple-600 sm:text-2xl">{p.name}</h3>
-                <p className="mb-8 flex-grow text-sm font-medium leading-6 text-slate-500 sm:mb-10">{p.description}</p>
-                <div className="flex items-center justify-between border-t border-slate-50 pt-6 sm:pt-8">
-                  <div>
-                    <span className="mb-1 block text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Base Cost</span>
-                    <span className="text-lg font-bold text-slate-900 sm:text-xl">${PRODUCT_PRICING[p.type]?.basePrice ?? 0}<span className="ml-1 text-xs font-medium text-slate-400">/mo</span></span>
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-purple-600 group-hover:text-white transition-all">
-                    <ArrowRight size={20} />
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </main>
@@ -834,7 +1068,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
             <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
               <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-400">Current Wallet Balance</p>
               <p className="mt-2 text-2xl font-black text-slate-900">
-                INR {Number(balance).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatCurrencyAmount(balance, balanceCurrency)}
               </p>
             </div>
 
@@ -862,7 +1096,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
                       : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
                   }`}
                 >
-                  INR {preset.toLocaleString("en-IN")}
+                  {formatCurrencyAmount(preset, balanceCurrency)}
                 </button>
               ))}
             </div>

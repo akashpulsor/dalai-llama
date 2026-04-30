@@ -1,9 +1,7 @@
 // @ts-check
 import React, { useState } from 'react';
 import { CheckCircle2, Sparkles, Zap, Crown, Building2, ChevronRight, Minus, Plus, Users, Info } from 'lucide-react';
-
-// TODO: Uncomment when backend is ready
-// import { useGetProductPlansQuery } from "@dalaillama/shared-store";
+import { useGetProductPlansQuery } from "@dalaillama/shared-store";
 
 /**
  * @typedef {Object} AiProviderInfo
@@ -163,9 +161,8 @@ const AI_STACK_KEYS = ['stt', 'tts', 'llm'];
  * @param {{productCode: string, selectedDid: AvailableDid, onSelect: (plan: PlanPricing, agentCount: number) => void}} props
  */
 export const PlanSelector = ({ productCode, selectedDid, onSelect }) => {
-  // TODO: Replace with RTK Query when backend ready
-  // const { data: plans = [], isLoading } = useGetProductPlansQuery(productCode);
-  const plans = MOCK_PLANS[productCode] || MOCK_PLANS['BASIC_PBX'];
+  const { data: apiPlans = [], isLoading } = useGetProductPlansQuery(productCode);
+  const plans = apiPlans.length > 0 ? apiPlans : MOCK_PLANS[productCode] || MOCK_PLANS['BASIC_PBX'];
 
   const [selectedPlanId, setSelectedPlanId] = useState(/** @type {string|null} */ (null));
   const [agentCounts, setAgentCounts] = useState(/** @type {Record<string, number>} */ ({}));
@@ -178,7 +175,7 @@ export const PlanSelector = ({ productCode, selectedDid, onSelect }) => {
    * @param {number} delta
    */
   const updateAgentCount = (planId, delta) => {
-    const plan = plans.find(p => p.id === planId);
+    const plan = plans.find((/** @type {PlanPricing} */ p) => p.id === planId);
     if (!plan) return;
     
     setAgentCounts(prev => {
@@ -189,14 +186,14 @@ export const PlanSelector = ({ productCode, selectedDid, onSelect }) => {
   };
 
   /** @param {PlanPricing} plan */
-  const calculatePrice = (plan) => {
+  const calculatePrice = (/** @type {PlanPricing} */ plan) => {
     const agents = getAgentCount(plan);
     const extraAgents = Math.max(0, agents - plan.includedAgents);
     return plan.platformFee + (extraAgents * plan.perAgentFee);
   };
 
   const handleContinue = () => {
-    const plan = plans.find(p => p.id === selectedPlanId);
+    const plan = plans.find((/** @type {PlanPricing} */ p) => p.id === selectedPlanId);
     if (plan) onSelect(plan, getAgentCount(plan));
   };
 
@@ -219,9 +216,14 @@ export const PlanSelector = ({ productCode, selectedDid, onSelect }) => {
         </div>
       </div>
 
-      <div className="space-y-3 mb-6 max-h-[380px] overflow-y-auto pr-1">
-        {plans.map((plan) => {
-          const tierConfig = TIER_CONFIG[plan.tier];
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <div className="space-y-3 mb-6 max-h-[380px] overflow-y-auto pr-1">
+        {plans.map((/** @type {PlanPricing} */ plan) => {
+          const tierConfig = TIER_CONFIG[plan.tier] || TIER_CONFIG.STANDARD;
           const TierIcon = tierConfig.icon;
           const isSelected = selectedPlanId === plan.id;
           const hasAi = !!plan.aiStackType && !!plan.stack;
@@ -230,10 +232,17 @@ export const PlanSelector = ({ productCode, selectedDid, onSelect }) => {
           const showAgentSelector = plan.perAgentFee > 0 && plan.maxAgents > plan.includedAgents;
 
           return (
-            <button
+            <div
               key={plan.id}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => setSelectedPlanId(plan.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelectedPlanId(plan.id);
+                }
+              }}
               className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
                 isSelected 
                   ? 'border-purple-500 bg-purple-50/50 shadow-lg shadow-purple-100' 
@@ -323,12 +332,13 @@ export const PlanSelector = ({ productCode, selectedDid, onSelect }) => {
                   <span className="text-xs text-slate-400">+{agentCount - plan.includedAgents} extra @ ₹{plan.perAgentFee}/ea</span>
                 )}
               </div>
-            </button>
+            </div>
           );
         })}
       </div>
+      )}
 
-      <button type="button" disabled={!selectedPlanId} onClick={handleContinue} className="w-full py-4 bg-purple-600 text-white rounded-2xl font-bold shadow-xl shadow-purple-200 hover:bg-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+      <button type="button" disabled={!selectedPlanId || isLoading} onClick={handleContinue} className="w-full py-4 bg-purple-600 text-white rounded-2xl font-bold shadow-xl shadow-purple-200 hover:bg-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
         Continue to Payment <ChevronRight size={18} />
       </button>
     </div>

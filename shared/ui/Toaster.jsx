@@ -2,7 +2,7 @@ import React from "react";
 import { useSelector } from "react-redux";
 
 /**
- * @typedef {"error" | "warning" | "success"} FlashType
+ * @typedef {"error" | "warning" | "success" | "info"} FlashType
  */
 
 /**
@@ -16,15 +16,15 @@ import { useSelector } from "react-redux";
  * @returns {React.ReactElement | null}
  */
 export const Toaster = () => {
-  /**
-   * @type {FlashMessage[]}
-   */
-  const messages = useSelector(
+  const flash = useSelector(
     /**
-     * @param {{ flash?: { messages?: FlashMessage[] } }} state
+     * @param {{ flash?: { message?: string | null, type?: FlashType | "info" } }} state
      */
-    (state) => state.flash?.messages || []
+    (state) => state.flash || { message: null, type: "info" }
   );
+  const messages = flash?.message
+    ? [{ text: flash.message, type: flash.type || "info" }]
+    : [];
 
   if (!messages.length) return null;
 
@@ -38,6 +38,8 @@ export const Toaster = () => {
               ? "bg-red-600"
               : msg.type === "warning"
               ? "bg-yellow-500"
+              : msg.type === "info"
+              ? "bg-sky-600"
               : "bg-green-600"
           }`}
         >

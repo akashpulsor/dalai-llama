@@ -31,7 +31,14 @@ export default function useStompEvents(token) {
   const subsRef = /** @type {import('react').MutableRefObject<Array<{unsubscribe: () => void}>>} */ (useRef([]));
 
   useEffect(() => {
-    if (!stompWsUrl || !token || !tenantId) return;
+    if (!stompWsUrl || !token || !tenantId) {
+      console.warn('[STOMP] Skipping connect:', {
+        hasWsUrl: !!stompWsUrl,
+        hasToken: !!token,
+        tenantId: tenantId || null,
+      });
+      return;
+    }
 
     const wsUrl = stompWsUrl
       .replace(/^https:\/\//, 'wss://')

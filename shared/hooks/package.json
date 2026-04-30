@@ -4,9 +4,15 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@dalaillama/shared-config": "workspace:*",
     "@dalaillama/shared-store": "workspace:*",
     "@dalaillama/shared-utils": "workspace:*",
-    "@dalaillama/shared-config": "workspace:*",
-    "react": "^18.3.1"
+    "@stomp/stompjs": "^7.3.0",
+    "react": "^18.3.1",
+    "sip.js": "^0.21.2",
+    "sockjs-client": "^1.6.1"
+  },
+  "devDependencies": {
+    "@types/sockjs-client": "^1.5.4"
   }
 }

@@ -32,12 +32,21 @@ const tokenExpired = (token) => {
  * @typedef {{ id: string, name: string, role: UserRole, email: string, tenantId: string }} User
  */
 
+const safeGetStorageItem = (key) => {
+  try {
+    return typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
+  } catch {
+    return null;
+  }
+};
+
 /**
- * @type {{ user: User | null, token: string | null }}
+ * @type {{ user: User | null, token: string | null, keycloakToken: string | null }}
  */
 const initialState = {
-  user: JSON.parse(localStorage.getItem("user") || "null"),
-  token: localStorage.getItem("auth_token"),
+  user: JSON.parse(safeGetStorageItem("user") || "null"),
+  token: safeGetStorageItem("auth_token"),
+  keycloakToken: null,
 };
 
 /* -------------------------------------------------------------------------- */
@@ -111,11 +120,20 @@ const slice = createSlice({
     },
 
     /**
+     * Set Keycloak token from tenant auth (useTenantAuth).
+     * RTK Query prepareHeaders reads this for API calls.
+     */
+    setKeycloakToken(state, action) {
+      state.keycloakToken = action.payload;
+    },
+
+    /**
      * Logout - clear state only (redirect handled by caller)
      */
     logout(state) {
       state.user = null;
       state.token = null;
+      state.keycloakToken = null;
       // Note: localStorage clearing is handled in keycloakApi.clearAuthState()
     },
 
@@ -175,10 +193,13 @@ const slice = createSlice({
 /* -------------------------------------------------------------------------- */
 export const {
   setUser,
+  setKeycloakToken,
   logout,
   validateToken,
   loginMock,
   loginMockByRole,
 } = slice.actions;
+
+export const login = loginMock;
 
 export default slice.reducer;

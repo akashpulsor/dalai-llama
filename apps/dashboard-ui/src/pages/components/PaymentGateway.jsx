@@ -147,6 +147,47 @@ export const PaymentGateway = ({ plan, selectedDid, agentCount, tenantId, produc
     showToast('Activation failed. Please contact support.', 'error');
   }, [clearPolling, showToast]);
 
+  useEffect(() => {
+    /** @param {Event} nativeEvent */
+    const handleProvisioningEvent = (nativeEvent) => {
+      const event = /** @type {CustomEvent<any>} */ (nativeEvent).detail || {};
+      const normalizedStatus = String(event.status || "").toUpperCase();
+      const normalizedEvent = String(event.event || "").toUpperCase();
+
+      if (normalizedStatus === "FAILED" || normalizedStatus === "ERROR" || normalizedStatus === "PARTIAL_FAILURE") {
+        handleProvisioningFailure();
+        return;
+      }
+
+      if (
+        normalizedStatus === "ACTIVE" ||
+        normalizedStatus === "COMPLETED" ||
+        normalizedStatus === "SUCCESS" ||
+        normalizedStatus === "READY"
+      ) {
+        handleActivated();
+        return;
+      }
+
+      if (event.message) {
+        showToast(event.message, "info");
+        return;
+      }
+
+      if (normalizedEvent === "SUBSCRIPTION_ACTIVATED") {
+        showToast("Subscription activated. Provisioning started...", "info");
+      }
+    };
+
+    window.addEventListener("tenant-provisioning-event", handleProvisioningEvent);
+    window.addEventListener("tenant-app-event", handleProvisioningEvent);
+
+    return () => {
+      window.removeEventListener("tenant-provisioning-event", handleProvisioningEvent);
+      window.removeEventListener("tenant-app-event", handleProvisioningEvent);
+    };
+  }, [handleActivated, handleProvisioningFailure, showToast]);
+
   /** @type {(subscriptionId: string) => void} */
   const pollSubscriptionStatus = useCallback((subscriptionId) => {
     provisioningNoticeShownRef.current = false;
