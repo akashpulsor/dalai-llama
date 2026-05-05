@@ -1,6 +1,6 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { Toaster } from "@dalaillama/shared-ui";
+import { Toaster, AuthLoader, AuthError } from "@dalaillama/shared-ui";
 
 import ProductPage from "./pages/ProductPage.jsx";
 import { useAuthBootstrap, useAuthGuard } from "@dalaillama/shared-hooks";
@@ -18,16 +18,6 @@ const safeGetLocalStorage = (/** @type {string} */ key) => {
   }
 };
 
-const FullScreenLoader = () => (
-  <div className="flex min-h-screen items-center justify-center bg-[#F9FAFB] px-4">
-    <div className="w-full max-w-sm rounded-[2rem] border border-purple-100 bg-white p-8 text-center shadow-[0_24px_80px_rgba(88,28,135,0.08)]">
-      <div className="mx-auto mb-5 h-10 w-10 animate-spin rounded-full border-[3px] border-purple-600/20 border-t-purple-600 shadow-[0_0_0_6px_rgba(168,85,247,0.08)]" />
-      <h1 className="mb-2 text-lg font-bold text-slate-900">Preparing dashboard</h1>
-      <p className="text-sm leading-6 text-slate-500">Loading your workspace and securing the session.</p>
-    </div>
-  </div>
-);
-
 const AuthCallbackPage = () => {
   const { status, error } = useAuthBootstrap();
 
@@ -35,17 +25,8 @@ const AuthCallbackPage = () => {
     return <Navigate to="/" replace />;
   }
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-[#F9FAFB] px-6">
-      <div className="w-full max-w-md rounded-3xl bg-white p-6 text-center shadow-xl sm:p-8">
-        <div className="mx-auto mb-5 h-10 w-10 animate-spin rounded-full border-[3px] border-purple-600/20 border-t-purple-600 shadow-[0_0_0_6px_rgba(168,85,247,0.08)]" />
-        <h1 className="mb-2 text-base font-bold text-slate-900 sm:text-lg">Signing you in</h1>
-        <p className="text-sm leading-6 text-slate-500 sm:text-base">
-          {error || "Completing your Keycloak login flow."}
-        </p>
-      </div>
-    </div>
-  );
+  if (error) return <AuthError message={error} />;
+  return <AuthLoader message="Signing you in" />;
 };
 
 const ProtectedProductPage = () => {
@@ -55,7 +36,7 @@ const ProtectedProductPage = () => {
   useDashboardTenantEvents();
 
   if (status === "checking" || status === "redirecting") {
-    return <FullScreenLoader />;
+    return <AuthLoader message="Preparing dashboard" />;
   }
 
   return (

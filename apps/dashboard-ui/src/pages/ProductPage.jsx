@@ -17,7 +17,6 @@ import {
   LayoutDashboard,
   Settings,
   ShieldCheck,
-  Menu,
   CreditCard,
   UserCheck,
   BarChart3,
@@ -25,8 +24,6 @@ import {
   Cpu,
   Sparkles,
   Wallet,
-  ChevronDown,
-  User,
   Plus,
   History,
   AlertTriangle,
@@ -38,6 +35,8 @@ import TenantSetupCard from "./components/TenantSetupCard.jsx";
 import NumberPicker from "./components/NumberPicker.jsx";
 import { PaymentGateway } from "./components/PaymentGateway.jsx";
 import { ActivationSuccess } from "./components/ActivationSuccess.jsx";
+import SubscriptionSidebar from "./components/SubscriptionSidebar.jsx";
+import ProvisioningWaitScreen from "./components/ProvisioningWaitScreen.jsx";
 // 1. Import PlanSelector and add PlanPricing type at top
 import { PlanSelector } from "./components/PlanSelector.jsx";
 
@@ -76,7 +75,7 @@ const RETRY_DELAY_BASE = 2000;
 
 /** @typedef {'AI_CONTACT_CENTER'|'CONVERSATIONAL_IVR'|'BASIC_PBX'|'OUTBOUND_DIALER'|'VIRTUAL_RECEPTIONIST'} ProductType */
 /** @typedef {'SHARED'|'DEDICATED'} DeploymentModel */
-/** @typedef {'TENANT_INFO'|'NUMBER_PICKER'|'PLAN_SELECTION'|'PAYMENT'|'SUCCESS'} WizardStep */
+/** @typedef {'TENANT_INFO'|'NUMBER_PICKER'|'PLAN_SELECTION'|'PAYMENT'|'PROVISIONING'|'SUCCESS'} WizardStep */
 
 /**
  * @typedef {Object} Product
@@ -121,7 +120,7 @@ const RETRY_DELAY_BASE = 2000;
  * ========================================================================== */
 
 /** @type {WizardStep[]} */
-const STEPS = ["TENANT_INFO", "NUMBER_PICKER", "PLAN_SELECTION", "PAYMENT", "SUCCESS"];
+const STEPS = ["TENANT_INFO", "NUMBER_PICKER", "PLAN_SELECTION", "PAYMENT", "PROVISIONING", "SUCCESS"];
 
 /**
  * @returns {TenantInfo}
@@ -139,6 +138,7 @@ const createInitialTenantInfo = () => ({
 });
 
 const DEFAULT_CURRENCY = "INR";
+/** @param {string|null|undefined} tenantId */
 const sanitizeTenantId = (tenantId) => {
   if (!tenantId) return null;
   const normalized = String(tenantId).trim();
@@ -147,23 +147,32 @@ const sanitizeTenantId = (tenantId) => {
 
 const BRANDED_SPINNER = "h-10 w-10 animate-spin rounded-full border-[3px] border-purple-600/20 border-t-purple-600 shadow-[0_0_0_6px_rgba(168,85,247,0.08)]";
 
+/**
+ * @param {number|string|null|undefined} amount
+ * @param {string} [currency]
+ */
 const formatCurrencyAmount = (amount, currency = DEFAULT_CURRENCY) => {
   try {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency,
-      maximumFractionDigits: amount >= 1000 ? 0 : 2,
+      maximumFractionDigits: Number(amount) >= 1000 ? 0 : 2,
     }).format(Number(amount || 0));
   } catch {
     return `${currency} ${Number(amount || 0).toLocaleString("en-IN")}`;
   }
 };
 
+/** @param {any} value */
 const extractNumericPrice = (value) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
 };
 
+/**
+ * @param {any} product
+ * @param {any[]} plans
+ */
 const extractProductStartingPrice = (product, plans) => {
   const productCandidates = [
     product?.minimumPrice,
@@ -225,11 +234,12 @@ const extractProductStartingPrice = (product, plans) => {
 
   if (!planPrices.length) return null;
 
-  return planPrices.reduce((lowest, current) =>
-    current.amount < lowest.amount ? current : lowest
-  );
+  return /** @type {{ amount: number; currency: string }} */ (planPrices.reduce(
+    (lowest, current) => /** @type {any} */ (current).amount < /** @type {any} */ (lowest).amount ? current : lowest
+  ));
 };
 
+/** @param {{ title: string; description: string }} props */
 const BrandedLoaderScreen = ({ title, description }) => (
   <div className="flex min-h-screen items-center justify-center bg-[#F9FAFB] px-4">
     <div className="w-full max-w-sm rounded-[2rem] border border-purple-100 bg-white p-8 text-center shadow-[0_24px_80px_rgba(88,28,135,0.08)]">
@@ -240,6 +250,7 @@ const BrandedLoaderScreen = ({ title, description }) => (
   </div>
 );
 
+/** @param {{ product: Product }} props */
 const ProductStartingPrice = ({ product }) => {
   const { data: plansData = [] } = useGetProductPlansQuery(product.code, {
     skip: !product?.code,
@@ -280,7 +291,7 @@ const ProductStartingPrice = ({ product }) => {
 export default function ProductPage({ demo = true, initialTenantInfo }) {
   const dispatch = useDispatch();
   const reduxTenantId = sanitizeTenantId(useSelector(selectTenantId));
-  const authTenantId = sanitizeTenantId(useSelector((s) => s.auth.user?.tenantId || null));
+  const authTenantId = sanitizeTenantId(useSelector((/** @type {any} */ s) => s.auth?.user?.tenantId || null));
   /* ------------------------------------------------------------------------
    * TENANT GATE (MOST IMPORTANT PART)
    * ---------------------------------------------------------------------- */
@@ -309,7 +320,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
     data: myTenant,
     isFetching: isMyTenantLoading,
     refetch: refetchMyTenant,
-  } = useGetMyTenantQuery();
+  } = useGetMyTenantQuery(undefined);
   const walletTenantId = tenantId ?? undefined;
   const { data: walletData, refetch: refetchWallet } = useGetWalletBalanceQuery(walletTenantId, { skip: !walletTenantId });
   const [addWalletBalance] = useAddWalletBalanceMutation();
@@ -420,7 +431,9 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
   const balanceCurrency = walletData?.currency || DEFAULT_CURRENCY;
   const [kycStatus] = useState("action_required"); 
 
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  /** @type {[string, React.Dispatch<React.SetStateAction<string>>]} */
+  const [activeNav, setActiveNav] = useState("Marketplace");
+  const [provisioningAppId, setProvisioningAppId] = useState(/** @type {string|null} */ (null));
   const [isSettingUpOrg, setIsSettingUpOrg] = useState(false);
   const [isTenantSetupDismissed, setIsTenantSetupDismissed] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -523,7 +536,11 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
   }, []);
 
   const handlePaymentComplete = useCallback(() => {
-    setWizardStep(4);
+    setWizardStep(4); // PROVISIONING
+  }, []);
+
+  const handleProvisioningComplete = useCallback(() => {
+    setWizardStep(5); // SUCCESS
   }, []);
 
   /** @type {(amount?: number | null) => void} */
@@ -574,7 +591,6 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
       setLocalTenantId(null);
       dispatch(clearTenant());
       setIsTenantSetupDismissed(false);
-      setShowProfileMenu(false);
       window.location.assign(window.location.origin + '/');
     }
   };
@@ -672,6 +688,14 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
           />
         ) : null;
 
+      case "PROVISIONING":
+        return (
+          <ProvisioningWaitScreen
+            productName={activeProduct?.name}
+            onComplete={handleProvisioningComplete}
+          />
+        );
+
       case "SUCCESS":
         return (
           <ActivationSuccess
@@ -689,11 +713,11 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
    * RENDER
    * ---------------------------------------------------------------------- */
 
-  if (isLoading && !demo) {
+  if (isLoading && !demo && activeNav === "Marketplace") {
     return <BrandedLoaderScreen title="Loading marketplace" description="Fetching the latest products and pricing for your workspace." />;
   }
 
-  if (isError && !demo) {
+  if (isError && !demo && activeNav === "Marketplace") {
         return (
       <div className="h-screen w-full flex items-center justify-center bg-[#F9FAFB] p-6 animate-in fade-in duration-500">
         <div className="max-w-md w-full text-center">
@@ -725,7 +749,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
 
     // Combined logic for UI effects (blur/dim)
   const isAnyOverlayActive = !!activeProduct || isSettingUpOrg;
-  const shouldBlockMainContent = (!tenantId && !isTenantSetupDismissed) || isAnyOverlayActive;
+  const shouldBlockMainContent = activeNav !== "Settings" && ((!tenantId && !isTenantSetupDismissed) || isAnyOverlayActive);
 /* ------------------------------------------------------------------------
    * RENDER
    * ---------------------------------------------------------------------- */
@@ -757,16 +781,17 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
         <nav className={`px-3 space-y-1 mt-4 flex-grow transition-all duration-300 ${!isExpanded && 'flex flex-col items-center'}`}>
           {[
             { icon: LayoutDashboard, label: "Overview" },
-            { icon: ShoppingBag, label: "Marketplace", active: true },
+            { icon: ShoppingBag, label: "Marketplace" },
             { icon: BarChart3, label: "Analytics" },
             { icon: CreditCard, label: "Billing" },
             { icon: ShieldCheck, label: "Business KYC", highlight: kycStatus === 'action_required' },
             { icon: Settings, label: "Settings" },
           ].map(item => (
             <div 
-              key={item.label} 
+              key={item.label}
+              onClick={() => setActiveNav(item.label)}
               className={`group flex items-center gap-4 px-4 py-3 rounded-xl cursor-pointer transition-all relative w-full ${
-                item.active 
+                activeNav === item.label 
                 ? 'bg-purple-600 text-white shadow-lg shadow-purple-100' 
                 : 'text-slate-400 hover:bg-slate-50 hover:text-slate-900'
               }`}
@@ -822,17 +847,25 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
 
       {/* MOBILE NAV BAR */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between border-t border-slate-100 bg-white px-4 py-3 shadow-2xl md:hidden">
-        <LayoutDashboard className="text-slate-400" size={24} />
-        <ShoppingBag className="text-purple-600" size={24} />
+        <button onClick={() => setActiveNav("Marketplace")} className={`p-2 rounded-xl ${activeNav === "Marketplace" ? "text-purple-600" : "text-slate-400"}`}>
+          <ShoppingBag size={24} />
+        </button>
+        <button onClick={() => setActiveNav("Settings")} className={`p-2 rounded-xl ${activeNav === "Settings" ? "text-purple-600" : "text-slate-400"}`}>
+          <Settings size={24} />
+        </button>
         <button
           type="button"
-          onClick={() => setShowProfileMenu((prev) => !prev)}
-          className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-600 text-white -mt-8 shadow-xl shadow-purple-200"
-          aria-label="Open account menu"
+          onClick={() => setActiveNav("Activity")}
+          className={`flex h-12 w-12 items-center justify-center rounded-full -mt-8 shadow-xl transition-all ${
+            activeNav === "Activity" ? "bg-purple-700 text-white shadow-purple-300" : "bg-purple-600 text-white shadow-purple-200"
+          }`}
+          aria-label="Activity Log"
         >
-          <Menu size={24} />
+          <History size={22} />
         </button>
-        <BarChart3 className="text-slate-400" size={24} />
+        <button onClick={() => setActiveNav("Billing")} className={`p-2 rounded-xl ${activeNav === "Billing" ? "text-purple-600" : "text-slate-400"}`}>
+          <CreditCard size={24} />
+        </button>
         <button
           onClick={handleLogout}
           className="flex h-10 w-10 items-center justify-center rounded-full text-slate-400"
@@ -877,12 +910,10 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
                </button>
             </div>
 
-            {/* Profile & Account Actions */}
-            <div className="relative">
-              <button 
-                onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className={`flex items-center gap-3 rounded-2xl border p-1.5 pr-3 transition-all ${showProfileMenu ? "border-slate-200 bg-slate-50 shadow-inner" : "border-slate-100 bg-white shadow-sm hover:shadow-md"}`}
-              >
+            {/* Profile & KYC */}
+            <div className="flex items-center gap-2">
+              <KYCBadge status={/** @type {"verified" | "pending" | "action_required"} */ (kycStatus)} />
+              <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-1.5 pr-3 shadow-sm">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white">
                   {userInitials}
                 </div>
@@ -890,36 +921,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
                    <p className="mb-1 text-xs font-bold leading-none">{userDisplayName}</p>
                    <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400">{userRole}</p>
                 </div>
-                <ChevronDown size={14} className={`text-slate-300 transition-transform ${showProfileMenu ? 'rotate-180' : ''}`} />
-              </button>
-
-              {showProfileMenu && (
-                <div className="absolute right-0 z-[60] mt-3 w-72 max-w-[calc(100vw-2rem)] rounded-3xl border border-slate-100 bg-white py-3 shadow-2xl animate-in fade-in slide-in-from-top-2">
-                   <div className="px-5 py-3 border-b border-slate-50 mb-2">
-                      <p className="mb-3 text-xs font-bold uppercase tracking-[0.08em] text-slate-400">Account</p>
-                      <div className="space-y-3">
-                         <div className="flex items-center gap-3 text-slate-600 hover:text-purple-600 cursor-pointer group">
-                            <User size={18} className="text-slate-300 group-hover:text-purple-600" />
-                            <span className="text-sm font-medium">My Profile</span>
-                         </div>
-                         <div className="flex items-center gap-3 text-slate-600 hover:text-purple-600 cursor-pointer group">
-                            <History size={18} className="text-slate-300 group-hover:text-purple-600" />
-                            <span className="text-sm font-medium">Activity Log</span>
-                         </div>
-                      </div>
-                   </div>
-                   <div className="px-5 py-3">
-                      <KYCBadge status={/** @type {"verified" | "pending" | "action_required"} */ (kycStatus)} />
-
-                   </div>
-                   <div className="px-5 py-3 mt-2">
-                      <button onClick={handleLogout} className="w-full flex items-center gap-3 text-rose-500 hover:text-rose-600 py-2 border-t border-slate-50">
-                         <LogOut size={16} />
-                         <span className="text-sm font-bold">Log Out</span>
-                      </button>
-                   </div>
-                </div>
-              )}
+              </div>
             </div>
           </div>
 
@@ -944,59 +946,103 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
         </header>
 
         <div className="mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6 lg:px-12 lg:py-10">
-          <div className="mb-8 flex flex-col gap-5 lg:mb-12 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-slate-500">
-                Service Catalog
-              </p>
-              <h1 className="mb-3 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-                Marketplace
-              </h1>
-              <p className="text-xs font-medium leading-6 text-slate-500 sm:text-sm">
-                Provision global voice infrastructure in 60 seconds.
-              </p>
-            </div>
-            {kycStatus === 'action_required' && (
-               <div className="flex w-full items-center gap-3 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 sm:w-auto sm:px-5">
-                  <AlertTriangle className="text-rose-500" size={20} />
-                  <div>
-                    <p className="mb-1 text-xs font-bold leading-none text-rose-900">KYC REQUIRED</p>
-                    <p className="text-xs font-medium text-rose-600 sm:text-sm">Some services may be restricted.</p>
-                  </div>
-                  <button className="ml-2 text-xs font-black uppercase tracking-[0.08em] text-rose-500 hover:underline sm:ml-4">Fix Now</button>
-               </div>
-            )}
-          </div>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 xl:gap-8">
-            {filteredProducts.map((p, index) => {
-              const productKey = p.id || p.code || `${p.name || "product"}-${index}`;
-              return (
-                <div 
-                  key={productKey}
-                  onClick={() => selectProduct(p)}
-                  className="group flex min-h-[320px] cursor-pointer flex-col rounded-[2rem] border border-slate-100 bg-white p-6 transition-all hover:-translate-y-1 hover:shadow-xl sm:rounded-[2.25rem] sm:p-8 lg:min-h-[360px] lg:p-10"
-                >
-                  <div className="mb-8 flex items-start justify-between sm:mb-10">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 transition-all group-hover:bg-purple-600 group-hover:text-white sm:h-14 sm:w-14">
-                      {String(p.type || p.code || "").includes("AI") ? <Cpu size={28} /> : <PhoneCall size={28} />}
-                    </div>
-                    <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold uppercase tracking-widest">Active</div>
-                  </div>
-                  <h3 className="mb-3 text-xl font-bold text-slate-900 transition-colors group-hover:text-purple-600 sm:text-2xl">{p.name}</h3>
-                  <p className="mb-8 flex-grow text-sm font-medium leading-6 text-slate-500 sm:mb-10">{p.description}</p>
-                  <div className="flex items-center justify-between border-t border-slate-50 pt-6 sm:pt-8">
-                    <div>
-                      <ProductStartingPrice product={p} />
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-purple-600 group-hover:text-white transition-all">
-                      <ArrowRight size={20} />
-                    </div>
-                  </div>
+          {/* ── SETTINGS VIEW ────────────────────────────────────────── */}
+          {activeNav === "Settings" ? (
+            <div className="animate-in fade-in duration-300">
+              <div className="mb-8 flex flex-col gap-5 lg:mb-12 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-slate-500">Your Workspace</p>
+                  <h1 className="mb-3 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">My Subscriptions</h1>
+                  <p className="text-xs font-medium leading-6 text-slate-500 sm:text-sm">Manage your active services and retry failed deployments.</p>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+
+              {/* Provisioning overlay — shown when user clicks retry */}
+              {provisioningAppId ? (
+                <div className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-sm sm:p-8">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-base font-bold text-slate-900">Provisioning Progress</h3>
+                    <button
+                      onClick={() => setProvisioningAppId(null)}
+                      className="rounded-xl p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <ProvisioningWaitScreen
+                    tenantAppId={provisioningAppId}
+                    autoStart
+                    onComplete={() => setProvisioningAppId(null)}
+                    onFailed={() => {}}
+                  />
+                </div>
+              ) : (
+                <SubscriptionSidebar
+                  onRetryWithProgress={(appId) => setProvisioningAppId(appId)}
+                />
+              )}
+            </div>
+
+          ) : (
+            /* ── MARKETPLACE VIEW (default) ──────────────────────────── */
+            <>
+              <div className="mb-8 flex flex-col gap-5 lg:mb-12 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-slate-500">
+                    Service Catalog
+                  </p>
+                  <h1 className="mb-3 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+                    Marketplace
+                  </h1>
+                  <p className="text-xs font-medium leading-6 text-slate-500 sm:text-sm">
+                    Provision global voice infrastructure in 60 seconds.
+                  </p>
+                </div>
+                {kycStatus === 'action_required' && (
+                   <div className="flex w-full items-center gap-3 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 sm:w-auto sm:px-5">
+                      <AlertTriangle className="text-rose-500" size={20} />
+                      <div>
+                        <p className="mb-1 text-xs font-bold leading-none text-rose-900">KYC REQUIRED</p>
+                        <p className="text-xs font-medium text-rose-600 sm:text-sm">Some services may be restricted.</p>
+                      </div>
+                      <button className="ml-2 text-xs font-black uppercase tracking-[0.08em] text-rose-500 hover:underline sm:ml-4">Fix Now</button>
+                   </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 xl:gap-8">
+                {filteredProducts.map((p, index) => {
+                  const productKey = p.id || p.code || `${p.name || "product"}-${index}`;
+                  return (
+                    <div 
+                      key={productKey}
+                      onClick={() => selectProduct(p)}
+                      className="group flex min-h-[320px] cursor-pointer flex-col rounded-[2rem] border border-slate-100 bg-white p-6 transition-all hover:-translate-y-1 hover:shadow-xl sm:rounded-[2.25rem] sm:p-8 lg:min-h-[360px] lg:p-10"
+                    >
+                      <div className="mb-8 flex items-start justify-between sm:mb-10">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 transition-all group-hover:bg-purple-600 group-hover:text-white sm:h-14 sm:w-14">
+                          {String(p.type || p.code || "").includes("AI") ? <Cpu size={28} /> : <PhoneCall size={28} />}
+                        </div>
+                        <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold uppercase tracking-widest">Active</div>
+                      </div>
+                      <h3 className="mb-3 text-xl font-bold text-slate-900 transition-colors group-hover:text-purple-600 sm:text-2xl">{p.name}</h3>
+                      <p className="mb-8 flex-grow text-sm font-medium leading-6 text-slate-500 sm:mb-10">{p.description}</p>
+                      <div className="flex items-center justify-between border-t border-slate-50 pt-6 sm:pt-8">
+                        <div>
+                          <ProductStartingPrice product={p} />
+                        </div>
+                        <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-purple-600 group-hover:text-white transition-all">
+                          <ArrowRight size={20} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
         </div>
       </main>
 

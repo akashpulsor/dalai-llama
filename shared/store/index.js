@@ -113,6 +113,8 @@ export {
   selectFeatures,
   selectFeature,
   selectIsResolved,
+  selectTenantWsUrl,
+  selectStompWsUrl,
 } from "./slices/tenantSlice.js";
 
 export {

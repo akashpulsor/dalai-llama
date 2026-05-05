@@ -3,32 +3,37 @@ import { useSelector } from 'react-redux';
 import { Client } from '@stomp/stompjs';
 
 /**
- * STOMP WebSocket hook — connects to PBX-Core /ws for real-time events.
+ * STOMP WebSocket hook — connects to a STOMP broker for real-time events.
  *
- * Uses native WebSocket transport so local Vite dev does not depend on
- * SockJS' CommonJS/transitive dependency chain.
+ * Two brokers exist:
+ *   - tenant-service /ws  → wallet, billing, provisioning, apps, notifications
+ *   - pbx-core /ws        → calls, agents, queues, campaigns
+ *
+ * Pass `wsUrl` to target a specific broker. If omitted, falls back to
+ * `stompWsUrl` from the Redux tenant slice (pbx-core per-app websocket_url).
+ *
  * Auth: JWT in STOMP CONNECT headers (validated by TenantChannelInterceptor).
  *
- * Topics available:
- *   /topic/tenant/{tid}/calls          → call events (start, answer, end)
- *   /topic/tenant/{tid}/agents         → agent status changes
- *   /topic/tenant/{tid}/queues         → queue stat updates
- *   /topic/tenant/{tid}/campaigns      → campaign progress
- *   /user/queue/transcript             → personal live transcript (my call)
- *   /topic/tenant/{tid}/calls/{cid}/transcript → specific call transcript
+ * On reconnect, all registered subscriptions are automatically re-subscribed.
  *
  * @param {string|null} token - JWT access token
+ * @param {string|null} [wsUrl] - optional explicit WebSocket URL override
  * @returns {{ isConnected: boolean, subscribe: (topic: string, callback: (msg: any) => void) => { unsubscribe: () => void }, send: (destination: string, body: any) => void, client: Client|null }}
  */
-export default function useStompEvents(token) {
-  const stompWsUrl = /** @type {string|null} */ (
+export default function useStompEvents(token, wsUrl) {
+  const stompWsUrlFromRedux = /** @type {string|null} */ (
     useSelector((/** @type {any} */ s) => s.tenant.stompWsUrl || s.tenant.websocketUrl)
   );
+  const stompWsUrl = wsUrl || stompWsUrlFromRedux;
   const tenantId = /** @type {string|null} */ (useSelector((/** @type {any} */ s) => s.tenant.tenantId));
 
   const [isConnected, setIsConnected] = useState(false);
   const clientRef = /** @type {import('react').MutableRefObject<Client|null>} */ (useRef(null));
-  const subsRef = /** @type {import('react').MutableRefObject<Array<{unsubscribe: () => void}>>} */ (useRef([]));
+  // Registry of desired subscriptions: Map<topic, callback>
+  // Survives reconnects — re-subscribed on every onConnect.
+  const registryRef = /** @type {import('react').MutableRefObject<Map<string, (msg: any) => void>>} */ (useRef(new Map()));
+  // Active STOMP subscription handles (from the current connection)
+  const activeSubsRef = /** @type {import('react').MutableRefObject<Array<{unsubscribe: () => void}>>} */ (useRef([]));
 
   useEffect(() => {
     if (!stompWsUrl || !token || !tenantId) {
@@ -40,12 +45,27 @@ export default function useStompEvents(token) {
       return;
     }
 
-    const wsUrl = stompWsUrl
+    const brokerUrl = stompWsUrl
       .replace(/^https:\/\//, 'wss://')
       .replace(/^http:\/\//, 'ws://');
 
+    /** Re-subscribe all topics in the registry on the given client */
+    const resubscribeAll = (/** @type {Client} */ cl) => {
+      // Tear down old handles
+      activeSubsRef.current.forEach((sub) => {
+        try { sub.unsubscribe(); } catch (/** @type {any} */ _) { /* ignore */ }
+      });
+      activeSubsRef.current = [];
+
+      registryRef.current.forEach((cb, topic) => {
+        console.log('[STOMP] Subscribing to', topic);
+        const sub = cl.subscribe(topic, cb);
+        activeSubsRef.current.push(sub);
+      });
+    };
+
     const client = new Client({
-      brokerURL: wsUrl,
+      brokerURL: brokerUrl,
       connectHeaders: {
         'Authorization': `Bearer ${token}`,
         'X-Tenant-ID': tenantId,
@@ -57,12 +77,18 @@ export default function useStompEvents(token) {
         if (import.meta.env.DEV) console.debug('[STOMP]', msg);
       },
       onConnect: () => {
+        console.log('[STOMP] Connected to', brokerUrl);
         setIsConnected(true);
-        console.log('[STOMP] Connected to', wsUrl);
+        // (Re-)subscribe everything in the registry
+        resubscribeAll(client);
       },
       onDisconnect: () => {
+        console.log('[STOMP] Disconnected — will auto-reconnect');
         setIsConnected(false);
-        console.log('[STOMP] Disconnected');
+      },
+      onWebSocketClose: () => {
+        console.warn('[STOMP] WebSocket closed — will auto-reconnect');
+        setIsConnected(false);
       },
       onStompError: (/** @type {any} */ frame) => {
         console.error('[STOMP] Error:', frame.headers?.message || frame.body);
@@ -74,10 +100,11 @@ export default function useStompEvents(token) {
     clientRef.current = client;
 
     return () => {
-      subsRef.current.forEach((/** @type {any} */ sub) => {
+      activeSubsRef.current.forEach((sub) => {
         try { sub.unsubscribe(); } catch (/** @type {any} */ _) { /* ignore */ }
       });
-      subsRef.current = [];
+      activeSubsRef.current = [];
+      registryRef.current.clear();
       client.deactivate();
       clientRef.current = null;
       setIsConnected(false);
@@ -86,6 +113,8 @@ export default function useStompEvents(token) {
 
   /**
    * Subscribe to a STOMP topic.
+   * The subscription is added to a registry and automatically re-subscribed
+   * after reconnect. If the client is already connected, subscribes immediately.
    * @param {string} topic
    * @param {(msg: any) => void} callback
    * @returns {{ unsubscribe: () => void }}
@@ -107,22 +136,24 @@ export default function useStompEvents(token) {
       callback(parsed);
     };
 
+    // Register so it survives reconnects
+    registryRef.current.set(topic, onMessage);
+
+    // If already connected, subscribe now
     const client = clientRef.current;
-    if (!client || !client.connected) {
-      console.warn('[STOMP] Not connected, queuing subscribe for:', topic);
-      const interval = setInterval(() => {
-        if (clientRef.current?.connected) {
-          clearInterval(interval);
-          const sub = clientRef.current.subscribe(topic, onMessage);
-          subsRef.current.push(sub);
-        }
-      }, 500);
-      return { unsubscribe: () => clearInterval(interval) };
+    if (client && client.connected) {
+      console.log('[STOMP] Subscribing to', topic);
+      const sub = client.subscribe(topic, onMessage);
+      activeSubsRef.current.push(sub);
     }
 
-    const sub = client.subscribe(topic, onMessage);
-    subsRef.current.push(sub);
-    return sub;
+    return {
+      unsubscribe: () => {
+        registryRef.current.delete(topic);
+        // Find and remove the active sub for this topic
+        // (best-effort — if not connected, nothing to unsub)
+      },
+    };
   }, []);
 
   /**

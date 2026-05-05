@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
+import { appConfig } from '../../config/appConfig.js';
 
 /**
  * @typedef {Object} TenantState
@@ -14,6 +15,7 @@ import { createSlice } from '@reduxjs/toolkit';
  * @property {string|null} productCode
  * @property {string|null} stompWsUrl
  * @property {string|null} websocketUrl
+ * @property {string|null} tenantWsUrl
  * @property {string|null} turnUrl
  * @property {string|null} dashboardUrl
  * @property {Record<string, any>} features
@@ -43,6 +45,7 @@ const initialState = {
   productCode: null,
   stompWsUrl: null,
   websocketUrl: null,
+  tenantWsUrl: null,
   turnUrl: null,
   dashboardUrl: null,
   features: {},
@@ -84,6 +87,24 @@ const tenantSlice = createSlice({
       state.name = name ?? state.name;
       state.companyName = companyName ?? state.companyName;
 
+      // Eagerly derive tenantWsUrl so STOMP can connect without waiting
+      // for the public tenant-config endpoint (dashboard-ui doesn't need it).
+      if (!state.tenantWsUrl) {
+        try {
+          const apiBase = appConfig.API_BASE_URL || '';
+          if (apiBase.startsWith('/')) {
+            const origin = typeof window !== 'undefined' ? window.location.origin : '';
+            state.tenantWsUrl = origin.replace(/^http/, 'ws') + '/ws';
+          } else {
+            const url = new URL(apiBase);
+            const wsProto = url.protocol === 'https:' ? 'wss:' : 'ws:';
+            state.tenantWsUrl = `${wsProto}//${url.host}/ws`;
+          }
+        } catch (e) {
+          console.warn('Failed to derive tenant WS URL in setTenantIdentity:', e);
+        }
+      }
+
       try {
         if (typeof window !== "undefined") {
           window.localStorage.setItem("tenant_config", JSON.stringify(state));
@@ -107,9 +128,9 @@ const tenantSlice = createSlice({
       state.companyName = cfg.company_name ?? null;
       state.status = cfg.status ?? null;
 
-      // Keycloak auth
+      // Keycloak auth — handle both keycloak_realm and realm field names
       state.keycloakUrl = cfg.keycloak_url ?? null;
-      state.keycloakRealm = cfg.keycloak_realm ?? null;
+      state.keycloakRealm = cfg.keycloak_realm ?? cfg.realm ?? null;
       state.keycloakIssuer = cfg.keycloak_issuer ?? null;
 
       // Per-app config — find the matching app for the current appType
@@ -117,16 +138,45 @@ const tenantSlice = createSlice({
       const apps = cfg.apps || [];
       state.apps = apps;
 
-      // Default to first app if only one
       const app = apps[0];
       if (app) {
-        state.keycloakClientId = app.keycloak_client_id ?? null;
-        state.productCode = app.product_code ?? null;
-        state.stompWsUrl = app.websocket_url ?? null;
-        state.websocketUrl = app.websocket_url ?? null;
-        state.turnUrl = app.turn_url ?? null;
+        state.keycloakClientId = app.keycloak_client_id ?? cfg.client_id ?? null;
+        state.productCode = app.product_code ?? cfg.product_code ?? null;
+        // Handle both websocket_url and stomp_ws_url field names (per-app and top-level)
+        const wsUrl = app.websocket_url ?? app.stomp_ws_url ?? cfg.stomp_ws_url ?? null;
+        state.stompWsUrl = wsUrl;
+        state.websocketUrl = wsUrl;
+        state.turnUrl = app.turn_url ?? cfg.turn_url ?? null;
         state.dashboardUrl = app.dashboard_url ?? null;
-        state.features = app.features || {};
+        state.features = app.features || cfg.features || {};
+      } else {
+        // Flat response format — no apps array, read top-level fields directly
+        state.keycloakClientId = cfg.client_id ?? null;
+        state.productCode = cfg.product_code ?? null;
+        state.stompWsUrl = cfg.stomp_ws_url ?? null;
+        state.websocketUrl = cfg.stomp_ws_url ?? null;
+        state.turnUrl = cfg.turn_url ?? null;
+        state.dashboardUrl = null;
+        state.features = cfg.features || {};
+      }
+
+      // Derive tenant-service WS URL from API_BASE_URL
+      // API_BASE_URL: https://api.dalaillama.in/api/v1 → wss://api.dalaillama.in/ws
+      // API_BASE_URL: /api/v1 (local proxy) → ws://localhost:{port}/ws
+      try {
+        const apiBase = appConfig.API_BASE_URL || '';
+        if (apiBase.startsWith('/')) {
+          // Local dev with Vite proxy — use current origin
+          const origin = typeof window !== 'undefined' ? window.location.origin : '';
+          state.tenantWsUrl = origin.replace(/^http/, 'ws') + '/ws';
+        } else {
+          const url = new URL(apiBase);
+          const wsProto = url.protocol === 'https:' ? 'wss:' : 'ws:';
+          state.tenantWsUrl = `${wsProto}//${url.host}/ws`;
+        }
+      } catch (e) {
+        console.warn('Failed to derive tenant WS URL:', e);
+        state.tenantWsUrl = null;
       }
 
       state.isResolved = true;
@@ -156,8 +206,9 @@ const tenantSlice = createSlice({
       if (app) {
         state.keycloakClientId = app.keycloak_client_id ?? null;
         state.productCode = app.product_code ?? null;
-        state.stompWsUrl = app.websocket_url ?? null;
-        state.websocketUrl = app.websocket_url ?? null;
+        const wsUrl = app.websocket_url ?? app.stomp_ws_url ?? null;
+        state.stompWsUrl = wsUrl;
+        state.websocketUrl = wsUrl;
         state.turnUrl = app.turn_url ?? null;
         state.dashboardUrl = app.dashboard_url ?? null;
         state.features = app.features || {};
@@ -194,5 +245,9 @@ export const selectFeatures = (state) => state.tenant.features;
 export const selectFeature = (name) => (state) => !!state.tenant.features[name];
 /** @param {{ tenant: TenantState }} state */
 export const selectIsResolved = (state) => state.tenant.isResolved;
+/** @param {{ tenant: TenantState }} state */
+export const selectTenantWsUrl = (state) => state.tenant.tenantWsUrl;
+/** @param {{ tenant: TenantState }} state */
+export const selectStompWsUrl = (state) => state.tenant.stompWsUrl;
 
 export default tenantSlice.reducer;

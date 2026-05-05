@@ -136,9 +136,6 @@ export const PaymentGateway = ({ plan, selectedDid, agentCount, tenantId, produc
     setCheckoutStage('idle');
     showToast('Subscription activated successfully', 'success');
     onComplete();
-    setTimeout(() => {
-      window.location.assign(`${window.location.origin}${import.meta.env.DEV ? '/' : '/dashboard/'}`);
-    }, 1000);
   }, [clearPolling, onComplete, showToast]);
 
   const handleProvisioningFailure = useCallback(() => {
@@ -272,9 +269,10 @@ export const PaymentGateway = ({ plan, selectedDid, agentCount, tenantId, produc
       }
 
       pollSubscriptionStatus(subscriptionId);
-    } catch {
+    } catch (/** @type {any} */ err) {
       setCheckoutStage('idle');
-      showToast('Unable to create subscription. Please try again.', 'error');
+      const apiMessage = err?.data?.message || err?.message || null;
+      showToast(apiMessage || 'Unable to create subscription. Please try again.', 'error');
     }
   }, [amountDue, createSubscription, hasEnoughWalletBalance, onRechargeRequired, orderTotal, pollSubscriptionStatus, refetchWallet, showToast, walletBalance]);
 

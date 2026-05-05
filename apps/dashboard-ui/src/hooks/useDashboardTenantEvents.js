@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 
 import {
   selectTenantId,
+  selectTenantWsUrl,
   setWallet,
   showFlash,
 } from "@dalaillama/shared-store";
@@ -25,8 +26,10 @@ const normalizeTenantEvent = (payload, tenantId) => {
     const eventName =
       payload.event ||
       payload.eventType ||
+      payload.EventType ||
       baseData.event ||
       baseData.eventType ||
+      baseData.EventType ||
       null;
     const status =
       payload.status ||
@@ -93,7 +96,18 @@ export default function useDashboardTenantEvents() {
   const dispatch = useDispatch();
   const tenantId = useSelector(selectTenantId);
   const token = useSelector((s) => s.auth.keycloakToken || s.auth.token);
-  const { isConnected, subscribe, send } = useStompEvents(token);
+  const tenantWsUrl = useSelector(selectTenantWsUrl);
+  const stompWsUrl = useSelector((s) => s.tenant.stompWsUrl);
+
+  // Debug: log which URL is being used for STOMP connection
+  console.debug('[dashboard-events] STOMP urls:', {
+    tenantWsUrl,
+    stompWsUrl,
+    tenantId,
+    hasToken: !!token,
+  });
+
+  const { isConnected, subscribe, send } = useStompEvents(token, tenantWsUrl);
   const pingTenantRef = useRef(null);
 
   const topics = useMemo(() => {

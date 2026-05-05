@@ -39,13 +39,15 @@ const normalizeError = (err) => {
   }
 
   if (typeof err.status === "number") {
-    return {
-      status: err.status,
-      message:
-        typeof err.data === "string"
-          ? err.data
-          : JSON.stringify(err.data || {}),
-    };
+    const data = err.data;
+    /** @type {string} */
+    let message = "An unexpected error occurred";
+    if (typeof data === "string") {
+      message = data;
+    } else if (data && typeof data === "object") {
+      message = data.message || data.error || data.detail || JSON.stringify(data);
+    }
+    return { status: err.status, message };
   }
 
   return { status: 0, message: "Unhandled error" };
@@ -584,7 +586,8 @@ const baseQueryWithMetrics = async (args, api, extra) => {
   }
 
   if (status >= 500) {
-    api.dispatch(showFlash({ message: "Server error", type: "error" }));
+    const serverMessage = error.message || "Something went wrong. Please try again.";
+    api.dispatch(showFlash({ message: serverMessage, type: "error" }));
   }
 
   return { error };
@@ -1325,6 +1328,42 @@ export const api = createApi({
     getSubscriptionStatus: builder.query({
       query: (subscriptionId) => `/subscriptions/${subscriptionId}`,
     }),
+    /* ---------------- TENANT APPS & PROVISIONING ---------------- */
+    getMyApps: builder.query({
+      query: () => "/tenants/me/apps",
+      transformResponse: (response) => unwrapJavaTypedJson(response),
+    }),
+    retryProvision: builder.mutation({
+      query: (tenantAppId) => ({
+        url: `/tenants/apps/${tenantAppId}/retry`,
+        method: "POST",
+      }),
+    }),
+    deleteApp: builder.mutation({
+      query: (tenantAppId) => ({
+        url: `/tenants/apps/${tenantAppId}`,
+        method: "DELETE",
+      }),
+    }),
+    getProvisionStatus: builder.query({
+      query: (tenantAppId) => `/tenants/apps/${tenantAppId}/provision/status`,
+    }),
+    /* ---------------- DID MANAGEMENT ---------------- */
+    getMyDids: builder.query({
+      query: () => "/tenants/me/dids",
+    }),
+    releaseDid: builder.mutation({
+      query: (didId) => ({
+        url: `/tenants/me/dids/${didId}`,
+        method: "DELETE",
+      }),
+    }),
+    cancelSubscription: builder.mutation({
+      query: (subscriptionId) => ({
+        url: `/tenants/me/subscriptions/${subscriptionId}`,
+        method: "DELETE",
+      }),
+    }),
     /* ---------------- BILLING & LICENSE ---------------- */
     getAuditLogs: builder.query({
       query: (userId) => `/audit/log/${userId}`
@@ -1594,5 +1633,13 @@ export const {
   useGetMyTenantQuery,
   useGetProductsQuery,
   useGetProductPlansQuery,
-  useSearchAvailableDidsQuery
+  useSearchAvailableDidsQuery,
+  useGetMyAppsQuery,
+  useRetryProvisionMutation,
+  useDeleteAppMutation,
+  useGetProvisionStatusQuery,
+  useLazyGetProvisionStatusQuery,
+  useGetMyDidsQuery,
+  useReleaseDidMutation,
+  useCancelSubscriptionMutation,
 } = api;

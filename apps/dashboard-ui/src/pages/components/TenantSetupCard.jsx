@@ -44,7 +44,8 @@ import { useTenantRegisterMutation } from "@dalaillama/shared-store";
  * @property {string} name
  * @property {string} description
  * @property {ProductType} type
-  * @property {boolean} active@property {Object.<string, boolean>} [features] - Key-value map of feature flags.
+ * @property {boolean} active
+ * @property {Object<string, boolean>} [features] - Key-value map of feature flags.
  */
 
 /* ============================================================================
@@ -93,6 +94,7 @@ const normalizePhoneDigits = (value) => value.replace(/[^\d]/g, "");
  * @returns {ValidationErrors}
  */
 const validateForm = (values) => {
+  /** @type {ValidationErrors} */
   const errors = {};
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   const selectedCountry = getCountryMeta(values.country);
@@ -137,7 +139,7 @@ const validateForm = (values) => {
  * @param {React.ElementType} [props.icon]
  * @param {TenantForm} props.form
  * @param {ValidationErrors} props.fieldErrors
- * @param {Object<string, boolean>} props.touched
+ * @param {Object.<string, boolean>} props.touched
  * @param {(field: string) => void} props.onBlur
  * @param {(field: keyof TenantForm, value: string) => void} props.onChange
  */
@@ -196,9 +198,11 @@ const FormField = ({ label, field, type = "text", placeholder, icon: Icon, form,
 const TenantSetupCard = ({ onCreated, authProfile }) => {
 
   const [serverError, setServerError] = useState(/** @type {string|null} */ (null));
-  const [touched, setTouched] = useState(/** @type {Object<string, boolean>} */ ({}));
+  const [touched, setTouched] = useState(/** @type {Object.<string, boolean>} */ ({}));
   
-  const [registerTenant, { data: registrationResponse,isLoading: isRegistering, isError: hasRegistrationError, error: registrationError,isSuccess: isRegistrationSuccess }] = useTenantRegisterMutation();
+  // @ts-ignore — RTK Query mutation hook typing
+  const [registerTenant, mutationResult] = useTenantRegisterMutation();
+  const { data: registrationResponse, isLoading: isRegistering, isError: hasRegistrationError, error: registrationError, isSuccess: isRegistrationSuccess } = /** @type {any} */ (mutationResult);
 
   /** @type {[TenantForm, React.Dispatch<React.SetStateAction<TenantForm>>]} */
   const [form, setForm] = useState({
@@ -268,13 +272,14 @@ useEffect(() => {
 
 useEffect(() => {
   if (hasRegistrationError) {
-    setServerError(registrationError?.data?.message ?? registrationError?.message ?? "Registration failed. Please try again.");
+    const /** @type {any} */ err = registrationError;
+    setServerError(err?.data?.message ?? err?.message ?? "Registration failed. Please try again.");
   }
 }, [hasRegistrationError, registrationError]);
 
   /** @returns {Promise<void>} */
 const submit = async () => {
-  const allTouched = Object.keys(form).reduce((acc, key) => ({ ...acc, [key]: true }), {});
+  const allTouched = Object.keys(form).reduce((/** @type {Object.<string, boolean>} */ acc, /** @type {string} */ key) => ({ ...acc, [key]: true }), /** @type {Object.<string, boolean>} */ ({}));
   setTouched(allTouched);
 
   if (!isValid) return;
