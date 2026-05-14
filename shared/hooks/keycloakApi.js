@@ -10,6 +10,10 @@ const PKCE_VERIFIER_KEY = "pkce_verifier";
 const OAUTH_STATE_KEY = "oauth_state";
 const KNOWN_BASENAMES = ["/platform", "/dashboard"];
 
+/**
+ * @param {unknown} tenantId
+ * @returns {string | null}
+ */
 const normalizeTenantId = (tenantId) => {
   if (!tenantId) return null;
   const normalized = String(tenantId).trim();
@@ -26,6 +30,7 @@ const LOCALHOST_PORT_CLIENT_MAP = {
   "5175": "supervisor-ui",
   "5176": "agent-ui",
   "5177": "dashboard-ui",
+  "5181": "creator-ui",
 };
 
 /**
@@ -105,6 +110,7 @@ export const resolveClientId = () => {
   if (hostname.startsWith("supervisor-")) return "supervisor-ui";
   if (hostname.startsWith("agent-")) return "agent-ui";
   if (hostname.startsWith("dashboard.")) return "dashboard-ui";
+  if (hostname.startsWith("creator.")) return "creator-ui";
   if (hostname.startsWith("platform.")) return "platform-ui";
 
   return appConfig.KEYCLOAK_CLIENT_ID;

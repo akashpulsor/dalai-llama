@@ -47,6 +47,7 @@
  *   AGENT: string,
  *   ANALYTICS: string,
  *   SUBSCRIPTION: string,
+ *   CREATOR: string,
  *   TENANT: string
  * }} APP_ROUTES
  *
@@ -55,7 +56,8 @@
  *   agent?: string,
  *   dashboard?: string,
  *   analytics?: string,
- *   subscription?: string
+ *   subscription?: string,
+ *   creator?: string
  * }} REMOTE_APPS
  *
  * ---------- TENANT-BASED ROUTES -------
@@ -231,6 +233,7 @@ export const appConfig = {
     AGENT: "/agent",
     ANALYTICS: "/analytics",
     SUBSCRIPTION: "/subscription",
+    CREATOR: "/creator",
     TENANT: "/tenant",
   },
   
@@ -241,6 +244,7 @@ export const appConfig = {
     //dashboard:  "http://localhost:5174",
     analytics: env.VITE_ANALYTICS_APP_URL || "http://localhost:5176",
     subscription: env.VITE_SUBSCRIPTION_APP_URL || "https://api.dalaillama.in",
+    creator: runtimeEnv.CREATOR_APP_URL || env.VITE_CREATOR_APP_URL || "https://creator.dalaillama.in",
   },
 
   /* TENANT-BASED URLS (fetched from backend, override later) */

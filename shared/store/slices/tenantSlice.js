@@ -31,6 +31,51 @@ const safeGetStorageItem = (/** @type {string} */ key) => {
   }
 };
 
+/** @param {any} cfg */
+const getTenantApps = (cfg) => {
+  if (Array.isArray(cfg?.apps)) return cfg.apps;
+  if (cfg?.app && typeof cfg.app === "object") return [cfg.app];
+  return [];
+};
+
+/** @param {any} app */
+const getAppClientId = (app) => app?.keycloak_client_id ?? app?.keycloakClientId ?? null;
+/** @param {any} app */
+const getAppProductCode = (app) => app?.product_code ?? app?.productCode ?? null;
+/** @param {any} app */
+const getAppWsUrl = (app, cfg) => app?.websocket_url ?? app?.websocketUrl ?? app?.stomp_ws_url ?? app?.stompWsUrl ?? cfg?.stomp_ws_url ?? cfg?.stompWsUrl ?? null;
+/** @param {any} app */
+const getAppTurnUrl = (app, cfg) => app?.turn_url ?? app?.turnUrl ?? cfg?.turn_url ?? cfg?.turnUrl ?? null;
+/** @param {any} app */
+const getAppDashboardUrl = (app) => app?.dashboard_url ?? app?.dashboardUrl ?? app?.app_url ?? app?.appUrl ?? app?.url ?? null;
+/** @param {any} app */
+const getAppFeatures = (app, cfg) => app?.features || cfg?.features || {};
+
+/**
+ * @param {any} app
+ * @param {string} targetAppType
+ * @returns {boolean}
+ */
+const matchesAppType = (app, targetAppType) => {
+  const rawType = String(app?.app_type ?? app?.appType ?? "").toLowerCase();
+  const rawProduct = String(app?.product_code ?? app?.productCode ?? "").toLowerCase();
+  const rawSubdomain = String(app?.subdomain ?? "").toLowerCase();
+
+  if (targetAppType === "admin") {
+    return rawType.includes("admin") || rawProduct.includes("admin") || rawSubdomain === "admin";
+  }
+  if (targetAppType === "supervisor") {
+    return rawType.includes("supervisor") || rawProduct.includes("supervisor") || rawSubdomain === "supervisor";
+  }
+  if (targetAppType === "agent") {
+    return rawType.includes("contact_center") || rawType.includes("agent") || rawProduct.includes("agent") || rawSubdomain === "agent";
+  }
+  if (targetAppType === "dashboard") {
+    return rawType.includes("dashboard") || rawProduct.includes("dashboard") || rawSubdomain === "dashboard";
+  }
+  return false;
+};
+
 /** @type {TenantState} */
 const initialState = {
   tenantId: null,
@@ -135,27 +180,26 @@ const tenantSlice = createSlice({
 
       // Per-app config — find the matching app for the current appType
       // (set by useTenantAuth after resolving from hostname)
-      const apps = cfg.apps || [];
+      const apps = getTenantApps(cfg);
       state.apps = apps;
 
       const app = apps[0];
       if (app) {
-        state.keycloakClientId = app.keycloak_client_id ?? cfg.client_id ?? null;
-        state.productCode = app.product_code ?? cfg.product_code ?? null;
-        // Handle both websocket_url and stomp_ws_url field names (per-app and top-level)
-        const wsUrl = app.websocket_url ?? app.stomp_ws_url ?? cfg.stomp_ws_url ?? null;
+        state.keycloakClientId = getAppClientId(app) ?? cfg.client_id ?? cfg.clientId ?? null;
+        state.productCode = getAppProductCode(app) ?? cfg.product_code ?? cfg.productCode ?? null;
+        const wsUrl = getAppWsUrl(app, cfg);
         state.stompWsUrl = wsUrl;
         state.websocketUrl = wsUrl;
-        state.turnUrl = app.turn_url ?? cfg.turn_url ?? null;
-        state.dashboardUrl = app.dashboard_url ?? null;
-        state.features = app.features || cfg.features || {};
+        state.turnUrl = getAppTurnUrl(app, cfg);
+        state.dashboardUrl = getAppDashboardUrl(app);
+        state.features = getAppFeatures(app, cfg);
       } else {
         // Flat response format — no apps array, read top-level fields directly
-        state.keycloakClientId = cfg.client_id ?? null;
-        state.productCode = cfg.product_code ?? null;
-        state.stompWsUrl = cfg.stomp_ws_url ?? null;
-        state.websocketUrl = cfg.stomp_ws_url ?? null;
-        state.turnUrl = cfg.turn_url ?? null;
+        state.keycloakClientId = cfg.client_id ?? cfg.clientId ?? null;
+        state.productCode = cfg.product_code ?? cfg.productCode ?? null;
+        state.stompWsUrl = cfg.stomp_ws_url ?? cfg.stompWsUrl ?? null;
+        state.websocketUrl = cfg.stomp_ws_url ?? cfg.stompWsUrl ?? null;
+        state.turnUrl = cfg.turn_url ?? cfg.turnUrl ?? null;
         state.dashboardUrl = null;
         state.features = cfg.features || {};
       }
@@ -198,20 +242,17 @@ const tenantSlice = createSlice({
      */
     selectApp(state, action) {
       const appType = action.payload;
-      const app = state.apps.find(a =>
-        a.app_type?.toLowerCase() === appType ||
-        a.product_code?.toLowerCase().includes(appType)
-      ) || state.apps[0];
+      const app = state.apps.find((a) => matchesAppType(a, appType)) || state.apps[0];
 
       if (app) {
-        state.keycloakClientId = app.keycloak_client_id ?? null;
-        state.productCode = app.product_code ?? null;
-        const wsUrl = app.websocket_url ?? app.stomp_ws_url ?? null;
+        state.keycloakClientId = getAppClientId(app);
+        state.productCode = getAppProductCode(app);
+        const wsUrl = getAppWsUrl(app, {});
         state.stompWsUrl = wsUrl;
         state.websocketUrl = wsUrl;
-        state.turnUrl = app.turn_url ?? null;
-        state.dashboardUrl = app.dashboard_url ?? null;
-        state.features = app.features || {};
+        state.turnUrl = getAppTurnUrl(app, {});
+        state.dashboardUrl = getAppDashboardUrl(app);
+        state.features = getAppFeatures(app, {});
       }
     },
 

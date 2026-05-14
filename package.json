@@ -12,11 +12,13 @@
     "dev:agent": "npm run dev --workspace=agent-ui",
     "dev:analytics": "npm run dev --workspace=analytics-ui",
     "dev:subscription": "npm run dev --workspace=subscription-ui",
+    "dev:creator": "npm run dev --workspace=creator-ui",
     "build:platform": "npm run build --workspace=platform-ui",
     "build:dashboard": "npm run build --workspace=dashboard-ui",
     "build:agent": "npm run build --workspace=agent-ui",
     "build:analytics": "npm run build --workspace=analytics-ui",
     "build:subscription": "npm run build --workspace=subscription-ui",
+    "build:creator": "npm run build --workspace=creator-ui",
     "dev:all": "npm run dev --workspaces",
     "build:all": "npm run build --workspaces"
   },

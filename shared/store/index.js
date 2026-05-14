@@ -19,6 +19,11 @@ import liveCallsReducer from "./slices/liveCallsSlice.js";
 import agentPresenceReducer from "./slices/agentPresenceSlice.js";
 import billingReducer from "./slices/billingSlice.js";
 import ivrReducer from "./slices/ivrSlice.js";
+import {
+  creatorPlannerReducer,
+  creatorPreviewReducer,
+  creatorStoryboardLocalReducer,
+} from "../../apps/creator-ui/src/slices/index.js";
 
 const isDashboardRuntime = (() => {
   if (typeof window === "undefined") return false;
@@ -61,6 +66,9 @@ export const createStore = () => {
       agentPresence: agentPresenceReducer,
       billing: billingReducer,
       ivr: ivrReducer,
+      creatorPlanner: creatorPlannerReducer,
+      creatorPreview: creatorPreviewReducer,
+      creatorStoryboardLocal: creatorStoryboardLocalReducer,
     };
 
     if (!isDashboardRuntime) {
@@ -101,6 +109,7 @@ export default store;
 export * from "./slices/apiSlice.js";
 export * from "./slices/authSlice.js";
 export * from "./slices/flashSlice.js";
+export * from "../../apps/creator-ui/src/slices/index.js";
 
 export {
   setTenantIdentity,

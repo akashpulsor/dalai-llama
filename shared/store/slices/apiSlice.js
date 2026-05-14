@@ -427,6 +427,214 @@ const MOCK_RESPONSES = {
   // ⭐ NEW → Branding fields
   brandName: "Demo Contact Center",
   brandLogo: "https://via.placeholder.com/200x60?text=Demo+Logo"
+},
+
+/* ---------------- CREATOR UI MOCKS ---------------- */
+"/creator/trends": [
+  {
+    id: "trend-she-almost",
+    title: "She Almost Didn't Go",
+    status: "Very Hot",
+    hashtags: ["#FitnessJourney", "#ShowUp", "#GlowUp"],
+    reels: "12.4K",
+    reelsGrowth: "+38%",
+    engagement: "9.1%",
+    engagementGrowth: "+21%"
+  },
+  {
+    id: "trend-wife-gym",
+    title: "POV: Indian Wife Starts Gym",
+    status: "Hot",
+    hashtags: ["#IndianFitness", "#POV", "#GymLife"],
+    reels: "9.8K",
+    reelsGrowth: "+31%",
+    engagement: "8.4%",
+    engagementGrowth: "+18%"
+  },
+  {
+    id: "trend-study-late",
+    title: "Study With Me - Late Nights",
+    status: "Trending",
+    hashtags: ["#StudyWithMe", "#LateNight", "#Discipline"],
+    reels: "7.2K",
+    reelsGrowth: "+24%",
+    engagement: "7.7%",
+    engagementGrowth: "+16%"
+  },
+  {
+    id: "trend-skin-routine",
+    title: "Glowing Skin Real Routine",
+    status: "Hot",
+    hashtags: ["#SkinCare", "#RealRoutine", "#Glow"],
+    reels: "8.6K",
+    reelsGrowth: "+29%",
+    engagement: "8.8%",
+    engagementGrowth: "+19%"
+  },
+  {
+    id: "trend-protein-meals",
+    title: "High Protein Indian Meals",
+    status: "Trending",
+    hashtags: ["#Protein", "#IndianMeals", "#MealPrep"],
+    reels: "6.9K",
+    reelsGrowth: "+22%",
+    engagement: "7.3%",
+    engagementGrowth: "+14%"
+  }
+],
+"/creator/trends/refresh": {
+  status: "success",
+  refreshedAt: "2026-05-13T10:00:00.000Z"
+},
+"/creator/trend-combinations": {
+  platforms: [
+    { code: "instagram", label: "Instagram Reels", active: true },
+    { code: "youtube", label: "YouTube Shorts", active: true },
+    { code: "tiktok", label: "TikTok", active: true }
+  ],
+  categories: [
+    { code: "fitness", label: "Fitness", active: true },
+    { code: "beauty", label: "Beauty", active: true },
+    { code: "food", label: "Food", active: true },
+    { code: "study", label: "Study", active: true },
+    { code: "tech_ai", label: "Tech & AI", active: true },
+    { code: "finance_crypto", label: "Finance & Crypto", active: true }
+  ],
+  combinations: [
+    { platformCode: "instagram", categoryCode: "fitness", active: true },
+    { platformCode: "instagram", categoryCode: "beauty", active: true },
+    { platformCode: "instagram", categoryCode: "food", active: true },
+    { platformCode: "instagram", categoryCode: "study", active: true },
+    { platformCode: "youtube", categoryCode: "fitness", active: true },
+    { platformCode: "youtube", categoryCode: "study", active: true },
+    { platformCode: "youtube", categoryCode: "tech_ai", active: true },
+    { platformCode: "tiktok", categoryCode: "fitness", active: true },
+    { platformCode: "tiktok", categoryCode: "beauty", active: true }
+  ]
+},
+"/creator/trends/predict": {
+  jobId: "job-predict-trends-mock",
+  predictionRunId: "prediction-run-mock",
+  status: "PENDING"
+},
+"/creator/audience/suggest": {
+  id: "audience-women-22-35-in",
+  title: "Women 22-35 in India",
+  description: "Interested in fitness, weight loss, confidence building and self improvement."
+},
+"/creator/audience/confirm": {
+  id: "audience-women-22-35-in",
+  status: "confirmed"
+},
+"/creator/profiles": [
+  {
+    id: "creator-priya",
+    name: "Priya",
+    age: 27,
+    gender: "Female",
+    vibe: ["Relatable", "Soft Spoken", "Determined"],
+    fitnessLevel: "Beginner",
+    style: "Casual Gym Wear",
+    cameraConfidence: "Shy"
+  }
+],
+"/creator/ideas/generate": {
+  ideas: [
+    {
+      id: "idea-she-almost",
+      title: "She Almost Didn't Go",
+      bestMatch: true,
+      description: "A hesitant beginner nearly skips the gym, then chooses one small brave step.",
+      hashtags: ["#ShowUp", "#FitnessJourney", "#BeginnerGym"]
+    },
+    {
+      id: "idea-wife-gym",
+      title: "POV: Indian Wife Starts Gym",
+      bestMatch: false,
+      description: "A relatable first-day gym story built around family expectations and self-belief.",
+      hashtags: ["#POV", "#IndianFitness", "#Confidence"]
+    },
+    {
+      id: "idea-day-one",
+      title: "Nobody Saw Her Day 1",
+      bestMatch: false,
+      description: "Quiet progress montage that turns a private first step into a public win.",
+      hashtags: ["#DayOne", "#GlowUp", "#Discipline"]
+    }
+  ]
+},
+"/creator/storyboard/generate": {
+  projectId: "project-she-almost",
+  status: "queued"
+},
+"/creator/locked-ideas/quote": {
+  cost: 149,
+  currency: "INR",
+  entitlementAllowed: true,
+  wallet: { balance: 1250, currency: "INR" },
+  includedItems: ["Locked idea", "First storyboard generation", "Director-level scene plan"]
+},
+"/creator/locked-ideas/generate-storyboard": {
+  lockedIdeaId: "locked-idea-mock",
+  storyboardId: "storyboard-she-almost",
+  jobId: "job-storyboard-mock",
+  status: "PENDING"
+},
+"/creator/storyboards/history": [
+  {
+    id: "storyboard-she-almost",
+    title: "She Almost Didn't Go",
+    lockedIdeaTitle: "She Almost Didn't Go",
+    durationSeconds: 30,
+    status: "COMPLETED",
+    time: "Just now"
+  },
+  {
+    id: "storyboard-gym-bag",
+    title: "The Gym Bag Stayed Packed",
+    lockedIdeaTitle: "First Small Win",
+    durationSeconds: 45,
+    status: "COMPLETED",
+    time: "Yesterday"
+  }
+],
+"/creator/storyboards/saved": [
+  {
+    id: "storyboard-she-almost",
+    title: "She Almost Didn't Go",
+    lockedIdeaTitle: "Beginner fitness transformation",
+    durationSeconds: 30,
+    status: "SAVED"
+  }
+],
+"/creator/export": {
+  exportId: "export-creator-mock",
+  status: "ready",
+  downloadUrl: "/mocks/storyboard/she-almost-storyboard.pdf"
+},
+"/creator/billing/wallet": {
+  balance: 1250,
+  currency: "INR"
+},
+"/creator/billing/recharge": {
+  rechargeId: "recharge-mock",
+  status: "PENDING",
+  paymentUrl: "https://billing.dalaillama.in/mock/recharge"
+},
+"/creator/subscription": {
+  planCode: "CREATOR_PRO",
+  planName: "Creator Pro",
+  status: "ACTIVE",
+  creatorEntitlements: {
+    creatorTrendPredictionEnabled: true,
+    lockIdeaPackageEnabled: true,
+    creatorTrendPredictionsPerMonth: 100
+  }
+},
+"/creator/subscription/upgrade": {
+  checkoutId: "checkout-upgrade-mock",
+  status: "PENDING",
+  checkoutUrl: "https://billing.dalaillama.in/mock/upgrade"
 }
 
 };
@@ -441,11 +649,334 @@ const MOCK_RESPONSES = {
 const mockBaseQuery = async (args) => {
   const endpoint =
     typeof args === "string" ? args : args.url ? args.url : "";
+  const method = typeof args === "string" ? "GET" : args.method || "GET";
 
   await new Promise((r) => setTimeout(r, 250));
 
   /** @type {string} */
   const key = String(endpoint);  // ✅ Fix: ensure string key
+
+  const creatorJobMatch = key.match(/^\/creator\/jobs\/([^/]+)$/);
+  if (creatorJobMatch) {
+    const [, jobId] = creatorJobMatch;
+    if (jobId.includes("predict")) {
+      return {
+        data: {
+          jobId,
+          status: "COMPLETED",
+          progress: 100,
+          message: "Trend prediction ready",
+          result: { predictionRunId: "prediction-run-mock" }
+        }
+      };
+    }
+
+    return {
+      data: {
+        jobId,
+        status: "COMPLETED",
+        progress: 100,
+        message: "Director-level storyboard ready",
+        result: {
+          storyboard: {
+            id: "storyboard-she-almost",
+            projectId: "project-she-almost",
+            title: "She Almost Didn't Go",
+            durationSeconds: 30,
+            hook: "A hesitant first step becomes the emotional proof that showing up counts.",
+            sceneCount: 10,
+            scenes: [
+              {
+                id: "scene-01",
+                timestamp: "0-2 sec",
+                description: "Priya stands outside the gym holding her bag, frozen before entering.",
+                vo: "I almost didn't go today.",
+                shotType: "Wide",
+                hookBeat: "Immediate hesitation hook",
+                expression: "Nervous, eyes lowered, shallow breath",
+                dialogue: "I almost didn't go today.",
+                cameraAngle: "Wide low-angle exterior with gym sign visible",
+                cameraMovement: "Slow push-in",
+                intendedImpact: "Make the viewer recognize the fear before the first step",
+                transition: "Hard cut on breath",
+                soundNote: "Soft city ambience, low heartbeat"
+              },
+              {
+                id: "scene-02",
+                timestamp: "2-4 sec",
+                description: "Close-up of her thumb hovering over a message saying 'Maybe tomorrow'.",
+                vo: "Excuses felt easier.",
+                shotType: "Insert close-up",
+                hookBeat: "Relatable resistance",
+                expression: "Tense hand, tiny tremor",
+                dialogue: "Excuses felt easier.",
+                cameraAngle: "Phone insert from over shoulder",
+                cameraMovement: "Static",
+                intendedImpact: "Show the exact moment she nearly quits",
+                transition: "Match cut to shoes",
+                soundNote: "Notification tap, muted"
+              },
+              {
+                id: "scene-03",
+                timestamp: "4-7 sec",
+                description: "Her shoes step forward once, stopping at the entrance line.",
+                vo: "So I made the promise smaller.",
+                shotType: "Low detail",
+                hookBeat: "Tiny action changes the story",
+                expression: "Body still guarded, shoulders tight",
+                dialogue: "Just ten minutes.",
+                cameraAngle: "Low angle on shoes",
+                cameraMovement: "Micro dolly forward",
+                intendedImpact: "Turn motivation into a simple action",
+                transition: "Door sound bridge",
+                soundNote: "Rubber sole squeak"
+              },
+              {
+                id: "scene-04",
+                timestamp: "7-10 sec",
+                description: "She enters the gym and looks around, overwhelmed but present.",
+                vo: "Not a new life. Just a new choice.",
+                shotType: "Medium",
+                hookBeat: "Audience sees the pressure",
+                expression: "Wide eyes, controlled inhale",
+                dialogue: "Not a new life. Just a new choice.",
+                cameraAngle: "Medium from behind, gym depth visible",
+                cameraMovement: "Handheld follow",
+                intendedImpact: "Make the gym feel intimidating without making her weak",
+                transition: "Cut on glance",
+                soundNote: "Distant weights, soft room tone"
+              },
+              {
+                id: "scene-05",
+                timestamp: "10-14 sec",
+                description: "She ties her hair and adjusts her grip on a light dumbbell.",
+                vo: "I didn't feel ready.",
+                shotType: "Close up",
+                hookBeat: "Preparation beat",
+                expression: "Focused but uncertain",
+                dialogue: "I didn't feel ready.",
+                cameraAngle: "Close-up hands and face reflected in mirror",
+                cameraMovement: "Static mirror frame",
+                intendedImpact: "Show preparation as courage",
+                transition: "Cut with music lift",
+                soundNote: "Music enters quietly"
+              },
+              {
+                id: "scene-06",
+                timestamp: "14-18 sec",
+                description: "First awkward rep, slow and imperfect.",
+                vo: "But I started anyway.",
+                shotType: "Medium action",
+                hookBeat: "Imperfect action beat",
+                expression: "Strained, embarrassed smile",
+                dialogue: "But I started anyway.",
+                cameraAngle: "Three-quarter medium at shoulder height",
+                cameraMovement: "Gentle handheld sway",
+                intendedImpact: "Give permission to begin badly",
+                transition: "Rep motion cut",
+                soundNote: "Breath and soft weight clink"
+              },
+              {
+                id: "scene-07",
+                timestamp: "18-22 sec",
+                description: "She pauses after the set, surprised that she completed it.",
+                vo: "One small win was enough.",
+                shotType: "Reaction close-up",
+                hookBeat: "Payoff begins",
+                expression: "Surprised relief, small smile",
+                dialogue: "One small win was enough.",
+                cameraAngle: "Close-up with mirror light",
+                cameraMovement: "Slow push-in",
+                intendedImpact: "Land the emotional reward",
+                transition: "Soft dissolve",
+                soundNote: "Music warms"
+              },
+              {
+                id: "scene-08",
+                timestamp: "22-25 sec",
+                description: "Text on screen over her tying her bag: 'Just one decision...'",
+                vo: "Just one decision...",
+                shotType: "Text overlay",
+                hookBeat: "Memorable line",
+                expression: "Calm, more grounded",
+                dialogue: "Just one decision...",
+                cameraAngle: "Close-up bag strap",
+                cameraMovement: "Static",
+                intendedImpact: "Create a shareable caption moment",
+                transition: "Text wipe",
+                soundNote: "Music beat hit"
+              },
+              {
+                id: "scene-09",
+                timestamp: "25-28 sec",
+                description: "She walks out of the gym, posture slightly taller.",
+                vo: "To show up.",
+                shotType: "Wide exit",
+                hookBeat: "Transformation without exaggeration",
+                expression: "Quiet confidence",
+                dialogue: "To show up.",
+                cameraAngle: "Wide from doorway",
+                cameraMovement: "Follow then stop",
+                intendedImpact: "Make the change feel believable",
+                transition: "Cut to end frame",
+                soundNote: "Music resolves"
+              },
+              {
+                id: "scene-10",
+                timestamp: "28-30 sec",
+                description: "End frame: Priya outside, morning light behind her.",
+                vo: "Start small. Start today.",
+                shotType: "Hero end frame",
+                hookBeat: "CTA close",
+                expression: "Soft smile, direct eye contact",
+                dialogue: "Start small. Start today.",
+                cameraAngle: "Portrait hero frame",
+                cameraMovement: "Static",
+                intendedImpact: "Leave the viewer with an actionable feeling",
+                transition: "End card",
+                soundNote: "Final warm chord"
+              }
+            ]
+          }
+        }
+      }
+    };
+  }
+
+  const creatorStoryboardSaveMatch = key.match(/^\/creator\/storyboards\/([^/]+)\/save$/);
+  if (creatorStoryboardSaveMatch) {
+    const [, storyboardId] = creatorStoryboardSaveMatch;
+    return {
+      data: {
+        storyboardId,
+        saved: method !== "DELETE",
+        status: method === "DELETE" ? "UNSAVED" : "SAVED"
+      }
+    };
+  }
+
+  const creatorStoryboardByIdMatch = key.match(/^\/creator\/storyboards\/([^/]+)$/);
+  if (creatorStoryboardByIdMatch) {
+    return {
+      data: {
+        id: "storyboard-she-almost",
+        title: "She Almost Didn't Go",
+        durationSeconds: 30,
+        scenes: []
+      }
+    };
+  }
+
+  const tenantSubscriptionMatch = key.match(/^\/tenants\/([^/]+)\/subscriptions\/([^/]+)$/);
+  if (tenantSubscriptionMatch) {
+    const [, tenantId, subscriptionId] = tenantSubscriptionMatch;
+    return {
+      data: {
+        id: "mock-subscription-detail",
+        tenantId,
+        subscriptionId,
+        appType: "CONTACT_CENTER",
+        displayName: "AI Contact Center",
+        subdomain: "cc-acme",
+        productCode: "AI_CC",
+        planCode: "AI_CC_PROFESSIONAL",
+        planTier: "PROFESSIONAL",
+        deploymentStatus: "COMPLETED",
+        createdAt: "2026-05-09T14:23:11.482+00:00",
+        deployedAt: "2026-05-09T14:31:47.215Z",
+        adminUsername: "admin@acmecorp.com",
+        adminPassword: "ChangeMe@123",
+        appPanels: [
+          {
+            appType: "CONTACT_CENTER",
+            displayName: "Agent Dashboard",
+            subdomain: "agent",
+            url: "https://agent-acme.dalaillama.in",
+            displayOrder: 0,
+            keycloakClientId: "agent-ui",
+            requiredRoles: "AGENT",
+          },
+          {
+            appType: "SUPERVISOR",
+            displayName: "Supervisor Dashboard",
+            subdomain: "supervisor",
+            url: "https://supervisor-acme.dalaillama.in",
+            displayOrder: 1,
+            keycloakClientId: "supervisor-ui",
+            requiredRoles: "SUPERVISOR,AGENT",
+          },
+          {
+            appType: "ADMIN_PANEL",
+            displayName: "Admin Panel",
+            subdomain: "admin",
+            url: "https://admin-acme.dalaillama.in",
+            displayOrder: 2,
+            keycloakClientId: "admin-ui",
+            requiredRoles: "ADMIN,SUPERVISOR,AGENT",
+          },
+        ],
+        dashboardUrl: "https://admin-acme.dalaillama.in",
+        agentSeats: 25,
+        maxAgents: 25,
+        maxSupervisors: 5,
+        didDisplayNumber: "+91 98765 43210",
+      },
+    };
+  }
+
+  const creatorStoryboardMatch = key.match(/^\/creator\/storyboard\/([^/]+)$/);
+  if (creatorStoryboardMatch) {
+    const [, projectId] = creatorStoryboardMatch;
+    return {
+      data: {
+        projectId,
+        title: "She Almost Didn't Go",
+        durationSeconds: 30,
+        ideas: MOCK_RESPONSES["/creator/ideas/generate"].ideas,
+        scenes: [
+          { id: "scene-01", timestamp: "0-2 sec", description: "Priya sits at the edge of her bed, gym bag untouched.", vo: "I almost didn't go today.", shotType: "Wide bedroom still" },
+          { id: "scene-02", timestamp: "2-4 sec", description: "Close-up of her thumb hovering over a cancel alarm.", vo: "My mind had already made excuses.", shotType: "Insert close-up" },
+          { id: "scene-03", timestamp: "4-6 sec", description: "She looks at herself in the mirror, unsure but awake.", vo: "But something felt different.", shotType: "Mirror medium" },
+          { id: "scene-04", timestamp: "6-8 sec", description: "Shoes hit the floor beside the bed.", vo: "Not motivation. Just a tiny push.", shotType: "Low angle detail" },
+          { id: "scene-05", timestamp: "8-10 sec", description: "Priya ties her laces slowly.", vo: "I told myself: only ten minutes.", shotType: "Hands close-up" },
+          { id: "scene-06", timestamp: "10-12 sec", description: "Apartment door opens into morning light.", vo: "That was enough to start.", shotType: "Backlit doorway" },
+          { id: "scene-07", timestamp: "12-14 sec", description: "She walks past a glass storefront reflection.", vo: "No dramatic change. No perfect plan.", shotType: "Tracking side shot" },
+          { id: "scene-08", timestamp: "14-16 sec", description: "Priya enters the gym and pauses near the entrance.", vo: "Just me, showing up scared.", shotType: "Wide gym entrance" },
+          { id: "scene-09", timestamp: "16-18 sec", description: "She adjusts a light dumbbell with both hands.", vo: "And still showing up.", shotType: "Object close-up" },
+          { id: "scene-10", timestamp: "18-20 sec", description: "First gentle rep, awkward but real.", vo: "The first rep was not pretty.", shotType: "Medium action" },
+          { id: "scene-11", timestamp: "20-22 sec", description: "She smiles faintly after finishing the set.", vo: "But it was mine.", shotType: "Close-up reaction" },
+          { id: "scene-12", timestamp: "22-24 sec", type: "text", description: "Text card with the core emotional line.", vo: "Just one decision... to show up.", shotType: "Text on screen" },
+          { id: "scene-13", timestamp: "24-28 sec", description: "Priya walks out brighter, gym bag on shoulder.", vo: "Tomorrow can be bigger.", shotType: "Exit tracking shot" },
+          { id: "scene-14", timestamp: "End Frame", description: "Final frame: Priya outside, morning city behind her.", vo: "Today, I just began.", shotType: "Hero end frame" }
+        ]
+      },
+    };
+  }
+
+  const creatorRegenerateSceneMatch = key.match(/^\/creator\/storyboard\/([^/]+)\/scenes\/([^/]+)\/regenerate$/);
+  if (creatorRegenerateSceneMatch) {
+    const [, projectId, sceneId] = creatorRegenerateSceneMatch;
+    return {
+      data: {
+        projectId,
+        sceneId,
+        status: "queued",
+        message: "Scene image regeneration queued"
+      },
+    };
+  }
+
+  const creatorExportMatch = key.match(/^\/creator\/export\/([^/]+)$/);
+  if (creatorExportMatch) {
+    const [, exportId] = creatorExportMatch;
+    return {
+      data: {
+        exportId,
+        status: "ready",
+        downloadUrl: "/mocks/storyboard/she-almost-storyboard.pdf"
+      },
+    };
+  }
 
   if (Object.prototype.hasOwnProperty.call(MOCK_RESPONSES, key)) {
     return { data: MOCK_RESPONSES[key] };   // ✅ TS safe
@@ -633,6 +1164,7 @@ const unwrapJavaTypedJson = (value) => {
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithMetrics,
+  tagTypes: ["CreatorTrends", "CreatorProfiles", "Storyboard", "CreatorWallet", "CreatorSubscription"],
 
   endpoints: (builder) => ({
 
@@ -1328,6 +1860,11 @@ export const api = createApi({
     getSubscriptionStatus: builder.query({
       query: (subscriptionId) => `/subscriptions/${subscriptionId}`,
     }),
+    getTenantSubscriptionDetails: builder.query({
+      /** @param {{ tenantId: string, subscriptionId: string }} params */
+      query: ({ tenantId, subscriptionId }) => `/tenants/${tenantId}/subscriptions/${subscriptionId}`,
+      transformResponse: (response) => unwrapJavaTypedJson(response),
+    }),
     /* ---------------- TENANT APPS & PROVISIONING ---------------- */
     getMyApps: builder.query({
       query: () => "/tenants/me/apps",
@@ -1344,6 +1881,10 @@ export const api = createApi({
         url: `/tenants/apps/${tenantAppId}`,
         method: "DELETE",
       }),
+    }),
+    getTenantApp: builder.query({
+      query: (tenantAppId) => `/tenants/apps/${tenantAppId}`,
+      transformResponse: (response) => unwrapJavaTypedJson(response),
     }),
     getProvisionStatus: builder.query({
       query: (tenantAppId) => `/tenants/apps/${tenantAppId}/provision/status`,
@@ -1605,6 +2146,7 @@ export const {
   useCreateSubscriptionMutation,
   useSimulatePaymentSuccessMutation,
   useLazyGetSubscriptionStatusQuery,
+  useLazyGetTenantSubscriptionDetailsQuery,
 
   useGetAuditLogsQuery,
 
@@ -1637,6 +2179,7 @@ export const {
   useGetMyAppsQuery,
   useRetryProvisionMutation,
   useDeleteAppMutation,
+  useLazyGetTenantAppQuery,
   useGetProvisionStatusQuery,
   useLazyGetProvisionStatusQuery,
   useGetMyDidsQuery,

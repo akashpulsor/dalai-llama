@@ -749,7 +749,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
 
     // Combined logic for UI effects (blur/dim)
   const isAnyOverlayActive = !!activeProduct || isSettingUpOrg;
-  const shouldBlockMainContent = activeNav !== "Settings" && ((!tenantId && !isTenantSetupDismissed) || isAnyOverlayActive);
+  const shouldBlockMainContent = activeNav !== "Subscriptions" && ((!tenantId && !isTenantSetupDismissed) || isAnyOverlayActive);
 /* ------------------------------------------------------------------------
    * RENDER
    * ---------------------------------------------------------------------- */
@@ -785,7 +785,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
             { icon: BarChart3, label: "Analytics" },
             { icon: CreditCard, label: "Billing" },
             { icon: ShieldCheck, label: "Business KYC", highlight: kycStatus === 'action_required' },
-            { icon: Settings, label: "Settings" },
+            { icon: Settings, label: "Subscriptions" },
           ].map(item => (
             <div 
               key={item.label}
@@ -850,7 +850,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
         <button onClick={() => setActiveNav("Marketplace")} className={`p-2 rounded-xl ${activeNav === "Marketplace" ? "text-purple-600" : "text-slate-400"}`}>
           <ShoppingBag size={24} />
         </button>
-        <button onClick={() => setActiveNav("Settings")} className={`p-2 rounded-xl ${activeNav === "Settings" ? "text-purple-600" : "text-slate-400"}`}>
+        <button onClick={() => setActiveNav("Subscriptions")} className={`p-2 rounded-xl ${activeNav === "Subscriptions" ? "text-purple-600" : "text-slate-400"}`}>
           <Settings size={24} />
         </button>
         <button
@@ -948,7 +948,7 @@ export default function ProductPage({ demo = true, initialTenantInfo }) {
         <div className="mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6 lg:px-12 lg:py-10">
 
           {/* ── SETTINGS VIEW ────────────────────────────────────────── */}
-          {activeNav === "Settings" ? (
+          {activeNav === "Subscriptions" ? (
             <div className="animate-in fade-in duration-300">
               <div className="mb-8 flex flex-col gap-5 lg:mb-12 lg:flex-row lg:items-end lg:justify-between">
                 <div>

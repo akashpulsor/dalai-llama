@@ -7,6 +7,48 @@ import { setTenantConfig, selectApp, selectIsResolved } from '../store/slices/te
 import { setKeycloakToken } from '../store/slices/authSlice.js';
 
 /**
+ * @param {any} tenantConfig
+ * @returns {any[]}
+ */
+function getTenantApps(tenantConfig) {
+  if (Array.isArray(tenantConfig?.apps)) return tenantConfig.apps;
+  if (tenantConfig?.app && typeof tenantConfig.app === 'object') return [tenantConfig.app];
+  return [];
+}
+
+/**
+ * @param {any} app
+ * @param {string} normalizedTarget
+ * @returns {boolean}
+ */
+function matchesAppType(app, normalizedTarget) {
+  const rawType = String(app?.app_type ?? app?.appType ?? '').toLowerCase();
+  const rawProduct = String(app?.product_code ?? app?.productCode ?? '').toLowerCase();
+  const rawSubdomain = String(app?.subdomain ?? '').toLowerCase();
+
+  if (normalizedTarget === 'admin') {
+    return rawType.includes('admin') || rawProduct.includes('admin') || rawSubdomain === 'admin';
+  }
+  if (normalizedTarget === 'supervisor') {
+    return rawType.includes('supervisor') || rawProduct.includes('supervisor') || rawSubdomain === 'supervisor';
+  }
+  if (normalizedTarget === 'agent') {
+    return rawType.includes('contact_center') || rawType.includes('agent') || rawProduct.includes('agent') || rawSubdomain === 'agent';
+  }
+  return false;
+}
+
+/**
+ * @param {any[]} apps
+ * @param {string} resolvedAppType
+ * @returns {any|null}
+ */
+function findMatchingTenantApp(apps, resolvedAppType) {
+  const normalizedTarget = resolvedAppType.toLowerCase();
+  return apps.find((app) => matchesAppType(app, normalizedTarget)) || apps[0] || null;
+}
+
+/**
  * @typedef {'agent'|'supervisor'|'admin'} AppType
  */
 
@@ -63,7 +105,7 @@ export default function useTenantAuth(appType) {
       try {
         // Step 2: Fetch tenant config from api.{domain} (no auth, public endpoint)
         const apiBase = getApiBaseUrl();
-        const configRes = await fetch(`${apiBase}/api/v1/public/tenant-config/${slug}`, {
+        const configRes = await fetch(`${apiBase}/api/v1/public/tenant-config/${encodeURIComponent(slug)}?app=${encodeURIComponent(resolvedAppType)}`, {
           headers: { 'X-App-Type': resolvedAppType },
         });
         if (!configRes.ok) {
@@ -84,10 +126,8 @@ export default function useTenantAuth(appType) {
         dispatch(selectApp(resolvedAppType));
 
         // Find the matching app's keycloak_client_id
-        const apps = tenantConfig.apps || [];
-        const matchedApp = apps.find(a =>
-          a.app_type?.toLowerCase() === resolvedAppType
-        ) || apps[0];
+        const apps = getTenantApps(tenantConfig);
+        const matchedApp = findMatchingTenantApp(apps, resolvedAppType);
 
         if (!matchedApp) {
           throw new Error(`No app configured for type: ${resolvedAppType}`);
@@ -97,7 +137,7 @@ export default function useTenantAuth(appType) {
         const kc = new Keycloak({
           url: tenantConfig.keycloak_url,
           realm: tenantConfig.keycloak_realm,
-          clientId: matchedApp.keycloak_client_id,
+          clientId: matchedApp.keycloak_client_id ?? matchedApp.keycloakClientId,
         });
         keycloakRef.current = kc;
 

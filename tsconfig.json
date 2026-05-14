@@ -50,5 +50,5 @@
     "package.json"
   ],
 
-  "exclude": ["node_modules", "dist", "build"]
+  "exclude": ["node_modules", "dist", "build", "**/dist/**", "**/build/**"]
 }

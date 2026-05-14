@@ -7,7 +7,7 @@
  * AI-powered insights, and supervisor intervention capabilities.
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import {
   useGetLiveCallsQuery,
@@ -160,6 +160,15 @@ export default function LiveCalls() {
   const { data: calls = [], isLoading, refetch } = useGetLiveCallsQuery(undefined, {
     pollingInterval: 2000 // Poll every 2 seconds for real-time updates
   });
+
+  useEffect(() => {
+    const handleLiveCallEvent = () => {
+      refetch();
+    };
+
+    window.addEventListener("tenant-call-event", handleLiveCallEvent);
+    return () => window.removeEventListener("tenant-call-event", handleLiveCallEvent);
+  }, [refetch]);
 
   const [monitorCall] = useMonitorCallMutation();
   const [whisperToAgent] = useWhisperToAgentMutation();

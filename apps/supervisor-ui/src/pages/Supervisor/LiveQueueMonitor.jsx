@@ -7,7 +7,7 @@
  * detailed metrics for each queue.
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -233,6 +233,15 @@ export default function LiveQueueMonitor() {
   const { data: queues = [], isLoading, refetch } = useGetQueueMonitorQuery(undefined, {
     pollingInterval: 3000 // Poll every 3 seconds for real-time updates
   });
+
+  useEffect(() => {
+    const handleQueueEvent = () => {
+      refetch();
+    };
+
+    window.addEventListener("tenant-queue-event", handleQueueEvent);
+    return () => window.removeEventListener("tenant-queue-event", handleQueueEvent);
+  }, [refetch]);
 
   /**
    * Handles view details click

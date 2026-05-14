@@ -29,6 +29,7 @@ export default function useStompEvents(token, wsUrl) {
 
   const [isConnected, setIsConnected] = useState(false);
   const clientRef = /** @type {import('react').MutableRefObject<Client|null>} */ (useRef(null));
+  const connectionAttemptRef = /** @type {import('react').MutableRefObject<number>} */ (useRef(0));
   // Registry of desired subscriptions: Map<topic, callback>
   // Survives reconnects — re-subscribed on every onConnect.
   const registryRef = /** @type {import('react').MutableRefObject<Map<string, (msg: any) => void>>} */ (useRef(new Map()));
@@ -48,6 +49,19 @@ export default function useStompEvents(token, wsUrl) {
     const brokerUrl = stompWsUrl
       .replace(/^https:\/\//, 'wss://')
       .replace(/^http:\/\//, 'ws://');
+    const attempt = connectionAttemptRef.current + 1;
+    connectionAttemptRef.current = attempt;
+
+    console.log('[STOMP] Preparing connection', {
+      attempt,
+      rawWsUrl: stompWsUrl,
+      brokerUrl,
+      tenantId,
+      hasToken: !!token,
+      reconnectDelayMs: 5000,
+      heartbeatIncomingMs: 10000,
+      heartbeatOutgoingMs: 10000,
+    });
 
     /** Re-subscribe all topics in the registry on the given client */
     const resubscribeAll = (/** @type {Client} */ cl) => {
@@ -77,29 +91,60 @@ export default function useStompEvents(token, wsUrl) {
         if (import.meta.env.DEV) console.debug('[STOMP]', msg);
       },
       onConnect: () => {
-        console.log('[STOMP] Connected to', brokerUrl);
+        console.log('[STOMP] Connected', {
+          brokerUrl,
+          tenantId,
+          registeredTopics: Array.from(registryRef.current.keys()),
+        });
         setIsConnected(true);
         // (Re-)subscribe everything in the registry
         resubscribeAll(client);
       },
-      onDisconnect: () => {
-        console.log('[STOMP] Disconnected — will auto-reconnect');
+      onDisconnect: (/** @type {any} */ frame) => {
+        console.log('[STOMP] Disconnected - will auto-reconnect', {
+          brokerUrl,
+          headers: frame?.headers || null,
+        });
         setIsConnected(false);
       },
-      onWebSocketClose: () => {
-        console.warn('[STOMP] WebSocket closed — will auto-reconnect');
+      onWebSocketClose: (/** @type {CloseEvent} */ event) => {
+        console.warn('[STOMP] WebSocket closed - will auto-reconnect', {
+          brokerUrl,
+          code: event?.code,
+          reason: event?.reason,
+          wasClean: event?.wasClean,
+        });
+        setIsConnected(false);
+      },
+      onWebSocketError: (/** @type {Event} */ event) => {
+        console.error('[STOMP] WebSocket error', {
+          brokerUrl,
+          type: event?.type,
+        });
         setIsConnected(false);
       },
       onStompError: (/** @type {any} */ frame) => {
-        console.error('[STOMP] Error:', frame.headers?.message || frame.body);
+        console.error('[STOMP] Broker error:', {
+          brokerUrl,
+          message: frame.headers?.message,
+          body: frame.body,
+        });
         setIsConnected(false);
+      },
+      onUnhandledMessage: (/** @type {any} */ msg) => {
+        console.warn('[STOMP] Unhandled message', {
+          destination: msg.headers?.destination,
+          body: msg.body,
+        });
       },
     });
 
+    console.log('[STOMP] Activating client', { attempt, brokerUrl, tenantId });
     client.activate();
     clientRef.current = client;
 
     return () => {
+      console.log('[STOMP] Cleaning up client', { brokerUrl, tenantId });
       activeSubsRef.current.forEach((sub) => {
         try { sub.unsubscribe(); } catch (/** @type {any} */ _) { /* ignore */ }
       });
@@ -142,13 +187,16 @@ export default function useStompEvents(token, wsUrl) {
     // If already connected, subscribe now
     const client = clientRef.current;
     if (client && client.connected) {
-      console.log('[STOMP] Subscribing to', topic);
+      console.log('[STOMP] Subscribing immediately', { topic });
       const sub = client.subscribe(topic, onMessage);
       activeSubsRef.current.push(sub);
+    } else {
+      console.log('[STOMP] Queued subscription until connected', { topic });
     }
 
     return {
       unsubscribe: () => {
+        console.log('[STOMP] Unsubscribe requested', { topic });
         registryRef.current.delete(topic);
         // Find and remove the active sub for this topic
         // (best-effort — if not connected, nothing to unsub)
@@ -163,10 +211,13 @@ export default function useStompEvents(token, wsUrl) {
    */
   const send = useCallback((/** @type {string} */ destination, /** @type {any} */ body) => {
     if (clientRef.current?.connected) {
+      console.log('[STOMP] Sending message', { destination, body });
       clientRef.current.publish({
         destination,
         body: JSON.stringify(body),
       });
+    } else {
+      console.warn('[STOMP] Send skipped - client not connected', { destination, body });
     }
   }, []);
 

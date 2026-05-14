@@ -1,0 +1,176 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --creator-bg: #05070d;
+  --creator-panel: rgba(11, 16, 28, 0.84);
+  --creator-panel-strong: rgba(14, 20, 34, 0.94);
+  --creator-border: rgba(148, 163, 184, 0.14);
+  --creator-border-strong: rgba(168, 85, 247, 0.38);
+  --creator-purple: #6d3fd8;
+  --creator-purple-bright: #8b5cf6;
+  --creator-green: #38d67a;
+  --creator-orange: #fb923c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--creator-bg);
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--creator-bg);
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  letter-spacing: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.creator-app {
+  background:
+    radial-gradient(circle at 30% -10%, rgba(109, 63, 216, 0.2), transparent 32rem),
+    radial-gradient(circle at 86% 8%, rgba(20, 184, 166, 0.12), transparent 28rem),
+    linear-gradient(180deg, #05070d 0%, #070b12 42%, #05070d 100%);
+}
+
+.creator-section {
+  scroll-margin-top: 24px;
+}
+
+.creator-panel {
+  border: 1px solid var(--creator-border);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(18, 24, 38, 0.9), rgba(9, 13, 23, 0.86)),
+    var(--creator-panel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 18px 40px rgba(0, 0, 0, 0.22);
+}
+
+.creator-panel-muted {
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.creator-control {
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.creator-control:hover {
+  border-color: rgba(168, 85, 247, 0.36);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.creator-primary {
+  border-radius: 8px;
+  background: linear-gradient(180deg, #7c4dff, #5d31c8);
+  box-shadow: 0 12px 28px rgba(91, 52, 199, 0.26);
+}
+
+.creator-primary:hover {
+  background: linear-gradient(180deg, #8b5cf6, #6d3fd8);
+}
+
+.creator-badge {
+  border-radius: 999px;
+  background: rgba(124, 77, 255, 0.16);
+  color: #d7c6ff;
+}
+
+.metric-tile {
+  border-radius: 6px;
+  background: rgba(2, 6, 23, 0.38);
+}
+
+.creator-media {
+  position: relative;
+  overflow: hidden;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #111827, #334155 48%, #0f172a);
+}
+
+.creator-media > img {
+  display: block;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+.creator-media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(5, 7, 13, 0.08), rgba(5, 7, 13, 0.42));
+}
+
+.creator-avatar-img {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  object-fit: cover;
+}
+
+.phone-poster {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0.64)),
+    url("/mocks/creator/preview-she-almost.png") center / cover no-repeat;
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(168, 85, 247, 0.5) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.5);
+  border-radius: 999px;
+}
+
+.scene-sketch {
+  background:
+    radial-gradient(circle at 50% 18%, rgba(248, 250, 252, 0.82) 0 9%, transparent 10%),
+    linear-gradient(120deg, transparent 35%, rgba(248, 250, 252, 0.8) 36% 38%, transparent 39%),
+    linear-gradient(60deg, transparent 42%, rgba(248, 250, 252, 0.55) 43% 45%, transparent 46%),
+    radial-gradient(circle at 45% 52%, rgba(226, 232, 240, 0.55) 0 16%, transparent 17%),
+    linear-gradient(135deg, #16181d, #6f655a 48%, #101318);
+  filter: grayscale(0.85);
+}

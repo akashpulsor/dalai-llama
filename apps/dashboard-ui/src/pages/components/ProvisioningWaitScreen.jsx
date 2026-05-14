@@ -15,6 +15,11 @@ import {
 } from "lucide-react";
 import { useRetryProvisionMutation, useLazyGetProvisionStatusQuery } from "@dalaillama/shared-store";
 
+const SUCCESS_EVENT_STATUSES = new Set(["ACTIVE", "COMPLETED", "READY", "SUCCESS"]);
+const FAILURE_EVENT_STATUSES = new Set(["ERROR", "FAILED", "PARTIAL_FAILURE"]);
+const STALLED_PROVISIONING_MS = 120000;
+const STALLED_STEP_UPDATE_MS = 45000;
+
 /* ─── provisioning step metadata ──────────────────────────────────── */
 
 /**
@@ -119,20 +124,30 @@ export default function ProvisioningWaitScreen({ onComplete, onFailed, productNa
   });
   const [overallStatus, setOverallStatus] = useState(/** @type {'running'|'completed'|'failed'} */ ("running"));
   const [failMessage, setFailMessage] = useState(/** @type {string|null} */ (null));
+  const [liveMessage, setLiveMessage] = useState(/** @type {string|null} */ ("Waiting for provisioning updates..."));
   const completedRef = useRef(false);
   const autoStartedRef = useRef(false);
+  const startedAtRef = useRef(Date.now());
+  const lastStepUpdateAtRef = useRef(Date.now());
+
+  const markProvisioningFailed = useCallback((message) => {
+    setOverallStatus("failed");
+    setFailMessage(message || "Provisioning failed. Please contact support.");
+    onFailed?.();
+  }, [onFailed]);
 
   // Auto-start provisioning when opened from Settings with tenantAppId
   useEffect(() => {
     if (autoStart && tenantAppId && !autoStartedRef.current) {
       autoStartedRef.current = true;
+      startedAtRef.current = Date.now();
+      lastStepUpdateAtRef.current = Date.now();
       retryProvision(tenantAppId).unwrap().catch((err) => {
         console.error("[ProvisioningWaitScreen] Auto-start failed:", err);
-        setOverallStatus("failed");
-        setFailMessage(err?.data?.message || "Failed to start provisioning.");
+        markProvisioningFailed(err?.data?.message || "Failed to start provisioning.");
       });
     }
-  }, [autoStart, tenantAppId, retryProvision]);
+  }, [autoStart, tenantAppId, retryProvision, markProvisioningFailed]);
 
   const handleProvisioningEvent = useCallback(
     /** @param {Event} nativeEvent */
@@ -142,8 +157,19 @@ export default function ProvisioningWaitScreen({ onComplete, onFailed, productNa
 
       const status = String(detail.status || detail.event || "").toUpperCase();
       const message = detail.message || detail.data?.message || "";
+      const connection = detail.connection || null;
+
+      if (message) {
+        setLiveMessage(message);
+      } else if (connection === "reconnecting") {
+        setLiveMessage("Realtime connection dropped. Reconnecting...");
+      } else if (connection === "connected") {
+        setLiveMessage("Realtime connection restored.");
+      }
 
       if (status === "STARTED") {
+        lastStepUpdateAtRef.current = Date.now();
+        setLiveMessage(message || "Provisioning started.");
         // Mark first step as running
         setStepStatuses((prev) => ({ ...prev, [PROVISIONING_STEPS[0].key]: "running" }));
         return;
@@ -152,6 +178,7 @@ export default function ProvisioningWaitScreen({ onComplete, onFailed, productNa
       if (status === "STEP_RUNNING") {
         const stepKey = resolveStepKey(message);
         if (stepKey) {
+          lastStepUpdateAtRef.current = Date.now();
           setStepStatuses((prev) => ({ ...prev, [stepKey]: "running" }));
         }
         return;
@@ -160,6 +187,7 @@ export default function ProvisioningWaitScreen({ onComplete, onFailed, productNa
       if (status === "STEP_COMPLETED") {
         const stepKey = resolveStepKey(message);
         if (stepKey) {
+          lastStepUpdateAtRef.current = Date.now();
           setStepStatuses((prev) => {
             const next = { ...prev, [stepKey]: /** @type {StepStatus} */ ("completed") };
             // Auto-advance: mark next step as running
@@ -176,7 +204,7 @@ export default function ProvisioningWaitScreen({ onComplete, onFailed, productNa
         return;
       }
 
-      if (status === "COMPLETED") {
+      if (SUCCESS_EVENT_STATUSES.has(status)) {
         if (completedRef.current) return;
         completedRef.current = true;
         // Mark all remaining as completed
@@ -189,23 +217,23 @@ export default function ProvisioningWaitScreen({ onComplete, onFailed, productNa
           return next;
         });
         setOverallStatus("completed");
+        setLiveMessage(message || "Provisioning completed successfully.");
         // Delay before calling onComplete for a brief success animation
         setTimeout(() => onComplete(), 2000);
         return;
       }
 
-      if (status === "FAILED") {
-        setOverallStatus("failed");
-        setFailMessage(message || "Provisioning failed. Please contact support.");
+      if (FAILURE_EVENT_STATUSES.has(status)) {
+        setLiveMessage(message || "Provisioning failed.");
         const stepKey = resolveStepKey(message);
         if (stepKey) {
           setStepStatuses((prev) => ({ ...prev, [stepKey]: /** @type {StepStatus} */ ("failed") }));
         }
-        onFailed?.();
+        markProvisioningFailed(message || "Provisioning failed. Please contact support.");
         return;
       }
     },
-    [onComplete, onFailed]
+    [markProvisioningFailed, onComplete]
   );
 
   // Listen for provisioning + app WebSocket browser events
@@ -226,18 +254,24 @@ export default function ProvisioningWaitScreen({ onComplete, onFailed, productNa
         const result = await fetchStatus(tenantAppId).unwrap();
         if (!result) return;
         const taskStatus = String(result.status || "").toUpperCase();
-        const currentStep = result.currentStep;
+        const currentStep = result.currentStep || result.current_step;
+        const lastError = result.lastError || result.last_error || null;
 
-        if (taskStatus === "COMPLETED") {
-          handleProvisioningEvent(new CustomEvent("poll", { detail: { status: "COMPLETED" } }));
-        } else if (taskStatus === "FAILED") {
+        if (FAILURE_EVENT_STATUSES.has(taskStatus)) {
           handleProvisioningEvent(new CustomEvent("poll", {
-            detail: { status: "FAILED", message: result.lastError || "Provisioning failed" }
+            detail: { status: "FAILED", message: lastError || "Provisioning failed" }
           }));
+          return;
+        }
+
+        if (SUCCESS_EVENT_STATUSES.has(taskStatus)) {
+          handleProvisioningEvent(new CustomEvent("poll", { detail: { status: "COMPLETED" } }));
         } else if (currentStep) {
+          setLiveMessage(`Provisioning step: ${currentStep}`);
           // Update current step status from poll
           const stepKey = resolveStepKey(currentStep);
           if (stepKey) {
+            lastStepUpdateAtRef.current = Date.now();
             setStepStatuses((prev) => {
               const next = { ...prev };
               // Mark all steps before current as completed
@@ -252,10 +286,20 @@ export default function ProvisioningWaitScreen({ onComplete, onFailed, productNa
             });
           }
         }
+
+        const now = Date.now();
+        const provisioningAge = now - startedAtRef.current;
+        const stalledFor = now - lastStepUpdateAtRef.current;
+        if (provisioningAge >= STALLED_PROVISIONING_MS && stalledFor >= STALLED_STEP_UPDATE_MS) {
+          markProvisioningFailed(
+            lastError ||
+            "Provisioning is taking too long without progress. Please check the subscription status and retry if needed."
+          );
+        }
       } catch (_) { /* ignore poll errors */ }
     }, 5000);
     return () => clearInterval(interval);
-  }, [tenantAppId, overallStatus, fetchStatus, handleProvisioningEvent]);
+  }, [tenantAppId, overallStatus, fetchStatus, handleProvisioningEvent, markProvisioningFailed]);
 
   // Group steps for display
   const groups = /** @type {{ name: string; steps: (ProvisioningStepMeta & { status: StepStatus })[] }[]} */ ([]);
@@ -305,6 +349,11 @@ export default function ProvisioningWaitScreen({ onComplete, onFailed, productNa
               ? failMessage || "An error occurred during setup."
               : `Provisioning ${productName || "your workspace"}. This usually takes 30-60 seconds.`}
         </p>
+        {overallStatus === "running" && liveMessage && (
+          <div className="mt-4 rounded-2xl border border-purple-100 bg-purple-50 px-4 py-3 text-xs font-semibold leading-5 text-purple-700">
+            {liveMessage}
+          </div>
+        )}
 
         {overallStatus === "failed" && tenantAppId && (
           <button
@@ -322,6 +371,9 @@ export default function ProvisioningWaitScreen({ onComplete, onFailed, productNa
                 });
                 setOverallStatus("running");
                 setFailMessage(null);
+                setLiveMessage("Retry started. Waiting for provisioning updates...");
+                startedAtRef.current = Date.now();
+                lastStepUpdateAtRef.current = Date.now();
                 completedRef.current = false;
               } catch (err) {
                 console.error("[ProvisioningWaitScreen] Retry failed:", err);

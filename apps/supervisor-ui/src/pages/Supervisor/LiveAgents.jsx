@@ -7,7 +7,7 @@
  * issue types, and sentiment analysis.
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import {
   useGetLiveAgentsQuery
@@ -169,6 +169,15 @@ export default function LiveAgents() {
   const { data: agents = [], isLoading, refetch } = useGetLiveAgentsQuery(undefined, {
     pollingInterval: 2000 // Poll every 2 seconds for real-time updates
   });
+
+  useEffect(() => {
+    const handleLiveAgentEvent = () => {
+      refetch();
+    };
+
+    window.addEventListener("tenant-agent-event", handleLiveAgentEvent);
+    return () => window.removeEventListener("tenant-agent-event", handleLiveAgentEvent);
+  }, [refetch]);
 
   /** @type {[AgentStatusType | "all", React.Dispatch<React.SetStateAction<AgentStatusType | "all">>]} */
   const [filterStatus, setFilterStatus] = useState(/** @type {AgentStatusType | "all"} */ ("all"));
