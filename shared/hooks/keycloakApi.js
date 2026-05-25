@@ -31,6 +31,7 @@ const LOCALHOST_PORT_CLIENT_MAP = {
   "5176": "agent-ui",
   "5177": "dashboard-ui",
   "5181": "creator-ui",
+  "5182": "creator-ui",
 };
 
 /**

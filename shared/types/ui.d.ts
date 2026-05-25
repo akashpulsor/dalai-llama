@@ -44,14 +44,6 @@ declare module "@dalaillama/shared-ui" {
   import * as React from "react";
 
   // ── Existing ──
-  export const Toaster: React.FC;
-
-
-
-  export class ErrorBoundary extends React.Component<
-    { children: React.ReactNode },
-    { hasError: boolean; error: Error | null }
-  > {}
   // ── FeatureGate ──
   export const FeatureGate: React.FC<{
     feature: string;
@@ -190,9 +182,6 @@ declare module "@dalaillama/shared-ui" {
   export const SentimentBadge: React.FC<{ sentiment: SentimentType }>;
 
   // ── Existing components (untyped before, now typed) ──
-  export const FormInput: React.FC<any>;
-  export const FormSelect: React.FC<any>;
-  export const FormTextArea: React.FC<any>;
   export const Table: React.FC<any>;
   export const TableRow: React.FC<any>;
   export const StatusTag: React.FC<any>;

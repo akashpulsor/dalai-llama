@@ -3,12 +3,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3,
-  Bookmark,
   Clapperboard,
-  History,
-  LayoutDashboard,
+  FileText,
+  FolderOpen,
+  ListChecks,
   Sparkles,
-  TrendingUp,
   Users,
   Wand2,
 } from "lucide-react";
@@ -16,27 +15,34 @@ import UpgradeCard from "./UpgradeCard.jsx";
 import UserChip from "./UserChip.jsx";
 
 const navItems = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "trends", label: "Trends", icon: TrendingUp },
-  { id: "audience", label: "Audience", icon: Users },
-  { id: "cast", label: "Cast / Creator", icon: Sparkles, badge: "New" },
-  { id: "ideas", label: "Generate", icon: Wand2 },
-  { id: "storyboard", label: "Storyboards", icon: Clapperboard },
-  { id: "saved", label: "Saved", icon: Bookmark },
-  { id: "history", label: "History", icon: History },
+  { id: "ideas", label: "New Idea", icon: Wand2 },
+  { id: "projects", label: "Projects", icon: FolderOpen },
+  { id: "generated-ideas", label: "Generated Ideas", icon: ListChecks },
+  { id: "past-storyline", label: "Past Storyline", icon: Sparkles },
+  { id: "past-script", label: "Past Script", icon: FileText },
+  { id: "cast", label: "Actor", icon: Users },
+  { id: "storyboard", label: "Storyboard", icon: Clapperboard },
 ];
 
 export default function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState("dashboard");
+  const [activeSection, setActiveSection] = useState("ideas");
   const sectionIds = useMemo(() => navItems.map((item) => item.id), []);
 
   useEffect(() => {
     const hashId = location.hash?.replace("#", "");
     if (!hashId || location.pathname !== "/") return;
+    if (hashId === "projects") {
+      setActiveSection("projects");
+      window.dispatchEvent(new CustomEvent("creator:open-projects"));
+      return;
+    }
+    if (sectionIds.includes(hashId)) {
+      setActiveSection(hashId);
+    }
     window.requestAnimationFrame(() => scrollToSection(hashId, "auto"));
-  }, [location.hash, location.pathname]);
+  }, [location.hash, location.pathname, sectionIds]);
 
   useEffect(() => {
     if (location.pathname !== "/") return undefined;
@@ -62,14 +68,23 @@ export default function Sidebar() {
     event.preventDefault();
     setActiveSection(id);
 
-    if (location.pathname !== "/") {
-      navigate({ pathname: "/", hash: id });
-      window.setTimeout(() => scrollToSection(id), 80);
+    if (id === "projects") {
+      window.dispatchEvent(new CustomEvent("creator:open-projects"));
+      window.history.replaceState(null, "", "/#projects");
       return;
     }
 
-    window.history.replaceState(null, "", `/#${id}`);
-    scrollToSection(id);
+    const dispatchWorkspaceNavigation = () => {
+      window.dispatchEvent(new CustomEvent("creator:navigate-workspace", { detail: { id } }));
+    };
+
+    if (location.pathname !== "/") {
+      navigate({ pathname: "/", hash: id });
+      window.setTimeout(dispatchWorkspaceNavigation, 80);
+      return;
+    }
+
+    dispatchWorkspaceNavigation();
   };
 
   return (
@@ -113,7 +128,7 @@ export default function Sidebar() {
       </aside>
 
       <nav className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t border-white/10 bg-[#05070d]/95 px-2 py-2 backdrop-blur lg:hidden">
-        {navItems.slice(1, 6).map(({ id, label, icon: Icon }) => (
+        {navItems.slice(0, 5).map(({ id, label, icon: Icon }) => (
           <a
             key={id}
             href={`/#${id}`}

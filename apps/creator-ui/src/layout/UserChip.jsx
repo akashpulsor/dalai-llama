@@ -2,16 +2,28 @@
 import React, { useState } from "react";
 import { ChevronDown, LogOut, Settings, User } from "lucide-react";
 import { useSelector } from "react-redux";
+import { useKeycloakLogoutMutation } from "@dalaillama/shared-hooks/keycloakApi";
 
 export default function UserChip() {
   const user = useSelector((state) => state.auth?.user);
-  const name = user?.name || "Karan";
+  const name = user?.name || user?.email || "Creator";
+  const email = user?.email || "Signed in";
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState("Free Plan");
+  const [keycloakLogout, logoutState] = useKeycloakLogoutMutation();
 
   const action = (label) => {
     setStatus(label);
     setOpen(false);
+  };
+
+  const signOut = async () => {
+    setOpen(false);
+    try {
+      await keycloakLogout().unwrap();
+    } finally {
+      window.location.assign("/");
+    }
   };
 
   return (
@@ -29,9 +41,9 @@ export default function UserChip() {
 
       {open && (
         <div className="absolute bottom-[calc(100%+8px)] left-0 right-0 overflow-hidden rounded-lg border border-white/10 bg-[#0b1020] p-1 shadow-2xl">
-          <MenuButton icon={User} label="View mock profile" onClick={() => action("Profile opened")} />
+          <MenuButton icon={User} label={email} onClick={() => action("Profile opened")} />
           <MenuButton icon={Settings} label="Settings" onClick={() => action("Settings opened")} />
-          <MenuButton icon={LogOut} label="Sign out mock" onClick={() => action("Signed out mock")} />
+          <MenuButton icon={LogOut} label={logoutState.isLoading ? "Signing out..." : "Sign out"} onClick={signOut} />
         </div>
       )}
     </div>

@@ -42,13 +42,22 @@ const getTenantApps = (cfg) => {
 const getAppClientId = (app) => app?.keycloak_client_id ?? app?.keycloakClientId ?? null;
 /** @param {any} app */
 const getAppProductCode = (app) => app?.product_code ?? app?.productCode ?? null;
-/** @param {any} app */
+/**
+ * @param {any} app
+ * @param {any} cfg
+ */
 const getAppWsUrl = (app, cfg) => app?.websocket_url ?? app?.websocketUrl ?? app?.stomp_ws_url ?? app?.stompWsUrl ?? cfg?.stomp_ws_url ?? cfg?.stompWsUrl ?? null;
-/** @param {any} app */
+/**
+ * @param {any} app
+ * @param {any} cfg
+ */
 const getAppTurnUrl = (app, cfg) => app?.turn_url ?? app?.turnUrl ?? cfg?.turn_url ?? cfg?.turnUrl ?? null;
 /** @param {any} app */
 const getAppDashboardUrl = (app) => app?.dashboard_url ?? app?.dashboardUrl ?? app?.app_url ?? app?.appUrl ?? app?.url ?? null;
-/** @param {any} app */
+/**
+ * @param {any} app
+ * @param {any} cfg
+ */
 const getAppFeatures = (app, cfg) => app?.features || cfg?.features || {};
 
 /**

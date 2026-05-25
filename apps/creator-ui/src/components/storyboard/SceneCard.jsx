@@ -1,193 +1,685 @@
 // @ts-nocheck
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Camera, Image as ImageIcon, Info, Lightbulb, Loader2, Maximize2, Sparkles, Wand2, X, ZoomIn, ZoomOut } from "lucide-react";
 
-export default function SceneCard({ scene, index, active, jsonReady, imageReady, onClick }) {
-  const [assetAvailable, setAssetAvailable] = useState(true);
+export default function SceneCard({
+  scene,
+  index,
+  active,
+  jsonReady,
+  imageReady,
+  frameAspectRatio = "9 / 16",
+  frameOrientation = "vertical",
+  loadingImageKinds = [],
+  onClick,
+  onGenerateImage,
+}) {
+  const [selectedAssetKind, setSelectedAssetKind] = useState("storyboard");
+  const [failedAssetKeys, setFailedAssetKeys] = useState({});
+  const [assetLoadState, setAssetLoadState] = useState({});
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
   const shot = normalizeShot(scene, index);
   const isTextCard = scene.type === "text";
-  const sceneImage = `/mocks/creator/story-scene-${String(index + 1).padStart(2, "0")}.png`;
-  const shouldUseAsset = imageReady && assetAvailable;
+  const fallbackSceneImage = `/mocks/creator/story-scene-${String(index + 1).padStart(2, "0")}.png`;
+  const loadingKindSet = useMemo(() => new Set((Array.isArray(loadingImageKinds) ? loadingImageKinds : []).map(normalizeImageAssetKind)), [loadingImageKinds]);
+  const storyboardImageUrl = sceneImageUrl(scene, "storyboard");
+  const lightingImageUrl = sceneImageUrl(scene, "lighting");
+  const cameraPlanImageUrl = sceneImageUrl(scene, "dp");
+  const hasRealShotImage = Boolean(storyboardImageUrl || lightingImageUrl || cameraPlanImageUrl);
+  const assetSlots = [
+    {
+      kind: "storyboard",
+      title: "Storyboard",
+      icon: ImageIcon,
+      src: storyboardImageUrl || (!hasRealShotImage && imageReady ? fallbackSceneImage : ""),
+      isFallback: !storyboardImageUrl && !hasRealShotImage && imageReady,
+      isGenerating: loadingKindSet.has("storyboard"),
+    },
+    { kind: "lighting", title: "Lighting", icon: Lightbulb, src: lightingImageUrl, isGenerating: loadingKindSet.has("lighting") },
+    { kind: "dp", title: "DP Plan", icon: Camera, src: cameraPlanImageUrl, isGenerating: loadingKindSet.has("dp") },
+  ];
+  const generatingAsset = assetSlots.find((asset) => asset.isGenerating);
+  const imageAssets = assetSlots.filter((asset) => asset.src);
+  const selectedAsset = imageAssets.find((asset) => asset.kind === selectedAssetKind) || imageAssets[0];
+  const selectedAssetKey = selectedAsset ? `${selectedAsset.kind}:${selectedAsset.src}` : "";
+  const shouldUseAsset = Boolean(selectedAsset?.src) && !failedAssetKeys[selectedAssetKey];
+  const selectedAssetLoading = shouldUseAsset && assetLoadState[selectedAssetKey] !== "loaded";
+  const hasImageAsset = Boolean(selectedAsset?.src);
+  const showCreativeLoader = Boolean(generatingAsset) || selectedAssetLoading;
+  const minHeight = frameOrientation === "horizontal" ? "20rem" : "30rem";
+  const maxWidth = frameOrientation === "horizontal" ? "100%" : "22rem";
+
+  useEffect(() => {
+    if (!shouldUseAsset || !selectedAssetKey) return;
+    setAssetLoadState((current) => current[selectedAssetKey] ? current : { ...current, [selectedAssetKey]: "loading" });
+  }, [selectedAssetKey, shouldUseAsset]);
 
   return (
-    <button
-      type="button"
+    <article
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className={`group relative block aspect-[9/16] min-h-[30rem] w-full overflow-hidden rounded-lg border bg-[#080d16] text-left transition hover:z-30 focus:z-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 ${
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onClick?.(event);
+        }
+      }}
+      style={{ aspectRatio: frameAspectRatio, minHeight, maxWidth }}
+      className={`relative mx-auto block w-full overflow-visible rounded-lg border bg-[#080d16] text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 ${
         active ? "border-purple-300 shadow-[0_0_0_1px_rgba(168,85,247,0.35)]" : "border-white/10 hover:border-purple-300/45"
       }`}
     >
-      <div className="absolute inset-0">
-        {!imageReady ? (
+      <div className="absolute inset-0 overflow-hidden rounded-lg bg-black">
+        {!hasImageAsset && !imageReady && !generatingAsset ? (
           <div className="h-full w-full animate-pulse bg-gradient-to-br from-slate-800 via-slate-700 to-slate-950" />
         ) : shouldUseAsset ? (
-          <img src={sceneImage} alt="" className="h-full w-full object-cover grayscale" loading="lazy" onError={() => setAssetAvailable(false)} />
+          <>
+            <img
+              src={selectedAsset.src}
+              alt=""
+              className="h-full w-full bg-black object-contain grayscale"
+              loading="lazy"
+              onLoad={() => setAssetLoadState((current) => ({ ...current, [selectedAssetKey]: "loaded" }))}
+              onError={() => {
+                setAssetLoadState((current) => ({ ...current, [selectedAssetKey]: "failed" }));
+                setFailedAssetKeys((current) => ({ ...current, [selectedAssetKey]: true }));
+              }}
+            />
+            {showCreativeLoader && (
+              <CreativeImageLoader
+                label={generatingAsset ? `Rendering ${generatingAsset.title}` : `Loading ${selectedAsset.title}`}
+                detail={generatingAsset ? "Composing storyboard sheet" : "Opening generated image"}
+              />
+            )}
+          </>
         ) : isTextCard ? (
           <div className="flex h-full w-full items-center justify-center bg-[#0B1020] p-8 text-center text-2xl font-black leading-9 text-white">
             "Just one decision... to show up."
           </div>
+        ) : generatingAsset ? (
+          <CreativeImageLoader label={`Rendering ${generatingAsset.title}`} detail="Building the technical frame" />
         ) : (
           <div className="scene-sketch h-full w-full" />
         )}
       </div>
 
-      <div className="absolute inset-0 bg-gradient-to-b from-black/72 via-black/4 to-black/88" />
-
-      <div className="absolute left-3 right-3 top-3 z-10 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-600 text-xs font-black text-white shadow-lg shadow-black/30">
-            {String(shot.number).padStart(2, "0")}
-          </span>
-          <span className="rounded-full border border-white/15 bg-black/45 px-2.5 py-1 text-xs font-black uppercase tracking-wide text-white backdrop-blur">
-            {shot.timeRange}
-          </span>
-        </div>
-        <span className="rounded-full border border-white/15 bg-black/45 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-slate-100 backdrop-blur">
-          {shot.difficulty}
-        </span>
+      <div className="absolute right-2 top-2 z-20 flex items-center gap-1.5">
+        <button
+          type="button"
+          title="Open shot details"
+          onClick={(event) => {
+            event.stopPropagation();
+            setDetailsOpen((open) => !open);
+          }}
+          className="flex h-8 items-center gap-1.5 rounded-md border border-white/15 bg-slate-950 px-2 text-[11px] font-black uppercase tracking-normal text-white shadow-lg shadow-black/35 transition hover:border-purple-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-200"
+        >
+          <Info size={13} />
+          Details
+        </button>
+        <button
+          type="button"
+          title="Open image zoom"
+          aria-label="Open image zoom"
+          disabled={!shouldUseAsset}
+          onClick={(event) => {
+            event.stopPropagation();
+            setZoomLevel(1);
+            setZoomOpen(true);
+          }}
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-white/15 bg-slate-950 text-white shadow-lg shadow-black/35 transition hover:border-purple-200 disabled:cursor-not-allowed disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-200"
+        >
+          <Maximize2 size={14} />
+        </button>
       </div>
 
-      {shot.textOverlay && (
-        <div className={`absolute z-10 ${overlayPositionClass(shot.subtitlePosition)}`}>
-          <span className="rounded-md border border-white/15 bg-black/62 px-3 py-2 text-center text-sm font-black uppercase tracking-wide text-white shadow-xl shadow-black/40 backdrop-blur">
-            {shot.textOverlay}
-          </span>
-        </div>
+      {detailsOpen && (
+        <ShotDetailsPanel
+          shot={shot}
+          scene={scene}
+          jsonReady={jsonReady}
+          imageReady={imageReady}
+          assetSlots={assetSlots}
+          selectedAsset={selectedAsset}
+          storyboardImageUrl={storyboardImageUrl}
+          onClose={(event) => {
+            event.stopPropagation();
+            setDetailsOpen(false);
+          }}
+          onSelectAsset={(asset, event) => {
+            event?.stopPropagation();
+            if (asset?.src) setSelectedAssetKind(asset.kind);
+          }}
+          onGenerateImage={onGenerateImage}
+        />
       )}
 
-      <div className="absolute inset-x-3 bottom-3 z-10 rounded-lg border border-white/10 bg-black/58 p-3 shadow-lg shadow-black/35 backdrop-blur">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <MetaChip>{shot.shotType}</MetaChip>
-          <MetaChip>{shot.cameraAngle}</MetaChip>
-          <MetaChip>{shot.cameraMovement}</MetaChip>
-        </div>
-        <h3 className="line-clamp-1 text-base font-black leading-5 text-white">{shot.title}</h3>
-        <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-300">{shot.purpose}</p>
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/10 pt-2">
-          <span className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
-            {shot.fps ? `${shot.fps} FPS` : "Storyboard"}
-          </span>
-          <span className="text-[10px] font-black uppercase tracking-[0.16em] text-purple-200">Hover Details</span>
-        </div>
-      </div>
-
-      <div className="pointer-events-none fixed inset-x-4 top-16 z-[95] opacity-0 transition-all duration-200 group-hover:pointer-events-auto group-hover:opacity-100 group-focus:pointer-events-auto group-focus:opacity-100 lg:inset-x-auto lg:right-8 lg:top-24 lg:w-[46rem]">
-        <div
-          onClick={(event) => event.stopPropagation()}
-          className="custom-scrollbar max-h-[min(34rem,calc(100vh-7rem))] overflow-y-auto rounded-[1.6rem] bg-slate-950 px-4 py-4 text-white shadow-2xl ring-1 ring-white/10"
-        >
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(17rem,0.8fr)]">
-            <div>
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Shot {String(shot.number).padStart(2, "0")} Production Brief</p>
-                  <h4 className="mt-1 text-xl font-black leading-6 text-white">{shot.title}</h4>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-300">{shot.purpose}</p>
-                </div>
-                <span className="shrink-0 rounded-full border border-purple-400/30 bg-purple-500/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-purple-100">
-                  {shot.timeRange}
-                </span>
-              </div>
-
-              {!jsonReady ? (
-                <div className="space-y-2">
-                  <div className="h-3 w-5/6 animate-pulse rounded bg-white/10" />
-                  <div className="h-3 w-2/3 animate-pulse rounded bg-white/10" />
-                </div>
-              ) : (
-                <>
-                  <BriefSection label="Action" value={shot.action} featured />
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <BriefSection label="Composition" value={shot.composition} />
-                    <BriefSection label="Expression" value={shot.expression} />
-                    <BriefSection label="Emotion" value={shot.emotion} />
-                    <BriefSection label="Body Language" value={shot.bodyLanguage} />
-                    <BriefSection label="Dialogue / VO" value={shot.dialogue} />
-                    <BriefSection label="Voice Over" value={shot.voiceOver} />
-                    <BriefSection label="Text Overlay" value={shot.textOverlay} />
-                    <BriefSection label="Sound Design" value={shot.soundDesign} />
-                    <BriefSection label="Editing Notes" value={shot.editingNotes} />
-                    <BriefSection label="Creator Direction" value={shot.creatorDirection} />
-                    <BriefSection label="Retention Goal" value={shot.retentionGoal} />
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              <SpecPanel title="Timeline">
-                <SpecRow label="Shot No." value={shot.number} />
-                <SpecRow label="Start" value={shot.startTime} />
-                <SpecRow label="End" value={shot.endTime} />
-                <SpecRow label="Duration" value={`${shot.durationSeconds}s`} />
-              </SpecPanel>
-
-              <SpecPanel title="Camera">
-                <SpecRow label="Shot Type" value={shot.shotType} />
-                <SpecRow label="Camera Angle" value={shot.cameraAngle} />
-                <SpecRow label="Movement" value={shot.cameraMovement} />
-                <SpecRow label="Lens Suggestion" value={shot.lensSuggestion} />
-                <SpecRow label="FPS" value={shot.fps} />
-                <SpecRow label="Transition" value={shot.transition} />
-              </SpecPanel>
-
-              <SpecPanel title="Set And Safe Zone">
-                <SpecRow label="Lighting" value={shot.lighting} />
-                <SpecRow label="Environment" value={shot.environment} />
-                <SpecRow label="Subtitle Position" value={shot.subtitlePosition} />
-                <SpecRow label="Mobile Focus Area" value={shot.mobileFocusArea} />
-                <SpecRow label="Safe Zone Notes" value={shot.safeZoneNotes} />
-              </SpecPanel>
-
-              <SpecPanel title="Execution Difficulty">
-                <SpecRow label="Score" value={shot.executionScore} />
-                <SpecRow label="Level" value={shot.executionLevel} />
-                <SpecRow label="Requires Tripod" value={shot.requiresTripod} />
-                <SpecRow label="Requires Helper" value={shot.requiresHelper} />
-                <SpecRow label="Phone Friendly" value={shot.phoneFriendly} />
-              </SpecPanel>
-
-              <SpecPanel title="Cinematic Execution">
-                <SpecRow label="Recommended FPS" value={shot.recommendedFPS} />
-                <SpecRow label="Capture Mode" value={shot.captureMode} />
-                <SpecRow label="Playback Speed" value={shot.playbackSpeed} />
-                <SpecRow label="Camera Style" value={shot.cameraStyle} />
-                <SpecRow label="Stabilization" value={shot.stabilization} />
-                <SpecRow label="Transition Style" value={shot.transitionStyle} />
-                <SpecRow label="Zoom" value={shot.zoomRecommendation} />
-                <SpecRow label="Motion Intensity" value={shot.motionIntensity} />
-                <SpecRow label="Editing Complexity" value={shot.editingComplexity} />
-              </SpecPanel>
-            </div>
-          </div>
-
-          {(shot.rookieGuide || shot.sketchPrompt) && (
-            <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)]">
-              <BriefSection label="Rookie Friendly Guide" value={shot.rookieGuide} compact />
-              <BriefSection label="Sketch Prompt" value={shot.sketchPrompt} compact />
-            </div>
-          )}
-        </div>
-      </div>
-    </button>
+      {zoomOpen && selectedAsset?.src && (
+        <ImageZoomModal
+          asset={selectedAsset}
+          assets={imageAssets}
+          frameOrientation={frameOrientation}
+          zoomLevel={zoomLevel}
+          onZoomChange={setZoomLevel}
+          onSelectAsset={(asset) => setSelectedAssetKind(asset.kind)}
+          onClose={() => setZoomOpen(false)}
+        />
+      )}
+    </article>
   );
 }
 
-function MetaChip({ children }) {
-  if (!children) return null;
+function ShotDetailsPanel({
+  shot,
+  scene,
+  jsonReady,
+  imageReady,
+  assetSlots,
+  selectedAsset,
+  storyboardImageUrl,
+  onClose,
+  onSelectAsset,
+  onGenerateImage,
+}) {
+  const availableAsset = selectedAsset || assetSlots.find((asset) => asset.src) || assetSlots[0];
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose(event);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   return (
-    <span className="max-w-full truncate rounded-full border border-white/15 bg-white/10 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-slate-100">
-      {children}
-    </span>
+    <div className="fixed inset-0 z-[110] bg-black/45 text-white" onClick={onClose}>
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Shot ${shot.number} details`}
+        onClick={(event) => event.stopPropagation()}
+        className="absolute bottom-3 right-3 top-3 flex w-[min(31rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-lg border border-white/10 bg-[#0a0f1a] shadow-2xl shadow-black/70"
+      >
+        <header className="shrink-0 border-b border-white/10 bg-slate-950/95 px-3.5 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-md border border-purple-300/30 bg-purple-400/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-normal text-purple-100">
+                  Shot {String(shot.number).padStart(2, "0")}
+                </span>
+                <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-black uppercase tracking-normal text-slate-300">
+                  {shot.timeRange}
+                </span>
+                {shot.difficulty && (
+                  <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-black uppercase tracking-normal text-slate-300">
+                    {shot.difficulty}
+                  </span>
+                )}
+              </div>
+              <h3 className="mt-2 line-clamp-2 text-base font-black leading-6 text-white">{shot.title}</h3>
+              <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-400">{shot.purpose}</p>
+            </div>
+            <button
+              type="button"
+              title="Close details"
+              aria-label="Close details"
+              onClick={onClose}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-slate-200 transition hover:border-purple-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-200"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </header>
+
+        <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
+          <div className="space-y-3 p-3.5">
+            <section className="rounded-lg border border-white/10 bg-black/22 p-3">
+              <AssetPreview asset={availableAsset} />
+
+              <div className="mt-2 grid grid-cols-3 gap-1.5">
+                {assetSlots.map((asset) => (
+                  <AssetStripButton
+                    key={asset.kind}
+                    asset={asset}
+                    selected={asset.kind === availableAsset?.kind}
+                    onSelect={(event) => onSelectAsset(asset, event)}
+                    onGenerateImage={onGenerateImage ? (event) => {
+                      event.stopPropagation();
+                      onGenerateImage(scene, asset.kind);
+                    } : null}
+                  />
+                ))}
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                <QuickMetric label="Storyboard" value={storyboardImageUrl ? "Ready" : imageReady ? "Mock" : "Pending"} />
+                <QuickMetric label="Lighting" value={sceneImageUrl(scene, "lighting") ? "Ready" : "Pending"} />
+                <QuickMetric label="DP" value={sceneImageUrl(scene, "dp") ? "Ready" : "Pending"} />
+                <QuickMetric label="Duration" value={`${shot.durationSeconds}s`} />
+              </div>
+            </section>
+
+            <section>
+              {!jsonReady ? (
+                <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.04] p-3">
+                  <div className="h-3 w-5/6 animate-pulse rounded bg-white/10" />
+                  <div className="h-3 w-2/3 animate-pulse rounded bg-white/10" />
+                  <div className="h-3 w-4/5 animate-pulse rounded bg-white/10" />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <DetailSection title="Shot Direction">
+                    <DetailTextBlock label="Action" value={shot.action} prominent />
+                    <DetailGrid
+                      items={[
+                        ["Composition", shot.composition],
+                        ["Intent", shot.retentionGoal],
+                        ["Direction", shot.creatorDirection],
+                      ]}
+                    />
+                  </DetailSection>
+
+                  <DetailSection title="Performance">
+                    <DetailGrid
+                      items={[
+                        ["Expression", shot.expression],
+                        ["Emotion", shot.emotion],
+                        ["Body Language", shot.bodyLanguage],
+                        ["Dialogue / VO", shot.dialogue],
+                        ["Text Overlay", shot.textOverlay],
+                      ]}
+                    />
+                  </DetailSection>
+
+                  <DetailSection title="Camera And Frame">
+                    <DetailGrid
+                      items={[
+                        ["Shot Type", shot.shotType],
+                        ["Camera Angle", shot.cameraAngle],
+                        ["Movement", shot.cameraMovement],
+                        ["Lens Suggestion", shot.lensSuggestion],
+                        ["FPS", shot.fps],
+                      ]}
+                    />
+                  </DetailSection>
+
+                  <details className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <summary className="cursor-pointer text-xs font-black uppercase tracking-normal text-slate-300">More setup notes</summary>
+                    <div className="mt-3">
+                      <DetailGrid
+                        items={[
+                          ["Lighting", shot.lighting],
+                          ["Environment", shot.environment],
+                          ["Voice Over", shot.voiceOver],
+                          ["Sound Design", shot.soundDesign],
+                          ["Editing Notes", shot.editingNotes],
+                          ["Safe Zone", shot.safeZoneNotes],
+                          ["Mobile Focus", shot.mobileFocusArea],
+                          ["Subtitle Position", shot.subtitlePosition],
+                          ["Transition", shot.transition],
+                          ["Capture Mode", shot.captureMode],
+                          ["Playback Speed", shot.playbackSpeed],
+                          ["Camera Style", shot.cameraStyle],
+                          ["Stabilization", shot.stabilization],
+                          ["Zoom", shot.zoomRecommendation],
+                          ["Rookie Guide", shot.rookieGuide],
+                          ["Execution", compactLines([shot.executionLevel, shot.executionScore && `Score ${shot.executionScore}`])],
+                          ["Tripod", shot.requiresTripod],
+                          ["Helper", shot.requiresHelper],
+                          ["Phone Friendly", shot.phoneFriendly],
+                        ]}
+                      />
+                    </div>
+                  </details>
+
+                  <details className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <summary className="cursor-pointer text-xs font-black uppercase tracking-normal text-slate-400">Raw tags</summary>
+                    <pre className="custom-scrollbar mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words text-[11px] font-semibold leading-5 text-slate-300">
+{JSON.stringify({
+  storyboardTag: scene.storyboardTag || {},
+  lightingBuildSheetTag: scene.lightingBuildSheetTag || {},
+  cameraPlanSheetTag: scene.cameraPlanSheetTag || {},
+}, null, 2)}
+                    </pre>
+                  </details>
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
+      </aside>
+    </div>
   );
+}
+
+function AssetPreview({ asset }) {
+  const Icon = asset?.icon || ImageIcon;
+  if (asset?.isGenerating) {
+    return (
+      <div className="h-44 overflow-hidden rounded-lg border border-white/10 bg-black/45">
+        <CreativeImageLoader compact label="Rendering" detail={asset.title} />
+      </div>
+    );
+  }
+  if (asset?.src) {
+    return (
+      <div className="h-44 overflow-hidden rounded-lg border border-white/10 bg-black">
+        <img src={asset.src} alt="" className="h-full w-full object-contain grayscale" loading="lazy" />
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-36 flex-col items-center justify-center rounded-lg border border-dashed border-white/15 bg-white/[0.035] p-4 text-center">
+      <Icon size={22} className="text-slate-500" />
+      <p className="mt-2 text-[11px] font-black uppercase tracking-normal text-slate-400">{asset?.title || "Image"} pending</p>
+    </div>
+  );
+}
+
+function AssetStripButton({ asset, selected, onSelect, onGenerateImage }) {
+  const Icon = asset.icon;
+  const hasImage = Boolean(asset.src);
+  const isGenerating = Boolean(asset.isGenerating);
+  return (
+    <div className={`min-w-0 rounded-md border p-1.5 ${selected ? "border-purple-300 bg-purple-400/10" : "border-white/10 bg-white/[0.035]"}`}>
+      <button
+        type="button"
+        disabled={!hasImage || isGenerating}
+        onClick={onSelect}
+        className="flex w-full min-w-0 items-center gap-1.5 text-left disabled:cursor-not-allowed"
+      >
+        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${selected ? "bg-purple-400/15 text-purple-100" : "bg-black/35 text-slate-300"}`}>
+          {isGenerating ? <Loader2 size={13} className="animate-spin" /> : <Icon size={13} />}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[10px] font-black uppercase tracking-normal text-white">{asset.title}</span>
+          <span className="block truncate text-[9px] font-bold uppercase tracking-normal text-slate-500">
+            {isGenerating ? "Rendering" : hasImage ? "Image ready" : "Pending"}
+          </span>
+        </span>
+      </button>
+      {onGenerateImage && (
+        <button
+          type="button"
+          disabled={isGenerating}
+          onClick={onGenerateImage}
+          className="mt-1.5 flex h-7 w-full items-center justify-center gap-1 rounded-md border border-white/10 text-[9px] font-black uppercase tracking-normal text-purple-100 transition hover:border-purple-200 hover:bg-purple-500/10 disabled:cursor-wait disabled:opacity-70"
+        >
+          {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
+          {hasImage && !asset.isFallback ? "Redo" : "Render"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function QuickMetric({ label, value }) {
+  const text = toText(value);
+  if (!text) return null;
+  return (
+    <div className="rounded-md border border-white/10 bg-white/[0.035] px-2 py-1">
+      <span className="text-[9px] font-black uppercase tracking-normal text-slate-500">{label}</span>
+      <span className="ml-1.5 text-[10px] font-black uppercase tracking-normal text-white">{text}</span>
+    </div>
+  );
+}
+
+function DetailSection({ title, children }) {
+  return (
+    <section className="rounded-lg border border-white/10 bg-white/[0.025] px-3 py-3">
+      <h4 className="text-[10px] font-black uppercase tracking-[0.16em] text-purple-100">{title}</h4>
+      <div className="mt-2.5 space-y-2.5">{children}</div>
+    </section>
+  );
+}
+
+function DetailGrid({ items = [] }) {
+  const visibleItems = items
+    .map(([label, value]) => [label, toText(value)])
+    .filter(([, value]) => value);
+  if (!visibleItems.length) return null;
+  return (
+    <div className="space-y-2">
+      {visibleItems.map(([label, value]) => (
+        <DetailTextBlock key={label} label={label} value={value} />
+      ))}
+    </div>
+  );
+}
+
+function DetailTextBlock({ label, value, prominent }) {
+  const text = toText(value);
+  if (!text) return null;
+  return (
+    <div className={prominent ? "rounded-md border border-purple-300/20 bg-purple-400/10 px-3 py-2.5" : ""}>
+      <p className="text-[10px] font-black uppercase tracking-normal text-slate-500">{label}</p>
+      <p className={`${prominent ? "text-sm leading-6 text-white" : "text-xs leading-5 text-slate-200"} mt-1 whitespace-pre-line font-semibold`}>
+        {text}
+      </p>
+    </div>
+  );
+}
+
+function ImageZoomModal({ asset, assets, frameOrientation, zoomLevel, onZoomChange, onSelectAsset, onClose }) {
+  const baseWidthRem = frameOrientation === "horizontal" ? 68 : 34;
+  const imageWidth = `${Math.round(baseWidthRem * zoomLevel)}rem`;
+  const controlClass = "flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-slate-200 transition hover:border-purple-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-200";
+
+  return (
+    <div className="fixed inset-0 z-[120] bg-black/95 text-white" onClick={onClose}>
+      <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 border-b border-white/10 bg-slate-950 px-4 py-3" onClick={(event) => event.stopPropagation()}>
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">Image Preview</p>
+          <h4 className="line-clamp-1 text-sm font-black text-white">{asset.title}</h4>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" title="Zoom out" aria-label="Zoom out" onClick={() => onZoomChange(Math.max(0.75, Number((zoomLevel - 0.25).toFixed(2))))} className={controlClass}>
+            <ZoomOut size={15} />
+          </button>
+          <span className="min-w-12 text-center text-xs font-black text-slate-300">{Math.round(zoomLevel * 100)}%</span>
+          <button type="button" title="Zoom in" aria-label="Zoom in" onClick={() => onZoomChange(Math.min(3, Number((zoomLevel + 0.25).toFixed(2))))} className={controlClass}>
+            <ZoomIn size={15} />
+          </button>
+          <button type="button" onClick={() => onZoomChange(1)} className="hidden rounded-md border border-white/10 px-3 py-2 text-xs font-black uppercase tracking-normal text-slate-200 transition hover:border-purple-200 sm:block">
+            Reset
+          </button>
+          <button type="button" title="Close preview" aria-label="Close preview" onClick={onClose} className={controlClass}>
+            <X size={16} />
+          </button>
+        </div>
+      </div>
+
+      <div className="custom-scrollbar absolute inset-x-0 bottom-20 top-16 overflow-auto p-4" onClick={(event) => event.stopPropagation()}>
+        <div className="flex min-h-full items-start justify-center">
+          <img
+            src={asset.src}
+            alt=""
+            className="max-w-none rounded-lg bg-black object-contain shadow-2xl shadow-black/60"
+            style={{ width: imageWidth }}
+          />
+        </div>
+      </div>
+
+      {assets.filter((item) => !item.isFallback).length > 1 && (
+        <div className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-center gap-2 border-t border-white/10 bg-slate-950 px-4 py-3" onClick={(event) => event.stopPropagation()}>
+          {assets.filter((item) => !item.isFallback).map((item) => (
+            <button
+              type="button"
+              key={item.kind}
+              title={`Show ${item.title}`}
+              onClick={() => {
+                onSelectAsset(item);
+                onZoomChange(1);
+              }}
+              className={`h-14 w-14 overflow-hidden rounded-md border bg-black transition hover:border-purple-200 ${item.kind === asset.kind ? "border-purple-300" : "border-white/15"}`}
+            >
+              <img src={item.src} alt="" className="h-full w-full object-cover grayscale" loading="lazy" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CreativeImageLoader({ label = "Loading Image", detail = "Preparing frame", compact = false }) {
+  return (
+    <div className={`${compact ? "relative h-full w-full" : "absolute inset-0 z-10"} flex items-center justify-center overflow-hidden bg-black/85 px-4 text-center`}>
+      <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:28px_28px]" />
+      <div className="relative flex flex-col items-center gap-3">
+        <div className="relative flex h-14 w-14 items-center justify-center rounded-lg border border-purple-200/35 bg-purple-400/10 text-purple-100">
+          <Sparkles size={18} className="absolute -right-1 -top-1 text-purple-200" />
+          <Loader2 size={26} className="animate-spin" />
+        </div>
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-white">{label}</p>
+          <p className="mt-1 text-[10px] font-bold uppercase tracking-normal text-purple-100/80">{detail}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function sceneImageUrl(scene = {}, kind = "storyboard") {
+  const normalizedKind = normalizeImageAssetKind(kind);
+  const assets = collectSceneImageAssets(scene);
+  if (normalizedKind === "lighting") {
+    return firstTextValue(
+      scene.lightingImageUrl,
+      scene.lighting_image_url,
+      scene.lightImageUrl,
+      scene.light_image_url,
+      imageUrlFromObject(scene.lightingImage),
+      imageUrlFromObject(scene.lightingAsset),
+      imageUrlByKind(assets, "lighting")
+    );
+  }
+  if (normalizedKind === "dp") {
+    return firstTextValue(
+      scene.cameraPlanImageUrl,
+      scene.camera_plan_image_url,
+      scene.dpImageUrl,
+      scene.dp_image_url,
+      scene.cameraImageUrl,
+      scene.camera_image_url,
+      imageUrlFromObject(scene.cameraPlanImage),
+      imageUrlFromObject(scene.cameraPlanAsset),
+      imageUrlFromObject(scene.dpImage),
+      imageUrlFromObject(scene.dpAsset),
+      imageUrlByKind(assets, "dp")
+    );
+  }
+  return firstTextValue(
+    scene.signedUrl,
+    scene.signed_url,
+    scene.presignedUrl,
+    scene.presigned_url,
+    scene.imageUrl,
+    scene.image_url,
+    scene.storyboardImageUrl,
+    scene.storyboard_image_url,
+    scene.publicUrl,
+    scene.public_url,
+    scene.assetUrl,
+    scene.asset_url,
+    imageUrlFromObject(scene.storyboardImage),
+    imageUrlFromObject(scene.storyboardAsset),
+    imageUrlByKind(assets, "storyboard")
+  );
+}
+
+function collectSceneImageAssets(scene = {}) {
+  if (!scene || typeof scene !== "object") return [];
+  return [
+    scene.image,
+    scene.asset,
+    ...(Array.isArray(scene.images) ? scene.images : []),
+    ...(Array.isArray(scene.assets) ? scene.assets : []),
+    ...(Array.isArray(scene.imageAssets) ? scene.imageAssets : []),
+    ...(Array.isArray(scene.image_assets) ? scene.image_assets : []),
+    ...(Array.isArray(scene.shotImages) ? scene.shotImages : []),
+    ...(Array.isArray(scene.shot_images) ? scene.shot_images : []),
+    ...(Array.isArray(scene.storyboardImages) ? scene.storyboardImages : []),
+    ...(Array.isArray(scene.storyboard_images) ? scene.storyboard_images : []),
+    ...(Array.isArray(scene.lightingImages) ? scene.lightingImages : []),
+    ...(Array.isArray(scene.lighting_images) ? scene.lighting_images : []),
+    ...(Array.isArray(scene.cameraPlanImages) ? scene.cameraPlanImages : []),
+    ...(Array.isArray(scene.camera_plan_images) ? scene.camera_plan_images : []),
+  ].filter((item) => item && typeof item === "object");
+}
+
+function imageUrlByKind(assets = [], targetKind = "storyboard") {
+  const normalizedTarget = normalizeImageAssetKind(targetKind);
+  const match = assets.find((asset) => {
+    const kind = normalizeImageAssetKind(asset.imageKind || asset.image_kind || asset.kind || asset.assetKind || asset.asset_kind || asset.imageType || asset.image_type || asset.type || asset.role || asset.objectKey || asset.object_key || imageUrlFromObject(asset));
+    return kind === normalizedTarget;
+  });
+  return imageUrlFromObject(match);
+}
+
+function imageUrlFromObject(value = {}) {
+  if (!value || typeof value !== "object") return "";
+  return firstTextValue(
+    value.signedUrl,
+    value.signed_url,
+    value.presignedUrl,
+    value.presigned_url,
+    value.imageUrl,
+    value.image_url,
+    value.storyboardImageUrl,
+    value.storyboard_image_url,
+    value.publicUrl,
+    value.public_url,
+    value.assetUrl,
+    value.asset_url,
+    value.downloadUrl,
+    value.download_url,
+    value.url,
+    value.href,
+    value.location,
+    value.src,
+    value.path,
+    value.asset?.signedUrl,
+    value.asset?.signed_url,
+    value.asset?.publicUrl,
+    value.asset?.public_url,
+    value.asset?.url,
+    value.image?.signedUrl,
+    value.image?.signed_url,
+    value.image?.publicUrl,
+    value.image?.public_url,
+    value.image?.url,
+    value.file?.signedUrl,
+    value.file?.signed_url,
+    value.file?.url,
+    value.media?.signedUrl,
+    value.media?.signed_url,
+    value.media?.url
+  );
+}
+
+function normalizeImageAssetKind(value = "") {
+  const text = String(value || "").toLowerCase();
+  if (text.includes("light")) return "lighting";
+  if (text.includes("camera") || text.includes("dp") || text.includes("director_photography")) return "dp";
+  return "storyboard";
+}
+
+function firstTextValue(...values) {
+  return values.find((value) => typeof value === "string" && value.trim()) || "";
 }
 
 function BriefSection({ label, value, featured, compact }) {
-  if (!value) return null;
+  const text = toText(value);
+  if (!text) return null;
   return (
     <div className={`${featured ? "border-purple-400/25 bg-purple-500/10" : "border-white/10 bg-white/[0.045]"} rounded-xl border px-3 py-3`}>
       <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">{label}</p>
       <p className={`${featured ? "text-sm text-white" : compact ? "text-xs text-slate-300" : "text-xs text-slate-200"} mt-2 whitespace-pre-line font-semibold leading-5`}>
-        {value}
+        {text}
       </p>
     </div>
   );
@@ -203,11 +695,12 @@ function SpecPanel({ title, children }) {
 }
 
 function SpecRow({ label, value }) {
-  if (value === undefined || value === null || value === "") return null;
+  const text = toText(value);
+  if (!text) return null;
   return (
-    <div className="flex items-start justify-between gap-3 text-xs">
+    <div className="flex min-w-0 items-start justify-between gap-3 text-xs">
       <span className="shrink-0 font-bold text-slate-500">{label}</span>
-      <span className="text-right font-semibold leading-5 text-slate-200">{String(value)}</span>
+      <span className="min-w-0 whitespace-pre-line break-words text-right font-semibold leading-5 text-slate-200">{text}</span>
     </div>
   );
 }
@@ -216,12 +709,19 @@ function normalizeShot(scene, index) {
   const cinematic = scene.cinematicExecution || {};
   const difficulty = scene.executionDifficulty || {};
   const rookie = scene.rookieFriendlyGuide || {};
+  const storyboardTag = scene.storyboardTag || {};
+  const lightingTag = scene.lightingBuildSheetTag || {};
+  const cameraPlanTag = scene.cameraPlanSheetTag || {};
+  const primaryDialogue = storyboardTag.primaryDialogue || {};
+  const framePreview = cameraPlanTag.framePreview || {};
+  const movementSpec = cameraPlanTag.movementSpec || {};
+  const cameraRig = cameraPlanTag.cameraRig || {};
   const startTime = scene.startTime || parseRange(scene.timestamp).start || "";
   const endTime = scene.endTime || parseRange(scene.timestamp).end || "";
   const timeRange = scene.timestamp || (startTime && endTime ? `${startTime}-${endTime}` : "0:00-0:00");
-  const expression = toKeyValueText(scene.expression);
-  const bodyLanguage = toKeyValueText(scene.bodyLanguage);
-  const dialogue = toKeyValueText(scene.dialogue) || scene.voiceOver || scene.vo || scene.voiceover || "";
+  const expression = toKeyValueText(scene.expression || storyboardTag.expression);
+  const bodyLanguage = toKeyValueText(scene.bodyLanguage || storyboardTag.bodyLanguage);
+  const dialogue = toKeyValueText(scene.dialogue) || primaryDialogue.line || scene.voiceOver || scene.vo || scene.voiceover || "";
   const voiceOver = scene.voiceOver || scene.vo || scene.voiceover || "";
 
   return {
@@ -230,31 +730,31 @@ function normalizeShot(scene, index) {
     endTime,
     timeRange,
     durationSeconds: scene.durationSeconds || inferDurationSeconds(startTime, endTime, timeRange) || 2,
-    title: scene.title || scene.description || scene.visualDirection || `Shot ${index + 1}`,
-    purpose: scene.purpose || scene.hookBeat || scene.scenePurpose || scene.description || "Storyboard beat",
-    shotType: scene.shotType || "Shot",
-    cameraAngle: scene.cameraAngle || scene.framing || "Camera angle",
-    cameraMovement: scene.cameraMovement || scene.transition || "Static",
-    lensSuggestion: scene.lensSuggestion || "",
-    fps: scene.fps || cinematic.recommendedFPS || "",
-    composition: scene.composition || scene.visualDirection || scene.description || "",
+    title: scene.title || storyboardTag.shotTitle || scene.description || scene.visualDirection || `Shot ${index + 1}`,
+    purpose: scene.purpose || storyboardTag.narrativeBeatSummary || scene.hookBeat || scene.scenePurpose || scene.description || "Storyboard beat",
+    shotType: scene.shotType || storyboardTag.shotType || cameraPlanTag.shotType || "Shot",
+    cameraAngle: scene.cameraAngle || storyboardTag.cameraAngle || cameraPlanTag.cameraAngle || scene.framing || "Camera angle",
+    cameraMovement: scene.cameraMovement || storyboardTag.cameraMovement || cameraPlanTag.cameraMovement || scene.transition || "Static",
+    lensSuggestion: scene.lensSuggestion || storyboardTag.lensSuggestion || cameraPlanTag.lensSuggestion || cameraRig.lensSuggestion || "",
+    fps: scene.fps || storyboardTag.fps || cameraPlanTag.fps || cinematic.recommendedFPS || "",
+    composition: scene.composition || storyboardTag.compositionSummary || scene.visualDirection || scene.description || "",
     expression,
-    emotion: toText(scene.emotion),
+    emotion: toText(scene.emotion || storyboardTag.emotion),
     bodyLanguage,
-    lighting: scene.lighting || "",
-    environment: scene.environment || "",
-    action: scene.action || scene.description || scene.visualDirection || "",
+    lighting: scene.lighting || storyboardTag.lightingAtmosphericDescription || lightingTag.cinematicIntent || "",
+    environment: scene.environment || storyboardTag.environment || storyboardTag.setDesign || "",
+    action: scene.action || storyboardTag.action || scene.description || scene.visualDirection || "",
     dialogue: dialogue || "No dialogue",
     voiceOver: voiceOver || "None",
-    textOverlay: scene.textOverlay || "",
-    transition: scene.transition || cinematic.transitionStyle || "",
-    soundDesign: toText(scene.soundDesign || scene.soundNote || scene.musicNote),
+    textOverlay: scene.textOverlay ?? storyboardTag.textOverlay ?? "",
+    transition: scene.transition || storyboardTag.transitionNote || cinematic.transitionStyle || "",
+    soundDesign: toText(scene.soundDesign || storyboardTag.soundDesign || storyboardTag.soundCues || storyboardTag.audioCues || storyboardTag.ambientBedDescription || storyboardTag.syncHitDescription || scene.soundNote || scene.musicNote),
     editingNotes: toText(scene.editingNotes),
-    retentionGoal: scene.retentionGoal || scene.intendedImpact || scene.emotionalImpact || "",
-    creatorDirection: toKeyValueText(scene.creatorDirection),
-    subtitlePosition: scene.subtitlePosition,
-    mobileFocusArea: scene.mobileFocusArea || "",
-    safeZoneNotes: scene.safeZoneNotes || "",
+    retentionGoal: scene.retentionGoal || storyboardTag.targetFocalPoint || scene.intendedImpact || scene.emotionalImpact || "",
+    creatorDirection: toKeyValueText(scene.creatorDirection || storyboardTag.creatorTip || storyboardTag.directorNote),
+    subtitlePosition: scene.subtitlePosition || storyboardTag.captionStyle?.position,
+    mobileFocusArea: scene.mobileFocusArea || framePreview.mobileFocusArea || "",
+    safeZoneNotes: scene.safeZoneNotes || framePreview.subjectPlacement || "",
     difficulty: difficulty.level || difficulty.score || "Beginner",
     executionScore: difficulty.score,
     executionLevel: difficulty.level,
@@ -264,12 +764,12 @@ function normalizeShot(scene, index) {
     recommendedFPS: cinematic.recommendedFPS,
     captureMode: cinematic.captureMode || "",
     playbackSpeed: cinematic.playbackSpeed || "",
-    cameraStyle: cinematic.cameraStyle || "",
-    stabilization: cinematic.stabilization || "",
-    transitionStyle: cinematic.transitionStyle || "",
-    zoomRecommendation: cinematic.zoomRecommendation || "",
-    motionIntensity: cinematic.motionIntensity || "",
-    editingComplexity: cinematic.editingComplexity || "",
+    cameraStyle: cinematic.cameraStyle || cameraRig.cameraBody || "",
+    stabilization: cinematic.stabilization || movementSpec.stabilizationTool || "",
+    transitionStyle: cinematic.transitionStyle || storyboardTag.transitionNote || "",
+    zoomRecommendation: cinematic.zoomRecommendation || framePreview.lensCompressionFeel || "",
+    motionIntensity: cinematic.motionIntensity || movementSpec.speed || "",
+    editingComplexity: cinematic.editingComplexity || cameraPlanTag.coverageSpec?.editorIntent || "",
     rookieGuide: compactLines([
       rookie.whatIsThis && `What is this: ${rookie.whatIsThis}`,
       rookie.whyThisWorks && `Why it works: ${rookie.whyThisWorks}`,
@@ -280,7 +780,6 @@ function normalizeShot(scene, index) {
       rookie.commonMistakes && `Avoid: ${toText(rookie.commonMistakes)}`,
       typeof rookie.phoneOnlyFriendly === "boolean" && `Phone only friendly: ${rookie.phoneOnlyFriendly ? "Yes" : "No"}`,
     ]),
-    sketchPrompt: scene.sketchPrompt || "",
   };
 }
 
@@ -295,16 +794,6 @@ function parseRange(timestamp) {
 function formatBoolean(value) {
   if (typeof value !== "boolean") return "";
   return value ? "Yes" : "No";
-}
-
-function overlayPositionClass(position) {
-  const map = {
-    "lower-middle": "left-1/2 bottom-32 -translate-x-1/2",
-    lower: "left-1/2 bottom-32 -translate-x-1/2",
-    middle: "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
-    top: "left-1/2 top-20 -translate-x-1/2",
-  };
-  return map[position] || "left-1/2 bottom-32 -translate-x-1/2";
 }
 
 function inferDurationSeconds(start, end, timestamp) {
@@ -345,8 +834,8 @@ function toKeyValueText(value) {
 }
 
 function toText(value) {
-  if (!value) return "";
-  if (Array.isArray(value)) return value.filter(Boolean).join("\n");
+  if (value === undefined || value === null || value === "") return "";
+  if (Array.isArray(value)) return value.map(toText).filter(Boolean).join("\n");
   if (typeof value === "object") return toKeyValueText(value);
   return String(value);
 }

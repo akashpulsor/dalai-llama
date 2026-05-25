@@ -135,6 +135,15 @@ const pbxCoreApi = createApi({
       }),
     }),
 
+    // POST /bots/{botId}/test-call
+    startTestCall: builder.mutation({
+      query: (/** @type {{ botId: string, phone_number?: string, use_softphone?: boolean }} */ { botId, ...body }) => ({
+        url: `/bots/${botId}/test-call`,
+        method: 'POST',
+        body,
+      }),
+    }),
+
     // POST /calls/{callId}/answer
     answerCall: builder.mutation({
       query: (/** @type {string} */ callId) => ({
@@ -168,6 +177,14 @@ const pbxCoreApi = createApi({
       }),
     }),
 
+    // POST /bots/{botId}/test-call/{callId}/hangup
+    hangupTestCall: builder.mutation({
+      query: (/** @type {{ botId: string, callId: string }} */ { botId, callId }) => ({
+        url: `/bots/${botId}/test-call/${callId}/hangup`,
+        method: 'POST',
+      }),
+    }),
+
     // POST /calls/{callId}/dtmf
     sendDtmf: builder.mutation({
       query: (/** @type {{ callId: string, digits: string }} */ { callId, digits }) => ({
@@ -191,7 +208,7 @@ const pbxCoreApi = createApi({
 
     // POST /calls/{callId}/listen
     listenCall: builder.mutation({
-      query: (/** @type {{ callId: string, supervisor_uuid: string }} */ { callId, supervisor_uuid }) => ({
+      query: (/** @type {{ callId: string, supervisor_uuid?: string }} */ { callId, supervisor_uuid }) => ({
         url: `/calls/${callId}/listen`,
         method: 'POST',
         body: { supervisor_uuid },
@@ -200,7 +217,7 @@ const pbxCoreApi = createApi({
 
     // POST /calls/{callId}/whisper
     whisperCall: builder.mutation({
-      query: (/** @type {{ callId: string, supervisor_uuid: string }} */ { callId, supervisor_uuid }) => ({
+      query: (/** @type {{ callId: string, supervisor_uuid?: string }} */ { callId, supervisor_uuid }) => ({
         url: `/calls/${callId}/whisper`,
         method: 'POST',
         body: { supervisor_uuid },
@@ -209,7 +226,7 @@ const pbxCoreApi = createApi({
 
     // POST /calls/{callId}/barge
     bargeCall: builder.mutation({
-      query: (/** @type {{ callId: string, supervisor_uuid: string }} */ { callId, supervisor_uuid }) => ({
+      query: (/** @type {{ callId: string, supervisor_uuid?: string }} */ { callId, supervisor_uuid }) => ({
         url: `/calls/${callId}/barge`,
         method: 'POST',
         body: { supervisor_uuid },
@@ -604,6 +621,7 @@ export const {
   // Call
   useGetActiveCallsQuery, useOriginateCallMutation, useAnswerCallMutation,
   useHoldCallMutation, useTransferCallMutation, useHangupCallMutation,
+  useStartTestCallMutation, useHangupTestCallMutation,
   useSendDtmfMutation, useInterruptCallMutation,
   // Supervisor
   useListenCallMutation, useWhisperCallMutation, useBargeCallMutation,

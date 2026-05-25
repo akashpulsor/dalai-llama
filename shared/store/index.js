@@ -80,7 +80,7 @@ export const createStore = () => {
 
     return configureStore({
       reducer: reducers,
-      middleware: (getDefault) => {
+      middleware: /** @type {any} */ ((/** @type {any} */ getDefault) => {
         let middleware = getDefault()
           .concat(api.middleware)
           .concat(keycloakApi.middleware);
@@ -92,7 +92,7 @@ export const createStore = () => {
         }
 
         return middleware;
-      },
+      }),
     });
   } catch (e) {
     console.error("configureStore FAILED:", e);
@@ -178,6 +178,8 @@ export {
   useHoldCallMutation,
   useTransferCallMutation,
   useHangupCallMutation,
+  useStartTestCallMutation,
+  useHangupTestCallMutation,
   useSendDtmfMutation,
   useInterruptCallMutation,
   useListenCallMutation,

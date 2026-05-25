@@ -105,6 +105,22 @@ a {
   background: linear-gradient(180deg, #8b5cf6, #6d3fd8);
 }
 
+.creator-workflow-panel {
+  animation: creator-workflow-panel-in 180ms ease-out;
+}
+
+@keyframes creator-workflow-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .creator-badge {
   border-radius: 999px;
   background: rgba(124, 77, 255, 0.16);
@@ -163,6 +179,30 @@ a {
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: rgba(168, 85, 247, 0.5);
   border-radius: 999px;
+}
+
+.script-paper,
+.script-paper * {
+  color-scheme: light;
+}
+
+.script-paper {
+  background-color: #f4ecd8 !important;
+  color: #15110d !important;
+}
+
+.script-paper input,
+.script-paper textarea {
+  background-color: transparent !important;
+  color: #15110d !important;
+  caret-color: #15110d;
+  -webkit-text-fill-color: #15110d;
+}
+
+.script-paper input::placeholder,
+.script-paper textarea::placeholder {
+  color: rgba(21, 17, 13, 0.35) !important;
+  -webkit-text-fill-color: rgba(21, 17, 13, 0.35);
 }
 
 .scene-sketch {

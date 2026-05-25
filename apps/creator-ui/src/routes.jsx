@@ -5,7 +5,10 @@ import PlannerPage from "./pages/PlannerPage.jsx";
 
 const routes = [
   { index: true, element: <PlannerPage /> },
-  { path: "trends", element: <Navigate to="/#trends" replace /> },
+  { path: "trends", element: <Navigate to="/#ideas" replace /> },
+  { path: "generated-ideas", element: <Navigate to="/#generated-ideas" replace /> },
+  { path: "storyline", element: <Navigate to="/#script" replace /> },
+  { path: "script", element: <Navigate to="/#screenplay" replace /> },
   { path: "audience", element: <Navigate to="/#audience" replace /> },
   { path: "cast", element: <Navigate to="/#cast" replace /> },
   { path: "generate", element: <Navigate to="/#ideas" replace /> },

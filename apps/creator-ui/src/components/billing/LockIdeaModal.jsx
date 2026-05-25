@@ -14,6 +14,7 @@ export default function LockIdeaModal({
   wallet,
   subscription,
   selectedTrend,
+  brief,
   selectedIdea,
   selectedCreator,
   audience,
@@ -23,6 +24,7 @@ export default function LockIdeaModal({
 
   const cost = Number(quote?.cost ?? quote?.packageCost ?? 0);
   const balance = Number((quote?.wallet || wallet)?.balance || 0);
+  const walletEmpty = balance <= 0;
   const hasEnoughWallet = balance >= cost;
   const entitlementBlocked = quote?.entitlementAllowed === false || subscription?.creatorEntitlements?.lockIdeaPackageEnabled === false;
   const canConfirm = hasEnoughWallet && !entitlementBlocked && !isLoading;
@@ -47,7 +49,7 @@ export default function LockIdeaModal({
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
-          <ReviewRow label="Trend" value={selectedTrend?.title} />
+          <ReviewRow label={selectedTrend ? "Trend" : "Topic"} value={selectedTrend?.title || brief?.title || brief?.description} />
           <ReviewRow label="Idea" value={selectedIdea?.title || selectedIdea?.description} />
           <ReviewRow label="Audience" value={audience?.title || "Confirmed audience"} />
           <ReviewRow label="Cast" value={selectedCreator?.name || "Confirmed cast"} />
@@ -68,7 +70,10 @@ export default function LockIdeaModal({
         </div>
 
         {!hasEnoughWallet && (
-          <InlineWarning message="Wallet balance is lower than the package cost. Recharge before locking this idea." />
+          <InlineWarning
+            tone={walletEmpty ? "error" : "warning"}
+            message={walletEmpty ? "Wallet balance is zero. Please recharge." : "Wallet balance is lower than the package cost. Recharge before locking this idea."}
+          />
         )}
         {entitlementBlocked && (
           <InlineWarning message="Your current subscription does not include this Creator generation package." />
@@ -109,9 +114,14 @@ function ReviewRow({ label, value }) {
   );
 }
 
-function InlineWarning({ message }) {
+function InlineWarning({ message, tone = "warning" }) {
+  const isError = tone === "error";
   return (
-    <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-300/20 bg-amber-300/10 p-3 text-sm font-semibold text-amber-100">
+    <div className={`mt-3 flex items-start gap-2 rounded-lg border p-3 text-sm font-semibold ${
+      isError
+        ? "border-rose-300/25 bg-rose-400/10 text-rose-100"
+        : "border-amber-300/20 bg-amber-300/10 text-amber-100"
+    }`}>
       <AlertTriangle size={16} className="mt-0.5 shrink-0" />
       <span>{message}</span>
     </div>

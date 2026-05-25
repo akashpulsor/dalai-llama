@@ -60,7 +60,10 @@ export function useWallet() {
    * @param {string} [currency]
    * @returns {Promise<{success: boolean, balance?: number, error?: string}>}
    */
-  const addBalance = useCallback(async (amount, currency = "INR") => {
+  const addBalance = useCallback(async (
+    /** @type {number} */ amount,
+    /** @type {string} */ currency = "INR"
+  ) => {
     try {
       const result = await dispatchAny(
         api.endpoints.addWalletBalance.initiate({ amount, currency })

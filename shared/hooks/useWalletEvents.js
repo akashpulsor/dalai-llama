@@ -23,6 +23,7 @@ export default function useWalletEvents() {
 
   const { isConnected, subscribe } = useStompEvents(token);
 
+  /** @param {any} event */
   const unwrapWalletEvent = (event) => {
     if (!event || typeof event !== 'object') return event;
     if (event.data && typeof event.data === 'object') {

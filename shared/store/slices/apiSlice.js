@@ -486,6 +486,103 @@ const MOCK_RESPONSES = {
   status: "success",
   refreshedAt: "2026-05-13T10:00:00.000Z"
 },
+"/creator/platforms": [
+  {
+    id: "mock-platform-instagram-reels",
+    code: "instagram_reels",
+    label: "Instagram Reels",
+    displayName: "Instagram Reels",
+    description: "Short-form vertical videos for Reels-first creator planning.",
+    iconKey: "instagram",
+    sortOrder: 10,
+    shortForm: true,
+    promptContext: "Optimize for Instagram Reels: hook-heavy, vertical, quick cuts, creator-led pacing."
+  },
+  {
+    id: "mock-platform-youtube-shorts",
+    code: "youtube_shorts",
+    label: "YouTube Shorts",
+    displayName: "YouTube Shorts",
+    description: "Short-form YouTube format with strong retention and replay value.",
+    iconKey: "youtube",
+    sortOrder: 20,
+    shortForm: true,
+    promptContext: "Optimize for YouTube Shorts: clear setup, payoff, retention loops, and concise scripting."
+  },
+  {
+    id: "mock-platform-tiktok",
+    code: "tiktok",
+    label: "TikTok",
+    displayName: "TikTok",
+    description: "Fast social-video format for trend-native creator content.",
+    iconKey: "music",
+    sortOrder: 30,
+    shortForm: true,
+    promptContext: "Optimize for TikTok: trend-aware framing, quick emotional beats, and native captions."
+  }
+],
+"/creator/categories": [
+  {
+    id: "mock-category-fitness",
+    code: "fitness",
+    label: "Fitness",
+    displayName: "Fitness",
+    description: "Health, weight loss, routines, transformation and relatable wellness ideas.",
+    iconKey: "dumbbell",
+    sortOrder: 10,
+    promptContext: "Fitness creator content with practical routines, motivation, realistic body goals, and clear action."
+  },
+  {
+    id: "mock-category-beauty",
+    code: "beauty",
+    label: "Beauty",
+    displayName: "Beauty",
+    description: "Makeup, skincare, glow-up, styling and transformation-led content.",
+    iconKey: "sparkles",
+    sortOrder: 20,
+    promptContext: "Beauty creator content with visual transformation, product moments, and confidence-led storytelling."
+  },
+  {
+    id: "mock-category-food",
+    code: "food",
+    label: "Food",
+    displayName: "Food",
+    description: "Recipes, meal prep, cravings, regional food and creator kitchen storytelling.",
+    iconKey: "utensils",
+    sortOrder: 30,
+    promptContext: "Food creator content with satisfying visuals, simple steps, cultural details, and sensory hooks."
+  },
+  {
+    id: "mock-category-study",
+    code: "study",
+    label: "Study",
+    displayName: "Study",
+    description: "Student life, productivity, exam prep, motivation and routine content.",
+    iconKey: "book-open",
+    sortOrder: 40,
+    promptContext: "Study creator content with focused routines, relatable pressure, practical advice, and calm pacing."
+  },
+  {
+    id: "mock-category-tech-ai",
+    code: "tech_ai",
+    label: "Tech & AI",
+    displayName: "Tech & AI",
+    description: "AI tools, tech explainers, workflows, product demos and creator education.",
+    iconKey: "cpu",
+    sortOrder: 50,
+    promptContext: "Tech and AI creator content with clear demos, strong before-after value, and simple explanations."
+  },
+  {
+    id: "mock-category-finance-crypto",
+    code: "finance_crypto",
+    label: "Finance & Crypto",
+    displayName: "Finance & Crypto",
+    description: "Personal finance, markets, crypto education and money mindset content.",
+    iconKey: "wallet",
+    sortOrder: 60,
+    promptContext: "Finance creator content with cautious educational framing, concrete examples, and trust-building clarity."
+  }
+],
 "/creator/trend-combinations": {
   platforms: [
     { code: "instagram", label: "Instagram Reels", active: true },
@@ -512,6 +609,42 @@ const MOCK_RESPONSES = {
     { platformCode: "tiktok", categoryCode: "beauty", active: true }
   ]
 },
+"/creator/ai-providers": [
+  {
+    id: "mock-openai-provider",
+    code: "openai",
+    label: "OpenAI",
+    displayName: "OpenAI",
+    description: "OpenAI Responses API provider for production creator generation.",
+    providerType: "LLM",
+    defaultModel: "gpt-4o-mini",
+    defaultProvider: true,
+    credentialConfigured: true,
+    sortOrder: 10,
+    capabilities: {
+      jsonOutput: true,
+      usageTokens: true,
+      textGeneration: true
+    }
+  },
+  {
+    id: "mock-local-provider",
+    code: "mock",
+    label: "Mock Provider",
+    displayName: "Mock Provider",
+    description: "Deterministic local provider for development and tests.",
+    providerType: "MOCK",
+    defaultModel: "mock-creator-v1",
+    defaultProvider: false,
+    credentialConfigured: true,
+    sortOrder: 90,
+    capabilities: {
+      offline: true,
+      jsonOutput: true,
+      textGeneration: true
+    }
+  }
+],
 "/creator/trends/predict": {
   jobId: "job-predict-trends-mock",
   predictionRunId: "prediction-run-mock",
@@ -536,6 +669,18 @@ const MOCK_RESPONSES = {
     fitnessLevel: "Beginner",
     style: "Casual Gym Wear",
     cameraConfidence: "Shy"
+  }
+],
+"/creator/projects": [
+  {
+    id: "00000000-0000-4000-8000-000000000001",
+    projectId: "00000000-0000-4000-8000-000000000001",
+    title: "She Almost Didn't Go",
+    lockedIdeaTitle: "Beginner fitness transformation",
+    selectedCategoryCode: "fitness",
+    durationSeconds: 30,
+    status: "SCREENPLAY_GENERATED",
+    updatedAt: new Date().toISOString()
   }
 ],
 "/creator/ideas/generate": {
@@ -564,7 +709,7 @@ const MOCK_RESPONSES = {
   ]
 },
 "/creator/storyboard/generate": {
-  projectId: "project-she-almost",
+  projectId: "00000000-0000-4000-8000-000000000001",
   status: "queued"
 },
 "/creator/locked-ideas/quote": {
@@ -650,11 +795,97 @@ const mockBaseQuery = async (args) => {
   const endpoint =
     typeof args === "string" ? args : args.url ? args.url : "";
   const method = typeof args === "string" ? "GET" : args.method || "GET";
+  const body = typeof args === "string" ? {} : args.body || {};
 
   await new Promise((r) => setTimeout(r, 250));
 
   /** @type {string} */
   const key = String(endpoint);  // ✅ Fix: ensure string key
+
+  if (key === "/tenants" && method === "POST") {
+    const sourceName = body.name || body.companyName || body.company_name || body.organizationName || "Creator Organization";
+    const slug = body.slug || String(sourceName).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "creator-org";
+    return {
+      data: {
+        id: `tenant-${slug}`,
+        tenantId: `tenant-${slug}`,
+        slug,
+        name: sourceName,
+        companyName: body.companyName || body.company_name || sourceName,
+        status: "ACTIVE",
+        hasTenant: true,
+        needsOnboarding: false,
+        productCode: body.productCode || "CREATOR",
+        currency: body.currency || body.wallet?.currency || "INR",
+      }
+    };
+  }
+
+  if (key === "/creator/profiles" && method === "POST") {
+    const displayName = body.displayName || body.name || "New Actor";
+    const vibe = Array.isArray(body.vibe) ? body.vibe : Array.isArray(body.vibes) ? body.vibes : ["Relatable"];
+    const mockId = `00000000-0000-4000-8000-${String(Date.now()).slice(-12).padStart(12, "0")}`;
+    return {
+      data: {
+        id: mockId,
+        projectId: body.projectId || null,
+        name: displayName,
+        displayName,
+        roleInShort: body.roleInShort || "Main Actor",
+        age: body.age || body.attributes?.age || 26,
+        gender: body.gender || body.attributes?.gender || "All",
+        vibe,
+        vibes: vibe,
+        style: body.style || body.attributes?.style || "Casual Gym Wear",
+        cameraConfidence: body.cameraConfidence || body.attributes?.cameraConfidence || "Somewhat Comfortable",
+        look: body.look || body.attributes?.look || "",
+        profile: body.profile || body.attributes?.profile || "",
+        notes: body.notes || body.attributes?.notes || "",
+        confirmed: body.confirmed !== false,
+        attributes: {
+          ...(body.attributes || {}),
+          age: body.age || body.attributes?.age || 26,
+          gender: body.gender || body.attributes?.gender || "All",
+          vibe,
+          vibes: vibe,
+          style: body.style || body.attributes?.style || "Casual Gym Wear",
+          cameraConfidence: body.cameraConfidence || body.attributes?.cameraConfidence || "Somewhat Comfortable",
+          look: body.look || body.attributes?.look || "",
+          profile: body.profile || body.attributes?.profile || "",
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+    };
+  }
+
+  const creatorProfileUpdateMatch = key.match(/^\/creator\/profiles\/([^/]+)$/);
+  if (creatorProfileUpdateMatch && method === "PATCH") {
+    const [, profileId] = creatorProfileUpdateMatch;
+    const displayName = body.displayName || body.name || "Updated Actor";
+    const vibe = Array.isArray(body.vibe) ? body.vibe : Array.isArray(body.vibes) ? body.vibes : ["Relatable"];
+    return {
+      data: {
+        id: profileId,
+        projectId: body.projectId || null,
+        name: displayName,
+        displayName,
+        roleInShort: body.roleInShort || "Main Actor",
+        age: body.age || body.attributes?.age || 26,
+        gender: body.gender || body.attributes?.gender || "All",
+        vibe,
+        vibes: vibe,
+        style: body.style || body.attributes?.style || "Casual Gym Wear",
+        cameraConfidence: body.cameraConfidence || body.attributes?.cameraConfidence || "Somewhat Comfortable",
+        look: body.look || body.attributes?.look || "",
+        profile: body.profile || body.attributes?.profile || "",
+        notes: body.notes || body.attributes?.notes || "",
+        confirmed: body.confirmed !== false,
+        attributes: body.attributes || {},
+        updatedAt: new Date().toISOString(),
+      }
+    };
+  }
 
   const creatorJobMatch = key.match(/^\/creator\/jobs\/([^/]+)$/);
   if (creatorJobMatch) {
@@ -680,7 +911,7 @@ const mockBaseQuery = async (args) => {
         result: {
           storyboard: {
             id: "storyboard-she-almost",
-            projectId: "project-she-almost",
+            projectId: "00000000-0000-4000-8000-000000000001",
             title: "She Almost Didn't Go",
             durationSeconds: 30,
             hook: "A hesitant first step becomes the emotional proof that showing up counts.",
@@ -867,6 +1098,211 @@ const mockBaseQuery = async (args) => {
     };
   }
 
+  const creatorStoryboardFromScriptMatch = key.match(/^\/creator\/storyboards\/scripts\/([^/]+)\/generate$/);
+  if (creatorStoryboardFromScriptMatch && method === "POST") {
+    const [, scriptId] = creatorStoryboardFromScriptMatch;
+    const sceneCount = 6;
+    const scenes = Array.from({ length: sceneCount }, (_, index) => {
+      const shotNumber = index + 1;
+      const start = index * 5;
+      const end = start + 5;
+      const imagePath = `/mocks/creator/story-scene-${String(shotNumber).padStart(2, "0")}.png`;
+      return {
+        sceneId: `scene-${String(shotNumber).padStart(2, "0")}`,
+        imageAssetId: `asset-storyboard-${shotNumber}`,
+        lightingImageAssetId: `asset-lighting-${shotNumber}`,
+        cameraPlanImageAssetId: `asset-camera-${shotNumber}`,
+        shotNumber,
+        title: `Shot ${shotNumber}: Production beat`,
+        startTime: `${start}s`,
+        endTime: `${end}s`,
+        durationSeconds: 5,
+        shotType: shotNumber % 2 ? "CU" : "MS",
+        cameraAngle: "Eye Level",
+        cameraMovement: shotNumber % 2 ? "Static" : "Slow Push-In",
+        lensSuggestion: "Mobile 1x Wide",
+        fps: 24,
+        objectKey: `mock/storyboard/${scriptId}/${shotNumber}.png`,
+        signedUrl: imagePath,
+        lightingImageUrl: imagePath,
+        cameraPlanImageUrl: imagePath,
+        sketchPrompt: "Production storyboard panel with matching character continuity.",
+        storyboardTag: {
+          projectTitle: "She Almost Didn't Go",
+          shotTitle: `Shot ${shotNumber}: Production beat`,
+          narrativeBeatSummary: shotNumber === 1 ? "Creator hesitates before the first brave action." : "Creator moves through the next emotional beat.",
+          compositionSummary: "Character center frame, eyes near upper third",
+          targetFocalPoint: "TARGET: creator expression",
+          shotType: shotNumber % 2 ? "CU" : "MS",
+          cameraAngle: "Eye Level",
+          cameraMovement: shotNumber % 2 ? "Static" : "Slow Push-In",
+          lensSuggestion: "Mobile 1x Wide",
+          fps: 24,
+          action: "Hold the emotional action clearly for the storyboard frame.",
+          expression: "Focused and vulnerable",
+          emotion: "determined",
+          textOverlay: shotNumber === sceneCount ? "START SMALL" : "",
+          primaryDialogue: {
+            characterName: "Priya",
+            archetypeLabel: "INFLUENCER",
+            line: shotNumber === 1 ? "I almost skipped this." : "",
+            deliveryNote: "soft, honest",
+            subtext: "Trying to stay brave",
+            lineStartTime: start,
+            lineEndTime: Math.min(end, start + 2),
+          },
+          primaryCharacters: [{ storyCharacterName: "Priya", archetypeLabel: "INFLUENCER", age: 27 }],
+          sideCharacters: [],
+        },
+        lightingBuildSheetTag: {
+          projectTitle: "She Almost Didn't Go",
+          shotTitle: `Shot ${shotNumber}: Production beat`,
+          shotNumber,
+          budgetTier: "zero_budget",
+          estimatedSetupMinutes: 10,
+          cinematicIntent: "Soft phone-friendly key light with readable face detail and gentle shadow contrast.",
+          floorPlan: {
+            actor: { characterName: "Priya", facingDirection: "facing camera, slight three-quarter turn" },
+            keyLight: { role: "KEY", householdGearName: "Window light", professionalGearName: "Aputure 600d equivalent", position: "front-left at 45 degrees" },
+          },
+          gearCards: [
+            { cardNumber: 1, roleLabel: "KEY LIGHT", itemName: "Window light", setupBullets: ["Place actor near window", "Turn face toward soft light", "Keep eyes bright"] },
+            { cardNumber: 2, roleLabel: "FILL LIGHT", itemName: "White A4 paper", setupBullets: ["Bounce from shadow side", "Keep fill low", "Avoid flattening face"] },
+            { cardNumber: 3, roleLabel: "RIM LIGHT", itemName: "Phone flashlight", setupBullets: ["Place behind shoulder", "Diffuse with white plastic", "Keep edge subtle"] },
+            { cardNumber: 4, roleLabel: "NEGATIVE FILL", itemName: "Black dupatta", setupBullets: ["Place on shadow side", "Keep out of frame", "Increase face shape"] },
+            { cardNumber: 5, roleLabel: "DIFFUSER", itemName: "White bedsheet", setupBullets: ["Hang between window and actor", "Keep fabric smooth", "Check exposure"] },
+            { cardNumber: 6, roleLabel: "CAMERA RIG", itemName: "Phone tripod", setupBullets: ["Lock phone vertical", "Set lens to 1x", "Frame upper third"] },
+          ],
+        },
+        cameraPlanSheetTag: {
+          projectTitle: "She Almost Didn't Go",
+          shotNumber,
+          shotTitle: `Shot ${shotNumber}: Production beat`,
+          fps: 24,
+          shotType: shotNumber % 2 ? "CU" : "MS",
+          cameraAngle: "Eye Level",
+          cameraMovement: shotNumber % 2 ? "Static" : "Slow Push-In",
+          lensSuggestion: "Mobile 1x Wide",
+          screenType: body.screenType || "vertical",
+          blockingMap: {
+            actors: [{ characterName: "Priya", age: 27, heightImpression: "average", startPosition: "center mark", endPosition: "center mark", movementPath: "static", movementDistanceFeet: 0 }],
+            oneEightyLineNote: "No 180 line concern (single subject).",
+          },
+          framePreview: {
+            aspectRatio: body.screenType === "horizontal" ? "16:9" : "9:16",
+            headroomPercent: 10,
+            leadRoomPercent: 25,
+            subjectPlacement: "center frame, eyes on upper third",
+            captionPosition: "bottom",
+            mobileFocusArea: "Keep face and hands inside central 50 percent safe zone",
+            lensCompressionFeel: "Natural mobile wide depth",
+          },
+          cameraRig: {
+            cameraBody: "iPhone 14 Pro",
+            lensSuggestion: "Mobile 1x Wide",
+            fps: 24,
+            shutterAngle: "180 degrees (1/48s)",
+            iso: "auto",
+            aperture: "f/1.78 (1x lens fixed)",
+            whiteBalance: "auto",
+            filter: "none",
+          },
+          movementSpec: { moveType: shotNumber % 2 ? "Static" : "Slow Push-In", speed: "slow", stabilizationRequired: shotNumber % 2 === 0, stabilizationTool: "phone tripod", rigType: "Phone tripod" },
+        },
+      };
+    });
+    return {
+      data: {
+        storyboardId: "storyboard-script-mock",
+        scriptId,
+        projectId: body.projectId || "00000000-0000-4000-8000-000000000001",
+        ideaId: body.ideaId || "idea-she-almost",
+        title: "She Almost Didn't Go",
+        screenType: body.screenType || "vertical",
+        renderWidth: body.screenType === "horizontal" ? 1280 : 1024,
+        renderHeight: body.screenType === "horizontal" ? 720 : 1792,
+        durationSeconds: 30,
+        totalShots: scenes.length,
+        status: "GENERATED",
+        scenes,
+        createdAt: new Date().toISOString(),
+      }
+    };
+  }
+
+  const tenantWalletMatch = key.match(/^\/billing\/([^/]+)\/wallet$/);
+  if (tenantWalletMatch) {
+    const [, tenantId] = tenantWalletMatch;
+    return {
+      data: {
+        tenantId,
+        balance: 1250,
+        currency: "INR",
+        lastUpdated: Date.now()
+      }
+    };
+  }
+
+  const tenantWalletRechargeMatch = key.match(/^\/billing\/([^/]+)\/wallet\/recharge$/);
+  if (tenantWalletRechargeMatch) {
+    const [, tenantId] = tenantWalletRechargeMatch;
+    return {
+      data: {
+        tenantId,
+        success: true,
+        rechargeId: "wallet-recharge-mock",
+        transactionId: "txn_creator_recharge_mock",
+        currency: "INR",
+        paymentUrl: "https://billing.dalaillama.in/mock/recharge"
+      }
+    };
+  }
+
+  if (key === "/tenants/me/apps") {
+    return {
+      data: [
+        {
+          id: "tenant-app-creator-mock",
+          tenantId: "tenant-demo",
+          subscriptionId: "sub-creator-mock",
+          appType: "CREATOR",
+          displayName: "Creator AI Short Planner",
+          productCode: "CREATOR",
+          planCode: "CREATOR_PRO",
+          deploymentStatus: "COMPLETED",
+          status: "ACTIVE",
+          createdAt: "2026-05-14T10:00:00.000Z",
+          url: "https://creator-demo.dalaillama.in"
+        }
+      ]
+    };
+  }
+
+  if (key === "/subscriptions" && method === "POST") {
+    return {
+      data: {
+        subscriptionId: "sub-creator-mock",
+        status: "PENDING_PROVISION",
+        requiredAmount: 0,
+        productCode: "CREATOR",
+        planCode: "CREATOR_PRO"
+      }
+    };
+  }
+
+  const subscriptionStatusMatch = key.match(/^\/subscriptions\/([^/]+)$/);
+  if (subscriptionStatusMatch) {
+    const [, subscriptionId] = subscriptionStatusMatch;
+    return {
+      data: {
+        subscriptionId,
+        status: "ACTIVE",
+        productCode: "CREATOR",
+        planCode: "CREATOR_PRO"
+      }
+    };
+  }
+
   const tenantSubscriptionMatch = key.match(/^\/tenants\/([^/]+)\/subscriptions\/([^/]+)$/);
   if (tenantSubscriptionMatch) {
     const [, tenantId, subscriptionId] = tenantSubscriptionMatch;
@@ -993,9 +1429,12 @@ const mockBaseQuery = async (args) => {
 
 const realBaseQuery = fetchBaseQuery({
   baseUrl: appConfig.API_BASE_URL,
-  prepareHeaders: (headers) => {
-    const token = localStorage.getItem("auth_token");
+  prepareHeaders: (headers, { getState }) => {
+    const token = getAccessToken() || localStorage.getItem("auth_token");
     if (token) headers.set("Authorization", `Bearer ${token}`);
+    const state = /** @type {any} */ (getState?.() || {});
+    const tenantId = state.tenant?.tenantId || state.auth?.user?.tenantId || localStorage.getItem("tenantId");
+    if (tenantId) headers.set("X-Tenant-ID", String(tenantId));
     return headers;
   },
 });
@@ -1026,6 +1465,21 @@ const refreshAuthToken = async (api) => {
   return refreshTokenPromise;
 };
 
+/** @param {unknown} args */
+const getRequestPath = (args) => {
+  if (typeof args === "string") return args;
+  if (args && typeof args === "object" && "url" in args) {
+    return String(/** @type {{ url?: unknown }} */ (args).url || "");
+  }
+  return "";
+};
+
+/** @param {string} path */
+const isTenantOnboardingProbe = (path) => {
+  const normalized = path.split("?")[0].replace(/^\/api\/v1/, "");
+  return normalized === "/tenants/me" || normalized === "/me";
+};
+
 /* -------------------------------------------------------------------------- */
 /*                        WRAPPED BASE QUERY (FINAL)                          */
 /* -------------------------------------------------------------------------- */
@@ -1035,6 +1489,7 @@ const refreshAuthToken = async (api) => {
  */
 const baseQueryWithMetrics = async (args, api, extra) => {
   const start = performance.now();
+  const requestPath = getRequestPath(args);
 
   const queryFn = appConfig.MOCK_MODE ? mockBaseQuery : realBaseQuery;
 
@@ -1094,7 +1549,7 @@ const baseQueryWithMetrics = async (args, api, extra) => {
           isAuthRedirectInFlight = false;
         });
       }
-    } else if (status === 403) {
+    } else if (status === 403 && !isTenantOnboardingProbe(requestPath)) {
       // Istio returns 403 "RBAC: access denied" when JWT is missing/invalid.
       // Treat as auth failure — clear state and redirect to login.
       clearAuthState();
@@ -1164,7 +1619,7 @@ const unwrapJavaTypedJson = (value) => {
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithMetrics,
-  tagTypes: ["CreatorTrends", "CreatorProfiles", "Storyboard", "CreatorWallet", "CreatorSubscription"],
+  tagTypes: ["CreatorTrends", "CreatorMasterData", "CreatorProfiles", "Storyboard", "CreatorWallet", "CreatorSubscription", "CreatorOrganization", "CreatorAiProviders", "CreatorProjects"],
 
   endpoints: (builder) => ({
 
@@ -1262,21 +1717,31 @@ export const api = createApi({
        */
       query: (tenantId) =>
         tenantId ? `/billing/${tenantId}/wallet` : "/wallet/balance",
+      providesTags: ["CreatorWallet"],
     }),
     addWalletBalance: builder.mutation({
-      query: (body) => {
+      query: (/** @type {{ tenantId?: string, amount?: number, currency?: string, [key: string]: any } | undefined} */ body) => {
         const { tenantId, ...payload } = body || {};
         return {
           url: tenantId ? `/billing/${tenantId}/wallet/recharge` : "/wallet/add-balance",
           method: "POST",
           body: payload,
         };
-      }
+      },
+      invalidatesTags: ["CreatorWallet"],
     }),
 
     getLiveCall: builder.query({
       /** @param {void} _ */
       query: (_) => "/calls/live",
+    }),
+
+    saveDisposition: builder.mutation({
+      query: (/** @type {{ disposition?: string, notes?: string, ts?: number, [key: string]: any }} */ body) => ({
+        url: "/calls/disposition",
+        method: "POST",
+        body,
+      }),
     }),
 
      /* ---------------------- Billing + Dashboard ---------------------- */
@@ -1513,7 +1978,7 @@ export const api = createApi({
     }),
     addAgent: builder.mutation({
       /**
-       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       * @param {Record<string, any>} body
        */
       query: (body) => ({
         url: "/agent/add",
@@ -1523,7 +1988,7 @@ export const api = createApi({
     }),
     updateAgent: builder.mutation({
       /**
-       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       * @param {Record<string, any>} body
        */
       query: (body) => ({
         url: "/agent/update",
@@ -1533,7 +1998,7 @@ export const api = createApi({
     }),
     disableAgent: builder.mutation({
       /**
-       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       * @param {Record<string, any>} body
        */
       query: (body) => ({
         url: "/agent/disable",
@@ -1543,7 +2008,7 @@ export const api = createApi({
     }),
     addQueue: builder.mutation({
       /**
-       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       * @param {Record<string, any>} body
        */
       query: (body) => ({
         url: "/queue/add",
@@ -1553,7 +2018,7 @@ export const api = createApi({
     }),
     updateQueue: builder.mutation({
       /**
-       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       * @param {Record<string, any>} body
        */
       query: (body) => ({
         url: "/queue/add",
@@ -1628,7 +2093,7 @@ export const api = createApi({
     }),
     addRoutingRule: builder.mutation({
       /**
-       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       * @param {Record<string, any>} body
        */
       query: (body) => ({
         url: "/routingrule/save",
@@ -1643,7 +2108,7 @@ export const api = createApi({
     }),
     updateRoutingRule: builder.mutation({
       /**
-       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       * @param {Record<string, any>} body
        */
       query: (body) => ({
         url: "/routingrule/save",
@@ -1653,7 +2118,7 @@ export const api = createApi({
     }),
     deleteRoutingRule: builder.mutation({
       /**
-       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       * @param {Record<string, any>} body
        */
       query: (body) => ({
         url: "/routingrule/save",
@@ -1943,7 +2408,7 @@ export const api = createApi({
     }),
     monitorCall:builder.mutation({
       /**
-       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       * @param {Record<string, any>} body
        */
       query: (body) => ({
         url: "/monitor/call",
@@ -1953,7 +2418,7 @@ export const api = createApi({
     }),
     whisperToAgent:builder.mutation({
       /**
-       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       * @param {Record<string, any>} body
        */
       query: (body) => ({
         url: "/whisper/agent",
@@ -1963,7 +2428,7 @@ export const api = createApi({
     }),
     bargeInCall:builder.mutation({
       /**
-       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       * @param {Record<string, any>} body
        */
       query: (body) => ({
         url: "/barge/call",
@@ -1973,7 +2438,7 @@ export const api = createApi({
     }),
     takeoverCall:builder.mutation({
       /**
-       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       * @param {Record<string, any>} body
        */
       query: (body) => ({
         url: "/takeover/call",
@@ -1987,7 +2452,7 @@ export const api = createApi({
     }),
     generateFeedback:builder.mutation({
       /**
-       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       * @param {Record<string, any>} body
        */
       query: (body) => ({
         url: "/generate/feedback",
@@ -2010,7 +2475,7 @@ export const api = createApi({
     }),
     generateCoaching:builder.mutation({
       /**
-       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       * @param {Record<string, any>} body
        */
       query: (body) => ({
         url: "/generate/coaching",
@@ -2024,7 +2489,7 @@ export const api = createApi({
     }),
     applyRecommendation:builder.mutation({
       /**
-       * @param {{ inventory: Array<{did: string, country: string, countryCode: string, type?: string, provider?: string}> }} body
+       * @param {Record<string, any>} body
        */
       query: (body) => ({
         url: "/recommendation/apply",
@@ -2044,6 +2509,7 @@ export const {
   useGetLiveCallQuery,
   useGetInvoicesQuery,
   useGetDashboardStatsQuery,
+  useSaveDispositionMutation,
   useOriginateCallMutation,
   useAcceptCallMutation,
   useHangupCallMutation,

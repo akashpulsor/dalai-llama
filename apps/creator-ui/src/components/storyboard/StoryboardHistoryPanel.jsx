@@ -10,7 +10,7 @@ export default function StoryboardHistoryPanel({ history = [], saved = [], onOpe
           <StoryboardRow key={item.id || item.storyboardId} item={item} onOpen={onOpen} />
         ))}
       </Panel>
-      <Panel id={historyId} icon={History} title="Storyboard History" empty="Generated storyboards and paid actions will appear here.">
+      <Panel id={historyId} icon={History} title="Project History" empty="Saved projects and generated storyboards will appear here.">
         {(history || []).map((item) => (
           <StoryboardRow key={item.id || item.storyboardId} item={item} onOpen={onOpen} />
         ))}

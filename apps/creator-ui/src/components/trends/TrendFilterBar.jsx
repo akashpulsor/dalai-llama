@@ -4,8 +4,8 @@ import { Calendar, ChevronDown, Dumbbell, Instagram, RefreshCw } from "lucide-re
 
 const fallbackOptions = {
   platform: [
-    { value: "instagram", label: "Instagram Reels" },
-    { value: "youtube", label: "YouTube Shorts" },
+    { value: "instagram_reels", label: "Instagram Reels" },
+    { value: "youtube_shorts", label: "YouTube Shorts" },
     { value: "tiktok", label: "TikTok" },
   ],
   category: [
@@ -15,8 +15,8 @@ const fallbackOptions = {
     { value: "study", label: "Study" },
   ],
   timeframe: [
-    { value: "7d", label: "Last 7 Days" },
     { value: "24h", label: "Last 24 Hours" },
+    { value: "7d", label: "Last 7 Days" },
     { value: "30d", label: "Last 30 Days" },
   ],
 };
@@ -32,6 +32,7 @@ function normalizeOption(option) {
   return {
     value: option.value || option.code || option.platformCode || option.categoryCode,
     label: option.label || option.displayName || option.name || option.code,
+    description: option.description || option.promptContext || "",
   };
 }
 
@@ -58,11 +59,16 @@ function FilterPill({ id, value, options, open, onToggle, onSelect }) {
               key={option.value}
               type="button"
               onClick={() => onSelect(option.value)}
-              className={`block w-full rounded-md px-3 py-2 text-left text-sm font-semibold transition ${
+              className={`block w-full rounded-md px-3 py-2 text-left transition ${
                 option.value === value ? "bg-purple-600 text-white" : "text-slate-300 hover:bg-white/10 hover:text-white"
               }`}
             >
-              {option.label}
+              <span className="block text-sm font-semibold">{option.label}</span>
+              {option.description && (
+                <span className={`mt-0.5 block line-clamp-2 text-[11px] leading-4 ${option.value === value ? "text-purple-100" : "text-slate-500"}`}>
+                  {option.description}
+                </span>
+              )}
             </button>
           ))}
         </div>

@@ -9,7 +9,7 @@ import { clearFlash } from "@dalaillama/shared-store";
 /**
  * @typedef {object} FlashMessage
  * @property {FlashType} type
- * @property {string} text
+ * @property {string} message
  */
 
 /**
@@ -35,28 +35,28 @@ export const Toaster = () => {
     if (!hasMessage || isError) return;
     const timer = setTimeout(() => dispatch(clearFlash()), 3000);
     return () => clearTimeout(timer);
-  }, [hasMessage, isError, dispatch]);
+  }, [flash?.message, flashType, hasMessage, isError, dispatch]);
 
   if (!hasMessage) return null;
 
   return (
-    <div className="fixed top-6 right-6 z-[9999] pointer-events-none">
+    <div className="fixed inset-x-3 top-6 z-[9999] pointer-events-none flex justify-end sm:inset-x-auto sm:right-6">
       <div
-        className={`pointer-events-auto flex items-center gap-3 max-w-sm px-5 py-3.5 rounded-xl shadow-2xl text-white font-semibold text-sm toast-animate ${
+        className={`pointer-events-auto flex max-h-[45vh] w-full max-w-[min(92vw,34rem)] items-start gap-3 overflow-hidden px-5 py-3.5 rounded-xl shadow-2xl text-white font-semibold text-sm toast-animate ${
           isError
             ? "bg-red-600"
             : "bg-emerald-600"
         }`}
       >
-        <span className="flex-1">{flash.message}</span>
+        <span className="custom-scrollbar min-w-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words leading-5">{flash.message}</span>
         {isError && (
           <button
             type="button"
             onClick={() => dispatch(clearFlash())}
-            className="opacity-80 hover:opacity-100 text-white font-bold text-base leading-none ml-2"
+            className="ml-2 shrink-0 opacity-80 hover:opacity-100 text-white font-bold text-base leading-none"
             aria-label="Close notification"
           >
-            ✕
+            &times;
           </button>
         )}
       </div>

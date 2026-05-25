@@ -2,11 +2,17 @@ import { appConfig } from "@dalaillama/shared-config";
 import { logError } from "./logger.js";
 
 class PrometheusClient {
+  /** @param {string} [baseUrl] */
   constructor(baseUrl = appConfig.PROM_PUSH_URL) {
     this.baseUrl = baseUrl;
     this.job = appConfig.PROM_JOB_NAME;
   }
 
+  /**
+   * @param {string} metric
+   * @param {Record<string, string | number | boolean | null | undefined>} [labels]
+   * @param {number} [value]
+   */
   async push(metric, labels = {}, value = 1) {
     try {
       const payload = {
@@ -27,10 +33,19 @@ class PrometheusClient {
     }
   }
 
+  /**
+   * @param {any} error
+   * @param {string} [origin]
+   */
   async pushError(error, origin = "ui") {
     return this.push("frontend_error_total", { origin, message: error?.message || String(error) }, 1);
   }
 
+  /**
+   * @param {string} name
+   * @param {number} durationMs
+   * @param {Record<string, string | number | boolean | null | undefined>} [labels]
+   */
   async pushLatency(name, durationMs, labels = {}) {
     return this.push(name, { ...labels, unit: "ms" }, durationMs);
   }

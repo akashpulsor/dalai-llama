@@ -9,14 +9,20 @@ export default function StoryboardGrid({
   durationSeconds,
   readySceneIds,
   imageReadySceneIds,
+  imageLoadingKeys = [],
   activeSceneIndex,
   onSelectScene,
+  onGenerateImage,
   onExport,
   onSave,
   isSaved,
   onGenerateAgain,
   isGenerating,
+  screenType,
+  renderWidth,
+  renderHeight,
 }) {
+  const frame = frameSpec(screenType, renderWidth, renderHeight);
   return (
     <section className="creator-panel p-4">
       <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -35,15 +41,22 @@ export default function StoryboardGrid({
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {scenes.map((scene, index) => {
           const sceneId = scene.id || `shot-${scene.shotNumber || index + 1}`;
+          const shotNumber = Number(scene.shotNumber || index + 1);
+          const imageReady = imageReadySceneIds.includes(sceneId) || hasShotImage(scene);
+          const loadingImageKinds = imageLoadingKindsForShot(imageLoadingKeys, shotNumber, sceneId);
           return (
             <SceneCard
               key={sceneId}
               scene={scene}
               index={index}
+              frameAspectRatio={scene.renderWidth && scene.renderHeight ? `${scene.renderWidth} / ${scene.renderHeight}` : frame.aspectRatio}
+              frameOrientation={scene.screenType || frame.orientation}
               active={activeSceneIndex === index}
               jsonReady={readySceneIds.includes(sceneId)}
-              imageReady={imageReadySceneIds.includes(sceneId)}
+              imageReady={imageReady}
+              loadingImageKinds={loadingImageKinds}
               onClick={() => onSelectScene?.(index)}
+              onGenerateImage={onGenerateImage}
             />
           );
         })}
@@ -54,6 +67,47 @@ export default function StoryboardGrid({
       </div>
     </section>
   );
+}
+
+function imageLoadingKindsForShot(keys = [], shotNumber, sceneId) {
+  const prefixes = [`${Number(shotNumber || 1)}:`, `${sceneId}:`];
+  return (Array.isArray(keys) ? keys : [])
+    .filter((key) => prefixes.some((prefix) => String(key).startsWith(prefix)))
+    .map((key) => String(key).split(":").pop())
+    .filter(Boolean);
+}
+
+function hasShotImage(scene = {}) {
+  return Boolean(
+    scene.signedUrl
+    || scene.signed_url
+    || scene.imageUrl
+    || scene.image_url
+    || scene.storyboardImageUrl
+    || scene.storyboard_image_url
+    || scene.publicUrl
+    || scene.public_url
+    || scene.assetUrl
+    || scene.asset_url
+    || scene.lightingImageUrl
+    || scene.lighting_image_url
+    || scene.cameraPlanImageUrl
+    || scene.camera_plan_image_url
+  );
+}
+
+function frameSpec(screenType, renderWidth, renderHeight) {
+  if (renderWidth && renderHeight) {
+    return {
+      aspectRatio: `${renderWidth} / ${renderHeight}`,
+      orientation: renderWidth > renderHeight ? "horizontal" : "vertical",
+    };
+  }
+  const horizontal = String(screenType || "").toLowerCase().includes("horizontal");
+  return {
+    aspectRatio: horizontal ? "16 / 9" : "9 / 16",
+    orientation: horizontal ? "horizontal" : "vertical",
+  };
 }
 
 function ToolbarButton({ icon: Icon, label, onClick, active }) {

@@ -32,6 +32,7 @@ const tokenExpired = (token) => {
  * @typedef {{ id: string, name: string, role: UserRole, email: string, tenantId: string }} User
  */
 
+/** @param {string} key */
 const safeGetStorageItem = (key) => {
   try {
     return typeof window !== "undefined" ? window.localStorage.getItem(key) : null;

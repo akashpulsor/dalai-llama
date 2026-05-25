@@ -3,23 +3,26 @@ import React from "react";
 import { Check, ChevronRight } from "lucide-react";
 
 const steps = [
-  { id: "trend", label: "Trend" },
+  { id: "trend", label: "Brief / Trend" },
+  { id: "ideas", label: "Story Ideas" },
+  { id: "script", label: "Script" },
+  { id: "screenplay", label: "Screenplay" },
+  { id: "cast", label: "Cast Plan" },
   { id: "audience", label: "Audience" },
-  { id: "cast", label: "Cast / Creator" },
-  { id: "ideas", label: "Ideas" },
   { id: "storyboard", label: "Storyboard" },
 ];
 
-export default function PlannerStepper({ activeStep, completedSteps, onStepClick }) {
+export default function PlannerStepper({ activeStep, completedSteps, onStepClick, briefLabel = "Brief / Trend" }) {
   const activeIndex = steps.findIndex((step) => step.id === activeStep);
+  const visibleSteps = steps.map((step) => step.id === "trend" ? { ...step, label: briefLabel } : step);
 
   return (
     <div className="creator-panel p-2">
-      <div className="grid gap-1 md:grid-cols-5">
-        {steps.map((step, index) => {
+      <div className="grid gap-1 md:grid-cols-7">
+        {visibleSteps.map((step, index) => {
           const isComplete = Boolean(completedSteps?.[step.id]);
           const isActive = step.id === activeStep;
-          const isEnabled = index <= activeIndex || isComplete || steps.slice(0, index).every((candidate) => completedSteps?.[candidate.id]);
+          const isEnabled = index <= activeIndex || isComplete || visibleSteps.slice(0, index).every((candidate) => completedSteps?.[candidate.id]);
 
           return (
             <div key={step.id} className="flex min-w-0 items-center">
@@ -40,7 +43,7 @@ export default function PlannerStepper({ activeStep, completedSteps, onStepClick
                 </span>
                 <span className="truncate">{step.label}</span>
               </button>
-              {index < steps.length - 1 && <ChevronRight size={18} className="mx-1 hidden shrink-0 text-slate-600 md:block" />}
+              {index < visibleSteps.length - 1 && <ChevronRight size={18} className="mx-1 hidden shrink-0 text-slate-600 md:block" />}
             </div>
           );
         })}

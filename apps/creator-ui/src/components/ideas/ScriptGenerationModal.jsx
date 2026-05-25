@@ -151,7 +151,7 @@ function ScriptBlock({ label, value }) {
   return (
     <div className="rounded-md border border-white/10 bg-black/20 p-3">
       <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-xs font-semibold leading-5 text-slate-200">{value}</p>
+      <p className="mt-1 whitespace-pre-wrap text-xs font-semibold leading-5 text-slate-200">{textValue(value)}</p>
     </div>
   );
 }
@@ -337,4 +337,13 @@ function trimText(value, maxLength) {
   const text = String(value || "").trim();
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength - 3)}...`;
+}
+
+function textValue(value) {
+  if (value == null || value === "") return "";
+  if (Array.isArray(value)) return value.map(textValue).filter(Boolean).join("\n");
+  if (typeof value === "object") {
+    return Object.entries(value).map(([key, item]) => `${key}: ${textValue(item)}`).join("\n");
+  }
+  return String(value);
 }
