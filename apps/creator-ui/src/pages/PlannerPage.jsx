@@ -8,13 +8,14 @@ import {
   useAddWalletBalanceMutation,
   useGetWalletBalanceQuery,
 } from "@dalaillama/shared-store";
-import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle, FolderOpen, HelpCircle, History, ListChecks, Loader2, LockKeyhole, RefreshCw, Sparkles, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle, Clapperboard, FolderOpen, HelpCircle, History, Image as ImageIcon, ListChecks, Loader2, LockKeyhole, RefreshCw, Sparkles, X } from "lucide-react";
 import {
   useConfirmAudienceMutation,
   useCreateCreatorMutation,
   useGenerateIdeasMutation,
   useGenerateLockedIdeaOptionsAsyncMutation,
   useGenerateLockedIdeaOptionsMutation,
+  useGetCreatorAiPricingQuery,
   useGenerateStoryIdeaScriptMutation,
   useGenerateStoryIdeaScreenplayAsyncMutation,
   useGetAiProvidersQuery,
@@ -23,6 +24,7 @@ import {
   useGetCreatorPlatformsQuery,
   useGetCreatorProjectsQuery,
   useLazyGetCreatorProjectQuery,
+  useGetPostProductionProjectsQuery,
   useGetOrganizationQuery,
   useGetJobQuery,
   useGetJobsQuery,
@@ -39,15 +41,32 @@ import {
   useGenerateStoryboardFromScriptAsyncMutation,
   useGenerateProductionPlansAsyncMutation,
   useGenerateShotImageMutation,
+  useEditStoryboardShotWithAiMutation,
+  useInsertStoryboardTimelineShotMutation,
   useGetProductionPlansQuery,
   useGetShotImageUrlsQuery,
+  useGetShotTakesQuery,
+  useUploadShotTakeMutation,
+  useUploadShotTakeReferenceFrameMutation,
+  useSaveShotTakeMediaAnalysisMutation,
+  useSaveShotTakeSoundTimelineMutation,
+  useUploadShotTakeSoundSnippetMutation,
+  useGenerateShotTakeSoundAsyncMutation,
+  useReviewShotTakeAsyncMutation,
+  useConfirmShotTakeMutation,
+  useEnhanceShotTakePreviewAsyncMutation,
+  useStudioPolishShotTakeAsyncMutation,
+  useStudioPolishAllShotTakesAsyncMutation,
+  useEnhanceShotTakeAudioAsyncMutation,
+  useSaveShotTakeEnhancementFeedbackMutation,
+  useApplyShotTakePreviewToTimelineMutation,
+  useEnhanceAllShotTakesAsyncMutation,
   useGetCreatorStorylineHistoryQuery,
   useGetCreatorScriptHistoryQuery,
   useLazyGetCreatorStorylineHistoryItemQuery,
   useLazyGetCreatorScriptHistoryItemQuery,
   useListCreatorsQuery,
   usePredictTrendsMutation,
-  useRequestExportMutation,
   useSaveStoryIdeaMutation,
   useSaveStoryIdeaScriptMutation,
   useSaveGeneratedScriptMutation,
@@ -85,6 +104,7 @@ import StoryScriptPanel from "../components/ideas/StoryScriptPanel.jsx";
 import ScriptReviewPanel from "../components/ideas/ScriptReviewPanel.jsx";
 import ScriptGenerationModal from "../components/ideas/ScriptGenerationModal.jsx";
 import StoryboardGrid from "../components/storyboard/StoryboardGrid.jsx";
+import ShotTakePanel from "../components/storyboard/ShotTakePanel.jsx";
 import StoryboardHistoryPanel from "../components/storyboard/StoryboardHistoryPanel.jsx";
 import ProductionPlanPanel from "../components/storyboard/ProductionPlanPanel.jsx";
 import MobileFrame from "../components/preview/MobileFrame.jsx";
@@ -106,6 +126,22 @@ const sanitizeTenantId = (tenantId) => {
   if (!normalized || normalized === "undefined" || normalized === "null") return null;
   return normalized;
 };
+
+function creatorDebugEnabled() {
+  try {
+    if (typeof window === "undefined") return false;
+    const params = new URLSearchParams(window.location.search || "");
+    return params.get("creatorDebug") === "1" || window.localStorage.getItem("creatorDebug") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function creatorDebugLog(label, payload = {}) {
+  if (!creatorDebugEnabled()) return;
+  // eslint-disable-next-line no-console
+  console.debug(`[creator-ui] ${label}`, payload);
+}
 
 const fallbackTrends = [
   {
@@ -199,8 +235,8 @@ const workflowSlides = [
 ];
 
 const workflowStepIds = new Set(workflowSlides.map((slide) => slide.id));
-const workspacePageIds = new Set(["ideas", "generated-ideas", "script", "screenplay", "cast", "storyboard"]);
-const modalHashIds = new Set(["projects", "past-storyline", "past-script"]);
+const workspacePageIds = new Set(["ideas", "generated-ideas", "script", "screenplay", "cast", "storyboard", "shoot-polish"]);
+const modalHashIds = new Set(["projects", "post-production", "past-storyline", "past-script"]);
 
 const pageFromHash = (hash) => {
   const id = String(hash || "").replace(/^#/, "");
@@ -340,6 +376,9 @@ export default function PlannerPage() {
   const [countryOpen, setCountryOpen] = useState(false);
   const [modal, setModal] = useState(null);
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const [postProductionOpen, setPostProductionOpen] = useState(false);
+  const [selectedPostProductionProject, setSelectedPostProductionProject] = useState(null);
+  const [postProductionShotRailCollapsed, setPostProductionShotRailCollapsed] = useState(false);
   const [extraIdeas, setExtraIdeas] = useState(() => normalizeStoredIdeas(storedWorkflowSnapshot?.extraIdeas));
   const [isGeneratingMore, setIsGeneratingMore] = useState(false);
   const [savedIdeaSnapshots, setSavedIdeaSnapshots] = useState(() => normalizeSavedIdeaSnapshots(storedWorkflowSnapshot?.savedIdeaSnapshots || storedWorkflowSnapshot?.savedIdeas));
@@ -378,6 +417,7 @@ export default function PlannerPage() {
   const [ideaGenerationJobId, setIdeaGenerationJobId] = useState(() => shouldRestoreStoredWorkflow ? readStoredIdeaGenerationJob()?.jobId || null : null);
   const [screenplayJobId, setScreenplayJobId] = useState(null);
   const [productionPlanJobId, setProductionPlanJobId] = useState(null);
+  const [shotTakeJobId, setShotTakeJobId] = useState(null);
   const [shotPlanRetry, setShotPlanRetry] = useState(null);
   const [shotPlanRetrySeconds, setShotPlanRetrySeconds] = useState(0);
   const [generatedIdeasOpen, setGeneratedIdeasOpen] = useState(false);
@@ -390,6 +430,7 @@ export default function PlannerPage() {
   const [storyboardJobId, setStoryboardJobId] = useState(null);
   const [generatedStoryboard, setGeneratedStoryboard] = useState(() => storedWorkflowSnapshot?.generatedStoryboard || null);
   const [shotImageLoadingKeys, setShotImageLoadingKeys] = useState([]);
+  const [pdfExporting, setPdfExporting] = useState(false);
   const [activity, setActivity] = useState([
     { label: "Storyboard generated", detail: "14-shot short preview", time: "4 min ago" },
     { label: "Audience confirmed", detail: "Women 22-35 in India", time: "2 min ago" },
@@ -404,6 +445,10 @@ export default function PlannerPage() {
   const { data: masterPlatforms = [] } = useGetCreatorPlatformsQuery(undefined, { skip: !TREND_DISCOVERY_ENABLED });
   const { data: masterCategories = [] } = useGetCreatorCategoriesQuery(undefined, { skip: !TREND_DISCOVERY_ENABLED });
   const { data: aiProviders = [], isFetching: aiProvidersLoading, isError: aiProvidersError } = useGetAiProvidersQuery();
+  const { data: creatorAiPricing = {} } = useGetCreatorAiPricingQuery(undefined, {
+    skip: !tenantId,
+    refetchOnMountOrArgChange: true,
+  });
   const { data: walletFromService, isFetching: walletLoading, refetch: refetchWallet } = useGetWalletBalanceQuery(tenantId, {
     skip: !tenantId,
     refetchOnMountOrArgChange: true,
@@ -444,9 +489,25 @@ export default function PlannerPage() {
   const [generateStoryboardFromScriptAsync, generateStoryboardAsyncState] = useGenerateStoryboardFromScriptAsyncMutation();
   const [generateProductionPlansAsync, generateProductionPlansState] = useGenerateProductionPlansAsyncMutation();
   const [generateShotImage, generateShotImageState] = useGenerateShotImageMutation();
+  const [editStoryboardShotWithAi, editStoryboardShotWithAiState] = useEditStoryboardShotWithAiMutation();
+  const [insertStoryboardTimelineShot, insertStoryboardTimelineShotState] = useInsertStoryboardTimelineShotMutation();
+  const [uploadShotTake, uploadShotTakeState] = useUploadShotTakeMutation();
+  const [uploadShotTakeReferenceFrame, uploadShotTakeReferenceFrameState] = useUploadShotTakeReferenceFrameMutation();
+  const [saveShotTakeMediaAnalysis, saveShotTakeMediaAnalysisState] = useSaveShotTakeMediaAnalysisMutation();
+  const [saveShotTakeSoundTimeline, saveShotTakeSoundTimelineState] = useSaveShotTakeSoundTimelineMutation();
+  const [uploadShotTakeSoundSnippet, uploadShotTakeSoundSnippetState] = useUploadShotTakeSoundSnippetMutation();
+  const [generateShotTakeSoundAsync, generateShotTakeSoundState] = useGenerateShotTakeSoundAsyncMutation();
+  const [reviewShotTakeAsync, reviewShotTakeState] = useReviewShotTakeAsyncMutation();
+  const [confirmShotTake, confirmShotTakeState] = useConfirmShotTakeMutation();
+  const [enhanceShotTakePreviewAsync, enhanceShotTakePreviewState] = useEnhanceShotTakePreviewAsyncMutation();
+  const [studioPolishShotTakeAsync, studioPolishShotTakeState] = useStudioPolishShotTakeAsyncMutation();
+  const [studioPolishAllShotTakesAsync, studioPolishAllShotTakesState] = useStudioPolishAllShotTakesAsyncMutation();
+  const [enhanceShotTakeAudioAsync, enhanceShotTakeAudioState] = useEnhanceShotTakeAudioAsyncMutation();
+  const [saveShotTakeEnhancementFeedback, saveShotTakeFeedbackState] = useSaveShotTakeEnhancementFeedbackMutation();
+  const [applyShotTakePreviewToTimeline, applyShotTakePreviewState] = useApplyShotTakePreviewToTimelineMutation();
+  const [enhanceAllShotTakesAsync, enhanceAllShotTakesState] = useEnhanceAllShotTakesAsyncMutation();
   const [saveStoryboard] = useSaveStoryboardMutation();
   const [unsaveStoryboard] = useUnsaveStoryboardMutation();
-  const [requestExport, exportState] = useRequestExportMutation();
   const [createWalletRecharge, rechargeState] = useAddWalletBalanceMutation();
   const [setupOrganization, setupOrganizationState] = useSetupOrganizationMutation();
   const [startSubscriptionUpgrade, upgradeState] = useStartSubscriptionUpgradeMutation();
@@ -454,9 +515,18 @@ export default function PlannerPage() {
   const { data: ideaGenerationJob } = useGetJobQuery(ideaGenerationJobId, { skip: !ideaGenerationJobId, pollingInterval: ideaGenerationJobId ? 1600 : 0 });
   const { data: screenplayJob } = useGetJobQuery(screenplayJobId, { skip: !screenplayJobId, pollingInterval: screenplayJobId ? 1600 : 0 });
   const { data: productionPlanJob } = useGetJobQuery(productionPlanJobId, { skip: !productionPlanJobId, pollingInterval: productionPlanJobId ? 1600 : 0 });
+  const { data: shotTakeJob } = useGetJobQuery(shotTakeJobId, { skip: !shotTakeJobId, pollingInterval: shotTakeJobId ? 1600 : 0 });
   const { data: creatorProjects = [], isFetching: creatorProjectsLoading, refetch: refetchCreatorProjects } = useGetCreatorProjectsQuery(
     { limit: 12 },
     { skip: !tenantId, refetchOnMountOrArgChange: true }
+  );
+  const {
+    data: postProductionProjects = [],
+    isFetching: postProductionProjectsLoading,
+    refetch: refetchPostProductionProjects,
+  } = useGetPostProductionProjectsQuery(
+    { limit: 30 },
+    { skip: !tenantId || !postProductionOpen, refetchOnMountOrArgChange: true }
   );
   const [fetchCreatorProject, fetchCreatorProjectState] = useLazyGetCreatorProjectQuery();
   const { data: ideaGenerationJobs = [], isFetching: ideaGenerationJobsLoading, refetch: refetchIdeaGenerationJobs } = useGetJobsQuery(
@@ -472,6 +542,10 @@ export default function PlannerPage() {
     { scriptId: scriptDetailIdea?.scriptId },
     { skip: !scriptDetailIdea?.scriptId, refetchOnMountOrArgChange: true }
   );
+  const { data: shotTakes = [], isFetching: shotTakesLoading, refetch: refetchShotTakes } = useGetShotTakesQuery(
+    { scriptId: scriptDetailIdea?.scriptId },
+    { skip: !scriptDetailIdea?.scriptId, pollingInterval: shotTakeJobId ? 2500 : 0, refetchOnMountOrArgChange: true }
+  );
   const { data: backendStorylineHistory = [], isFetching: storylineHistoryLoading } = useGetCreatorStorylineHistoryQuery(
     { limit: 30 },
     { skip: !tenantId || pastHistoryModal !== "storyline", refetchOnMountOrArgChange: true }
@@ -483,6 +557,7 @@ export default function PlannerPage() {
   const [fetchStorylineHistoryItem, fetchStorylineHistoryItemState] = useLazyGetCreatorStorylineHistoryItemQuery();
   const [fetchScriptHistoryItem, fetchScriptHistoryItemState] = useLazyGetCreatorScriptHistoryItemQuery();
   const legacyStoryboardQueriesEnabled = false;
+  const legacyStoryboardSaveApiEnabled = false;
   const { data: storyboardHistory = [] } = useGetStoryboardHistoryQuery({ limit: 6 }, { skip: !legacyStoryboardQueriesEnabled });
   const { data: savedStoryboards = [] } = useGetSavedStoryboardsQuery({ limit: 6 }, { skip: !legacyStoryboardQueriesEnabled });
   const { data: storyboard } = useGetStoryboardQuery(planner.projectId, { skip: !legacyStoryboardQueriesEnabled || !isUuid(planner.projectId) });
@@ -634,8 +709,124 @@ export default function PlannerPage() {
     [backendShotImageLoadingKeys, shotImageLoadingKeys]
   );
   const shotPlanLoading = productionPlansLoading || generateProductionPlansState.isLoading || Boolean(productionPlanJobId);
+  const shotPlansReadyForGeneration = productionPlanTags.length > 0;
+  const shotGenerationLoading = Boolean(storyboardJobId) || generateStoryboardAsyncState.isLoading;
+  const shotsGenerated = Boolean(
+    (Array.isArray(backendShotImageUrls) && backendShotImageUrls.some(hasShotImageUrlData))
+    || (Array.isArray(currentStoryboard?.scenes) && currentStoryboard.scenes.some(hasRenderableShotAsset))
+    || (Array.isArray(generatedStoryboard?.scenes) && generatedStoryboard.scenes.some(hasRenderableShotAsset))
+  );
+  const canGenerateShots = Boolean(
+    scriptDetailIdea?.scriptId
+    && shotPlansReadyForGeneration
+    && storyboardSaved
+    && !shotGenerationLoading
+  );
+  const generateShotsBlockedReason = !scriptDetailIdea?.scriptId
+    ? "Generate screenplay before generating shots."
+    : !shotPlansReadyForGeneration
+      ? "Generate shot plans first."
+      : !storyboardSaved
+        ? "Save production before generating shots."
+      : shotGenerationLoading
+        ? "Shot generation is already running."
+        : "";
+  const expectedExportShotCount = useMemo(() => firstPositiveNumber(
+    currentStoryboard?.totalShots,
+    currentStoryboard?.total_shots,
+    scriptDetailIdea?.scriptJson?.shots?.length,
+    scriptDetailIdea?.scriptScenes?.length,
+    productionPlanTags.length,
+    scenes.length
+  ), [
+    currentStoryboard?.totalShots,
+    currentStoryboard?.total_shots,
+    productionPlanTags.length,
+    scenes.length,
+    scriptDetailIdea?.scriptJson?.shots?.length,
+    scriptDetailIdea?.scriptScenes?.length,
+  ]);
+  const shotExportSummary = useMemo(
+    () => summarizeShotExportAssets(scenes, expectedExportShotCount),
+    [expectedExportShotCount, scenes]
+  );
+  const canExportShotsPdf = Boolean(
+    !shotGenerationLoading
+    && shotExportSummary.expected > 0
+    && shotExportSummary.storyboardReady >= shotExportSummary.expected
+    && shotExportSummary.lightingReady >= shotExportSummary.expected
+    && shotExportSummary.dpReady >= shotExportSummary.expected
+  );
+  const exportBlockedReason = shotGenerationLoading
+    ? "Shot generation is still running. Please export after all shots are generated."
+    : shotExportSummary.expected <= 0
+      ? "Generate shot plans and shots before exporting."
+      : !canExportShotsPdf
+        ? `Please export after generating all the shots (${shotExportSummary.completeReady}/${shotExportSummary.expected} complete).`
+        : "";
+  const shotTakeBusy = Boolean(
+    shotTakeJobId
+    || uploadShotTakeState.isLoading
+    || uploadShotTakeReferenceFrameState.isLoading
+    || saveShotTakeMediaAnalysisState.isLoading
+    || saveShotTakeSoundTimelineState.isLoading
+    || uploadShotTakeSoundSnippetState.isLoading
+    || generateShotTakeSoundState.isLoading
+    || reviewShotTakeState.isLoading
+    || confirmShotTakeState.isLoading
+    || enhanceShotTakePreviewState.isLoading
+    || studioPolishShotTakeState.isLoading
+    || studioPolishAllShotTakesState.isLoading
+    || enhanceShotTakeAudioState.isLoading
+    || saveShotTakeFeedbackState.isLoading
+    || applyShotTakePreviewState.isLoading
+    || enhanceAllShotTakesState.isLoading
+  );
   const selectedCreator = castPlan || creators.find((creator) => creator.id === planner.selectedCreatorId) || buildDefaultCastPlan(creators);
   const selectedScene = scenes[preview.currentSceneIndex] || scenes[0];
+  useEffect(() => {
+    creatorDebugLog("storyboard-flow snapshot", {
+      projectId: activeProjectId,
+      scriptId: scriptDetailIdea?.scriptId,
+      productionPlanTagsCount: productionPlanTags.length,
+      backendProductionPlansCount: Array.isArray(backendProductionPlans) ? backendProductionPlans.length : 0,
+      firstPlanSound: productionPlanSoundDebug(productionPlanTags[0]),
+      sceneCount: scenes.length,
+      storyboardJobId,
+      storyboardJobStatus: storyboardJob?.status || "",
+      storyboardJobProgress: storyboardJob?.progress || 0,
+      shotImageUrlCount: Array.isArray(backendShotImageUrls) ? backendShotImageUrls.length : 0,
+      shotsGenerated,
+      shotExportSummary,
+      storyboardSaved,
+    });
+  }, [
+    activeProjectId,
+    backendProductionPlans.length,
+    backendShotImageUrls.length,
+    productionPlanTags.length,
+    scenes.length,
+    scriptDetailIdea?.scriptId,
+    shotExportSummary,
+    shotsGenerated,
+    storyboardJob?.progress,
+    storyboardJob?.status,
+    storyboardJobId,
+    storyboardSaved,
+  ]);
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search || "");
+      if (params.get("creatorPdfCallback") !== "1") return;
+      emitCreatorAnalyticsEvent("creator_pdf_callback_page_view", {
+        project_id: params.get("projectId") || "",
+        script_id: params.get("scriptId") || "",
+        source: "pdf_callback",
+      });
+    } catch {
+      // Ignore analytics parsing issues on normal app load.
+    }
+  }, []);
   const selectedTrend = useMemo(
     () => TREND_DISCOVERY_ENABLED ? trends.find((trend) => trend.id === planner.selectedTrendId) || trends[0] : null,
     [planner.selectedTrendId, trends]
@@ -812,12 +1003,15 @@ export default function PlannerPage() {
   const savedBriefMatchesCurrentMode = TREND_DISCOVERY_ENABLED && trendChoiceMode === "trend"
     ? Boolean(lockedBrief?.source === "trend" && lockedBrief?.trendId === selectedTrend?.id)
     : Boolean(lockedBrief?.source === "original" && lockedBrief?.description === manualIdeaDraft.trim());
+  const canGenerateStoryIdeas = projectWorkspaceMode ? Boolean(lockedBrief) : savedBriefMatchesCurrentMode;
   const activeStoryboardId = currentStoryboard?.id || currentStoryboard?.storyboardId || planner.projectId;
+  const projectNeedsIdeaWorkflow = projectWorkspaceMode && !storyScriptIdea && !scriptDetailIdea;
+  const hideIdeaWorkflowForProject = projectWorkspaceMode && !projectNeedsIdeaWorkflow;
   const workflowDisplaySlides = useMemo(
-    () => projectWorkspaceMode
+    () => hideIdeaWorkflowForProject
       ? workflowSlides.filter((slide) => slide.id !== "ideas")
       : workflowSlides,
-    [projectWorkspaceMode]
+    [hideIdeaWorkflowForProject]
   );
   const activeWorkflowStepIndex = workflowDisplaySlides.findIndex((slide) => slide.id === planner.activeStep);
   const workflowIndex = activeWorkflowStepIndex >= 0
@@ -850,6 +1044,9 @@ export default function PlannerPage() {
   const effectiveAudienceStepComplete = !freshNewIdeaMode && Boolean(selectedAudienceDecision || planner.completedSteps.audience);
   const effectiveScreenplayReady = !freshNewIdeaMode && Boolean(scriptDetailIdea);
   const effectiveShotPlansReady = !freshNewIdeaMode && Boolean(productionPlanTags.length || storyboardSaved || generatedStoryboard);
+  const expectedShotTakeCount = scenes.length || productionPlanTags.length || screenplayShotCount || 0;
+  const acceptedShotTakeCount = (Array.isArray(shotTakes) ? shotTakes : []).filter((take) => take?.accepted).length;
+  const effectiveShootPolishReady = Boolean(expectedShotTakeCount && acceptedShotTakeCount >= expectedShotTakeCount);
   const usedGeneratedIdeaIds = useMemo(
     () => new Set([savedStoryIdeaId, storyScriptIdea?.id, scriptDetailIdea?.id].filter(Boolean).map((id) => String(id))),
     [savedStoryIdeaId, scriptDetailIdea?.id, storyScriptIdea?.id]
@@ -875,8 +1072,8 @@ export default function PlannerPage() {
     {
       id: "idea",
       label: "Idea",
-      value: savedStoryIdeaId ? selectedIdea?.title || "Story idea saved" : projectWorkspaceMode ? selectedIdea?.title || "Idea selection pending" : selectedIdea?.title || "Pick a story idea",
-      done: Boolean(savedStoryIdeaId || (projectWorkspaceMode && selectedIdea?.id)),
+      value: savedStoryIdeaId ? selectedIdea?.title || "Story idea saved" : projectNeedsIdeaWorkflow ? "Choose a story idea" : selectedIdea?.title || "Pick a story idea",
+      done: Boolean(savedStoryIdeaId),
       active: activeWorkflowSlide.id === "ideas",
     },
     {
@@ -903,7 +1100,7 @@ export default function PlannerPage() {
       active: activeWorkflowSlide.id === "screenplay",
     },
   ];
-  const visibleWorkflowStatusItems = projectWorkspaceMode
+  const visibleWorkflowStatusItems = hideIdeaWorkflowForProject
     ? workflowStatusItems.filter((item) => item.id !== "brief" && item.id !== "idea")
     : workflowStatusItems;
   const workspacePages = [
@@ -953,26 +1150,46 @@ export default function PlannerPage() {
     },
     {
       id: "storyboard",
-      label: "Storyboard",
-      kicker: "Plan",
+      label: "Shot Design",
+      kicker: "Production",
       description: productionPlanTags.length ? `${productionPlanTags.length} shot plans ready` : getWorkflowGateMessage("storyboard") || "Generate readable shot plans",
       done: effectiveShotPlansReady,
       locked: Boolean(getWorkflowGateMessage("storyboard")),
     },
+    {
+      id: "shoot-polish",
+      label: "Polish",
+      kicker: "Takes",
+      description: effectiveShotPlansReady
+        ? `${acceptedShotTakeCount}/${expectedShotTakeCount || scenes.length || 0} takes accepted`
+        : "Upload takes after shot design is ready",
+      done: effectiveShootPolishReady,
+      locked: false,
+    },
   ];
   const visibleWorkspacePages = projectWorkspaceMode
     ? workspacePages
-        .filter((page) => page.id !== "ideas" && page.id !== "generated-ideas")
+        .filter((page) => page.id !== "generated-ideas" && (page.id !== "ideas" || projectNeedsIdeaWorkflow))
     : workspacePages;
   const activeWorkspaceMeta = visibleWorkspacePages.find((page) => page.id === workspacePage) || visibleWorkspacePages[0] || workspacePages[0];
+  const showCreativeBriefPanel = workspacePage === "ideas" && (!projectWorkspaceMode || projectNeedsIdeaWorkflow);
 
   useEffect(() => {
     if (!projectWorkspaceMode || (workspacePage !== "ideas" && workspacePage !== "generated-ideas")) return;
+    if (workspacePage === "generated-ideas") {
+      const nextPage = projectNeedsIdeaWorkflow ? "ideas" : "script";
+      setGeneratedIdeasOpen(false);
+      setSelectedGeneratedTopicId(null);
+      setWorkspacePage(nextPage);
+      window.history.replaceState(null, "", `/#${nextPage}`);
+      return;
+    }
+    if (!hideIdeaWorkflowForProject) return;
     setGeneratedIdeasOpen(false);
     setSelectedGeneratedTopicId(null);
     setWorkspacePage("script");
     window.history.replaceState(null, "", "/#script");
-  }, [projectWorkspaceMode, workspacePage]);
+  }, [hideIdeaWorkflowForProject, projectNeedsIdeaWorkflow, projectWorkspaceMode, workspacePage]);
 
   useEffect(() => {
     if (projectWorkspaceMode || workspacePage !== "generated-ideas") return;
@@ -990,6 +1207,10 @@ export default function PlannerPage() {
       if (!window.location.hash) return;
       if (window.location.hash === "#projects") {
         setProjectsOpen(true);
+        return;
+      }
+      if (window.location.hash === "#post-production") {
+        setPostProductionOpen(true);
         return;
       }
       if (window.location.hash === "#past-storyline" || window.location.hash === "#past-script") {
@@ -1013,10 +1234,25 @@ export default function PlannerPage() {
   }, []);
 
   useEffect(() => {
+    const openPostProduction = () => {
+      setSelectedPostProductionProject(null);
+      setPostProductionOpen(true);
+    };
+    window.addEventListener("creator:open-post-production", openPostProduction);
+    if (window.location.hash === "#post-production") {
+      openPostProduction();
+    }
+    return () => window.removeEventListener("creator:open-post-production", openPostProduction);
+  }, []);
+
+  useEffect(() => {
     if (!workflowStepIds.has(workspacePage) || planner.activeStep === workspacePage) return;
     const gateMessage = getWorkflowGateMessage(workspacePage);
     if (gateMessage) {
-      setWorkspacePage(workflowStepIds.has(planner.activeStep) ? planner.activeStep : "ideas");
+      const fallbackStep = workflowStepIds.has(planner.activeStep) && !getWorkflowGateMessage(planner.activeStep)
+        ? planner.activeStep
+        : "ideas";
+      setWorkspacePage(fallbackStep);
       return;
     }
     dispatch(setActiveStep(workspacePage));
@@ -1142,6 +1378,13 @@ export default function PlannerPage() {
   useEffect(() => {
     const status = String(productionPlanJob?.status || "").toUpperCase();
     if (isFailedJobStatus(status)) {
+      creatorDebugLog("production plan job failed", {
+        jobId: productionPlanJobId,
+        scriptId: scriptDetailIdea?.scriptId,
+        status,
+        errorMessage: productionPlanJob?.errorMessage || productionPlanJob?.message || "",
+        result: productionPlanJob?.result || null,
+      });
       setProductionPlanJobId(null);
       const message = productionPlanJob?.errorMessage || productionPlanJob?.message || "Shot plan generation failed. Inspect raw prompt response and retry.";
       const missingDetails = extractMissingDetailsFromJob(productionPlanJob);
@@ -1165,12 +1408,22 @@ export default function PlannerPage() {
     if (!isCompletedJobStatus(status)) return;
     const plans = productionPlanJob?.result?.productionPlanTags || [];
     const focusedShotNumber = Number(productionPlanJob?.result?.focusedShotNumber || productionPlanJob?.input?.focusedShotNumber || productionPlanJob?.inputPayload?.focusedShotNumber || 0);
+    creatorDebugLog("production plan job completed", {
+      jobId: productionPlanJobId,
+      scriptId: scriptDetailIdea?.scriptId,
+      focusedShotNumber,
+      planCount: plans.length,
+      firstPlanSound: productionPlanSoundDebug(plans[0]),
+    });
     setScriptDetailIdea((current) => current ? {
       ...current,
       productionPlanTags: focusedShotNumber ? mergeProductionPlanTags(current.productionPlanTags || productionPlanTags, plans) : plans,
       productionPlanStatus: "GENERATED",
       productionPlanError: "",
     } : current);
+    if (!focusedShotNumber) {
+      setStoryboardSaved(false);
+    }
     setProductionPlanJobId(null);
     setShotPlanRetry(null);
     void refetchProductionPlans?.();
@@ -1194,6 +1447,17 @@ export default function PlannerPage() {
 
   useEffect(() => {
     const status = String(storyboardJob?.status || "").toUpperCase();
+    if (storyboardJobId || status) {
+      creatorDebugLog("storyboard job update", {
+        jobId: storyboardJobId,
+        scriptId: scriptDetailIdea?.scriptId,
+        status,
+        progress: storyboardJob?.progress || 0,
+        message: storyboardJob?.message || storyboardJob?.result?.message || "",
+        partialSceneCount: storyboardJob?.result?.storyboard?.scenes?.length || 0,
+        storyboardId: storyboardJob?.result?.storyboardId || storyboardJob?.result?.storyboard?.storyboardId || "",
+      });
+    }
     if (storyboardJob?.result?.storyboard) {
       setGeneratedStoryboard(normalizeStoryboardResponse(storyboardJob.result.storyboard, scriptDetailIdea));
     }
@@ -1208,6 +1472,12 @@ export default function PlannerPage() {
     const storyboardResult = storyboardJob?.result?.storyboard
       ? normalizeStoryboardResponse(storyboardJob.result.storyboard, scriptDetailIdea)
       : null;
+    creatorDebugLog("storyboard job completed", {
+      jobId: storyboardJobId,
+      scriptId: scriptDetailIdea?.scriptId,
+      storyboardId: storyboardResult?.storyboardId || storyboardResult?.id || storyboardJob?.result?.storyboardId || "",
+      sceneCount: storyboardResult?.scenes?.length || 0,
+    });
     if (storyboardResult) setGeneratedStoryboard(storyboardResult);
     setStoryboardSaved(false);
     setStoryboardJobId(null);
@@ -1221,6 +1491,27 @@ export default function PlannerPage() {
     void refetchCreatorProjects?.();
     scrollToSection("storyboard");
   }, [storyboardJob?.status, storyboardJob?.progress]);
+
+  useEffect(() => {
+    const status = String(shotTakeJob?.status || "").toUpperCase();
+    if (!shotTakeJobId || !status) return;
+    creatorDebugLog("shot take job update", {
+      jobId: shotTakeJobId,
+      jobType: shotTakeJob?.jobType,
+      status,
+      progress: shotTakeJob?.progress || 0,
+      message: shotTakeJob?.message || "",
+    });
+    if (!isCompletedJobStatus(status) && !isFailedJobStatus(status)) return;
+    setShotTakeJobId(null);
+    void refetchShotTakes?.();
+    if (isFailedJobStatus(status)) {
+      flash(shotTakeJob?.errorMessage || shotTakeJob?.message || "Shot take job failed.", "error");
+      return;
+    }
+    addActivity("Shoot & Polish updated", shotTakeJob?.message || "Shot take job completed");
+    flash(shotTakeJob?.message || "Shoot & Polish job completed.", "success");
+  }, [shotTakeJob?.status, shotTakeJob?.progress]);
 
   useEffect(() => {
     if (!scenes.length) return;
@@ -1503,6 +1794,7 @@ export default function PlannerPage() {
   const handleCloseGeneratedIdeas = () => {
     setGeneratedIdeasOpen(false);
     setSelectedGeneratedTopicId(null);
+    setActorModalSignal(0);
     if (workspacePage === "generated-ideas") {
       setWorkspacePage("ideas");
       window.history.replaceState(null, "", "/#ideas");
@@ -1528,6 +1820,7 @@ export default function PlannerPage() {
     setShotPlanRetry(null);
     setShotPlanRetrySeconds(0);
     setIdeaGenerationJobId(null);
+    setActorModalSignal(0);
     clearStoredIdeaGenerationJob();
     setWorkspacePage("ideas");
     dispatch(resetPlannerState());
@@ -1690,6 +1983,57 @@ export default function PlannerPage() {
     }
   };
 
+  const handleGenerateShots = async () => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate and review the backend screenplay before generating shots.", "error");
+      setWorkspacePage("screenplay");
+      dispatch(setActiveStep("screenplay"));
+      return;
+    }
+    if (!shotPlansReadyForGeneration) {
+      flash("Generate shot plans before generating shots.", "error");
+      return;
+    }
+    if (!storyboardSaved) {
+      flash("Save the production plan first, then generate shots.", "warning");
+      return;
+    }
+    if (shotGenerationLoading) return;
+
+    try {
+      creatorDebugLog("generate shots requested", {
+        projectId: activeProjectId,
+        scriptId: scriptDetailIdea.scriptId,
+        planCount: productionPlanTags.length,
+        firstPlanSound: productionPlanSoundDebug(productionPlanTags[0]),
+      });
+      const job = await generateStoryboardFromScriptAsync({
+        scriptId: scriptDetailIdea.scriptId,
+        screenType: scriptDetailIdea.screenType || scriptDetailIdea.scriptJson?.screenType || screenType,
+        signedUrlTtlSeconds: 604800,
+      }).unwrap();
+      const jobId = job?.jobId || job?.id;
+      if (!jobId) {
+        throw new Error("Shot generation job did not return a job id.");
+      }
+      setStoryboardJobId(jobId);
+      setWorkspacePage("storyboard");
+      dispatch(setActiveStep("storyboard"));
+      addActivity("Shot generation started", `${productionPlanTags.length || "All"} shots queued`);
+      flash("Shot generation started. Storyboard, lighting, and DP cards will appear as the job progresses.", "success");
+      scrollToSection("storyboard");
+    } catch (error) {
+      const message = apiErrorMessage(error, "Shot generation failed. Check backend logs and try again.");
+      creatorDebugLog("generate shots failed to start", {
+        projectId: activeProjectId,
+        scriptId: scriptDetailIdea.scriptId,
+        message,
+        error,
+      });
+      flash(message, "error");
+    }
+  };
+
   const handleShotPlansAction = () => {
     if (effectiveShotPlansReady) {
       setWorkspacePage("storyboard");
@@ -1764,11 +2108,426 @@ export default function PlannerPage() {
     }
   };
 
+  const handleEditStoryboardShotWithAi = async (scene, instruction) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate screenplay before editing storyboard shots.", "error");
+      return;
+    }
+    const cleanInstruction = String(instruction || "").trim();
+    if (!cleanInstruction) {
+      flash("Describe what AI should change in this shot.", "error");
+      return;
+    }
+    const shotNumber = Number(scene?.shotNumber || preview.currentSceneIndex + 1 || 1);
+    const loadingKey = shotImageLoadingKey(shotNumber, "storyboard");
+    setShotImageLoadingKeys((current) => current.includes(loadingKey) ? current : [...current, loadingKey]);
+    try {
+      creatorDebugLog("shot-ai-edit:start", { projectId: activeProjectId, scriptId: scriptDetailIdea.scriptId, shotNumber, instruction: cleanInstruction });
+      const result = await editStoryboardShotWithAi({
+        scriptId: scriptDetailIdea.scriptId,
+        shotNumber,
+        instruction: cleanInstruction,
+        imageKind: "storyboard",
+        screenType: scriptDetailIdea.screenType || scriptDetailIdea.scriptJson?.screenType || screenType,
+        signedUrlTtlSeconds: 604800,
+      }).unwrap();
+      const resultScene = normalizeShotImageResult(result, scene, shotNumber, "storyboard");
+      const normalizedScene = normalizeStoryboardResponse(
+        { scenes: [resultScene], screenType: resultScene.screenType || result.screenType || screenType, renderWidth: resultScene.renderWidth || result.renderWidth, renderHeight: resultScene.renderHeight || result.renderHeight },
+        scriptDetailIdea
+      ).scenes[0];
+      setGeneratedStoryboard((current) => {
+        const baseScenes = current?.scenes?.length ? current.scenes : scenes;
+        const updatedScenes = replaceSceneByShotNumber(baseScenes, normalizedScene);
+        return {
+          ...(current || {}),
+          id: current?.id || current?.storyboardId || activeStoryboardId || scriptDetailIdea.scriptId,
+          storyboardId: current?.storyboardId || current?.id || activeStoryboardId || scriptDetailIdea.scriptId,
+          projectId: current?.projectId || scriptDetailIdea.projectId || activeProjectId,
+          title: current?.title || scriptDetailIdea.title,
+          screenType: current?.screenType || scriptDetailIdea.screenType || screenType,
+          renderWidth: current?.renderWidth || normalizedScene.renderWidth,
+          renderHeight: current?.renderHeight || normalizedScene.renderHeight,
+          durationSeconds: current?.durationSeconds || scriptDetailIdea.durationSeconds || selectedDuration,
+          totalShots: updatedScenes.length,
+          scenes: updatedScenes,
+          productionPlanTags: extractProductionPlanTagsFromScenes(updatedScenes),
+        };
+      });
+      setScriptDetailIdea((current) => current ? {
+        ...current,
+        scriptScenes: replaceSceneByShotNumber(current.scriptScenes || [], normalizedScene),
+      } : current);
+      addActivity("AI shot edit rendered", `Shot ${shotNumber}`);
+      flash(`Shot ${shotNumber} updated with AI.`, "success");
+      creatorDebugLog("shot-ai-edit:complete", { scriptId: scriptDetailIdea.scriptId, shotNumber, result });
+    } catch (error) {
+      flash(apiErrorMessage(error, `Could not edit shot ${shotNumber}.`), "error");
+    } finally {
+      setShotImageLoadingKeys((current) => current.filter((key) => key !== loadingKey));
+    }
+  };
+
+  const handleInsertStoryboardTimelineShot = async (scene, instruction) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate screenplay before adding timeline shots.", "error");
+      return;
+    }
+    const cleanInstruction = String(instruction || "").trim();
+    if (!cleanInstruction) {
+      flash("Describe the shot you want to add.", "error");
+      return;
+    }
+    const afterShotNumber = Number(scene?.shotNumber || preview.currentSceneIndex + 1 || scenes.length || 0);
+    const expectedShotNumber = afterShotNumber + 1;
+    const loadingKey = shotImageLoadingKey(expectedShotNumber, "storyboard");
+    setShotImageLoadingKeys((current) => current.includes(loadingKey) ? current : [...current, loadingKey]);
+    try {
+      creatorDebugLog("shot-ai-insert:start", { projectId: activeProjectId, scriptId: scriptDetailIdea.scriptId, afterShotNumber, instruction: cleanInstruction });
+      const result = await insertStoryboardTimelineShot({
+        scriptId: scriptDetailIdea.scriptId,
+        afterShotNumber,
+        instruction: cleanInstruction,
+        screenType: scriptDetailIdea.screenType || scriptDetailIdea.scriptJson?.screenType || screenType,
+        signedUrlTtlSeconds: 604800,
+      }).unwrap();
+      const insertedShotNumber = Number(result?.shotNumber || result?.shot_number || expectedShotNumber);
+      const resultScene = normalizeShotImageResult(result, {}, insertedShotNumber, "storyboard");
+      const normalizedScene = normalizeStoryboardResponse(
+        { scenes: [resultScene], screenType: resultScene.screenType || result.screenType || screenType, renderWidth: resultScene.renderWidth || result.renderWidth, renderHeight: resultScene.renderHeight || result.renderHeight },
+        scriptDetailIdea
+      ).scenes[0];
+      setGeneratedStoryboard((current) => {
+        const baseScenes = current?.scenes?.length ? current.scenes : scenes;
+        const shiftedScenes = shiftScenesAfterShotNumber(baseScenes, afterShotNumber);
+        const updatedScenes = replaceSceneByShotNumber(shiftedScenes, normalizedScene);
+        return {
+          ...(current || {}),
+          id: current?.id || current?.storyboardId || activeStoryboardId || scriptDetailIdea.scriptId,
+          storyboardId: current?.storyboardId || current?.id || activeStoryboardId || scriptDetailIdea.scriptId,
+          projectId: current?.projectId || scriptDetailIdea.projectId || activeProjectId,
+          title: current?.title || scriptDetailIdea.title,
+          screenType: current?.screenType || scriptDetailIdea.screenType || screenType,
+          renderWidth: current?.renderWidth || normalizedScene.renderWidth,
+          renderHeight: current?.renderHeight || normalizedScene.renderHeight,
+          durationSeconds: current?.durationSeconds || scriptDetailIdea.durationSeconds || selectedDuration,
+          totalShots: updatedScenes.length,
+          scenes: updatedScenes,
+          productionPlanTags: extractProductionPlanTagsFromScenes(updatedScenes),
+        };
+      });
+      setScriptDetailIdea((current) => current ? {
+        ...current,
+        scriptScenes: replaceSceneByShotNumber(shiftScenesAfterShotNumber(current.scriptScenes || [], afterShotNumber), normalizedScene),
+      } : current);
+      dispatch(setCurrentSceneIndex(Math.max(0, insertedShotNumber - 1)));
+      addActivity("AI timeline shot added", `After shot ${afterShotNumber}`);
+      flash(`Added AI shot after shot ${afterShotNumber}.`, "success");
+      creatorDebugLog("shot-ai-insert:complete", { scriptId: scriptDetailIdea.scriptId, afterShotNumber, insertedShotNumber, result });
+    } catch (error) {
+      flash(apiErrorMessage(error, `Could not add a shot after shot ${afterShotNumber}.`), "error");
+    } finally {
+      setShotImageLoadingKeys((current) => current.filter((key) => key !== loadingKey));
+    }
+  };
+
+  const handleUploadShotTake = async (scene, file, note = "") => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate screenplay before uploading shot takes.", "error");
+      return;
+    }
+    if (!file) {
+      flash("Choose a video or image take first.", "error");
+      return;
+    }
+    const shotNumber = Number(scene?.shotNumber || 1);
+    try {
+      const uploadedTake = await uploadShotTake({
+        scriptId: scriptDetailIdea.scriptId,
+        shotNumber,
+        file,
+        note,
+      }).unwrap();
+      if (String(file.type || "").startsWith("video/") && uploadedTake?.takeId) {
+        try {
+          const mediaAnalysis = await analyzeVideoTakeFile(file, shotNumber);
+          await saveShotTakeMediaAnalysis({
+            takeId: uploadedTake.takeId,
+            mediaAnalysis,
+          }).unwrap();
+        } catch (analysisError) {
+          console.warn("[creator] video media analysis failed", analysisError);
+          flash("Take uploaded. Timeline analysis could not be created in this browser.", "warning");
+        }
+      }
+      addActivity("Shot take uploaded", `Shot ${shotNumber}`);
+      flash(`Shot ${shotNumber} take uploaded. Run review before polish.`, "success");
+      void refetchShotTakes?.();
+    } catch (error) {
+      flash(apiErrorMessage(error, `Could not upload shot ${shotNumber}.`), "error");
+    }
+  };
+
+  const handleReviewShotTake = async (take) => {
+    if (!take?.takeId) return;
+    try {
+      const job = await reviewShotTakeAsync({ takeId: take.takeId }).unwrap();
+      const jobId = job?.jobId || job?.id;
+      if (jobId) setShotTakeJobId(jobId);
+      addActivity("Shot review started", `Shot ${take.shotNumber}`);
+      flash("Shot review started. Deterministic checks will finish shortly.", "success");
+    } catch (error) {
+      flash(apiErrorMessage(error, "Shot review could not start."), "error");
+    }
+  };
+
+  const handleUploadShotTakeReferenceFrame = async (take, file, context = {}) => {
+    if (!take?.takeId || !file) return;
+    try {
+      await uploadShotTakeReferenceFrame({
+        takeId: take.takeId,
+        file,
+      }).unwrap();
+      const timelineSuffix = context?.source === "timeline" && context.timestampSeconds != null
+        ? ` at ${Number(context.timestampSeconds).toFixed(1)}s`
+        : "";
+      addActivity(context?.source === "timeline" ? "Timeline frame selected" : "Reference frame saved", `Shot ${take.shotNumber}${timelineSuffix}`);
+      flash(context?.source === "timeline" ? "Timeline frame selected. Gemini image-wise polish preview is now enabled." : "Reference frame saved. Gemini image-wise polish preview is now enabled.", "success");
+      void refetchShotTakes?.();
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not save selected frame."), "error");
+    }
+  };
+
+  const handleDeleteShotTakeTimelineFrame = async (take, frame) => {
+    if (!take?.takeId || !frame) return;
+    const currentAnalysis = take.mediaAnalysis && typeof take.mediaAnalysis === "object" ? take.mediaAnalysis : {};
+    const currentVideo = currentAnalysis.video && typeof currentAnalysis.video === "object" ? currentAnalysis.video : {};
+    const currentFrames = Array.isArray(currentVideo.frames) ? currentVideo.frames : [];
+    const nextFrames = currentFrames.filter((candidate) => !isSameTimelineFrame(candidate, frame));
+    if (nextFrames.length === currentFrames.length) {
+      flash("That timeline frame was already removed.", "warning");
+      return;
+    }
+    const mediaAnalysis = {
+      ...currentAnalysis,
+      updatedAt: new Date().toISOString(),
+      video: {
+        ...currentVideo,
+        frameCount: nextFrames.length,
+        frames: nextFrames,
+      },
+    };
+    try {
+      await saveShotTakeMediaAnalysis({
+        takeId: take.takeId,
+        mediaAnalysis,
+      }).unwrap();
+      addActivity("Timeline frame deleted", `Shot ${take.shotNumber} at ${Number(frame.timestampSeconds || 0).toFixed(1)}s`);
+      flash("Timeline frame removed.", "success");
+      void refetchShotTakes?.();
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not delete timeline frame."), "error");
+    }
+  };
+
+  const handleSaveShotTakeSoundTimeline = async (take, payload = {}) => {
+    if (!take?.takeId) return;
+    try {
+      await saveShotTakeSoundTimeline({
+        takeId: take.takeId,
+        layers: Array.isArray(payload.layers) ? payload.layers : [],
+        mixSettings: payload.mixSettings || {},
+      }).unwrap();
+      addActivity("Sound timeline saved", `Shot ${take.shotNumber}`);
+      flash("Sound timeline and ducking rules saved.", "success");
+      void refetchShotTakes?.();
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not save sound timeline."), "error");
+    }
+  };
+
+  const handleUploadShotTakeSoundSnippet = async (take, file, metadata = {}) => {
+    if (!take?.takeId || !file) return;
+    try {
+      await uploadShotTakeSoundSnippet({
+        takeId: take.takeId,
+        file,
+        metadata,
+      }).unwrap();
+      addActivity("Sound snippet added", `Shot ${take.shotNumber}`);
+      flash("Sound snippet added to the timeline.", "success");
+      void refetchShotTakes?.();
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not upload sound snippet."), "error");
+    }
+  };
+
+  const handleGenerateShotTakeSound = async (take, payload = {}) => {
+    if (!take?.takeId) return;
+    try {
+      const job = await generateShotTakeSoundAsync({
+        takeId: take.takeId,
+        ...payload,
+      }).unwrap();
+      const jobId = job?.jobId || job?.id;
+      if (jobId) setShotTakeJobId(jobId);
+      addActivity("Sound generation prepared", `Shot ${take.shotNumber}`);
+      flash("Sound generation task prepared and added to the timeline.", "success");
+      void refetchShotTakes?.();
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not prepare generated sound."), "error");
+    }
+  };
+
+  const handleEnhanceShotTakeAudio = async (take, payload = {}) => {
+    if (!take?.takeId) return;
+    try {
+      const job = await enhanceShotTakeAudioAsync({
+        takeId: take.takeId,
+        editNote: payload.editNote || "Clean production audio and mix uploaded snippets according to the saved timeline.",
+        preserveVoiceTexture: true,
+        preserveRoomTone: true,
+        overrides: {
+          mixSettings: payload.mixSettings || take.mediaAnalysis?.soundTimeline?.mixSettings || {},
+        },
+      }).unwrap();
+      const jobId = job?.jobId || job?.id;
+      if (jobId) setShotTakeJobId(jobId);
+      addActivity("Audio enhancement prepared", `Shot ${take.shotNumber}`);
+      flash("Audio enhancement task prepared with the saved foley/music timeline.", "success");
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not start audio enhancement."), "error");
+    }
+  };
+
+  const handleConfirmShotTake = async (take, accepted) => {
+    if (!take?.takeId) return;
+    try {
+      await confirmShotTake({
+        takeId: take.takeId,
+        accepted,
+        note: accepted ? "User confirmed shot matches plan." : "User requested re-shoot.",
+      }).unwrap();
+      addActivity(accepted ? "Shot take accepted" : "Shot take marked re-shoot", `Shot ${take.shotNumber}`);
+      flash(accepted ? "Shot take accepted. Polish preview is enabled." : "Shot take marked for re-shoot.", accepted ? "success" : "warning");
+      void refetchShotTakes?.();
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not update shot take."), "error");
+    }
+  };
+
+  const handleEnhanceShotTakePreview = async (take, editNote = "") => {
+    if (!take?.takeId) return;
+    try {
+      const job = await enhanceShotTakePreviewAsync({
+        takeId: take.takeId,
+        editNote,
+        generateImage: true,
+      }).unwrap();
+      const jobId = job?.jobId || job?.id;
+      if (jobId) setShotTakeJobId(jobId);
+      addActivity("Polish preview started", `Shot ${take.shotNumber}`);
+      flash("Gemini frame preview started from the uploaded image/frame.", "success");
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not start polish preview."), "error");
+    }
+  };
+
+  const handleShotTakeFeedback = async (take, feedback) => {
+    if (!take?.takeId || !feedback?.trim()) return;
+    try {
+      await saveShotTakeEnhancementFeedback({ takeId: take.takeId, feedback }).unwrap();
+      addActivity("Polish feedback saved", `Shot ${take.shotNumber}`);
+      flash("Polish feedback saved.", "success");
+      void refetchShotTakes?.();
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not save polish feedback."), "error");
+    }
+  };
+
+  const handleApplyShotTakePreviewToTimeline = async (take, variant, applied = true) => {
+    if (!take?.takeId || !variant?.variantId) {
+      flash("Generate an enhanced image for this clip before applying it to the timeline.", "warning");
+      return;
+    }
+    try {
+      await applyShotTakePreviewToTimeline({
+        takeId: take.takeId,
+        variantId: variant.variantId,
+        applied,
+      }).unwrap();
+      addActivity(applied ? "Preview applied to clip" : "Preview removed from clip", `Shot ${take.shotNumber}`);
+      flash(applied ? "Enhanced image applied to this clip timeline." : "Enhanced image removed from this clip timeline.", "success");
+      void refetchShotTakes?.();
+    } catch (error) {
+      flash(apiErrorMessage(error, applied ? "Could not apply preview to timeline." : "Could not remove preview from timeline."), "error");
+    }
+  };
+
+  const handleStudioPolishShotTake = async (take, polishPayload = {}) => {
+    if (!take?.takeId) return;
+    const payload = typeof polishPayload === "string" ? { editNote: polishPayload } : (polishPayload || {});
+    try {
+      const job = await studioPolishShotTakeAsync({
+        takeId: take.takeId,
+        ...payload,
+        generatePlateFromReference: payload.generatePlateFromReference ?? Boolean(take.referenceFrameUrl),
+        plateMode: payload.plateMode || "clean_background_plate",
+      }).unwrap();
+      const jobId = job?.jobId || job?.id;
+      if (jobId) setShotTakeJobId(jobId);
+      addActivity("Studio Polish prepared", `Shot ${take.shotNumber}`);
+      flash("Low-cost Studio Polish task started for this shot.", "success");
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not start Studio Polish."), "error");
+    }
+  };
+
+  const handleStudioPolishAllShotTakes = async (polishPayload = {}) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate screenplay before Studio Polish.", "error");
+      return;
+    }
+    const payload = typeof polishPayload === "string" ? { editNote: polishPayload } : (polishPayload || {});
+    try {
+      const job = await studioPolishAllShotTakesAsync({
+        scriptId: scriptDetailIdea.scriptId,
+        ...payload,
+        plateMode: payload.plateMode || "clean_background_plate",
+      }).unwrap();
+      const jobId = job?.jobId || job?.id;
+      if (jobId) setShotTakeJobId(jobId);
+      addActivity("Studio Polish prepared", "Accepted shot takes");
+      flash("Low-cost Studio Polish tasks started for accepted shots.", "success");
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not start Studio Polish for accepted shots."), "error");
+    }
+  };
+
+  const handleEnhanceAllShotTakes = async ({ approvedVariantId } = {}) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate screenplay before applying polish.", "error");
+      return;
+    }
+    try {
+      const job = await enhanceAllShotTakesAsync({
+        scriptId: scriptDetailIdea.scriptId,
+        approvedVariantId,
+      }).unwrap();
+      const jobId = job?.jobId || job?.id;
+      if (jobId) setShotTakeJobId(jobId);
+      addActivity("Veo video polish started", "Accepted shot takes");
+      flash("Google Veo video + sound generation started.", "success");
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not start apply-all polish job."), "error");
+    }
+  };
+
   function getWorkflowGateMessage(step) {
-    if (!workflowStepIds.has(step) && step !== "storyboard") return "";
+    if (!workflowStepIds.has(step) && step !== "storyboard" && step !== "shoot-polish") return "";
     if (step === "ideas") return "";
     if (step === "script" && !storyScriptIdea) {
-      if (projectWorkspaceMode && (savedStoryIdeaId || lockedBrief || ideaCandidatePageItems.length)) return "";
       return savedStoryIdeaId === planner.selectedIdeaId
         ? "Generate the story script from the saved idea first"
         : "Save a story idea, then generate its script";
@@ -1813,6 +2572,8 @@ export default function PlannerPage() {
     }
     if (nextPage === "cast") {
       setActorModalSignal(Date.now());
+    } else {
+      setActorModalSignal(0);
     }
     setWorkspacePage(nextPage);
     window.history.replaceState(null, "", `/#${nextPage}`);
@@ -1853,9 +2614,12 @@ export default function PlannerPage() {
       setWorkspacePage(step);
       if (step === "cast") {
         setActorModalSignal(Date.now());
+      } else {
+        setActorModalSignal(0);
       }
     } else if (step === "trend") {
       setWorkspacePage("ideas");
+      setActorModalSignal(0);
     }
     dispatch(setActiveStep(step));
     window.history.replaceState(null, "", `/#${step === "trend" ? "ideas" : step}`);
@@ -2052,6 +2816,32 @@ export default function PlannerPage() {
     flash(`Selected ${trend?.title || "trend"}`);
   };
 
+  const generateStoryIdeasForBrief = async (brief) => {
+    if (!brief) {
+      flash(TREND_DISCOVERY_ENABLED ? "Save a trend or original idea first" : "Write and save a topic first", "error");
+      return null;
+    }
+
+    dispatch(setActiveStep("ideas"));
+    setWorkspacePage("ideas");
+    window.history.replaceState(null, "", "/#ideas");
+
+    const generated = await loadIdeaCandidatesForBrief(brief, 0);
+    const firstGeneratedIdea = generated.items[0] || brief;
+    if (firstGeneratedIdea?.id) {
+      dispatch(selectIdea(firstGeneratedIdea.id));
+    }
+    dispatch(setActiveStep("ideas"));
+    setWorkspacePage("ideas");
+    addActivity("Generated story ideas", `${generated.pageInfo.totalElements || generated.items.length || 20} options from saved brief`);
+    flash(
+      generated.usedFallback ? "Story ideas API failed; showing local generated options." : "Story ideas generated in creative workflow",
+      generated.usedFallback ? "warning" : "success"
+    );
+    scrollToSection("workflow");
+    return generated;
+  };
+
   const handleSaveTrendBrief = async () => {
     if (!selectedTrend) {
       flash("Select a trend first", "error");
@@ -2078,9 +2868,11 @@ export default function PlannerPage() {
     setIdeaCandidatePageItems([]);
     setIdeaCandidatePageInfo({ number: 0, size: ideaCandidatePageSize, totalPages: 1, totalElements: 0 });
     setSavedStoryIdeaId(null);
+    dispatch(completeStep("trend"));
+    setWorkspacePage("ideas");
     addActivity("Trend saved", selectedTrend.title);
     flash(
-      lockedSelection?.ideaId ? "Trend saved as creative brief" : "Trend saved locally; backend save unavailable",
+      lockedSelection?.ideaId ? "Trend saved. Generate story ideas when ready." : "Trend saved locally; generate local story ideas when ready.",
       lockedSelection?.ideaId ? "success" : "warning"
     );
   };
@@ -2116,7 +2908,7 @@ export default function PlannerPage() {
     dispatch(completeStep("trend"));
     setWorkspacePage("ideas");
     flash(
-      lockedSelection?.ideaId ? "Topic saved as creative brief" : "Topic saved locally; backend save unavailable",
+      lockedSelection?.ideaId ? "Topic saved. Generate story ideas when ready." : "Topic saved locally; generate local story ideas when ready.",
       lockedSelection?.ideaId ? "success" : "warning"
     );
   };
@@ -2126,21 +2918,11 @@ export default function PlannerPage() {
       flash(TREND_DISCOVERY_ENABLED ? "Save a trend or original idea first" : "Write and save a topic first", "error");
       return;
     }
-    if (!savedBriefMatchesCurrentMode) {
+    if (!canGenerateStoryIdeas) {
       flash(TREND_DISCOVERY_ENABLED ? "Save the current trend or idea before generating" : "Save the current topic before generating", "error");
       return;
     }
-    const generated = await loadIdeaCandidatesForBrief(lockedBrief, 0);
-    const firstGeneratedIdea = generated.items[0] || lockedBrief;
-    dispatch(selectIdea(firstGeneratedIdea.id));
-    dispatch(setActiveStep("ideas"));
-    setWorkspacePage("ideas");
-    addActivity("Generated story ideas", `${generated.pageInfo.totalElements || 20} options from saved brief`);
-    flash(
-      generated.usedFallback ? "Story ideas API failed; showing local generated options." : "Story ideas generated in creative workflow",
-      generated.usedFallback ? "warning" : "success"
-    );
-    scrollToSection("workflow");
+    await generateStoryIdeasForBrief(lockedBrief);
   };
 
   const handleIdeaCandidatePageChange = async (page) => {
@@ -2720,53 +3502,114 @@ export default function PlannerPage() {
   const handleSaveStoryboard = async () => {
     const next = !storyboardSaved;
     let usedLocalSave = false;
+    const actualStoryboardId = currentStoryboard?.storyboardId || currentStoryboard?.id;
+    const canPersistStoryboardSave = legacyStoryboardSaveApiEnabled
+      && isUuid(actualStoryboardId)
+      && actualStoryboardId !== activeProjectId
+      && actualStoryboardId !== scriptDetailIdea?.scriptId;
     try {
-      if (next) {
-        await saveStoryboard({ storyboardId: activeStoryboardId, note: "Saved from planner" }).unwrap();
+      if (canPersistStoryboardSave) {
+        if (next) {
+          await saveStoryboard({ storyboardId: actualStoryboardId, note: "Saved from planner" }).unwrap();
+        } else {
+          await unsaveStoryboard({ storyboardId: actualStoryboardId }).unwrap();
+        }
       } else {
-        await unsaveStoryboard({ storyboardId: activeStoryboardId }).unwrap();
+        usedLocalSave = true;
       }
     } catch {
       usedLocalSave = true;
       // Local state keeps the CTA responsive if the backend is not available yet.
     }
+    creatorDebugLog("production save toggled", {
+      next,
+      usedLocalSave,
+      activeProjectId,
+      actualStoryboardId,
+      scriptId: scriptDetailIdea?.scriptId,
+      planCount: productionPlanTags.length,
+    });
     setStoryboardSaved(next);
-    addActivity(next ? "Saved storyboard" : "Unsaved storyboard", currentStoryboard?.title || "She Almost Didn't Go");
+    addActivity(next ? "Saved production" : "Unsaved production", currentStoryboard?.title || "Shot plan");
     flash(
       usedLocalSave
-        ? (next ? "Storyboard save API failed; saved locally." : "Storyboard unsave API failed; updated locally.")
+        ? (next ? "Production plan saved. Generate Shots is now enabled." : "Production plan save removed.")
         : (next ? "Storyboard saved" : "Storyboard removed from saved"),
-      usedLocalSave ? "warning" : "success"
+      "success"
     );
   };
 
-  const handleExport = async () => {
+  const handleExport = () => {
     if (!activeProjectId) {
       flash("Save a topic first so this workflow has a project id to export.", "error");
       return;
     }
-    let exportResult = { exportId: "export-local-mock" };
-    let usedLocalExport = false;
-    try {
-      exportResult = await requestExport({ projectId: activeProjectId, format: "json" }).unwrap();
-    } catch {
-      usedLocalExport = true;
-      // Local export still works as a mock even without an API response.
+    if (!canExportShotsPdf) {
+      emitCreatorAnalyticsEvent("creator_pdf_export_blocked", {
+        project_id: activeProjectId,
+        script_id: scriptDetailIdea?.scriptId || "",
+        expected_shots: shotExportSummary.expected,
+        complete_shots: shotExportSummary.completeReady,
+      });
+      flash(exportBlockedReason || "Please export after generating all the shots.", "warning");
+      return;
     }
-    const payload = {
-      projectId: activeProjectId,
-      exportId: exportResult.exportId,
-      title: currentStoryboard?.title || "She Almost Didn't Go",
-      selectedTrend,
-      selectedIdea,
-      scenes,
-    };
-    downloadJson("she-almost-didnt-go-storyboard.json", payload);
-    addActivity("Exported storyboard", exportResult.exportId || "mock export");
-    flash(
-      usedLocalExport ? "Export API failed; downloaded local storyboard JSON." : "Storyboard export downloaded",
-      usedLocalExport ? "warning" : "success"
-    );
+    setPdfExporting(true);
+    try {
+      const reportWindow = window.open("", "_blank");
+      if (!reportWindow) {
+        flash("Allow pop-ups for Creator UI, then export again.", "error");
+        return;
+      }
+      const report = buildStoryboardPdfReport({
+        projectId: activeProjectId,
+        scriptId: scriptDetailIdea?.scriptId || "",
+        title: currentStoryboard?.projectTitle || currentStoryboard?.title || selectedIdea?.title || scriptDetailIdea?.title || "Storyboard",
+        storyline: buildExportStoryline({ storyScriptIdea, scriptDetailIdea, selectedIdea, currentStoryboard }),
+        scenes: scenes.slice(0, shotExportSummary.expected),
+        durationSeconds: currentStoryboard?.durationSeconds || currentStoryboard?.duration || selectedDuration,
+        screenType: currentStoryboard?.screenType || screenType,
+        callbackUrl: buildPdfCallbackUrl(activeProjectId, scriptDetailIdea?.scriptId),
+      });
+      emitCreatorAnalyticsEvent("creator_pdf_export_opened", {
+        project_id: activeProjectId,
+        script_id: scriptDetailIdea?.scriptId || "",
+        shot_count: report.shotCount,
+      });
+      emitCreatorAnalyticsEvent("creator_pdf_preview_page_view", {
+        project_id: activeProjectId,
+        script_id: scriptDetailIdea?.scriptId || "",
+        shot_count: report.shotCount,
+      });
+      reportWindow.document.open();
+      reportWindow.document.write(report.html);
+      reportWindow.document.close();
+      let printRequested = false;
+      const openPrintDialog = () => {
+        if (printRequested) return;
+        printRequested = true;
+        emitCreatorAnalyticsEvent("creator_pdf_print_dialog_opened", {
+          project_id: activeProjectId,
+          script_id: scriptDetailIdea?.scriptId || "",
+          shot_count: report.shotCount,
+        });
+        reportWindow.focus();
+        reportWindow.print();
+      };
+      reportWindow.onload = () => window.setTimeout(openPrintDialog, 500);
+      window.setTimeout(openPrintDialog, 1400);
+      addActivity("Export PDF opened", `${report.shotCount} generated shots`);
+      flash("Branded PDF report opened. Use Save as PDF from the print dialog.", "success");
+    } catch (error) {
+      creatorDebugLog("pdf export failed", {
+        projectId: activeProjectId,
+        scriptId: scriptDetailIdea?.scriptId,
+        error,
+      });
+      flash("Could not create the PDF report. Try again after the shot cards finish loading.", "error");
+    } finally {
+      setPdfExporting(false);
+    }
   };
 
   const handleSceneSelect = (index) => {
@@ -2878,6 +3721,7 @@ export default function PlannerPage() {
       const projectId = project.projectId || project.id;
       const restored = buildWorkflowStateFromProject(project);
       const stage = projectResumeStage(restored, project);
+      const postProductionShots = buildPostProductionShotsFromRestored(restored);
       return {
         id: `project-${projectId}`,
         projectId,
@@ -2887,9 +3731,27 @@ export default function PlannerPage() {
         time: project.updatedAt ? formatJobTime(project.updatedAt) : "Project",
         status: project.status,
         stage,
+        restored,
+        postProductionShots,
+        shotDesignReady: Boolean(postProductionShots.length || restored?.planner?.completedSteps?.storyboard),
         rawProject: project,
       };
     });
+  const displayedPostProductionProjects = useMemo(
+    () => (Array.isArray(postProductionProjects) ? postProductionProjects : [])
+      .map(normalizePostProductionProject)
+      .filter((project) => project.shotDesignReady),
+    [postProductionProjects]
+  );
+  useEffect(() => {
+    if (!postProductionOpen) return;
+    creatorDebugLog("post production projects loaded", {
+      count: displayedPostProductionProjects.length,
+      firstProjectId: displayedPostProductionProjects[0]?.projectId,
+      firstScriptId: displayedPostProductionProjects[0]?.scriptId,
+      firstShotCount: displayedPostProductionProjects[0]?.postProductionShots?.length || 0,
+    });
+  }, [displayedPostProductionProjects, postProductionOpen]);
   const pastStorylineItems = dedupeHistoryItems([
     ...buildPastStorylineHistory(storyScriptIdea, displayedProjectHistory),
     ...normalizeBackendHistoryItems(backendStorylineHistory, "storyline"),
@@ -2909,10 +3771,10 @@ export default function PlannerPage() {
     ...(Array.isArray(storyboardHistory) ? storyboardHistory : []),
   ];
 
-  const handleOpenHistoryItem = async (item) => {
+  const handleOpenHistoryItem = async (item, options = {}) => {
     let project = item?.rawProject || item;
     const requestedProjectId = project?.projectId || item?.projectId || project?.id || item?.id;
-    if (isUuid(requestedProjectId)) {
+    if (isUuid(requestedProjectId) && !options.skipProjectFetch) {
       try {
         project = await fetchCreatorProject(requestedProjectId).unwrap();
       } catch {
@@ -2923,9 +3785,12 @@ export default function PlannerPage() {
     const nextProjectId = restored?.projectId || requestedProjectId;
 
     if (restored?.projectId) {
+      const targetWorkspacePage = options.workspacePage || restored.workspacePage;
       if (restored.lockedBrief) {
         setLockedBrief(restored.lockedBrief);
         setExtraIdeas((current) => mergeUniqueIdeas(current, [restored.lockedBrief]));
+      } else {
+        setLockedBrief(null);
       }
       if (restored.ideaCandidates.length) {
         setLockedIdeaOptions((current) => mergeUniqueIdeas(current, restored.ideaCandidates));
@@ -2936,6 +3801,9 @@ export default function PlannerPage() {
           totalPages: Math.max(1, Math.ceil(restored.ideaCandidates.length / ideaCandidatePageSize)),
           totalElements: restored.ideaCandidates.length,
         });
+      } else {
+        setIdeaCandidatePageItems([]);
+        setIdeaCandidatePageInfo({ number: 0, size: ideaCandidatePageSize, totalPages: 1, totalElements: 0 });
       }
       if (restored.savedStoryIdea) {
         setSavedStoryIdeaId(restored.savedStoryIdea.id);
@@ -2945,23 +3813,74 @@ export default function PlannerPage() {
           return next;
         });
         setSavedIdeaSnapshots((current) => mergeUniqueIdeas(current, [restored.savedStoryIdea]));
+      } else {
+        setSavedStoryIdeaId(null);
       }
-      if (restored.storyScriptIdea) setStoryScriptIdea(restored.storyScriptIdea);
-      if (restored.scriptDetailIdea) setScriptDetailIdea(restored.scriptDetailIdea);
-      if (restored.castPlan) setCastPlan(restored.castPlan);
-      if (restored.audienceDecision) setSelectedAudienceDecision(restored.audienceDecision);
-      if (restored.storyboard) setGeneratedStoryboard(restored.storyboard);
+      setStoryScriptIdea(restored.storyScriptIdea || null);
+      setScriptDetailIdea(restored.scriptDetailIdea || null);
+      setCastPlan(restored.castPlan || null);
+      setSelectedAudienceDecision(restored.audienceDecision || null);
+      setGeneratedStoryboard(restored.storyboard || null);
       setStoryboardSaved(Boolean(restored.storyboardSaved));
       dispatch(restorePlannerState(restored.planner));
-      setWorkspacePage(restored.workspacePage);
-      window.history.replaceState(null, "", `/#${restored.workspacePage}`);
+      if (Number.isFinite(options.sceneIndex)) {
+        dispatch(setCurrentSceneIndex(Math.max(0, options.sceneIndex)));
+        dispatch(setCursorMs(0));
+      }
+      setWorkspacePage(targetWorkspacePage);
+      window.history.replaceState(null, "", `/#${targetWorkspacePage}`);
       flash("Project restored as the active workflow", "success");
     } else if (isUuid(nextProjectId)) {
       dispatch(setProjectId(nextProjectId));
       flash("Project restored as the active workflow", "success");
     }
-    const restoredSection = restored?.workspacePage === "ideas" ? "workflow" : sectionForWorkspacePage(restored?.workspacePage);
+    const targetPage = options.workspacePage || restored?.workspacePage;
+    const restoredSection = targetPage === "ideas" ? "workflow" : sectionForWorkspacePage(targetPage);
     scrollToSection(restored?.workspacePage ? restoredSection : isUuid(nextProjectId) ? "storyboard" : "dashboard");
+  };
+
+  const handleClosePostProduction = () => {
+    setPostProductionOpen(false);
+    setSelectedPostProductionProject(null);
+    if (window.location.hash === "#post-production") {
+      window.history.replaceState(null, "", "/#dashboard");
+    }
+  };
+
+  const handleSelectPostProductionProject = async (project) => {
+    if (!project) return;
+    const requestedProjectId = project.projectId || project.rawProject?.projectId || project.rawProject?.id;
+    let rawProject = project.rawProject || project;
+    if (isUuid(requestedProjectId) && !project.postProductionApi) {
+      try {
+        rawProject = await fetchCreatorProject(requestedProjectId).unwrap();
+      } catch {
+        rawProject = project.rawProject || project;
+      }
+    }
+    const restored = buildWorkflowStateFromProject(rawProject);
+    const apiShots = Array.isArray(project.postProductionShots) ? project.postProductionShots : [];
+    const restoredShots = buildPostProductionShotsFromRestored(restored);
+    const postProductionShots = apiShots.length ? apiShots : restoredShots;
+    setSelectedPostProductionProject({
+      ...project,
+      rawProject,
+      restored,
+      projectId: restored?.projectId || requestedProjectId,
+      title: rawProject?.title || project.title || "Creator project",
+      postProductionShots,
+      shotDesignReady: Boolean(postProductionShots.length || restored?.planner?.completedSteps?.storyboard),
+    });
+  };
+
+  const handleOpenPostProductionShot = async (project, shot, index = 0) => {
+    if (!project) return;
+    await handleOpenHistoryItem(project, {
+      workspacePage: "shoot-polish",
+      sceneIndex: Number.isFinite(index) ? index : Math.max(0, Number(shot?.shotNumber || 1) - 1),
+      skipProjectFetch: Boolean(project.postProductionApi),
+    });
+    handleClosePostProduction();
   };
 
   const handleOpenBackendHistoryItem = async (item) => {
@@ -3024,6 +3943,8 @@ export default function PlannerPage() {
           providersError={aiProvidersError}
           pageInfo={ideaCandidatePageInfo}
           onPageChange={handleIdeaCandidatePageChange}
+          onGenerateIdeas={handleGenerateStoryIdeas}
+          showGenerateIdeasAction={!showCreativeBriefPanel}
           onSelectIdea={handleIdeaSelect}
           onSaveStoryIdea={handleSaveStoryIdea}
           onGenerateScript={handleGenerateScriptForStoryIdea}
@@ -3095,7 +4016,7 @@ export default function PlannerPage() {
           onCreateActor={handleCreateActor}
           onConfirm={handleCreatorConfirm}
           onEnhanceIdeaWithCast={handleEnhanceIdeaWithCast}
-          openActorModalSignal={actorModalSignal}
+          openActorModalSignal={workspacePage === "cast" ? actorModalSignal : 0}
           isCreatingActor={createCreatorState.isLoading}
           isSaving={createCreatorState.isLoading || updateCreatorState.isLoading || saveCharacterCastMappingsState.isLoading}
         />
@@ -3172,7 +4093,7 @@ export default function PlannerPage() {
         onRecharge={handleOpenRecharge}
       />
 
-      {workspacePage === "ideas" && !projectWorkspaceMode && (
+      {showCreativeBriefPanel && (
       <section id="trends" className="creator-section space-y-4">
         {TREND_DISCOVERY_ENABLED && (
           <>
@@ -3205,8 +4126,8 @@ export default function PlannerPage() {
           isFetching={isFetching}
           isLockingSelection={lockSelectionState.isLoading}
           isGeneratingIdeas={generatedIdeaState.isLoading || generatedIdeaAsyncState.isLoading || Boolean(ideaGenerationJobId)}
-          canGenerateStoryIdeas={savedBriefMatchesCurrentMode}
-          savedBriefTitle={savedBriefMatchesCurrentMode ? lockedBrief?.title : ""}
+          canGenerateStoryIdeas={canGenerateStoryIdeas}
+          savedBriefTitle={canGenerateStoryIdeas ? lockedBrief?.title : ""}
           aiProviders={availableAiProviders}
           selectedProviderCode={selectedAiProvider?.code || selectedProviderCode}
           selectedProvider={selectedAiProvider}
@@ -3403,11 +4324,23 @@ export default function PlannerPage() {
           activeSceneIndex={preview.currentSceneIndex}
           onSelectScene={handleSceneSelect}
           onGenerateImage={handleGenerateShotImage}
+          onEditShot={handleEditStoryboardShotWithAi}
+          onInsertShot={handleInsertStoryboardTimelineShot}
           onExport={handleExport}
           onSave={handleSaveStoryboard}
           isSaved={storyboardSaved}
           onGenerateAgain={handleGenerateStoryboard}
-          isGenerating={shotPlanLoading || shotImageUrlsLoading || generateShotImageState.isLoading || exportState.isLoading}
+          onGenerateShots={handleGenerateShots}
+          canGenerateShots={canGenerateShots}
+          generateShotsBlockedReason={generateShotsBlockedReason}
+          canExport={canExportShotsPdf}
+          exportBlockedReason={exportBlockedReason}
+          isExporting={pdfExporting}
+          shotsGenerated={shotsGenerated}
+          isGeneratingShots={shotGenerationLoading}
+          isEditingShot={editStoryboardShotWithAiState.isLoading}
+          isInsertingShot={insertStoryboardTimelineShotState.isLoading}
+          isGenerating={shotPlanLoading || shotImageUrlsLoading || generateShotImageState.isLoading || editStoryboardShotWithAiState.isLoading || insertStoryboardTimelineShotState.isLoading || pdfExporting || shotGenerationLoading}
         />
         <MobileFrame
           scene={selectedScene}
@@ -3422,7 +4355,25 @@ export default function PlannerPage() {
           }}
         />
       </div>
-      <GenerationStatusBar job={productionPlanJob || storyboardJob || (generateProductionPlansState.isLoading ? { status: "RUNNING", progress: 18, message: "Starting shot plan job" } : productionPlanJobId ? { status: "RUNNING", progress: 38, message: "Generating storyboard, lighting, sound, and DP plans" } : null)} label="Storyboard planning" />
+      <GenerationStatusBar job={productionPlanJob || storyboardJob || (generateProductionPlansState.isLoading ? { status: "RUNNING", progress: 18, message: "Starting shot plan job" } : productionPlanJobId ? { status: "RUNNING", progress: 38, message: "Generating storyboard, lighting, sound, and DP plans" } : generateStoryboardAsyncState.isLoading ? { status: "RUNNING", progress: 10, message: "Starting shot generation job" } : storyboardJobId ? { status: "RUNNING", progress: 35, message: "Generating shot cards one by one" } : null)} label="Shot design" />
+
+      {effectiveShotPlansReady && (
+        <div className="creator-panel-muted flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-normal text-emerald-200">Ready for real footage</p>
+            <p className="mt-1 text-sm font-semibold text-slate-300">
+              Upload each recorded take in Polish, review camera/dialogue fit, then generate a preview pass for lighting, background, production design, and sound direction.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleWorkspacePageClick("shoot-polish")}
+            className="creator-primary flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white"
+          >
+            Open Polish <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
 
       <StoryboardHistoryPanel
         saved={displayedSavedStoryboards}
@@ -3430,6 +4381,61 @@ export default function PlannerPage() {
         onOpen={handleOpenHistoryItem}
       />
       </>
+      )}
+
+      {workspacePage === "shoot-polish" && (
+      <section id="shoot-polish" className="creator-section space-y-5">
+        {!effectiveShotPlansReady && (
+          <div className="creator-panel border-amber-300/20 bg-amber-400/[0.045] p-4">
+            <p className="text-xs font-black uppercase tracking-normal text-amber-200">Shot design needed</p>
+            <p className="mt-1 text-sm font-semibold leading-6 text-slate-300">
+              Generate shot plans first. Once every shot has camera, lighting, production design, and sound direction, upload the recorded take here and polish it.
+            </p>
+            <button
+              type="button"
+              onClick={() => handleWorkspacePageClick("storyboard")}
+              className="creator-primary mt-3 inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white"
+            >
+              Open Shot Design <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
+        <div className={`grid gap-5 ${postProductionShotRailCollapsed ? "xl:grid-cols-[4.25rem_minmax(0,1fr)]" : "xl:grid-cols-[minmax(18rem,0.85fr)_minmax(0,1.35fr)]"}`}>
+          <PostProductionShotStrip
+            scenes={scenes}
+            activeIndex={preview.currentSceneIndex}
+            onSelect={handleSceneSelect}
+            collapsed={postProductionShotRailCollapsed}
+            onToggle={() => setPostProductionShotRailCollapsed((collapsed) => !collapsed)}
+          />
+          <ShotTakePanel
+            scenes={scenes}
+            takes={shotTakes}
+            scriptId={scriptDetailIdea?.scriptId}
+            pricingMatrix={creatorAiPricing}
+            focusedShotNumber={selectedScene?.shotNumber || preview.currentSceneIndex + 1}
+            isLoading={shotTakesLoading}
+            isBusy={shotTakeBusy}
+            activeJob={shotTakeJob}
+            onUpload={handleUploadShotTake}
+            onUploadReferenceFrame={handleUploadShotTakeReferenceFrame}
+            onDeleteTimelineFrame={handleDeleteShotTakeTimelineFrame}
+            onSaveSoundTimeline={handleSaveShotTakeSoundTimeline}
+            onUploadSoundSnippet={handleUploadShotTakeSoundSnippet}
+            onGenerateSound={handleGenerateShotTakeSound}
+            onReview={handleReviewShotTake}
+            onConfirm={handleConfirmShotTake}
+            onEnhancePreview={handleEnhanceShotTakePreview}
+            onApplyPreviewToTimeline={handleApplyShotTakePreviewToTimeline}
+            onStudioPolish={handleStudioPolishShotTake}
+            onStudioPolishAll={handleStudioPolishAllShotTakes}
+            onEnhanceAudio={handleEnhanceShotTakeAudio}
+            onFeedback={handleShotTakeFeedback}
+            onEnhanceAll={handleEnhanceAllShotTakes}
+          />
+        </div>
+        <GenerationStatusBar job={shotTakeJob || (shotTakeJobId ? { status: "RUNNING", progress: 35, message: "Processing shoot and polish job" } : null)} label="Shoot & Polish" />
+      </section>
       )}
 
       <RechargeWalletModal
@@ -3632,6 +4638,130 @@ export default function PlannerPage() {
                 </div>
               </>
             )}
+          </div>
+        </CreatorModal>
+      )}
+
+      {postProductionOpen && (
+        <CreatorModal title="Post Production" onClose={handleClosePostProduction}>
+          <div className="grid max-h-[72vh] gap-4 overflow-hidden lg:grid-cols-[minmax(17rem,0.8fr)_minmax(0,1.2fr)]">
+            <div className="min-h-0 space-y-3">
+              <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+                <p className="text-sm font-bold text-white">Projects ready for polish</p>
+                <p className="mt-1 text-sm font-medium leading-6 text-slate-400">
+                  Only projects with shot design or storyboard plans appear here.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => refetchPostProductionProjects?.()}
+                  className="creator-control mt-3 px-3 py-2 text-xs font-bold text-slate-200"
+                >
+                  {postProductionProjectsLoading ? "Refreshing..." : "Refresh"}
+                </button>
+              </div>
+              <div className="custom-scrollbar max-h-[52vh] overflow-y-auto rounded-lg border border-white/10 bg-black/20 p-2">
+                {postProductionProjectsLoading && !displayedPostProductionProjects.length ? (
+                  <div className="px-3 py-6 text-sm font-semibold text-slate-500">Loading shot-ready projects...</div>
+                ) : displayedPostProductionProjects.length ? (
+                  <div className="space-y-2">
+                    {displayedPostProductionProjects.map((project) => {
+                      const active = String(selectedPostProductionProject?.projectId || "") === String(project.projectId || "");
+                      return (
+                        <button
+                          key={project.id}
+                          type="button"
+                          onClick={() => handleSelectPostProductionProject(project)}
+                          className={`flex w-full items-start gap-3 rounded-md border px-3 py-3 text-left transition ${
+                            active
+                              ? "border-emerald-300/35 bg-emerald-400/[0.07]"
+                              : "border-white/10 bg-white/[0.025] hover:border-emerald-300/30 hover:bg-white/[0.06]"
+                          }`}
+                        >
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-200">
+                            <Clapperboard size={16} />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-bold text-white">{project.title}</span>
+                            <span className="mt-1 block text-xs font-semibold text-slate-400">
+                              {project.postProductionShots.length || "Shot design"} shots ready {project.time ? `- ${project.time}` : ""}
+                            </span>
+                            <span className="mt-1 block line-clamp-2 text-xs font-medium leading-5 text-slate-500">{project.stage.description}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="px-3 py-6 text-sm font-semibold text-slate-500">
+                    No projects have shot design ready yet. Generate shot plans from a project first.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="min-h-0 rounded-lg border border-white/10 bg-white/[0.025] p-3">
+              {fetchCreatorProjectState.isFetching ? (
+                <div className="grid min-h-[20rem] place-items-center text-sm font-semibold text-slate-500">Loading project shots...</div>
+              ) : selectedPostProductionProject ? (
+                <div className="flex h-full min-h-0 flex-col">
+                  <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-xs font-black uppercase tracking-normal text-emerald-200">Shot thumbnails</p>
+                      <h3 className="mt-1 truncate text-lg font-extrabold text-white">{selectedPostProductionProject.title}</h3>
+                      <p className="mt-1 text-xs font-semibold text-slate-500">Select a shot to open its storyboard and upload the actual take.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenPostProductionShot(selectedPostProductionProject, selectedPostProductionProject.postProductionShots[0], 0)}
+                      disabled={!selectedPostProductionProject.postProductionShots.length}
+                      className="creator-primary flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"
+                    >
+                      Open First Shot <ChevronRight size={14} />
+                    </button>
+                  </div>
+                  {selectedPostProductionProject.postProductionShots.length ? (
+                    <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
+                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        {selectedPostProductionProject.postProductionShots.map((shot, index) => (
+                          <button
+                            key={`${selectedPostProductionProject.projectId}-${shot.shotNumber}-${index}`}
+                            type="button"
+                            onClick={() => handleOpenPostProductionShot(selectedPostProductionProject, shot, index)}
+                            className="group overflow-hidden rounded-lg border border-white/10 bg-black/25 text-left transition hover:border-emerald-300/35 hover:bg-white/[0.055]"
+                          >
+                            <PostProductionShotThumb shot={shot} />
+                            <span className="block p-3">
+                              <span className="block text-[10px] font-black uppercase tracking-normal text-slate-500">Shot {String(shot.shotNumber || index + 1).padStart(2, "0")}</span>
+                              <span className="mt-1 line-clamp-2 min-h-[2.25rem] text-xs font-extrabold leading-5 text-white">{shot.title || `Shot ${index + 1}`}</span>
+                              <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-200">
+                                Open Polish <ChevronRight size={12} />
+                              </span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid min-h-[20rem] place-items-center rounded-lg border border-amber-300/20 bg-amber-400/[0.045] p-6 text-center">
+                      <div>
+                        <p className="text-sm font-bold text-amber-100">No shot thumbnails found</p>
+                        <p className="mt-1 text-sm font-semibold leading-6 text-slate-400">Open the project and generate shot plans first.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="grid min-h-[20rem] place-items-center text-center">
+                  <div>
+                    <Clapperboard size={28} className="mx-auto text-emerald-200" />
+                    <p className="mt-3 text-sm font-bold text-white">Choose a project</p>
+                    <p className="mt-1 max-w-sm text-sm font-medium leading-6 text-slate-500">
+                      Its shot thumbnails will appear here. Opening one resumes the project in the polish workspace.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </CreatorModal>
       )}
@@ -4677,6 +5807,633 @@ function firstText(...values) {
   return values.find((value) => typeof value === "string" && value.trim()) || "";
 }
 
+function hasShotImageUrlData(item = {}) {
+  return Boolean(
+    firstText(
+      item.storyboardImageUrl,
+      item.storyboard_image_url,
+      item.signedUrl,
+      item.signed_url,
+      item.imageUrl,
+      item.image_url,
+      item.lightingImageUrl,
+      item.lighting_image_url,
+      item.cameraPlanImageUrl,
+      item.camera_plan_image_url,
+      item.dpImageUrl,
+      item.dp_image_url
+    )
+    || item.storyboardImageAssetId
+    || item.storyboard_image_asset_id
+    || item.lightingImageAssetId
+    || item.lighting_image_asset_id
+    || item.cameraPlanImageAssetId
+    || item.camera_plan_image_asset_id
+  );
+}
+
+function hasRenderableShotAsset(scene = {}) {
+  return Boolean(
+    firstText(
+      scene.signedUrl,
+      scene.signed_url,
+      scene.imageUrl,
+      scene.image_url,
+      scene.storyboardImageUrl,
+      scene.storyboard_image_url,
+      scene.publicUrl,
+      scene.public_url,
+      scene.assetUrl,
+      scene.asset_url,
+      scene.lightingImageUrl,
+      scene.lighting_image_url,
+      scene.cameraPlanImageUrl,
+      scene.camera_plan_image_url
+    )
+    || scene.imageAssetId
+    || scene.image_asset_id
+    || scene.lightingImageAssetId
+    || scene.lighting_image_asset_id
+    || scene.cameraPlanImageAssetId
+    || scene.camera_plan_image_asset_id
+  );
+}
+
+function firstPositiveNumber(...values) {
+  const value = values.map((item) => Number(item)).find((item) => Number.isFinite(item) && item > 0);
+  return value || 0;
+}
+
+function summarizeShotExportAssets(scenes = [], expectedShotCount = 0) {
+  const shotCount = expectedShotCount || (Array.isArray(scenes) ? scenes.length : 0);
+  const relevantScenes = (Array.isArray(scenes) ? scenes : []).slice(0, shotCount || undefined);
+  const summary = relevantScenes.reduce((counts, scene) => {
+    const urls = normalizeShotImageFields(scene);
+    const storyboardReady = Boolean(urls.storyboardImageUrl);
+    const lightingReady = Boolean(urls.lightingImageUrl);
+    const dpReady = Boolean(urls.cameraPlanImageUrl);
+    return {
+      storyboardReady: counts.storyboardReady + (storyboardReady ? 1 : 0),
+      lightingReady: counts.lightingReady + (lightingReady ? 1 : 0),
+      dpReady: counts.dpReady + (dpReady ? 1 : 0),
+      completeReady: counts.completeReady + (storyboardReady && lightingReady && dpReady ? 1 : 0),
+    };
+  }, { storyboardReady: 0, lightingReady: 0, dpReady: 0, completeReady: 0 });
+
+  return {
+    expected: shotCount,
+    ...summary,
+  };
+}
+
+function emitCreatorAnalyticsEvent(eventName, params = {}) {
+  if (typeof window === "undefined") return;
+  const payload = Object.fromEntries(Object.entries(params)
+    .filter(([, value]) => ["string", "number", "boolean"].includes(typeof value) || value == null)
+    .map(([key, value]) => [key, value ?? ""]));
+  try {
+    if (typeof window.gtag === "function") {
+      window.gtag("event", eventName, payload);
+    }
+    window.dataLayer = window.dataLayer || [];
+    if (Array.isArray(window.dataLayer)) {
+      window.dataLayer.push({ event: eventName, ...payload });
+    }
+    creatorDebugLog("analytics event", { eventName, payload });
+  } catch {
+    // Analytics should never block the export workflow.
+  }
+}
+
+function buildStoryboardPdfReport({
+  projectId,
+  scriptId,
+  title,
+  storyline,
+  scenes = [],
+  durationSeconds,
+  screenType,
+  callbackUrl,
+}) {
+  const generatedAt = formatExportDate(new Date());
+  const shotCards = (Array.isArray(scenes) ? scenes : []).map(renderShotPdfCard).join("\n");
+  const safeProjectTitle = escapeHtml(title || "Creator project");
+  const safeStoryline = escapeHtml(storyline || "Storyline not available.");
+  const safeCallbackUrl = escapeHtml(callbackUrl || "");
+  const callbackAction = safeCallbackUrl
+    ? `<a class="callback-button" href="${safeCallbackUrl}" target="_blank" rel="noreferrer">Open walkthrough / callback</a>`
+    : "";
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${safeProjectTitle} - DalaiLlama Story Board</title>
+  <style>
+    @page { size: A4; margin: 14mm; }
+    * { box-sizing: border-box; }
+    html { background: #070a12; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 15% 0%, rgba(247, 201, 72, 0.18), transparent 28%),
+        radial-gradient(circle at 88% 8%, rgba(34, 211, 238, 0.12), transparent 26%),
+        linear-gradient(145deg, #070a12 0%, #0d1322 52%, #111827 100%);
+      color: #f7f9fc;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .page {
+      max-width: 1060px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+    .cover {
+      min-height: 92vh;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      background:
+        linear-gradient(160deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.035)),
+        linear-gradient(135deg, #101827 0%, #080b13 100%);
+      padding: 32px;
+      border-radius: 8px;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.44), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 24px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 900;
+      letter-spacing: 0;
+      color: #ffffff;
+    }
+    .brand-mark {
+      display: inline-grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: linear-gradient(145deg, #f7c948, #b98b16);
+      color: #070a12;
+      font-weight: 900;
+      box-shadow: 0 10px 24px rgba(247, 201, 72, 0.28);
+    }
+    .meta {
+      color: #b8c2d6;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: right;
+    }
+    h1 {
+      margin: 0;
+      max-width: 860px;
+      font-size: 56px;
+      line-height: 0.98;
+      letter-spacing: 0;
+      color: #ffffff;
+      text-transform: uppercase;
+    }
+    .project-title {
+      margin-top: 12px;
+      color: #f7c948;
+      font-size: 18px;
+      font-weight: 900;
+    }
+    .storyline {
+      margin-top: 24px;
+      padding: 20px;
+      border: 1px solid rgba(247, 201, 72, 0.26);
+      border-left: 5px solid #f7c948;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.07);
+      color: #e6ecf7;
+      font-size: 15px;
+      font-weight: 650;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 22px;
+    }
+    .summary-item {
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.055);
+    }
+    .summary-item span {
+      display: block;
+      color: #91a0b8;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+    .summary-item strong {
+      display: block;
+      margin-top: 4px;
+      color: #ffffff;
+      font-size: 15px;
+    }
+    .cover-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-top: 26px;
+    }
+    .callback-button,
+    .site-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 38px;
+      border-radius: 8px;
+      padding: 0 14px;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0;
+      text-transform: uppercase;
+      text-decoration: none;
+    }
+    .callback-button {
+      background: linear-gradient(145deg, #f7c948, #d49d18);
+      color: #07101f;
+      box-shadow: 0 12px 28px rgba(247, 201, 72, 0.2);
+    }
+    .site-pill {
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.06);
+      color: #dbe5f6;
+    }
+    .shot-card {
+      margin-top: 22px;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      border-radius: 8px;
+      background:
+        linear-gradient(160deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.035)),
+        #0c111d;
+      padding: 18px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+    .shot-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+      padding-bottom: 12px;
+    }
+    .eyebrow {
+      margin: 0 0 4px;
+      color: #f7c948;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+    h2 {
+      margin: 0;
+      color: #ffffff;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+    .timestamp {
+      flex: 0 0 auto;
+      color: #9aa8bd;
+      font-size: 12px;
+      font-weight: 800;
+      text-align: right;
+    }
+    .asset-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .asset {
+      min-height: 210px;
+      border: 1px solid rgba(255, 255, 255, 0.11);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #070a12;
+    }
+    .asset-title {
+      padding: 8px 10px;
+      background: linear-gradient(145deg, rgba(247, 201, 72, 0.18), rgba(255, 255, 255, 0.055));
+      color: #eef4ff;
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+    .asset img {
+      display: block;
+      width: 100%;
+      height: 260px;
+      object-fit: contain;
+      background: #05070d;
+    }
+    .missing {
+      display: grid;
+      place-items: center;
+      height: 260px;
+      color: #77869d;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .details-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .detail {
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 8px;
+      padding: 11px;
+      background: rgba(255, 255, 255, 0.055);
+    }
+    .detail span {
+      display: block;
+      color: #8fa0ba;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0;
+      margin-bottom: 4px;
+    }
+    .detail p {
+      margin: 0;
+      color: #e7edf8;
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .pdf-footer {
+      margin-top: 14px;
+      color: #8190a8;
+      font-size: 10px;
+      font-weight: 900;
+      text-align: right;
+      text-transform: uppercase;
+    }
+    @media print {
+      body { background: #070a12; }
+      .page { max-width: none; padding: 0; }
+      .cover, .shot-card { box-shadow: none; }
+      .shot-card { margin-top: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="cover">
+      <div class="brand-row">
+        <div class="brand"><span class="brand-mark">DL</span><span>DalaiLlama Creator</span></div>
+        <div class="meta">Generated ${escapeHtml(generatedAt)}<br />Story Board</div>
+      </div>
+      <div>
+        <h1>Story Board</h1>
+        <div class="project-title">${safeProjectTitle}</div>
+        <div class="storyline">${safeStoryline}</div>
+        <div class="summary-grid">
+          <div class="summary-item"><span>Shots</span><strong>${scenes.length}</strong></div>
+          <div class="summary-item"><span>Duration</span><strong>${escapeHtml(durationSeconds || 30)} sec</strong></div>
+          <div class="summary-item"><span>Format</span><strong>${escapeHtml(screenType || "vertical")}</strong></div>
+          <div class="summary-item"><span>Project</span><strong>${escapeHtml(shortId(projectId))}</strong></div>
+        </div>
+      </div>
+      <div class="cover-actions">
+        ${callbackAction}
+        <span class="site-pill">dalaillama.in</span>
+      </div>
+    </section>
+    ${shotCards}
+    <div class="pdf-footer">dalaillama.in</div>
+  </main>
+</body>
+</html>`;
+  return { html, shotCount: scenes.length };
+}
+
+function renderShotPdfCard(scene = {}, index = 0) {
+  const shotNumber = Number(scene.shotNumber || scene.shot_number || index + 1);
+  const storyboardTag = extractStoryboardTag(scene) || {};
+  const lightingTag = extractLightingTag(scene) || {};
+  const cameraTag = extractCameraTag(scene) || {};
+  const imageFields = normalizeShotImageFields(scene);
+  const title = firstText(scene.title, scene.shotTitle, storyboardTag.shotTitle, cameraTag.shotTitle, `Shot ${shotNumber}`);
+  const timestamp = firstText(scene.timestamp, scene.time, buildTimestamp(scene.startTime, scene.endTime), `Shot ${shotNumber}`);
+  const visual = firstText(scene.visualDirection, scene.visual, scene.description, storyboardTag.narrativeBeatSummary, storyboardTag.compositionSummary, storyboardTag.action);
+  const dialogue = plainTextValue(scene.dialogue || scene.primaryDialogue || storyboardTag.primaryDialogue || scene.vo || scene.voiceOver || scene.voiceover);
+  const sound = buildExportSoundText(scene, storyboardTag);
+  const lighting = firstText(scene.lighting, storyboardTag.lightingAtmosphericDescription, lightingTag.cinematicIntent, lightingTag.motivatedSource, lightingTag.keyLightBehavior);
+  const camera = joinNonEmpty([
+    firstText(scene.camera, scene.cameraAngle, storyboardTag.cameraAngle, cameraTag.cameraAngle),
+    firstText(scene.shotType, storyboardTag.shotType, cameraTag.shotType),
+    firstText(scene.cameraMovement, storyboardTag.cameraMovement, cameraTag.cameraMovement),
+    firstText(scene.lensSuggestion, storyboardTag.lensSuggestion, cameraTag.lensSuggestion, cameraTag.cameraRig?.lensSuggestion),
+  ], " | ");
+  return `<section class="shot-card">
+    <div class="shot-head">
+      <div>
+        <p class="eyebrow">Shot ${escapeHtml(shotNumber)}</p>
+        <h2>${escapeHtml(title)}</h2>
+      </div>
+      <div class="timestamp">${escapeHtml(timestamp)}</div>
+    </div>
+    <div class="asset-grid">
+      ${renderPdfAsset("Storyboard", imageFields.storyboardImageUrl)}
+      ${renderPdfAsset("Lighting Design", imageFields.lightingImageUrl)}
+      ${renderPdfAsset("DP / Camera", imageFields.cameraPlanImageUrl)}
+    </div>
+    <div class="details-grid">
+      ${renderPdfDetail("Visual", visual || "Visual direction pending.")}
+      ${renderPdfDetail("Dialogue / VO", dialogue || "No dialogue.")}
+      ${renderPdfDetail("Sound", sound || "Sound design pending.")}
+      ${renderPdfDetail("Lighting + DP", joinNonEmpty([lighting, camera], " | ") || "Lighting and camera plan pending.")}
+    </div>
+  </section>`;
+}
+
+function renderPdfAsset(label, url) {
+  const safeLabel = escapeHtml(label);
+  const safeUrl = escapeHtml(url || "");
+  return `<div class="asset">
+    <div class="asset-title">${safeLabel}</div>
+    ${safeUrl ? `<img src="${safeUrl}" alt="${safeLabel}" />` : `<div class="missing">${safeLabel} pending</div>`}
+  </div>`;
+}
+
+function renderPdfDetail(label, value) {
+  return `<div class="detail"><span>${escapeHtml(label)}</span><p>${escapeHtml(trimText(value, 420))}</p></div>`;
+}
+
+function buildExportSoundText(scene = {}, storyboardTag = {}) {
+  const shotPayload = scene.shotPayload || scene.shot_payload || {};
+  const ambient = firstText(
+    storyboardTag.ambientBedDescription,
+    storyboardTag.ambient_bed_description,
+    scene.ambientBedDescription,
+    scene.ambient_bed_description,
+    shotPayload.ambientBedDescription,
+    shotPayload.ambient_bed_description
+  );
+  const sync = firstText(
+    storyboardTag.syncHitDescription,
+    storyboardTag.sync_hit_description,
+    scene.syncHitDescription,
+    scene.sync_hit_description,
+    shotPayload.syncHitDescription,
+    shotPayload.sync_hit_description
+  );
+  const explicit = plainTextValue(
+    storyboardTag.soundDesign
+    || storyboardTag.sound_design
+    || storyboardTag.soundCues
+    || storyboardTag.sound_cues
+    || storyboardTag.audioCues
+    || storyboardTag.audio_cues
+    || scene.soundDesign
+    || scene.sound_design
+    || shotPayload.soundDesign
+    || shotPayload.sound_design
+  );
+  return joinNonEmpty([
+    ambient ? `Ambient bed: ${ambient}` : "",
+    sync ? `Sync hit: ${sync}` : "",
+    explicit,
+  ], " ");
+}
+
+function buildExportStoryline({ storyScriptIdea, scriptDetailIdea, selectedIdea, currentStoryboard } = {}) {
+  return trimText(firstText(
+    currentStoryboard?.storyline,
+    currentStoryboard?.logline,
+    scriptDetailIdea?.storyline,
+    scriptDetailIdea?.scriptJson?.storyline,
+    scriptDetailIdea?.scriptJson?.logline,
+    storyScriptIdea?.storyScriptJson?.storyline,
+    storyScriptIdea?.storyScriptJson?.logline,
+    storyScriptIdea?.storyScriptText,
+    storyScriptIdea?.description,
+    selectedIdea?.description,
+    selectedIdea?.summary,
+    scriptDetailIdea?.scriptText
+  ), 900);
+}
+
+function buildPdfCallbackUrl(projectId, scriptId) {
+  if (typeof window === "undefined") return "";
+  const env = window.__ENV__ || {};
+  const base = firstText(env.CREATOR_APP_URL, window.location.origin);
+  try {
+    const url = new URL(base, window.location.origin);
+    url.searchParams.set("creatorPdfCallback", "1");
+    url.searchParams.set("utm_source", "creator_pdf");
+    url.searchParams.set("utm_medium", "pdf");
+    url.searchParams.set("utm_campaign", "client_reachout");
+    if (projectId) url.searchParams.set("projectId", projectId);
+    if (scriptId) url.searchParams.set("scriptId", scriptId);
+    url.hash = "storyboard";
+    return url.toString();
+  } catch {
+    return window.location.href;
+  }
+}
+
+function plainTextValue(value) {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number") return String(value);
+  if (Array.isArray(value)) return value.map(plainTextValue).filter(Boolean).join(" ");
+  if (!value || typeof value !== "object") return "";
+  return firstText(
+    value.text,
+    value.line,
+    value.words,
+    value.dialogue,
+    value.voiceOver,
+    value.voiceover,
+    value.description,
+    value.summary,
+    value.primaryDialogue,
+    value.ambientBedDescription,
+    value.syncHitDescription
+  );
+}
+
+function joinNonEmpty(values = [], separator = " ") {
+  return values.map((value) => String(value || "").trim()).filter(Boolean).join(separator);
+}
+
+function trimText(value, maxLength = 900) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}...` : text;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function shortId(value) {
+  const text = String(value || "");
+  return text.length > 12 ? `${text.slice(0, 8)}...${text.slice(-4)}` : text || "Draft";
+}
+
+function formatExportDate(value) {
+  try {
+    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(value);
+  } catch {
+    return "";
+  }
+}
+
+function productionPlanSoundDebug(plan = {}) {
+  const storyboardTag = extractStoryboardTag(plan) || {};
+  const scene = plan.sourceScene || plan.scene || {};
+  const sceneStoryboard = scene.storyboardTag || {};
+  return {
+    shotNumber: plan.shotNumber || storyboardTag.shotNumber || scene.shotNumber || "",
+    soundDesign: storyboardTag.soundDesign || storyboardTag.sound_design || scene.soundDesign || scene.sound_design || scene.shotPayload?.soundDesign || scene.shot_payload?.soundDesign || null,
+    ambientBedDescription: firstText(
+      storyboardTag.ambientBedDescription,
+      storyboardTag.ambient_bed_description,
+      sceneStoryboard.ambientBedDescription,
+      sceneStoryboard.ambient_bed_description,
+      scene.ambientBedDescription,
+      scene.ambient_bed_description
+    ),
+    syncHitDescription: firstText(
+      storyboardTag.syncHitDescription,
+      storyboardTag.sync_hit_description,
+      sceneStoryboard.syncHitDescription,
+      sceneStoryboard.sync_hit_description,
+      scene.syncHitDescription,
+      scene.sync_hit_description
+    ),
+    storyboardTagKeys: Object.keys(storyboardTag).filter((key) => /sound|audio|ambient|sync/i.test(key)),
+  };
+}
+
 function extractProductionPlanTagsFromScenes(scenes = []) {
   return (Array.isArray(scenes) ? scenes : [])
     .filter(hasProductionPlanData)
@@ -4688,6 +6445,7 @@ function extractProductionPlanTagsFromScenes(scenes = []) {
         planId: scene.sceneId || scene.id || scene.planId || `scene-plan-${index}`,
         shotNumber: scene.shotNumber || storyboardTag?.shotNumber || lightingBuildSheetTag?.shotNumber || cameraPlanSheetTag?.shotNumber || index + 1,
         styleKey: scene.styleKey || storyboardTag?.styleKey || "indian_creator_pencil",
+        sourceScene: scene,
         storyboardTag,
         lightingBuildSheetTag,
         cameraPlanSheetTag,
@@ -4784,6 +6542,22 @@ function replaceSceneByShotNumber(scenes = [], replacement = {}) {
     return scene;
   });
   return replaced ? updated : [...updated, replacement].sort((a, b) => Number(a?.shotNumber || 0) - Number(b?.shotNumber || 0));
+}
+
+function shiftScenesAfterShotNumber(scenes = [], afterShotNumber = 0) {
+  const after = Number(afterShotNumber || 0);
+  return (Array.isArray(scenes) ? scenes : [])
+    .map((scene, index) => {
+      const currentShot = Number(scene?.shotNumber || index + 1);
+      if (currentShot > after) {
+        return {
+          ...scene,
+          shotNumber: currentShot + 1,
+        };
+      }
+      return scene;
+    })
+    .sort((a, b) => Number(a?.shotNumber || 0) - Number(b?.shotNumber || 0));
 }
 
 function mergeScenePreservingImages(existing = {}, replacement = {}) {
@@ -4993,6 +6767,211 @@ function normalizeCategoryOptions(options) {
     };
   });
   return normalized.filter((option, index) => option.code && normalized.findIndex((candidate) => candidate.code === option.code) === index);
+}
+
+async function analyzeVideoTakeFile(file, shotNumber) {
+  const [video, audio] = await Promise.all([
+    extractVideoFrameTimeline(file, shotNumber),
+    extractAudioWaveform(file).catch(() => ({ status: "unavailable", peaks: [] })),
+  ]);
+  return {
+    version: 1,
+    source: "browser_local_file",
+    generatedAt: new Date().toISOString(),
+    shotNumber,
+    file: {
+      name: file?.name || "video",
+      sizeBytes: file?.size || 0,
+      contentType: file?.type || "",
+      lastModified: file?.lastModified || null,
+    },
+    video,
+    audio,
+  };
+}
+
+function isSameTimelineFrame(candidate = {}, target = {}) {
+  const candidateIndex = candidate.index == null ? null : Number(candidate.index);
+  const targetIndex = target.index == null ? null : Number(target.index);
+  const candidateTime = candidate.timestampSeconds == null ? null : Number(candidate.timestampSeconds);
+  const targetTime = target.timestampSeconds == null ? null : Number(target.timestampSeconds);
+  const hasIndex = candidateIndex != null && targetIndex != null && Number.isFinite(candidateIndex) && Number.isFinite(targetIndex);
+  const hasTime = candidateTime != null && targetTime != null && Number.isFinite(candidateTime) && Number.isFinite(targetTime);
+  if (hasIndex && hasTime) return candidateIndex === targetIndex && Math.abs(candidateTime - targetTime) < 0.001;
+  if (hasIndex) return candidateIndex === targetIndex;
+  if (hasTime) return Math.abs(candidateTime - targetTime) < 0.001;
+  return Boolean(candidate.thumbnailDataUrl && candidate.thumbnailDataUrl === target.thumbnailDataUrl);
+}
+
+async function extractVideoFrameTimeline(file, shotNumber) {
+  const objectUrl = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  video.preload = "metadata";
+  video.muted = true;
+  video.playsInline = true;
+  video.src = objectUrl;
+  try {
+    await waitForMediaEvent(video, "loadedmetadata");
+    await ensureVideoFrameReady(video);
+    const durationSeconds = await resolveVideoDurationSeconds(video);
+    const width = video.videoWidth || 0;
+    const height = video.videoHeight || 0;
+    const timestamps = timelineSampleTimestamps(durationSeconds, 10);
+    const canvas = document.createElement("canvas");
+    const maxWidth = 160;
+    const scale = width > 0 ? Math.min(1, maxWidth / width) : 1;
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    const ctx = canvas.getContext("2d", { alpha: false });
+    const frames = [];
+    for (let index = 0; index < timestamps.length; index++) {
+      const timestamp = timestamps[index];
+      await seekVideo(video, timestamp);
+      if (ctx && width && height) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      }
+      frames.push({
+        index,
+        shotNumber,
+        timestampSeconds: roundMediaNumber(timestamp),
+        width: canvas.width,
+        height: canvas.height,
+        originalWidth: width,
+        originalHeight: height,
+        aspectRatio: canvas.width && canvas.height ? `${canvas.width} / ${canvas.height}` : "",
+        thumbnailDataUrl: ctx ? canvas.toDataURL("image/jpeg", 0.58) : "",
+      });
+    }
+    return {
+      durationSeconds: roundMediaNumber(durationSeconds),
+      width,
+      height,
+      frameCount: frames.length,
+      sampleStrategy: "evenly_spaced_browser_canvas",
+      frames,
+    };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function resolveVideoDurationSeconds(video) {
+  let best = readVideoDurationCandidate(video);
+  for (const delay of [80, 160, 320, 640]) {
+    await sleep(delay);
+    best = Math.max(best, readVideoDurationCandidate(video));
+  }
+  return roundMediaNumber(best);
+}
+
+function readVideoDurationCandidate(video) {
+  return Math.max(
+    safeMediaDuration(video.duration),
+    mediaRangeEnd(video.seekable),
+    mediaRangeEnd(video.buffered)
+  );
+}
+
+function safeMediaDuration(value) {
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
+}
+
+function mediaRangeEnd(ranges) {
+  try {
+    if (!ranges?.length) return 0;
+    const end = Number(ranges.end(ranges.length - 1));
+    return Number.isFinite(end) && end > 0 ? end : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function extractAudioWaveform(file) {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    return { status: "unsupported", peaks: [] };
+  }
+  const context = new AudioContextClass();
+  try {
+    const audioBuffer = await context.decodeAudioData(await file.arrayBuffer());
+    const channel = audioBuffer.getChannelData(0);
+    const bucketCount = 72;
+    const bucketSize = Math.max(1, Math.floor(channel.length / bucketCount));
+    const peaks = [];
+    for (let bucket = 0; bucket < bucketCount; bucket++) {
+      let peak = 0;
+      const start = bucket * bucketSize;
+      const end = Math.min(channel.length, start + bucketSize);
+      for (let index = start; index < end; index++) {
+        peak = Math.max(peak, Math.abs(channel[index] || 0));
+      }
+      peaks.push(roundMediaNumber(peak));
+    }
+    return {
+      status: "ready",
+      durationSeconds: roundMediaNumber(audioBuffer.duration),
+      sampleRate: audioBuffer.sampleRate,
+      channels: audioBuffer.numberOfChannels,
+      peaks,
+    };
+  } finally {
+    context.close?.();
+  }
+}
+
+function timelineSampleTimestamps(durationSeconds, count) {
+  if (!durationSeconds || durationSeconds <= 0) return [0];
+  const frameCount = Math.max(1, Math.min(count, Math.ceil(durationSeconds)));
+  if (frameCount === 1) return [Math.min(0.05, durationSeconds)];
+  const last = Math.max(0, durationSeconds - 0.05);
+  return Array.from({ length: frameCount }, (_, index) => (last * index) / (frameCount - 1));
+}
+
+function waitForMediaEvent(element, eventName) {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error(`Timed out waiting for ${eventName}`)), 12000);
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      element.removeEventListener(eventName, onEvent);
+      element.removeEventListener("error", onError);
+    };
+    const onEvent = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error("Could not read video metadata."));
+    };
+    element.addEventListener(eventName, onEvent, { once: true });
+    element.addEventListener("error", onError, { once: true });
+  });
+}
+
+async function seekVideo(video, timestampSeconds) {
+  const target = Math.max(0, Math.min(timestampSeconds || 0, Number.isFinite(video.duration) ? video.duration : timestampSeconds || 0));
+  if (Math.abs((video.currentTime || 0) - target) < 0.03) {
+    await ensureVideoFrameReady(video);
+    return;
+  }
+  const wait = waitForMediaEvent(video, "seeked");
+  video.currentTime = target;
+  await wait;
+  await ensureVideoFrameReady(video);
+}
+
+async function ensureVideoFrameReady(video) {
+  if (video.readyState >= 2) return;
+  await waitForMediaEvent(video, "loadeddata");
+}
+
+function roundMediaNumber(value) {
+  return Math.round((Number(value) || 0) * 1000) / 1000;
 }
 
 function buildOrganizationSetupPayload(draft = {}) {
@@ -5297,7 +7276,7 @@ function buildWorkflowStateFromProject(project = {}) {
 
   const completedSteps = {
     trend: Boolean(lockedBrief),
-    ideas: Boolean(savedStoryIdea || ideaCandidates.length),
+    ideas: Boolean(savedStoryIdea),
     script: Boolean(storyScriptIdea),
     cast: Boolean(castPlan || project.characterCastMappings?.length || project.castMappings?.length),
     screenplay: Boolean(scriptDetailIdea),
@@ -5311,7 +7290,7 @@ function buildWorkflowStateFromProject(project = {}) {
         ? "screenplay"
         : completedSteps.script
           ? "cast"
-          : "script";
+          : "ideas";
 
   return {
     projectId,
@@ -5657,6 +7636,149 @@ function buildAiProviderContext(provider) {
     providerType: provider.providerType || "",
     credentialConfigured: provider.credentialConfigured !== false,
   };
+}
+
+function PostProductionShotStrip({ scenes = [], activeIndex = 0, onSelect, collapsed = false, onToggle }) {
+  const selectedScene = scenes[activeIndex] || scenes[0] || null;
+  const selectedImages = normalizeShotImageFields(selectedScene || {});
+  if (collapsed) {
+    return (
+      <section className="creator-panel flex min-h-[4.25rem] flex-row items-center gap-3 p-2 xl:min-h-[32rem] xl:flex-col">
+        <button
+          type="button"
+          onClick={onToggle}
+          title="Expand storyboard reference"
+          aria-label="Expand storyboard reference"
+          className="creator-control grid h-10 w-10 place-items-center p-0 text-slate-200"
+        >
+          <ChevronRight size={16} />
+        </button>
+        <div className="h-10 w-px bg-white/10 xl:h-px xl:w-full" />
+        <div className="custom-scrollbar flex w-full flex-1 gap-2 overflow-x-auto pb-1 xl:flex-col xl:overflow-x-hidden xl:overflow-y-auto xl:pb-0 xl:pr-1">
+          {scenes.map((scene, index) => {
+            const images = normalizeShotImageFields(scene);
+            const active = index === activeIndex;
+            return (
+              <button
+                key={scene.id || scene.sceneId || `post-shot-rail-${index}`}
+                type="button"
+                onClick={() => onSelect?.(index)}
+                title={scene.title || `Shot ${index + 1}`}
+                className={`grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-lg border text-[10px] font-black transition ${
+                  active
+                    ? "border-emerald-300/50 bg-emerald-300/[0.12] text-white"
+                    : "border-white/10 bg-white/[0.035] text-slate-400 hover:border-emerald-300/25 hover:text-slate-200"
+                }`}
+              >
+                {images.storyboardImageUrl ? (
+                  <span className="relative h-full w-full">
+                    <img src={images.storyboardImageUrl} alt="" className="h-full w-full object-cover opacity-75" loading="lazy" />
+                    <span className="absolute inset-0 grid place-items-center bg-black/35">
+                      {String(scene.shotNumber || index + 1).padStart(2, "0")}
+                    </span>
+                  </span>
+                ) : (
+                  String(scene.shotNumber || index + 1).padStart(2, "0")
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="creator-panel p-4">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-black uppercase tracking-normal text-emerald-200">Storyboard Shot</p>
+          <h3 className="mt-1 truncate text-lg font-extrabold text-white">{selectedScene?.title || "Select a shot"}</h3>
+          <p className="mt-1 text-sm font-semibold text-slate-500">
+            Shot {String(selectedScene?.shotNumber || activeIndex + 1).padStart(2, "0")}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="rounded-md border border-white/10 bg-white/[0.045] px-2 py-1 text-[10px] font-black uppercase tracking-normal text-slate-300">
+            {scenes.length || 0} shots
+          </span>
+          <button
+            type="button"
+            onClick={onToggle}
+            title="Collapse storyboard reference"
+            aria-label="Collapse storyboard reference"
+            className="creator-control grid h-8 w-8 place-items-center p-0 text-slate-300"
+          >
+            <ChevronLeft size={15} />
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-lg border border-white/10 bg-black/30">
+        {selectedImages.storyboardImageUrl ? (
+          <img src={selectedImages.storyboardImageUrl} alt="" className="h-72 w-full object-contain" loading="lazy" />
+        ) : (
+          <div className="grid h-72 place-items-center text-center text-xs font-bold text-slate-500">
+            <div>
+              <ImageIcon size={24} className="mx-auto mb-2 text-slate-600" />
+              Storyboard image pending
+            </div>
+          </div>
+        )}
+      </div>
+      <p className="mt-3 line-clamp-4 text-sm font-medium leading-6 text-slate-400">
+        {selectedScene?.description || selectedScene?.visualDirection || selectedScene?.action || "Open a shot to upload the actual recorded take beside its storyboard."}
+      </p>
+
+      <div className="custom-scrollbar mt-4 max-h-[23rem] space-y-2 overflow-y-auto pr-1">
+        {scenes.map((scene, index) => {
+          const images = normalizeShotImageFields(scene);
+          const active = index === activeIndex;
+          return (
+            <button
+              key={scene.id || scene.sceneId || `post-shot-${index}`}
+              type="button"
+              onClick={() => onSelect?.(index)}
+              className={`flex w-full items-center gap-3 rounded-lg border p-2 text-left transition ${
+                active
+                  ? "border-emerald-300/40 bg-emerald-400/[0.08]"
+                  : "border-white/10 bg-white/[0.025] hover:border-emerald-300/25 hover:bg-white/[0.055]"
+              }`}
+            >
+              <span className="grid h-14 w-10 shrink-0 place-items-center overflow-hidden rounded-md bg-black/40">
+                {images.storyboardImageUrl ? (
+                  <img src={images.storyboardImageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                ) : (
+                  <ImageIcon size={14} className="text-slate-600" />
+                )}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[10px] font-black uppercase tracking-normal text-slate-500">
+                  Shot {String(scene.shotNumber || index + 1).padStart(2, "0")}
+                </span>
+                <span className="mt-0.5 line-clamp-2 text-xs font-bold leading-5 text-slate-200">{scene.title || scene.description || `Shot ${index + 1}`}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function PostProductionShotThumb({ shot = {} }) {
+  const images = normalizeShotImageFields(shot);
+  if (images.storyboardImageUrl) {
+    return <img src={images.storyboardImageUrl} alt="" className="h-36 w-full bg-black object-cover" loading="lazy" />;
+  }
+  return (
+    <span className="grid h-36 w-full place-items-center bg-black/40 text-center text-xs font-bold text-slate-500">
+      <span>
+        <ImageIcon size={22} className="mx-auto mb-2 text-slate-600" />
+        Shot thumbnail
+      </span>
+    </span>
+  );
 }
 
 function attachAiProviderMetadata(result, providerContext) {
@@ -6028,13 +8150,189 @@ function dedupeHistoryItems(items = []) {
   });
 }
 
+function normalizePostProductionProject(project = {}) {
+  const projectId = project.projectId || project.project_id || project.id || "";
+  const scriptId = project.scriptId || project.script_id || project.screenplayId || project.screenplay_id || "";
+  const rawShots = firstArray(project.shots, project.scenes, project.storyboardScenes, project.storyboard_scenes);
+  const shots = rawShots.map(normalizePostProductionShot).filter((shot) => shot.shotNumber);
+  const title = firstText(project.title, project.projectTitle, project.project_title, project.name, "Creator project");
+  const shotCount = Number(project.shotCount || project.shot_count || shots.length || 0);
+  const updatedAt = project.updatedAt || project.updated_at || project.createdAt || project.created_at;
+  const rawProject = buildRawPostProductionProject({
+    ...project,
+    projectId,
+    scriptId,
+    title,
+    shots,
+    shotCount,
+    updatedAt,
+  });
+
+  return {
+    ...project,
+    id: `post-production-${projectId || scriptId || title}`,
+    projectId,
+    scriptId,
+    title,
+    lockedIdeaTitle: `${shotCount || shots.length || "Shot"} shots ready for polish`,
+    status: project.status || "SHOT_DESIGN_READY",
+    durationSeconds: project.durationSeconds || project.duration_seconds,
+    time: updatedAt ? formatJobTime(updatedAt) : "",
+    stage: {
+      label: "Open Polish",
+      description: `${shotCount || shots.length || 0} storyboard shots are ready for recording and polishing.`,
+      actionLabel: "Open",
+      progressText: `${shotCount || shots.length || 0} shots`,
+      steps: [],
+    },
+    rawProject,
+    restored: buildWorkflowStateFromProject(rawProject),
+    postProductionShots: shots,
+    postProductionApi: true,
+    shotDesignReady: shots.length > 0,
+  };
+}
+
+function normalizePostProductionShot(shot = {}, index = 0) {
+  const shotNumber = Number(shot.shotNumber || shot.shot_number || index + 1);
+  const storyboardTag = firstObject(shot.storyboardTag, shot.storyboard_tag) || {};
+  const lightingBuildSheetTag = firstObject(shot.lightingBuildSheetTag, shot.lighting_build_sheet_tag) || {};
+  const cameraPlanSheetTag = firstObject(shot.cameraPlanSheetTag, shot.camera_plan_sheet_tag) || {};
+  const shotPayload = firstObject(shot.shotPayload, shot.shot_payload, shot.payload) || {};
+  const merged = {
+    ...shotPayload,
+    ...shot,
+    shotNumber,
+    storyboardTag,
+    lightingBuildSheetTag,
+    cameraPlanSheetTag,
+  };
+  const imageFields = normalizeShotImageFields(merged);
+  const title = firstText(
+    shot.title,
+    shot.shotTitle,
+    shot.shot_title,
+    storyboardTag.shotTitle,
+    cameraPlanSheetTag.shotTitle,
+    shotPayload.title,
+    `Shot ${shotNumber}`
+  );
+
+  return {
+    ...merged,
+    id: shot.id || shot.sceneId || shot.scene_id || `shot-${shotNumber}`,
+    sceneId: shot.sceneId || shot.scene_id || shot.id || `shot-${shotNumber}`,
+    shotNumber,
+    title,
+    timestamp: shot.timestamp || buildTimestamp(shot.startTime || shot.start_time, shot.endTime || shot.end_time),
+    camera: firstText(shot.camera, shot.cameraAngle, shot.camera_angle, storyboardTag.cameraAngle, cameraPlanSheetTag.cameraAngle, shot.shotType, shot.shot_type),
+    visual: firstText(shot.visual, shot.description, storyboardTag.narrativeBeatSummary, storyboardTag.action, shotPayload.visual, shotPayload.action),
+    storyboardTag,
+    lightingBuildSheetTag,
+    cameraPlanSheetTag,
+    shotPayload,
+    signedUrl: imageFields.storyboardImageUrl,
+    imageUrl: imageFields.storyboardImageUrl,
+    storyboardImageUrl: imageFields.storyboardImageUrl,
+    lightingImageUrl: imageFields.lightingImageUrl,
+    cameraPlanImageUrl: imageFields.cameraPlanImageUrl,
+  };
+}
+
+function buildRawPostProductionProject(project = {}) {
+  const shots = firstArray(project.shots);
+  const productionPlanTags = shots.map((shot, index) => ({
+    shotNumber: shot.shotNumber || index + 1,
+    title: shot.title || `Shot ${index + 1}`,
+    storyboardTag: shot.storyboardTag || {},
+    lightingBuildSheetTag: shot.lightingBuildSheetTag || {},
+    cameraPlanSheetTag: shot.cameraPlanSheetTag || {},
+    sourceScene: shot,
+  }));
+  return {
+    ...project,
+    projectId: project.projectId,
+    id: project.projectId,
+    title: project.title,
+    updatedAt: project.updatedAt,
+    productionPlanTags,
+    script: {
+      id: project.scriptId,
+      scriptId: project.scriptId,
+      projectId: project.projectId,
+      title: project.title,
+      durationSeconds: project.durationSeconds,
+      screenType: project.screenType || project.screen_type,
+      scriptJson: {
+        projectTitle: project.title,
+        duration: project.durationSeconds,
+        screenType: project.screenType || project.screen_type,
+        shots,
+      },
+      shots,
+      scenes: shots,
+      productionPlanTags,
+      status: "SHOT_DESIGN_READY",
+    },
+    storyboard: {
+      id: project.storyboardId || project.storyboard_id || project.projectId,
+      storyboardId: project.storyboardId || project.storyboard_id || project.projectId,
+      projectId: project.projectId,
+      title: project.title,
+      totalShots: shots.length,
+      scenes: shots,
+      productionPlanTags,
+    },
+  };
+}
+
+function buildPostProductionShotsFromRestored(restored = {}) {
+  const storyboardScenes = Array.isArray(restored?.storyboard?.scenes) ? restored.storyboard.scenes : [];
+  const screenplayScenes = firstArray(
+    restored?.scriptDetailIdea?.scriptScenes,
+    restored?.scriptDetailIdea?.scriptJson?.shots,
+    restored?.scriptDetailIdea?.scenes
+  );
+  const productionPlans = Array.isArray(restored?.scriptDetailIdea?.productionPlanTags)
+    ? restored.scriptDetailIdea.productionPlanTags
+    : [];
+  const mergedScreenplayScenes = screenplayScenes.length
+    ? mergeScreenplayScenesWithProductionPlans(screenplayScenes, productionPlans)
+    : [];
+  const sourceScenes = storyboardScenes.length
+    ? storyboardScenes
+    : mergedScreenplayScenes.length
+      ? mergedScreenplayScenes
+      : productionPlans.map((plan, index) => ({
+          ...plan,
+          shotNumber: plan.shotNumber || plan.storyboardTag?.shotNumber || index + 1,
+          title: plan.title || plan.storyboardTag?.shotTitle || plan.cameraPlanSheetTag?.shotTitle || `Shot ${index + 1}`,
+          description: plan.description || plan.storyboardTag?.narrativeBeatSummary || plan.storyboardTag?.action || "",
+        }));
+
+  return sourceScenes
+    .map((scene, index) => {
+      const imageFields = normalizeShotImageFields(scene);
+      return {
+        ...scene,
+        shotNumber: Number(scene.shotNumber || scene.shot_number || index + 1),
+        title: scene.title || scene.shotTitle || scene.storyboardTag?.shotTitle || `Shot ${index + 1}`,
+        storyboardImageUrl: imageFields.storyboardImageUrl,
+        lightingImageUrl: imageFields.lightingImageUrl,
+        cameraPlanImageUrl: imageFields.cameraPlanImageUrl,
+      };
+    })
+    .filter((shot) => shot.shotNumber);
+}
+
 function projectResumeStage(restored, project = {}) {
   const steps = [
     { id: "ideas", label: "Idea", fullLabel: "Idea selected" },
     { id: "script", label: "Story", fullLabel: "Storyline ready" },
     { id: "cast", label: "Actor", fullLabel: "Actors mapped" },
     { id: "screenplay", label: "Script", fullLabel: "Script ready" },
-    { id: "storyboard", label: "Storyboard", fullLabel: "Storyboard ready" },
+    { id: "storyboard", label: "Shot Design", fullLabel: "Shot design ready" },
+    { id: "shoot-polish", label: "Polish", fullLabel: "Recorded takes ready" },
   ];
   const completedSteps = restored?.planner?.completedSteps || {};
   const resumePage = restored?.workspacePage || "ideas";
@@ -6070,12 +8368,14 @@ function workspacePageLabel(pageId) {
     script: "Storyline",
     cast: "Actor",
     screenplay: "Script",
-    storyboard: "Storyboard",
+    storyboard: "Shot Design",
+    "shoot-polish": "Polish",
   }[pageId] || "Workflow";
 }
 
 function sectionForWorkspacePage(pageId) {
   if (pageId === "storyboard") return "storyboard";
+  if (pageId === "shoot-polish") return "shoot-polish";
   if (pageId === "generated-ideas") return "generated-ideas";
   if (pageId === "ideas") return "trends";
   return "workflow";

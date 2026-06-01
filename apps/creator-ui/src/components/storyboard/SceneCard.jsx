@@ -300,6 +300,7 @@ function ShotDetailsPanel({
                         ["Shot Type", shot.shotType],
                         ["Camera Angle", shot.cameraAngle],
                         ["Movement", shot.cameraMovement],
+                        ["Gimbal", shot.gimbalSettings],
                         ["Lens Suggestion", shot.lensSuggestion],
                         ["FPS", shot.fps],
                       ]}
@@ -735,6 +736,7 @@ function normalizeShot(scene, index) {
     shotType: scene.shotType || storyboardTag.shotType || cameraPlanTag.shotType || "Shot",
     cameraAngle: scene.cameraAngle || storyboardTag.cameraAngle || cameraPlanTag.cameraAngle || scene.framing || "Camera angle",
     cameraMovement: scene.cameraMovement || storyboardTag.cameraMovement || cameraPlanTag.cameraMovement || scene.transition || "Static",
+    gimbalSettings: toText(cameraPlanTag.gimbalSettings || compactGimbalFromMovement(movementSpec)),
     lensSuggestion: scene.lensSuggestion || storyboardTag.lensSuggestion || cameraPlanTag.lensSuggestion || cameraRig.lensSuggestion || "",
     fps: scene.fps || storyboardTag.fps || cameraPlanTag.fps || cinematic.recommendedFPS || "",
     composition: scene.composition || storyboardTag.compositionSummary || scene.visualDirection || scene.description || "",
@@ -788,6 +790,16 @@ function parseRange(timestamp) {
   return {
     start: parts[0]?.trim() || "",
     end: parts[1]?.trim() || "",
+  };
+}
+
+function compactGimbalFromMovement(movement = {}) {
+  if (!movement || typeof movement !== "object") return "";
+  return {
+    liveCameraMove: movement.liveCameraMove,
+    stabilization: movement.stabilizationTool,
+    rig: movement.rigType,
+    operatorCue: movement.operatorCue,
   };
 }
 

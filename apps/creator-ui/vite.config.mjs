@@ -3,9 +3,14 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath } from "url";
 import path from "path";
+import fs from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const schedulerPath = [
+  path.resolve(__dirname, "node_modules/scheduler/index.js"),
+  path.resolve(__dirname, "../../node_modules/scheduler/index.js"),
+].find((candidate) => fs.existsSync(candidate));
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname, "");
@@ -28,6 +33,7 @@ export default defineConfig(({ mode }) => {
         "@dalaillama/shared-config": path.resolve(__dirname, "../../shared/config"),
         "@dalaillama/shared-utils": path.resolve(__dirname, "../../shared/utils"),
         "@dalaillama/shared-types": path.resolve(__dirname, "../../shared/types"),
+        ...(schedulerPath ? { scheduler: schedulerPath } : {}),
       },
       preserveSymlinks: true,
     },
@@ -54,7 +60,10 @@ export default defineConfig(({ mode }) => {
       sourcemap: mode === "development",
       target: "esnext",
       rollupOptions: {
-        external: [],
+        external: () => false,
+      },
+      commonjsOptions: {
+        include: [/node_modules/],
       },
     },
   };

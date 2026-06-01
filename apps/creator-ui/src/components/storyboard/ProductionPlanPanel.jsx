@@ -6,7 +6,7 @@ export default function ProductionPlanPanel({ plans = [], scenes = [], compact =
   const normalizedPlans = normalizePlans(plans, scenes);
   const totalShots = normalizedPlans.length;
   const storyboardReady = normalizedPlans.filter((plan) => hasKeys(plan.storyboardTag)).length;
-  const soundReady = normalizedPlans.filter((plan) => hasReadableValue(soundPlanValue(plan.storyboardTag))).length;
+  const soundReady = normalizedPlans.filter((plan) => hasReadableValue(soundPlanValue(plan.storyboardTag, plan.sourceScene, plan))).length;
   const lightingReady = normalizedPlans.filter((plan) => hasKeys(plan.lightingBuildSheetTag)).length;
   const cameraReady = normalizedPlans.filter((plan) => hasKeys(plan.cameraPlanSheetTag)).length;
 
@@ -92,10 +92,11 @@ function ShotPlanCard({ plan }) {
   const primaryDialogue = storyboard.primaryDialogue || {};
   const cameraRig = camera.cameraRig || {};
   const movementSpec = camera.movementSpec || {};
+  const gimbalSettings = camera.gimbalSettings || movementSpec.gimbalSettings || {};
   const framePreview = camera.framePreview || {};
   const keyLight = lighting.floorPlan?.keyLight || {};
   const gearCards = Array.isArray(lighting.gearCards) ? lighting.gearCards : [];
-  const soundValue = soundPlanValue(storyboard);
+  const soundValue = soundPlanValue(storyboard, plan.sourceScene, plan);
   const blockingValue = firstValue(storyboard.blockingNotes, lighting.blockingNotes, camera.blockingMap, storyboard.action);
   const charactersValue = firstValue(storyboard.primaryCharacters, storyboard.characters, storyboard.characterVisualProfile);
   const wardrobeValue = firstValue(storyboard.wardrobeThisShot, storyboard.wardrobe, lighting.characterContinuityWardrobe);
@@ -152,6 +153,8 @@ function ShotPlanCard({ plan }) {
             ["Body", cameraRig.cameraBody],
             ["Angle", firstValue(storyboard.cameraAngle, camera.cameraAngle)],
             ["Move", movementSpec.moveType || camera.cameraMovement],
+            ["Gimbal", gimbalSummary(gimbalSettings, movementSpec)],
+            ["Operator Cue", firstValue(movementSpec.operatorCue, gimbalSettings.rehearsalCue)],
             ["Lens", firstValue(storyboard.lensSuggestion, camera.lensSuggestion, cameraRig.lens)],
             ["Frame", firstValue(framePreview.subjectPlacement, framePreview.headroomNote, storyboard.frameNotes)],
             ["Composition", storyboard.compositionSummary],
@@ -214,15 +217,17 @@ function PlanRow({ label, value }) {
 function normalizePlans(plans, scenes) {
   const scenePlans = (Array.isArray(scenes) ? scenes : [])
     .filter((scene) => scene?.storyboardTag || scene?.lightingBuildSheetTag || scene?.cameraPlanSheetTag)
-    .map((scene, index) => normalizePlanShape(scene, index));
+    .map((scene, index) => normalizePlanShape(scene, index, scene));
   const scenePlanByShot = new Map(scenePlans.map((plan) => [Number(plan.shotNumber), plan]));
 
   if (Array.isArray(plans) && plans.length) {
     return plans.map((plan, index) => {
       const normalized = normalizePlanShape(plan, index);
       const scenePlan = scenePlanByShot.get(Number(normalized.shotNumber)) || {};
+      const sourceScene = scenePlan.sourceScene || {};
       return {
         ...normalized,
+        sourceScene,
         storyboardTag: hasKeys(normalized.storyboardTag) ? normalized.storyboardTag : scenePlan.storyboardTag || {},
         lightingBuildSheetTag: hasKeys(normalized.lightingBuildSheetTag) ? normalized.lightingBuildSheetTag : scenePlan.lightingBuildSheetTag || {},
         cameraPlanSheetTag: hasKeys(normalized.cameraPlanSheetTag) ? normalized.cameraPlanSheetTag : scenePlan.cameraPlanSheetTag || {},
@@ -233,7 +238,7 @@ function normalizePlans(plans, scenes) {
   return scenePlans;
 }
 
-function normalizePlanShape(plan = {}, index = 0) {
+function normalizePlanShape(plan = {}, index = 0, sourceScene = null) {
   const storyboardTag = firstObject(
     plan.storyboardTag,
     plan.storyboard_tag,
@@ -269,6 +274,7 @@ function normalizePlanShape(plan = {}, index = 0) {
     shotNumber: plan.shotNumber || storyboardTag.shotNumber || lightingBuildSheetTag.shotNumber || cameraPlanSheetTag.shotNumber || index + 1,
     title: plan.title || storyboardTag.shotTitle || lightingBuildSheetTag.shotTitle || cameraPlanSheetTag.shotTitle || "",
     styleKey: plan.styleKey || storyboardTag.styleKey || "indian_creator_pencil",
+    sourceScene: sourceScene || plan.sourceScene || plan.scene || null,
     storyboardTag,
     lightingBuildSheetTag,
     cameraPlanSheetTag,
@@ -283,21 +289,79 @@ function hasReadableValue(value) {
   return Boolean(toShortText(value));
 }
 
-function soundPlanValue(storyboard = {}) {
-  return storyboard.soundDesign
-    || storyboard.soundCues
-    || storyboard.soundCue
-    || storyboard.audioCues
-    || storyboard.foleyNotes
-    || storyboard.musicCue
-    || storyboard.ambientBedDescription
-    || storyboard.syncHitDescription
-    || storyboard.soundNote;
+function soundPlanValue(storyboard = {}, scene = {}, plan = {}) {
+  const sceneStoryboard = scene?.storyboardTag || {};
+  const ambient = firstValue(
+    storyboard.ambientBedDescription,
+    storyboard.ambient_bed_description,
+    storyboard.ambientBed,
+    storyboard.ambient_bed,
+    sceneStoryboard.ambientBedDescription,
+    sceneStoryboard.ambient_bed_description,
+    scene.ambientBedDescription,
+    scene.ambient_bed_description,
+    plan.ambientBedDescription,
+    plan.ambient_bed_description
+  );
+  const syncHit = firstValue(
+    storyboard.syncHitDescription,
+    storyboard.sync_hit_description,
+    storyboard.syncHit,
+    storyboard.sync_hit,
+    sceneStoryboard.syncHitDescription,
+    sceneStoryboard.sync_hit_description,
+    scene.syncHitDescription,
+    scene.sync_hit_description,
+    plan.syncHitDescription,
+    plan.sync_hit_description
+  );
+  if (ambient || syncHit) {
+    return {
+      ...(ambient ? { ambientBed: ambient } : {}),
+      ...(syncHit ? { syncHit } : {}),
+    };
+  }
+  return firstValue(
+    storyboard.soundDesign,
+    storyboard.sound_design,
+    storyboard.soundCues,
+    storyboard.sound_cues,
+    storyboard.soundCue,
+    storyboard.audioCues,
+    storyboard.audio_cues,
+    storyboard.foleyNotes,
+    storyboard.foley_notes,
+    storyboard.musicCue,
+    storyboard.music_cue,
+    storyboard.soundNote,
+    storyboard.sound_note,
+    sceneStoryboard.soundDesign,
+    sceneStoryboard.sound_design,
+    scene.soundDesign,
+    scene.sound_design,
+    scene.shotPayload?.soundDesign,
+    scene.shot_payload?.soundDesign,
+    plan.soundDesign,
+    plan.sound_design
+  );
 }
 
 function firstCharacterName(storyboard) {
   const characters = Array.isArray(storyboard.primaryCharacters) ? storyboard.primaryCharacters : [];
   return characters[0]?.storyCharacterName || characters[0]?.name || "";
+}
+
+function gimbalSummary(gimbal = {}, movement = {}) {
+  const enabled = gimbal.enabled === true || movement.liveCameraMove === true;
+  if (!enabled) return firstValue(gimbal.mode, movement.stabilizationTool);
+  return [
+    firstValue(gimbal.device, movement.stabilizationTool),
+    firstValue(gimbal.mode, movement.moveType),
+    gimbal.axisLock,
+    gimbal.panSpeed !== undefined ? `pan ${gimbal.panSpeed}` : "",
+    gimbal.tiltSpeed !== undefined ? `tilt ${gimbal.tiltSpeed}` : "",
+    gimbal.horizonLock === true ? "horizon lock" : "",
+  ].filter(Boolean).join(" - ");
 }
 
 function firstValue(...values) {
@@ -309,7 +373,17 @@ function firstObject(...values) {
 }
 
 function looksLikeStoryboardTag(value = {}) {
-  return Boolean(value.shotTitle || value.narrativeBeatSummary || value.compositionSummary || value.primaryDialogue || value.targetFocalPoint || value.soundDesign || value.soundCues);
+  return Boolean(
+    value.shotTitle
+    || value.narrativeBeatSummary
+    || value.compositionSummary
+    || value.primaryDialogue
+    || value.targetFocalPoint
+    || value.soundDesign
+    || value.soundCues
+    || value.ambientBedDescription
+    || value.syncHitDescription
+  );
 }
 
 function looksLikeLightingTag(value = {}) {
@@ -317,7 +391,7 @@ function looksLikeLightingTag(value = {}) {
 }
 
 function looksLikeCameraTag(value = {}) {
-  return Boolean(value.cameraRig || value.movementSpec || value.framePreview || value.blockingMap || value.lensSuggestion);
+  return Boolean(value.cameraRig || value.movementSpec || value.gimbalSettings || value.framePreview || value.blockingMap || value.lensSuggestion);
 }
 
 function toShortText(value) {

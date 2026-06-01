@@ -17,11 +17,11 @@ import UserChip from "./UserChip.jsx";
 const navItems = [
   { id: "ideas", label: "New Idea", icon: Wand2 },
   { id: "projects", label: "Projects", icon: FolderOpen },
+  { id: "post-production", label: "Post Production", icon: Clapperboard },
   { id: "generated-ideas", label: "Generated Ideas", icon: ListChecks },
   { id: "past-storyline", label: "Past Storyline", icon: Sparkles },
   { id: "past-script", label: "Past Script", icon: FileText },
   { id: "cast", label: "Actor", icon: Users },
-  { id: "storyboard", label: "Storyboard", icon: Clapperboard },
 ];
 
 export default function Sidebar() {
@@ -71,6 +71,11 @@ export default function Sidebar() {
     if (id === "projects") {
       window.dispatchEvent(new CustomEvent("creator:open-projects"));
       window.history.replaceState(null, "", "/#projects");
+      return;
+    }
+    if (id === "post-production") {
+      window.dispatchEvent(new CustomEvent("creator:open-post-production"));
+      window.history.replaceState(null, "", "/#post-production");
       return;
     }
 

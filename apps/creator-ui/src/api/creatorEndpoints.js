@@ -190,6 +190,10 @@ export const creatorApi = apiSlice.injectEndpoints({
       transformResponse: normalizeAiProviders,
       providesTags: ["CreatorAiProviders"],
     }),
+    getCreatorAiPricing: builder.query({
+      query: () => "/creator/ai-pricing",
+      providesTags: ["CreatorAiProviders"],
+    }),
     getTrends: builder.query({
       query: ({ platform = "instagram_reels", category = "fitness", timeframe = "7d", days, country = "IN", page = 0, size = 8 } = {}) => ({
         url: "/creator/trends",
@@ -229,6 +233,14 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: (projectId) => `/creator/projects/${projectId}`,
       transformResponse: normalizeCreatorProject,
       providesTags: (_result, _error, projectId) => [{ type: "CreatorProjects", id: projectId || "detail" }],
+    }),
+    getPostProductionProjects: builder.query({
+      query: ({ limit = 30 } = {}) => ({
+        url: "/creator/post-production/projects",
+        params: { limit },
+      }),
+      transformResponse: (response = []) => arrayFromResponse(response, ["projects", "items", "content"]),
+      providesTags: ["CreatorProjects", "Storyboard"],
     }),
     createCreatorProject: builder.mutation({
       query: (body = {}) => ({
@@ -377,6 +389,143 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: ({ scriptId }) => `/creator/storyboards/scripts/${scriptId}/shots/images`,
       providesTags: (_result, _error, args) => [{ type: "Storyboard", id: `shot-images-${args?.scriptId || "current"}` }],
     }),
+    getShotTakes: builder.query({
+      query: ({ scriptId }) => `/creator/storyboards/scripts/${scriptId}/takes`,
+      providesTags: (_result, _error, args) => [{ type: "Storyboard", id: `shot-takes-${args?.scriptId || "current"}` }],
+    }),
+    uploadShotTake: builder.mutation({
+      query: ({ scriptId, shotNumber, file, note }) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        if (note) formData.append("note", note);
+        return {
+          url: `/creator/storyboards/scripts/${scriptId}/shots/${shotNumber}/takes`,
+          method: "POST",
+          body: formData,
+        };
+      },
+      invalidatesTags: (_result, _error, body) => [{ type: "Storyboard", id: `shot-takes-${body?.scriptId || "current"}` }],
+    }),
+    uploadShotTakeReferenceFrame: builder.mutation({
+      query: ({ takeId, file }) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        return {
+          url: `/creator/storyboards/shots/takes/${takeId}/reference-frame`,
+          method: "POST",
+          body: formData,
+        };
+      },
+      invalidatesTags: ["Storyboard"],
+    }),
+    saveShotTakeMediaAnalysis: builder.mutation({
+      query: ({ takeId, mediaAnalysis }) => ({
+        url: `/creator/storyboards/shots/takes/${takeId}/media-analysis`,
+        method: "POST",
+        body: { mediaAnalysis },
+      }),
+      invalidatesTags: ["Storyboard"],
+    }),
+    saveShotTakeSoundTimeline: builder.mutation({
+      query: ({ takeId, layers = [], mixSettings = {} }) => ({
+        url: `/creator/storyboards/shots/takes/${takeId}/sound-timeline`,
+        method: "POST",
+        body: { layers, mixSettings },
+      }),
+      invalidatesTags: ["Storyboard"],
+    }),
+    uploadShotTakeSoundSnippet: builder.mutation({
+      query: ({ takeId, file, metadata = {} }) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("metadata", JSON.stringify(metadata));
+        return {
+          url: `/creator/storyboards/shots/takes/${takeId}/sound-snippets`,
+          method: "POST",
+          body: formData,
+        };
+      },
+      invalidatesTags: ["Storyboard"],
+    }),
+    generateShotTakeSoundAsync: builder.mutation({
+      query: ({ takeId, ...body }) => ({
+        url: `/creator/storyboards/shots/takes/${takeId}/sound-generate-async`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Storyboard"],
+    }),
+    reviewShotTakeAsync: builder.mutation({
+      query: ({ takeId }) => ({
+        url: `/creator/storyboards/shots/takes/${takeId}/review-async`,
+        method: "POST",
+      }),
+      invalidatesTags: ["Storyboard"],
+    }),
+    confirmShotTake: builder.mutation({
+      query: ({ takeId, ...body }) => ({
+        url: `/creator/storyboards/shots/takes/${takeId}/confirm`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Storyboard"],
+    }),
+    enhanceShotTakePreviewAsync: builder.mutation({
+      query: ({ takeId, ...body }) => ({
+        url: `/creator/storyboards/shots/takes/${takeId}/enhance-preview-async`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Storyboard"],
+    }),
+    studioPolishShotTakeAsync: builder.mutation({
+      query: ({ takeId, ...body }) => ({
+        url: `/creator/storyboards/shots/takes/${takeId}/studio-polish-async`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Storyboard"],
+    }),
+    studioPolishAllShotTakesAsync: builder.mutation({
+      query: ({ scriptId, ...body }) => ({
+        url: `/creator/storyboards/scripts/${scriptId}/studio-polish-async`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [{ type: "Storyboard", id: `shot-takes-${body?.scriptId || "current"}` }, "Storyboard"],
+    }),
+    enhanceShotTakeAudioAsync: builder.mutation({
+      query: ({ takeId, ...body }) => ({
+        url: `/creator/storyboards/shots/takes/${takeId}/enhance-audio-async`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Storyboard"],
+    }),
+    saveShotTakeEnhancementFeedback: builder.mutation({
+      query: ({ takeId, ...body }) => ({
+        url: `/creator/storyboards/shots/takes/${takeId}/enhance-feedback`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Storyboard"],
+    }),
+    applyShotTakePreviewToTimeline: builder.mutation({
+      query: ({ takeId, variantId, applied = true }) => ({
+        url: `/creator/storyboards/shots/takes/${takeId}/variants/${variantId}/timeline-clip`,
+        method: "POST",
+        body: { applied },
+      }),
+      invalidatesTags: ["Storyboard"],
+    }),
+    enhanceAllShotTakesAsync: builder.mutation({
+      query: ({ scriptId, ...body }) => ({
+        url: `/creator/storyboards/scripts/${scriptId}/enhance-all-async`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [{ type: "Storyboard", id: `shot-takes-${body?.scriptId || "current"}` }],
+    }),
     generateProductionPlansAsync: builder.mutation({
       query: ({ scriptId, ...body }) => ({
         url: `/creator/storyboards/scripts/${scriptId}/plans/generate-async`,
@@ -388,6 +537,28 @@ export const creatorApi = apiSlice.injectEndpoints({
     generateShotImage: builder.mutation({
       query: ({ scriptId, shotNumber, imageKind, ...body }) => ({
         url: `/creator/storyboards/scripts/${scriptId}/shots/${shotNumber}/images/${imageKind}`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: body?.projectId || body?.scriptId || "latest" },
+        "Storyboard",
+      ],
+    }),
+    editStoryboardShotWithAi: builder.mutation({
+      query: ({ scriptId, shotNumber, ...body }) => ({
+        url: `/creator/storyboards/scripts/${scriptId}/shots/${shotNumber}/ai-edit`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: body?.projectId || body?.scriptId || "latest" },
+        "Storyboard",
+      ],
+    }),
+    insertStoryboardTimelineShot: builder.mutation({
+      query: ({ scriptId, ...body }) => ({
+        url: `/creator/storyboards/scripts/${scriptId}/shots/insert`,
         method: "POST",
         body,
       }),
@@ -547,6 +718,7 @@ export const {
   useGetCreatorPlatformsQuery,
   useGetCreatorCategoriesQuery,
   useGetAiProvidersQuery,
+  useGetCreatorAiPricingQuery,
   useGetTrendsQuery,
   useGetTrendInsightQuery,
   usePredictTrendsMutation,
@@ -555,6 +727,7 @@ export const {
   useGetJobsQuery,
   useGetCreatorProjectsQuery,
   useLazyGetCreatorProjectQuery,
+  useGetPostProductionProjectsQuery,
   useCreateCreatorProjectMutation,
   useSuggestAudienceMutation,
   useConfirmAudienceMutation,
@@ -579,8 +752,26 @@ export const {
   useGenerateStoryboardFromScriptAsyncMutation,
   useGetProductionPlansQuery,
   useGetShotImageUrlsQuery,
+  useGetShotTakesQuery,
+  useUploadShotTakeMutation,
+  useUploadShotTakeReferenceFrameMutation,
+  useSaveShotTakeMediaAnalysisMutation,
+  useSaveShotTakeSoundTimelineMutation,
+  useUploadShotTakeSoundSnippetMutation,
+  useGenerateShotTakeSoundAsyncMutation,
+  useReviewShotTakeAsyncMutation,
+  useConfirmShotTakeMutation,
+  useEnhanceShotTakePreviewAsyncMutation,
+  useStudioPolishShotTakeAsyncMutation,
+  useStudioPolishAllShotTakesAsyncMutation,
+  useEnhanceShotTakeAudioAsyncMutation,
+  useSaveShotTakeEnhancementFeedbackMutation,
+  useApplyShotTakePreviewToTimelineMutation,
+  useEnhanceAllShotTakesAsyncMutation,
   useGenerateProductionPlansAsyncMutation,
   useGenerateShotImageMutation,
+  useEditStoryboardShotWithAiMutation,
+  useInsertStoryboardTimelineShotMutation,
   useGenerateStoryboardMutation,
   useGetStoryboardQuery,
   useRegenerateSceneMutation,

@@ -11,6 +11,7 @@ RUN pnpm install --no-frozen-lockfile
 
 WORKDIR /app/apps/creator-ui
 RUN pnpm build
+RUN ! grep -R 'from"scheduler"' dist/assets
 
 FROM nginx:1.27-alpine
 

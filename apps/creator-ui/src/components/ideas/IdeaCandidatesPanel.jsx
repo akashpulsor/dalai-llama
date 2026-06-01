@@ -21,6 +21,8 @@ export default function IdeaCandidatesPanel({
   providersError,
   pageInfo,
   onPageChange,
+  onGenerateIdeas,
+  showGenerateIdeasAction = true,
   onSelectIdea,
   onSaveStoryIdea,
   onGenerateScript,
@@ -41,6 +43,7 @@ export default function IdeaCandidatesPanel({
   const totalPages = Math.max(1, pageInfo?.totalPages || 1);
   const totalElements = pageInfo?.totalElements || ideas.length;
   const selectedIdea = ideas.find((idea) => idea.id === selectedIdeaId);
+  const hasIdeas = ideas.length > 0;
 
   const toggleIdeaDetails = (ideaId) => {
     setExpandedIdeaIds((current) => {
@@ -57,11 +60,13 @@ export default function IdeaCandidatesPanel({
         <div>
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-normal text-purple-200">
             <Sparkles size={15} />
-            {projectMode ? "Project story idea" : "20 AI story ideas"}
+            {projectMode && !hasIdeas ? "Project idea generation" : projectMode ? "Project story idea" : "20 AI story ideas"}
           </div>
-          <h2 className="mt-2 text-xl font-extrabold text-white">{projectMode ? "Selected story idea" : "Select story idea"}</h2>
+          <h2 className="mt-2 text-xl font-extrabold text-white">{projectMode && !hasIdeas ? "Generate story ideas" : projectMode ? "Selected story idea" : "Select story idea"}</h2>
           <p className="mt-1 max-w-3xl text-sm font-medium leading-6 text-slate-400">
-            {projectMode
+            {projectMode && !hasIdeas
+              ? "Generate story ideas from this project's saved brief before opening the story."
+              : projectMode
               ? "This project already has generated story ideas. Review the selected idea and continue from the saved stage."
               : "Generated from the locked brief. Save one story idea, then generate the complete script."}
           </p>
@@ -81,6 +86,27 @@ export default function IdeaCandidatesPanel({
               ? "No project story idea was restored for this project yet."
               : "Lock a trend or original idea from the Creative Brief panel to generate paginated AI idea options here."}
           </p>
+        </div>
+      ) : !ideas.length ? (
+        <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-white/10 bg-black/20 p-8 text-center">
+          <div className="max-w-md">
+            <p className="text-sm font-semibold leading-6 text-slate-400">
+              {isLoading
+                ? "Generating story ideas from the saved brief..."
+                : "No story ideas are available for this project yet."}
+            </p>
+            {showGenerateIdeasAction && (
+              <button
+                type="button"
+                onClick={onGenerateIdeas}
+                disabled={isLoading}
+                className="creator-primary mx-auto mt-4 flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                {isLoading ? "Generating Ideas..." : "Generate Story Ideas"}
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <>

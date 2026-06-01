@@ -161,10 +161,10 @@ export default function TrendCarousel({
               <button
                 type="button"
                 onClick={onSaveTrend}
-                disabled={!selectedTrendId || isLockingSelection}
+                disabled={!selectedTrendId || isLockingSelection || isGeneratingIdeas || canGenerateStoryIdeas}
                 className="creator-control flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-100 disabled:opacity-50"
               >
-                {isLockingSelection ? "Saving..." : "Save Trend"}
+                {isLockingSelection ? "Saving..." : canGenerateStoryIdeas ? "Trend Saved" : "Save Trend"}
               </button>
               <button
                 type="button"
@@ -214,10 +214,10 @@ export default function TrendCarousel({
               <button
                 type="button"
                 onClick={() => onSaveOriginalIdea?.(originalIdea.trim())}
-                disabled={!originalIdeaValid || isLockingSelection}
+                disabled={!originalIdeaValid || isLockingSelection || isGeneratingIdeas || canGenerateStoryIdeas}
                 className="creator-control flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold text-slate-100 disabled:opacity-50"
               >
-                {isLockingSelection ? "Saving..." : trendsDisabled ? "Save Topic" : "Save Idea"}
+                {isLockingSelection ? "Saving..." : canGenerateStoryIdeas ? (trendsDisabled ? "Topic Saved" : "Idea Saved") : trendsDisabled ? "Save Topic" : "Save Idea"}
               </button>
               <button
                 type="button"
