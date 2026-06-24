@@ -1,12 +1,31 @@
 // @ts-nocheck
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, FileText, GripVertical, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, FileText, GripVertical, Loader2, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 
 const AUTOSAVE_DELAY_MS = 1800;
 
-export default function ScriptReviewPanel({ scriptIdea, duration = 30, onContinue, onSave, onGenerate, isGenerating = false, isSaving }) {
+const storytellingTypeOptions = [
+  { value: "narrator_visual_mix", label: "Narrator + Visuals" },
+  { value: "talking_head_explainer", label: "Talking Head" },
+  { value: "visual_voiceover", label: "Visual VO" },
+  { value: "dialogue_scene", label: "Dialogue Scene" },
+  { value: "dramatic_scene", label: "Drama Scene" },
+];
+
+const hookLensOptions = [
+  { value: "direct", label: "Direct" },
+  { value: "history", label: "History" },
+  { value: "geography", label: "Geography" },
+  { value: "philosophy", label: "Philosophy" },
+  { value: "science", label: "Science" },
+  { value: "culture", label: "Culture" },
+  { value: "psychology", label: "Psychology" },
+  { value: "economics", label: "Economics" },
+];
+
+export default function ScriptReviewPanel({ scriptIdea, duration = 30, storytellingType = "narrator_visual_mix", hookLens = "direct", onContinue, onSave, onGenerate, isGenerating = false, isSaving }) {
   const [pageIndex, setPageIndex] = useState(0);
-  const [draft, setDraft] = useState(() => normalizeEditableScript(scriptIdea, duration));
+  const [draft, setDraft] = useState(() => normalizeEditableScript(scriptIdea, duration, storytellingType, hookLens));
   const [draggedShotIndex, setDraggedShotIndex] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState("idle");
@@ -24,13 +43,13 @@ export default function ScriptReviewPanel({ scriptIdea, duration = 30, onContinu
   }, [draft]);
 
   useEffect(() => {
-    const nextDraft = normalizeEditableScript(scriptIdea, duration);
+    const nextDraft = normalizeEditableScript(scriptIdea, duration, storytellingType, hookLens);
     setDraft(nextDraft);
     latestDraftRef.current = nextDraft;
     setPageIndex(0);
     setDirty(false);
     setSaveState(hasScript ? "saved" : "idle");
-  }, [duration, hasScript, scriptIdea]);
+  }, [duration, hasScript, hookLens, scriptIdea, storytellingType]);
 
   useEffect(() => {
     if (!hasScript || !dirty || !onSave) return undefined;
@@ -170,6 +189,9 @@ export default function ScriptReviewPanel({ scriptIdea, duration = 30, onContinu
               <p className="mt-3 text-sm font-semibold leading-6 text-slate-400">
                 Storyline, cast, and audience are locked. Generate the shot-wise screenplay from this production package.
               </p>
+              <p className="mx-auto mt-3 w-fit rounded-full border border-purple-300/25 bg-purple-500/10 px-3 py-1 text-xs font-black uppercase text-purple-100">
+                {storytellingLabelFor(storytellingType)} / Hook: {hookLensLabelFor(hookLens)}
+              </p>
               <button
                 type="button"
                 onClick={() => onGenerate?.()}
@@ -247,6 +269,16 @@ export default function ScriptReviewPanel({ scriptIdea, duration = 30, onContinu
               </button>
               <button type="button" onClick={() => setPageIndex((current) => Math.min(totalPages - 1, current + 1))} disabled={pageIndex >= totalPages - 1} className="creator-control flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-200 disabled:opacity-40">
                 Next Page <ChevronRight size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onGenerate?.()}
+                disabled={!onGenerate || isGenerating || dirty || saveState === "saving" || isSaving}
+                className="creator-control flex items-center gap-2 px-3 py-2 text-xs font-bold text-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                title={dirty || saveState === "saving" ? "Wait for screenplay autosave before regenerating." : "Regenerate the shot-wise screenplay from the locked storyline, cast, and audience context."}
+              >
+                {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                Regenerate Screenplay
               </button>
               <button type="button" onClick={onContinue} disabled={dirty || saveState === "saving" || isSaving} className="creator-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
                 Continue To Shot Plans
@@ -380,7 +412,7 @@ function ScriptOverviewPage({ draft, shots, duration, updateDraft }) {
       </div>
 
       <PaperSection title="Project Setup" description="Base production metadata used by every shot plan.">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-7">
           <ScriptCompactNote
             label="Duration"
             description="Final reel length."
@@ -411,6 +443,18 @@ function ScriptOverviewPage({ draft, shots, duration, updateDraft }) {
             description="Target frame orientation."
             value={draft?.screenType || "vertical"}
             onChange={(value) => updateDraft({ screenType: value })}
+          />
+          <ScriptCompactNote
+            label="Storytelling"
+            description="Narrator, visuals, or acted scene mix."
+            value={storytellingLabelFor(draft?.storytellingType)}
+            onChange={(value) => updateDraft({ storytellingType: storytellingValueFor(value) })}
+          />
+          <ScriptCompactNote
+            label="Hook Lens"
+            description="Opening bridge into the story."
+            value={hookLensLabelFor(draft?.hookLens)}
+            onChange={(value) => updateDraft({ hookLens: hookLensValueFor(value) })}
           />
         </div>
       </PaperSection>
@@ -543,6 +587,27 @@ function ShotScriptPage({
           <div className="mx-auto max-w-[28rem]">
             <p className="text-center text-[10px] font-black uppercase text-black/35">Voice Over</p>
             <ScreenplayParagraph value={page?.voiceOver} onChange={(value) => updateShot({ voiceOver: value })} placeholder="Optional voiceover..." className="text-center" />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <ScriptCompactNote
+              label="Story Role"
+              description="Narrator face, related visual, acted beat."
+              value={page?.storytellingRole}
+              onChange={(value) => updateShot({ storytellingRole: value })}
+            />
+            <ScriptCompactNote
+              label="Asset Mode"
+              description="Record, generate, or either."
+              value={page?.assetCaptureMode}
+              onChange={(value) => updateShot({ assetCaptureMode: value })}
+            />
+            <ScriptNote
+              label="Asset Prompt"
+              description="Prompt for visuals the user may generate instead of record."
+              value={page?.assetGenerationPrompt}
+              onChange={(value) => updateShot({ assetGenerationPrompt: value })}
+            />
           </div>
 
           <div className="ml-auto max-w-[18rem] text-right">
@@ -780,7 +845,35 @@ function buildScriptHeader(draft, page, pageIndex, totalPages) {
   };
 }
 
-function normalizeEditableScript(scriptIdea, duration) {
+function storytellingLabelFor(value) {
+  return storytellingTypeOptions.find((option) => option.value === value)?.label || "Narrator + Visuals";
+}
+
+function hookLensLabelFor(value) {
+  return hookLensOptions.find((option) => option.value === value)?.label || "Direct";
+}
+
+function storytellingValueFor(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return storytellingTypeOptions.find((option) => option.value === value || option.label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") === normalized)?.value
+    || (normalized || "narrator_visual_mix");
+}
+
+function hookLensValueFor(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return hookLensOptions.find((option) => option.value === value || option.label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") === normalized)?.value
+    || (normalized || "direct");
+}
+
+function normalizeEditableScript(scriptIdea, duration, storytellingType = "narrator_visual_mix", hookLens = "direct") {
   const source = scriptIdea?.scriptJson || {};
   const rawShots = source?.shots?.length ? source.shots : scriptIdea?.scriptScenes?.length ? scriptIdea.scriptScenes : [];
   const shots = rawShots.length ? rawShots.map(normalizeShot) : [normalizeShot({ shotNumber: 1, title: "Screenplay Pending", action: "Generate screenplay first." })];
@@ -798,6 +891,13 @@ function normalizeEditableScript(scriptIdea, duration) {
     inferredTone: source.inferredTone || scriptIdea?.inferredTone,
     dialogueLanguage: source.dialogueLanguage || scriptIdea?.dialogueLanguage || "English",
     screenType: source.screenType || scriptIdea?.screenType || "vertical",
+    storytellingType: source.storytellingType || scriptIdea?.storytellingType || storytellingType || "narrator_visual_mix",
+    storytellingGuidance: source.storytellingGuidance || scriptIdea?.storytellingGuidance || {},
+    shotMixPlan: source.shotMixPlan || {},
+    hookLens: source.hookLens || scriptIdea?.hookLens || hookLens || "direct",
+    hookLensGuidance: source.hookLensGuidance || scriptIdea?.hookLensGuidance || {},
+    hookBridge: source.hookBridge || scriptIdea?.hookBridge || {},
+    factualityNotes: source.factualityNotes || scriptIdea?.factualityNotes || {},
     provider: source.provider,
     model: source.model,
     shots,
@@ -835,6 +935,9 @@ function normalizeShot(shot = {}) {
     dialogue: normalizeDialogue(shot.dialogue),
     textOverlay: shot.textOverlay ?? shot.screenText ?? "",
     transition: shot.transition ?? "Hard Cut",
+    storytellingRole: shot.storytellingRole || shot.storyRole || "narrator_face",
+    assetCaptureMode: shot.assetCaptureMode || shot.captureMode || "record",
+    assetGenerationPrompt: shot.assetGenerationPrompt || "",
     soundDesign: Array.isArray(shot.soundDesign) ? shot.soundDesign : [],
     editingNotes: Array.isArray(shot.editingNotes) ? shot.editingNotes : [],
     retentionGoal: shot.retentionGoal ?? shot.intent ?? "",
@@ -911,6 +1014,9 @@ function createInsertedShot(shotNumber) {
     dialogue: {},
     textOverlay: "",
     transition: "",
+    storytellingRole: "narrator_face",
+    assetCaptureMode: "record",
+    assetGenerationPrompt: "",
     soundDesign: [],
     editingNotes: [],
     retentionGoal: "",
@@ -954,6 +1060,13 @@ function normalizeDraftForSave(draft) {
   const shots = renumberShots(draft?.shots || []);
   return {
     ...draft,
+    storytellingType: draft?.storytellingType || "narrator_visual_mix",
+    storytellingGuidance: draft?.storytellingGuidance || {},
+    shotMixPlan: draft?.shotMixPlan || {},
+    hookLens: draft?.hookLens || "direct",
+    hookLensGuidance: draft?.hookLensGuidance || {},
+    hookBridge: draft?.hookBridge || {},
+    factualityNotes: draft?.factualityNotes || {},
     totalShots: shots.length,
     shots,
   };

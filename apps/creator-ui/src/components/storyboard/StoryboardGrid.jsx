@@ -78,10 +78,22 @@ export default function StoryboardGrid({
           const shotNumber = Number(scene.shotNumber || index + 1);
           const imageReady = imageReadySceneIds.includes(sceneId) || hasShotImage(scene);
           const loadingImageKinds = imageLoadingKindsForShot(imageLoadingKeys, shotNumber, sceneId);
+          const effectiveLoadingImageKinds = loadingImageKinds.length
+            ? loadingImageKinds
+            : isGeneratingShots
+              ? ["storyboard"]
+              : [];
           const promptKey = `${shotNumber}:${sceneId}`;
           const active = activeSceneIndex === index;
           return (
-            <div key={sceneId} className="space-y-2">
+            <div
+              key={sceneId}
+              className={`rounded-lg border p-2 transition ${
+                active
+                  ? "border-purple-300/30 bg-slate-950/55 shadow-lg shadow-purple-950/20"
+                  : "border-white/5 bg-white/[0.02]"
+              }`}
+            >
               <SceneCard
                 scene={scene}
                 index={index}
@@ -90,20 +102,22 @@ export default function StoryboardGrid({
                 active={active}
                 jsonReady={readySceneIds.includes(sceneId) || hasShotJson(scene)}
                 imageReady={imageReady}
-                loadingImageKinds={loadingImageKinds}
+                loadingImageKinds={effectiveLoadingImageKinds}
                 onClick={() => onSelectScene?.(index)}
                 onGenerateImage={onGenerateImage}
               />
               {active && (onEditShot || onInsertShot) && (
-                <ShotAiComposer
-                  scene={scene}
-                  value={shotPrompts[promptKey] || ""}
-                  onChange={(value) => setShotPrompts((current) => ({ ...current, [promptKey]: value }))}
-                  onEdit={() => onEditShot?.(scene, shotPrompts[promptKey] || "")}
-                  onInsert={() => onInsertShot?.(scene, shotPrompts[promptKey] || "")}
-                  isEditing={isEditingShot}
-                  isInserting={isInsertingShot}
-                />
+                <div className="mt-2">
+                  <ShotAiComposer
+                    scene={scene}
+                    value={shotPrompts[promptKey] || ""}
+                    onChange={(value) => setShotPrompts((current) => ({ ...current, [promptKey]: value }))}
+                    onEdit={() => onEditShot?.(scene, shotPrompts[promptKey] || "")}
+                    onInsert={() => onInsertShot?.(scene, shotPrompts[promptKey] || "")}
+                    isEditing={isEditingShot}
+                    isInserting={isInsertingShot}
+                  />
+                </div>
               )}
             </div>
           );
@@ -122,7 +136,7 @@ function ShotAiComposer({ scene, value, onChange, onEdit, onInsert, isEditing, i
   const busy = Boolean(isEditing || isInserting);
   const disabled = busy || !String(value || "").trim();
   return (
-    <div className="mx-auto w-full max-w-[22rem] rounded-lg border border-white/10 bg-slate-950/80 p-3 shadow-lg shadow-black/25 xl:max-w-none">
+    <div className="w-full rounded-lg border border-purple-300/20 bg-slate-950/85 p-3 shadow-lg shadow-black/25">
       <div className="mb-2 flex items-center justify-between gap-3">
         <p className="text-[10px] font-black uppercase tracking-[0.16em] text-purple-100">AI Shot Brief</p>
         <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[10px] font-black uppercase tracking-normal text-slate-400">
@@ -183,8 +197,14 @@ function hasShotImage(scene = {}) {
     || scene.asset_url
     || scene.lightingImageUrl
     || scene.lighting_image_url
+    || scene.lightImageUrl
+    || scene.light_image_url
     || scene.cameraPlanImageUrl
     || scene.camera_plan_image_url
+    || scene.dpImageUrl
+    || scene.dp_image_url
+    || scene.cameraImageUrl
+    || scene.camera_image_url
   );
 }
 

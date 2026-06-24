@@ -81,7 +81,7 @@ export default function SceneCard({
             <img
               src={selectedAsset.src}
               alt=""
-              className="h-full w-full bg-black object-contain grayscale"
+              className="h-full w-full bg-black object-contain"
               loading="lazy"
               onLoad={() => setAssetLoadState((current) => ({ ...current, [selectedAssetKey]: "loaded" }))}
               onError={() => {
@@ -153,6 +153,7 @@ export default function SceneCard({
             event?.stopPropagation();
             if (asset?.src) setSelectedAssetKind(asset.kind);
           }}
+          onPreviewAssetKind={setSelectedAssetKind}
           onGenerateImage={onGenerateImage}
         />
       )}
@@ -182,6 +183,7 @@ function ShotDetailsPanel({
   storyboardImageUrl,
   onClose,
   onSelectAsset,
+  onPreviewAssetKind,
   onGenerateImage,
 }) {
   const availableAsset = selectedAsset || assetSlots.find((asset) => asset.src) || assetSlots[0];
@@ -248,6 +250,7 @@ function ShotDetailsPanel({
                     onSelect={(event) => onSelectAsset(asset, event)}
                     onGenerateImage={onGenerateImage ? (event) => {
                       event.stopPropagation();
+                      onPreviewAssetKind?.(asset.kind);
                       onGenerateImage(scene, asset.kind);
                     } : null}
                   />
@@ -368,7 +371,7 @@ function AssetPreview({ asset }) {
   if (asset?.src) {
     return (
       <div className="h-44 overflow-hidden rounded-lg border border-white/10 bg-black">
-        <img src={asset.src} alt="" className="h-full w-full object-contain grayscale" loading="lazy" />
+        <img src={asset.src} alt="" className="h-full w-full object-contain" loading="lazy" />
       </div>
     );
   }
@@ -517,7 +520,7 @@ function ImageZoomModal({ asset, assets, frameOrientation, zoomLevel, onZoomChan
               }}
               className={`h-14 w-14 overflow-hidden rounded-md border bg-black transition hover:border-purple-200 ${item.kind === asset.kind ? "border-purple-300" : "border-white/15"}`}
             >
-              <img src={item.src} alt="" className="h-full w-full object-cover grayscale" loading="lazy" />
+              <img src={item.src} alt="" className="h-full w-full object-cover" loading="lazy" />
             </button>
           ))}
         </div>
@@ -527,17 +530,36 @@ function ImageZoomModal({ asset, assets, frameOrientation, zoomLevel, onZoomChan
 }
 
 function CreativeImageLoader({ label = "Loading Image", detail = "Preparing frame", compact = false }) {
+  const steps = compact
+    ? ["Prompt", "Light", "Frame"]
+    : ["Reading shot plan", "Composing frame", "Rendering image"];
   return (
-    <div className={`${compact ? "relative h-full w-full" : "absolute inset-0 z-10"} flex items-center justify-center overflow-hidden bg-black/85 px-4 text-center`}>
-      <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:28px_28px]" />
-      <div className="relative flex flex-col items-center gap-3">
-        <div className="relative flex h-14 w-14 items-center justify-center rounded-lg border border-purple-200/35 bg-purple-400/10 text-purple-100">
-          <Sparkles size={18} className="absolute -right-1 -top-1 text-purple-200" />
-          <Loader2 size={26} className="animate-spin" />
+    <div className={`${compact ? "relative h-full w-full" : "absolute inset-0 z-10"} flex items-center justify-center overflow-hidden bg-black/90 px-4 text-center`}>
+      <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:30px_30px]" />
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-purple-200/70 to-transparent" />
+      <div className={`relative w-full ${compact ? "max-w-[13rem] p-3" : "max-w-[17rem] p-4"} overflow-hidden rounded-lg border border-white/10 bg-[#070b12]/95 shadow-2xl shadow-black/55`}>
+        <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-white/[0.08] to-transparent" />
+        <div className="relative flex items-center justify-between gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-purple-200/25 bg-purple-300/10 text-purple-100">
+            <Sparkles size={16} />
+          </div>
+          <div className="min-w-0 flex-1 text-left">
+            <p className="truncate text-[11px] font-black uppercase tracking-[0.14em] text-white">{label}</p>
+            <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-normal text-slate-400">{detail}</p>
+          </div>
+          <Loader2 size={17} className="shrink-0 animate-spin text-purple-100" />
         </div>
-        <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-white">{label}</p>
-          <p className="mt-1 text-[10px] font-bold uppercase tracking-normal text-purple-100/80">{detail}</p>
+        <div className="relative mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
+          <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-purple-200 via-white to-purple-200" />
+        </div>
+        <div className="relative mt-4 space-y-2">
+          {steps.map((step, stepIndex) => (
+            <div key={step} className="flex items-center gap-2 text-left">
+              <span className={`h-1.5 w-1.5 rounded-full ${stepIndex === 2 ? "animate-pulse bg-purple-200" : "bg-white/35"}`} />
+              <span className="shrink-0 text-[10px] font-black uppercase tracking-normal text-slate-300">{step}</span>
+              <span className="h-px flex-1 bg-white/10" />
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -554,7 +576,9 @@ function sceneImageUrl(scene = {}, kind = "storyboard") {
       scene.lightImageUrl,
       scene.light_image_url,
       imageUrlFromObject(scene.lightingImage),
+      imageUrlFromObject(scene.lighting_image),
       imageUrlFromObject(scene.lightingAsset),
+      imageUrlFromObject(scene.lighting_asset),
       imageUrlByKind(assets, "lighting")
     );
   }
@@ -567,9 +591,13 @@ function sceneImageUrl(scene = {}, kind = "storyboard") {
       scene.cameraImageUrl,
       scene.camera_image_url,
       imageUrlFromObject(scene.cameraPlanImage),
+      imageUrlFromObject(scene.camera_plan_image),
       imageUrlFromObject(scene.cameraPlanAsset),
+      imageUrlFromObject(scene.camera_plan_asset),
       imageUrlFromObject(scene.dpImage),
+      imageUrlFromObject(scene.dp_image),
       imageUrlFromObject(scene.dpAsset),
+      imageUrlFromObject(scene.dp_asset),
       imageUrlByKind(assets, "dp")
     );
   }
@@ -587,7 +615,9 @@ function sceneImageUrl(scene = {}, kind = "storyboard") {
     scene.assetUrl,
     scene.asset_url,
     imageUrlFromObject(scene.storyboardImage),
+    imageUrlFromObject(scene.storyboard_image),
     imageUrlFromObject(scene.storyboardAsset),
+    imageUrlFromObject(scene.storyboard_asset),
     imageUrlByKind(assets, "storyboard")
   );
 }
@@ -609,6 +639,8 @@ function collectSceneImageAssets(scene = {}) {
     ...(Array.isArray(scene.lighting_images) ? scene.lighting_images : []),
     ...(Array.isArray(scene.cameraPlanImages) ? scene.cameraPlanImages : []),
     ...(Array.isArray(scene.camera_plan_images) ? scene.camera_plan_images : []),
+    ...(Array.isArray(scene.dpImages) ? scene.dpImages : []),
+    ...(Array.isArray(scene.dp_images) ? scene.dp_images : []),
   ].filter((item) => item && typeof item === "object");
 }
 
@@ -658,7 +690,21 @@ function imageUrlFromObject(value = {}) {
     value.file?.url,
     value.media?.signedUrl,
     value.media?.signed_url,
-    value.media?.url
+    value.media?.url,
+    value.result?.signedUrl,
+    value.result?.signed_url,
+    value.result?.imageUrl,
+    value.result?.image_url,
+    value.result?.publicUrl,
+    value.result?.public_url,
+    value.result?.url,
+    value.data?.signedUrl,
+    value.data?.signed_url,
+    value.data?.imageUrl,
+    value.data?.image_url,
+    value.data?.publicUrl,
+    value.data?.public_url,
+    value.data?.url
   );
 }
 

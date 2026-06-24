@@ -6,11 +6,14 @@ import {
   Clapperboard,
   FileText,
   FolderOpen,
+  History,
   ListChecks,
+  Scissors,
   Sparkles,
   Users,
   Wand2,
 } from "lucide-react";
+import { enableShortGeneration } from "../config/featureFlags.js";
 import UpgradeCard from "./UpgradeCard.jsx";
 import UserChip from "./UserChip.jsx";
 
@@ -22,13 +25,28 @@ const navItems = [
   { id: "past-storyline", label: "Past Storyline", icon: Sparkles },
   { id: "past-script", label: "Past Script", icon: FileText },
   { id: "cast", label: "Actor", icon: Users },
+  ...(enableShortGeneration
+    ? [
+        { id: "generate-shorts", label: "Generate Shorts", icon: Scissors, path: "/generate-shorts" },
+        { id: "shorts-history", label: "Shorts History", icon: History, path: "/shorts-history" },
+      ]
+    : []),
 ];
 
 export default function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState("ideas");
+  const [activeSection, setActiveSection] = useState(sectionForPath(location.pathname));
   const sectionIds = useMemo(() => navItems.map((item) => item.id), []);
+
+  useEffect(() => {
+    const pathSection = sectionForPath(location.pathname);
+    if (pathSection !== "ideas") {
+      setActiveSection(pathSection);
+    } else if (location.pathname !== "/") {
+      setActiveSection("ideas");
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     const hashId = location.hash?.replace("#", "");
@@ -68,6 +86,12 @@ export default function Sidebar() {
     event.preventDefault();
     setActiveSection(id);
 
+    const navItem = navItems.find((item) => item.id === id);
+    if (navItem?.path) {
+      navigate(navItem.path);
+      return;
+    }
+
     if (id === "projects") {
       window.dispatchEvent(new CustomEvent("creator:open-projects"));
       window.history.replaceState(null, "", "/#projects");
@@ -106,13 +130,13 @@ export default function Sidebar() {
         </a>
 
         <nav className="space-y-1">
-          {navItems.map(({ id, label, icon: Icon, badge }) => {
+          {navItems.map(({ id, label, icon: Icon, badge, path }) => {
             const isActive = activeSection === id;
 
             return (
               <a
                 key={id}
-                href={`/#${id}`}
+                href={path || `/#${id}`}
                 onClick={(event) => handleNavClick(event, id)}
                 className={`flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold transition-all ${
                   isActive ? "bg-purple-600 text-white shadow-lg shadow-purple-950/30" : "text-slate-400 hover:bg-white/5 hover:text-white"
@@ -133,10 +157,10 @@ export default function Sidebar() {
       </aside>
 
       <nav className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t border-white/10 bg-[#05070d]/95 px-2 py-2 backdrop-blur lg:hidden">
-        {navItems.slice(0, 5).map(({ id, label, icon: Icon }) => (
+        {navItems.slice(0, 5).map(({ id, label, icon: Icon, path }) => (
           <a
             key={id}
-            href={`/#${id}`}
+            href={path || `/#${id}`}
             onClick={(event) => handleNavClick(event, id)}
             className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold ${activeSection === id ? "text-purple-300" : "text-slate-500"}`}
           >
@@ -147,6 +171,12 @@ export default function Sidebar() {
       </nav>
     </>
   );
+}
+
+function sectionForPath(pathname) {
+  if (pathname === "/generate-shorts") return "generate-shorts";
+  if (pathname === "/shorts-history") return "shorts-history";
+  return "ideas";
 }
 
 function scrollToSection(id, behavior = "smooth") {

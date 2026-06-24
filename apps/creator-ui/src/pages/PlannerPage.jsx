@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   selectTenantId,
@@ -8,17 +8,17 @@ import {
   useAddWalletBalanceMutation,
   useGetWalletBalanceQuery,
 } from "@dalaillama/shared-store";
-import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle, Clapperboard, FolderOpen, HelpCircle, History, Image as ImageIcon, ListChecks, Loader2, LockKeyhole, RefreshCw, Sparkles, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle, Clapperboard, FolderOpen, GripVertical, HelpCircle, History, Image as ImageIcon, ListChecks, Loader2, LockKeyhole, Plus, RefreshCw, Sparkles, WalletCards, X } from "lucide-react";
 import {
   useConfirmAudienceMutation,
   useCreateCreatorMutation,
   useGenerateIdeasMutation,
   useGenerateLockedIdeaOptionsAsyncMutation,
   useGenerateLockedIdeaOptionsMutation,
-  useGetCreatorAiPricingQuery,
   useGenerateStoryIdeaScriptMutation,
   useGenerateStoryIdeaScreenplayAsyncMutation,
   useGetAiProvidersQuery,
+  useGetCreatorProviderCreditsQuery,
   useGetCharacterCastMappingsQuery,
   useGetCreatorCategoriesQuery,
   useGetCreatorPlatformsQuery,
@@ -35,6 +35,7 @@ import {
   useGetTrendInsightQuery,
   useGetTrendsQuery,
   useGetTrendCombinationsQuery,
+  useGetWeeklyIdeaTagsQuery,
   useGetCreatorSubscriptionQuery,
   useLockIdeaSelectionMutation,
   useGenerateStoryboardFromScriptMutation,
@@ -54,10 +55,15 @@ import {
   useGenerateShotTakeSoundAsyncMutation,
   useReviewShotTakeAsyncMutation,
   useConfirmShotTakeMutation,
+  useGetAcceptedShotSequenceQuery,
+  useRenderAcceptedShotSequenceAsyncMutation,
   useEnhanceShotTakePreviewAsyncMutation,
   useStudioPolishShotTakeAsyncMutation,
   useStudioPolishAllShotTakesAsyncMutation,
   useEnhanceShotTakeAudioAsyncMutation,
+  useMixShotTakeAudioAsyncMutation,
+  useGenerateShotTakePolishedFramesMutation,
+  useRenderShotTakeFinalVideoAsyncMutation,
   useSaveShotTakeEnhancementFeedbackMutation,
   useApplyShotTakePreviewToTimelineMutation,
   useEnhanceAllShotTakesAsyncMutation,
@@ -67,6 +73,7 @@ import {
   useLazyGetCreatorScriptHistoryItemQuery,
   useListCreatorsQuery,
   usePredictTrendsMutation,
+  useRefreshWeeklyIdeaTagsMutation,
   useSaveStoryIdeaMutation,
   useSaveStoryIdeaScriptMutation,
   useSaveGeneratedScriptMutation,
@@ -112,6 +119,8 @@ import GenerationStatusBar from "../components/jobs/GenerationStatusBar.jsx";
 import OrganizationSetupCard from "../components/billing/OrganizationSetupCard.jsx";
 import RechargeWalletModal from "../components/billing/RechargeWalletModal.jsx";
 import SubscriptionBadge from "../components/billing/SubscriptionBadge.jsx";
+
+const MINIMUM_PAID_GENERATION_WALLET_BALANCE = 100;
 
 const countryOptions = [
   { code: "IN", label: "India" },
@@ -226,6 +235,8 @@ const filterLabels = {
 };
 
 const TREND_DISCOVERY_ENABLED = false;
+const DEFAULT_STORYTELLING_TYPE = "narrator_visual_mix";
+const DEFAULT_HOOK_LENS = "direct";
 
 const workflowSlides = [
   { id: "ideas", label: "New Ideas", caption: "Write a topic and pick one of the generated angles" },
@@ -379,6 +390,7 @@ export default function PlannerPage() {
   const [postProductionOpen, setPostProductionOpen] = useState(false);
   const [selectedPostProductionProject, setSelectedPostProductionProject] = useState(null);
   const [postProductionShotRailCollapsed, setPostProductionShotRailCollapsed] = useState(false);
+  const [postProductionSceneOrder, setPostProductionSceneOrder] = useState([]);
   const [extraIdeas, setExtraIdeas] = useState(() => normalizeStoredIdeas(storedWorkflowSnapshot?.extraIdeas));
   const [isGeneratingMore, setIsGeneratingMore] = useState(false);
   const [savedIdeaSnapshots, setSavedIdeaSnapshots] = useState(() => normalizeSavedIdeaSnapshots(storedWorkflowSnapshot?.savedIdeaSnapshots || storedWorkflowSnapshot?.savedIdeas));
@@ -391,6 +403,8 @@ export default function PlannerPage() {
   const [selectedDuration, setSelectedDuration] = useState(() => Number(storedWorkflowSnapshot?.selectedDuration) || 30);
   const [dialogueLanguage, setDialogueLanguage] = useState(() => storedWorkflowSnapshot?.dialogueLanguage || "Hinglish");
   const [screenType, setScreenType] = useState(() => storedWorkflowSnapshot?.screenType || "vertical");
+  const [storytellingType, setStorytellingType] = useState(() => storedWorkflowSnapshot?.storytellingType || DEFAULT_STORYTELLING_TYPE);
+  const [hookLens, setHookLens] = useState(() => storedWorkflowSnapshot?.hookLens || DEFAULT_HOOK_LENS);
   const [selectedProviderCode, setSelectedProviderCode] = useState(() => {
     try {
       return window.localStorage.getItem("creatorAiProviderCode") || "";
@@ -406,6 +420,7 @@ export default function PlannerPage() {
   const [savedStoryIdeaId, setSavedStoryIdeaId] = useState(() => storedWorkflowSnapshot?.savedStoryIdeaId || null);
   const ideaCandidatePageSize = 5;
   const [rechargeOpen, setRechargeOpen] = useState(false);
+  const [lowBalanceNotice, setLowBalanceNotice] = useState(null);
   const [scriptModalOpen, setScriptModalOpen] = useState(false);
   const [scriptModalMode, setScriptModalMode] = useState("brief");
   const [storyScriptIdea, setStoryScriptIdea] = useState(() => storedWorkflowSnapshot?.storyScriptIdea || null);
@@ -417,6 +432,8 @@ export default function PlannerPage() {
   const [ideaGenerationJobId, setIdeaGenerationJobId] = useState(() => shouldRestoreStoredWorkflow ? readStoredIdeaGenerationJob()?.jobId || null : null);
   const [screenplayJobId, setScreenplayJobId] = useState(null);
   const [productionPlanJobId, setProductionPlanJobId] = useState(null);
+  const screenplayStartInFlightRef = useRef(false);
+  const productionPlanStartInFlightRef = useRef(false);
   const [shotTakeJobId, setShotTakeJobId] = useState(null);
   const [shotPlanRetry, setShotPlanRetry] = useState(null);
   const [shotPlanRetrySeconds, setShotPlanRetrySeconds] = useState(0);
@@ -442,19 +459,33 @@ export default function PlannerPage() {
   const tenantId = reduxTenantId || organizationTenantId || localTenantId || authTenantId;
 
   const { data: combinationData = {} } = useGetTrendCombinationsQuery(undefined, { skip: !TREND_DISCOVERY_ENABLED });
+  const {
+    data: weeklyIdeaTags = {},
+    isFetching: weeklyIdeaTagsLoading,
+    refetch: refetchWeeklyIdeaTags,
+  } = useGetWeeklyIdeaTagsQuery(undefined, {
+    skip: !tenantId,
+    refetchOnMountOrArgChange: true,
+  });
   const { data: masterPlatforms = [] } = useGetCreatorPlatformsQuery(undefined, { skip: !TREND_DISCOVERY_ENABLED });
   const { data: masterCategories = [] } = useGetCreatorCategoriesQuery(undefined, { skip: !TREND_DISCOVERY_ENABLED });
   const { data: aiProviders = [], isFetching: aiProvidersLoading, isError: aiProvidersError } = useGetAiProvidersQuery();
-  const { data: creatorAiPricing = {} } = useGetCreatorAiPricingQuery(undefined, {
-    skip: !tenantId,
+  const { data: creatorProviderCredits = {} } = useGetCreatorProviderCreditsQuery(undefined, {
+    pollingInterval: 60000,
     refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
   });
   const { data: walletFromService, isFetching: walletLoading, refetch: refetchWallet } = useGetWalletBalanceQuery(tenantId, {
     skip: !tenantId,
     refetchOnMountOrArgChange: true,
     refetchOnFocus: true,
   });
-  const wallet = walletFromService || eventWallet || { balance: 0, currency: organization?.currency || "INR" };
+  const walletFromProviderCredits = normalizeProviderCreditsWallet(creatorProviderCredits?.wallet);
+  const wallet = walletFromService || walletFromProviderCredits || eventWallet || { balance: 0, currency: organization?.currency || "INR" };
+  const walletBalanceAmount = walletBalanceValue(wallet);
+  const paidGenerationMinimumBalance = walletMinimumBalanceValue(wallet, MINIMUM_PAID_GENERATION_WALLET_BALANCE);
+  const walletHasPaidGenerationBalance = walletBalanceAmount >= paidGenerationMinimumBalance;
+  const walletCurrencyCode = wallet?.currency || wallet?.currencyCode || organization?.currency || "INR";
   const { data: subscription = { planName: "Creator Starter", creatorEntitlements: {} }, isFetching: subscriptionLoading } = useGetCreatorSubscriptionQuery();
   const { data: trendsData = [], isFetching } = useGetTrendsQuery(
     {
@@ -468,6 +499,7 @@ export default function PlannerPage() {
     { skip: !TREND_DISCOVERY_ENABLED }
   );
   const [predictTrends, predictState] = usePredictTrendsMutation();
+  const [refreshWeeklyIdeaTags, refreshWeeklyIdeaTagsState] = useRefreshWeeklyIdeaTagsMutation();
   const [suggestAudience, suggestAudienceState] = useSuggestAudienceMutation();
   const [confirmAudience, confirmAudienceState] = useConfirmAudienceMutation();
   const { data: creators = [] } = useListCreatorsQuery();
@@ -499,10 +531,14 @@ export default function PlannerPage() {
   const [generateShotTakeSoundAsync, generateShotTakeSoundState] = useGenerateShotTakeSoundAsyncMutation();
   const [reviewShotTakeAsync, reviewShotTakeState] = useReviewShotTakeAsyncMutation();
   const [confirmShotTake, confirmShotTakeState] = useConfirmShotTakeMutation();
+  const [renderAcceptedShotSequenceAsync, renderAcceptedShotSequenceState] = useRenderAcceptedShotSequenceAsyncMutation();
   const [enhanceShotTakePreviewAsync, enhanceShotTakePreviewState] = useEnhanceShotTakePreviewAsyncMutation();
   const [studioPolishShotTakeAsync, studioPolishShotTakeState] = useStudioPolishShotTakeAsyncMutation();
   const [studioPolishAllShotTakesAsync, studioPolishAllShotTakesState] = useStudioPolishAllShotTakesAsyncMutation();
   const [enhanceShotTakeAudioAsync, enhanceShotTakeAudioState] = useEnhanceShotTakeAudioAsyncMutation();
+  const [mixShotTakeAudioAsync, mixShotTakeAudioState] = useMixShotTakeAudioAsyncMutation();
+  const [generateShotTakePolishedFrames] = useGenerateShotTakePolishedFramesMutation();
+  const [renderShotTakeFinalVideoAsync] = useRenderShotTakeFinalVideoAsyncMutation();
   const [saveShotTakeEnhancementFeedback, saveShotTakeFeedbackState] = useSaveShotTakeEnhancementFeedbackMutation();
   const [applyShotTakePreviewToTimeline, applyShotTakePreviewState] = useApplyShotTakePreviewToTimelineMutation();
   const [enhanceAllShotTakesAsync, enhanceAllShotTakesState] = useEnhanceAllShotTakesAsyncMutation();
@@ -515,10 +551,14 @@ export default function PlannerPage() {
   const { data: ideaGenerationJob } = useGetJobQuery(ideaGenerationJobId, { skip: !ideaGenerationJobId, pollingInterval: ideaGenerationJobId ? 1600 : 0 });
   const { data: screenplayJob } = useGetJobQuery(screenplayJobId, { skip: !screenplayJobId, pollingInterval: screenplayJobId ? 1600 : 0 });
   const { data: productionPlanJob } = useGetJobQuery(productionPlanJobId, { skip: !productionPlanJobId, pollingInterval: productionPlanJobId ? 1600 : 0 });
-  const { data: shotTakeJob } = useGetJobQuery(shotTakeJobId, { skip: !shotTakeJobId, pollingInterval: shotTakeJobId ? 1600 : 0 });
+  const {
+    data: shotTakeJob,
+    error: shotTakeJobError,
+    isError: shotTakeJobIsError,
+  } = useGetJobQuery(shotTakeJobId, { skip: !shotTakeJobId, pollingInterval: shotTakeJobId ? 1600 : 0 });
   const { data: creatorProjects = [], isFetching: creatorProjectsLoading, refetch: refetchCreatorProjects } = useGetCreatorProjectsQuery(
     { limit: 12 },
-    { skip: !tenantId, refetchOnMountOrArgChange: true }
+    { refetchOnMountOrArgChange: true }
   );
   const {
     data: postProductionProjects = [],
@@ -526,12 +566,12 @@ export default function PlannerPage() {
     refetch: refetchPostProductionProjects,
   } = useGetPostProductionProjectsQuery(
     { limit: 30 },
-    { skip: !tenantId || !postProductionOpen, refetchOnMountOrArgChange: true }
+    { skip: !postProductionOpen, refetchOnMountOrArgChange: true }
   );
   const [fetchCreatorProject, fetchCreatorProjectState] = useLazyGetCreatorProjectQuery();
   const { data: ideaGenerationJobs = [], isFetching: ideaGenerationJobsLoading, refetch: refetchIdeaGenerationJobs } = useGetJobsQuery(
     { jobType: "IDEA_GENERATE" },
-    { skip: !tenantId, pollingInterval: ideaGenerationJobId ? 5000 : 0, refetchOnMountOrArgChange: true }
+    { pollingInterval: ideaGenerationJobId ? 5000 : 0, refetchOnMountOrArgChange: true }
   );
   const { data: storyboardJob } = useGetJobQuery(storyboardJobId, { skip: !storyboardJobId, pollingInterval: storyboardJobId ? 1600 : 0 });
   const { data: backendProductionPlans = [], isFetching: productionPlansLoading, refetch: refetchProductionPlans } = useGetProductionPlansQuery(
@@ -546,13 +586,21 @@ export default function PlannerPage() {
     { scriptId: scriptDetailIdea?.scriptId },
     { skip: !scriptDetailIdea?.scriptId, pollingInterval: shotTakeJobId ? 2500 : 0, refetchOnMountOrArgChange: true }
   );
-  const { data: backendStorylineHistory = [], isFetching: storylineHistoryLoading } = useGetCreatorStorylineHistoryQuery(
-    { limit: 30 },
-    { skip: !tenantId || pastHistoryModal !== "storyline", refetchOnMountOrArgChange: true }
+  const {
+    data: acceptedShotSequence = {},
+    isFetching: acceptedShotSequenceLoading,
+    refetch: refetchAcceptedShotSequence,
+  } = useGetAcceptedShotSequenceQuery(
+    { scriptId: scriptDetailIdea?.scriptId },
+    { skip: !scriptDetailIdea?.scriptId, pollingInterval: shotTakeJobId ? 2500 : 0, refetchOnMountOrArgChange: true }
   );
-  const { data: backendScriptHistory = [], isFetching: scriptHistoryLoading } = useGetCreatorScriptHistoryQuery(
+  const { data: backendStorylineHistory = [], isFetching: storylineHistoryLoading, refetch: refetchStorylineHistory } = useGetCreatorStorylineHistoryQuery(
     { limit: 30 },
-    { skip: !tenantId || pastHistoryModal !== "script", refetchOnMountOrArgChange: true }
+    { skip: pastHistoryModal !== "storyline", refetchOnMountOrArgChange: true }
+  );
+  const { data: backendScriptHistory = [], isFetching: scriptHistoryLoading, refetch: refetchScriptHistory } = useGetCreatorScriptHistoryQuery(
+    { limit: 30 },
+    { skip: pastHistoryModal !== "script", refetchOnMountOrArgChange: true }
   );
   const [fetchStorylineHistoryItem, fetchStorylineHistoryItemState] = useLazyGetCreatorStorylineHistoryItemQuery();
   const [fetchScriptHistoryItem, fetchScriptHistoryItemState] = useLazyGetCreatorScriptHistoryItemQuery();
@@ -696,10 +744,17 @@ export default function PlannerPage() {
     [productionPlanTags, scriptDetailIdea?.scriptJson?.shots, scriptDetailIdea?.scriptScenes]
   );
   const baseScenes = storyboardSourceScenes.length ? storyboardSourceScenes : screenplayPlanScenes.length ? screenplayPlanScenes : fallbackScenes;
-  const scenes = useMemo(
+  const mergedScenes = useMemo(
     () => mergeShotImageUrlsIntoScenes(baseScenes, backendShotImageUrls),
     [backendShotImageUrls, baseScenes]
   );
+  const scenes = useMemo(
+    () => applySceneOrder(mergedScenes, postProductionSceneOrder),
+    [mergedScenes, postProductionSceneOrder]
+  );
+  useEffect(() => {
+    setPostProductionSceneOrder((current) => reconcileSceneOrder(mergedScenes, current));
+  }, [mergedScenes]);
   const backendShotImageLoadingKeys = useMemo(
     () => shotImageUrlsLoading ? shotImageLoadingKeysForScenes(baseScenes) : [],
     [baseScenes, shotImageUrlsLoading]
@@ -757,6 +812,10 @@ export default function PlannerPage() {
     && shotExportSummary.lightingReady >= shotExportSummary.expected
     && shotExportSummary.dpReady >= shotExportSummary.expected
   );
+  const generatedShotCardsReadyForPolish = Boolean(
+    shotExportSummary.expected > 0
+    && shotExportSummary.completeReady >= shotExportSummary.expected
+  );
   const exportBlockedReason = shotGenerationLoading
     ? "Shot generation is still running. Please export after all shots are generated."
     : shotExportSummary.expected <= 0
@@ -774,16 +833,21 @@ export default function PlannerPage() {
     || generateShotTakeSoundState.isLoading
     || reviewShotTakeState.isLoading
     || confirmShotTakeState.isLoading
+    || renderAcceptedShotSequenceState.isLoading
     || enhanceShotTakePreviewState.isLoading
     || studioPolishShotTakeState.isLoading
     || studioPolishAllShotTakesState.isLoading
     || enhanceShotTakeAudioState.isLoading
+    || mixShotTakeAudioState.isLoading
     || saveShotTakeFeedbackState.isLoading
     || applyShotTakePreviewState.isLoading
     || enhanceAllShotTakesState.isLoading
   );
   const selectedCreator = castPlan || creators.find((creator) => creator.id === planner.selectedCreatorId) || buildDefaultCastPlan(creators);
   const selectedScene = scenes[preview.currentSceneIndex] || scenes[0];
+  useEffect(() => {
+    setPostProductionSceneOrder([]);
+  }, [activeProjectId, scriptDetailIdea?.scriptId]);
   useEffect(() => {
     creatorDebugLog("storyboard-flow snapshot", {
       projectId: activeProjectId,
@@ -959,6 +1023,8 @@ export default function PlannerPage() {
       selectedDuration,
       dialogueLanguage,
       screenType,
+      storytellingType,
+      hookLens,
       manualIdeaDraft,
       savedIdeaIds: Array.from(savedIdeaIds),
       savedIdeaSnapshots,
@@ -973,6 +1039,7 @@ export default function PlannerPage() {
     generatedStoryboard,
     ideaCandidatePageInfo,
     ideaCandidatePageItems,
+    hookLens,
     lockedBrief,
     lockedIdeaOptions,
     manualIdeaDraft,
@@ -992,6 +1059,7 @@ export default function PlannerPage() {
     selectedDuration,
     storyboardSaved,
     storyScriptIdea,
+    storytellingType,
     workflowRestored,
     workspacePage,
   ]);
@@ -1047,6 +1115,14 @@ export default function PlannerPage() {
   const expectedShotTakeCount = scenes.length || productionPlanTags.length || screenplayShotCount || 0;
   const acceptedShotTakeCount = (Array.isArray(shotTakes) ? shotTakes : []).filter((take) => take?.accepted).length;
   const effectiveShootPolishReady = Boolean(expectedShotTakeCount && acceptedShotTakeCount >= expectedShotTakeCount);
+  const polishBlockedReason = !effectiveShotPlansReady
+    ? "Generate shot design before opening Polish."
+    : shotGenerationLoading
+      ? "Shot images are still generating. Polish unlocks when generated shots are ready."
+      : !generatedShotCardsReadyForPolish
+        ? `Generate all shot images before opening Polish (${shotExportSummary.completeReady}/${shotExportSummary.expected || expectedShotTakeCount || 0} complete).`
+        : "";
+  const polishUnlocked = !polishBlockedReason;
   const usedGeneratedIdeaIds = useMemo(
     () => new Set([savedStoryIdeaId, storyScriptIdea?.id, scriptDetailIdea?.id].filter(Boolean).map((id) => String(id))),
     [savedStoryIdeaId, scriptDetailIdea?.id, storyScriptIdea?.id]
@@ -1160,11 +1236,13 @@ export default function PlannerPage() {
       id: "shoot-polish",
       label: "Polish",
       kicker: "Takes",
-      description: effectiveShotPlansReady
+      description: polishBlockedReason
+        ? polishBlockedReason
+        : effectiveShotPlansReady
         ? `${acceptedShotTakeCount}/${expectedShotTakeCount || scenes.length || 0} takes accepted`
         : "Upload takes after shot design is ready",
       done: effectiveShootPolishReady,
-      locked: false,
+      locked: Boolean(polishBlockedReason),
     },
   ];
   const visibleWorkspacePages = projectWorkspaceMode
@@ -1246,6 +1324,31 @@ export default function PlannerPage() {
   }, []);
 
   useEffect(() => {
+    if (!projectsOpen) return;
+    void refetchCreatorProjects?.();
+  }, [projectsOpen, refetchCreatorProjects]);
+
+  useEffect(() => {
+    if (!recentIdeaJobsOpen) return;
+    void refetchIdeaGenerationJobs?.();
+  }, [recentIdeaJobsOpen, refetchIdeaGenerationJobs]);
+
+  useEffect(() => {
+    if (!postProductionOpen) return;
+    void refetchPostProductionProjects?.();
+  }, [postProductionOpen, refetchPostProductionProjects]);
+
+  useEffect(() => {
+    if (!pastHistoryModal) return;
+    void refetchCreatorProjects?.();
+    if (pastHistoryModal === "storyline") {
+      void refetchStorylineHistory?.();
+    } else if (pastHistoryModal === "script") {
+      void refetchScriptHistory?.();
+    }
+  }, [pastHistoryModal, refetchCreatorProjects, refetchScriptHistory, refetchStorylineHistory]);
+
+  useEffect(() => {
     if (!workflowStepIds.has(workspacePage) || planner.activeStep === workspacePage) return;
     const gateMessage = getWorkflowGateMessage(workspacePage);
     if (gateMessage) {
@@ -1324,6 +1427,12 @@ export default function PlannerPage() {
   }, [refetchWallet, tenantId]);
 
   useEffect(() => {
+    if (!tenantId || walletHasPaidGenerationBalance) {
+      setLowBalanceNotice(null);
+    }
+  }, [tenantId, walletHasPaidGenerationBalance]);
+
+  useEffect(() => {
     if (TREND_DISCOVERY_ENABLED
       && !ideasState.data
       && isUuid(planner.selectedTrendId)
@@ -1346,34 +1455,40 @@ export default function PlannerPage() {
     if (isCompletedJobStatus(status)) {
       addActivity("Trend prediction ready", `${filterLabels.category[filters.category] || filters.category} - ${country.label}`);
       flash("Predicted trends are ready", "success");
+      void refetchWallet?.();
       setPredictionJobId(null);
       return;
     }
     if (isFailedJobStatus(status)) {
       addActivity("Trend prediction failed", `${filterLabels.category[filters.category] || filters.category} - ${country.label}`);
       flash("Trend prediction failed. Try again.", "error");
+      void refetchWallet?.();
       setPredictionJobId(null);
     }
-  }, [predictionJob?.status]);
+  }, [predictionJob?.status, refetchWallet]);
 
   useEffect(() => {
     const status = String(screenplayJob?.status || "").toUpperCase();
     if (isFailedJobStatus(status)) {
+      screenplayStartInFlightRef.current = false;
       setScreenplayJobId(null);
       addActivity("Screenplay generation failed", selectedIdea?.title || storyScriptIdea?.title || "Story idea");
       flash(screenplayJob?.errorMessage || screenplayJob?.message || "Screenplay generation failed. Inspect raw prompt response and retry.", "error");
+      void refetchWallet?.();
       return;
     }
     if (!isCompletedJobStatus(status)) return;
+    screenplayStartInFlightRef.current = false;
     const sourceIdea = storyScriptIdea || selectedIdea;
     const result = attachAiProviderMetadata(screenplayJob?.result || {}, aiProviderContext);
     const screenplayIdea = applyScreenplayResult(result, sourceIdea);
     setScreenplayJobId(null);
     if (screenplayIdea) {
       flash("Screenplay generated. Review it, then generate storyboard, lighting, and DP plans.", "success");
+      void refetchWallet?.();
       void refetchCreatorProjects?.();
     }
-  }, [screenplayJob?.status, screenplayJob?.progress]);
+  }, [screenplayJob?.status, screenplayJob?.progress, refetchWallet]);
 
   useEffect(() => {
     const status = String(productionPlanJob?.status || "").toUpperCase();
@@ -1385,6 +1500,7 @@ export default function PlannerPage() {
         errorMessage: productionPlanJob?.errorMessage || productionPlanJob?.message || "",
         result: productionPlanJob?.result || null,
       });
+      productionPlanStartInFlightRef.current = false;
       setProductionPlanJobId(null);
       const message = productionPlanJob?.errorMessage || productionPlanJob?.message || "Shot plan generation failed. Inspect raw prompt response and retry.";
       const missingDetails = extractMissingDetailsFromJob(productionPlanJob);
@@ -1403,9 +1519,11 @@ export default function PlannerPage() {
         productionPlanDebug: productionPlanJob?.result || null,
       } : current);
       flash(message, "error");
+      void refetchWallet?.();
       return;
     }
     if (!isCompletedJobStatus(status)) return;
+    productionPlanStartInFlightRef.current = false;
     const plans = productionPlanJob?.result?.productionPlanTags || [];
     const focusedShotNumber = Number(productionPlanJob?.result?.focusedShotNumber || productionPlanJob?.input?.focusedShotNumber || productionPlanJob?.inputPayload?.focusedShotNumber || 0);
     creatorDebugLog("production plan job completed", {
@@ -1427,10 +1545,11 @@ export default function PlannerPage() {
     setProductionPlanJobId(null);
     setShotPlanRetry(null);
     void refetchProductionPlans?.();
+    void refetchWallet?.();
     dispatch(completeStep("storyboard"));
     addActivity("Shot plans generated", `${plans.length || "All"} shots enriched`);
     flash("Storyboard, lighting, sound, and DP plans generated. You can render images per shot now.", "success");
-  }, [productionPlanJob?.status, productionPlanJob?.progress]);
+  }, [productionPlanJob?.status, productionPlanJob?.progress, refetchWallet]);
 
   useEffect(() => {
     if (!shotPlanRetry?.availableAt) {
@@ -1505,6 +1624,8 @@ export default function PlannerPage() {
     if (!isCompletedJobStatus(status) && !isFailedJobStatus(status)) return;
     setShotTakeJobId(null);
     void refetchShotTakes?.();
+    void refetchAcceptedShotSequence?.();
+    void refetchWallet?.();
     if (isFailedJobStatus(status)) {
       flash(shotTakeJob?.errorMessage || shotTakeJob?.message || "Shot take job failed.", "error");
       return;
@@ -1512,6 +1633,21 @@ export default function PlannerPage() {
     addActivity("Shoot & Polish updated", shotTakeJob?.message || "Shot take job completed");
     flash(shotTakeJob?.message || "Shoot & Polish job completed.", "success");
   }, [shotTakeJob?.status, shotTakeJob?.progress]);
+
+  useEffect(() => {
+    if (!shotTakeJobId || !shotTakeJobIsError) return;
+    const status = queryErrorStatus(shotTakeJobError);
+    creatorDebugLog("shot take job polling failed", {
+      jobId: shotTakeJobId,
+      status,
+      error: shotTakeJobError,
+    });
+    if (status && ![401, 403, 404].includes(status)) return;
+    setShotTakeJobId(null);
+    void refetchShotTakes?.();
+    void refetchWallet?.();
+    flash("Could not read the shoot/polish job status. Refreshing the shot take results.", "warning");
+  }, [shotTakeJobId, shotTakeJobIsError, shotTakeJobError]);
 
   useEffect(() => {
     if (!scenes.length) return;
@@ -1543,6 +1679,34 @@ export default function PlannerPage() {
     setActivity((current) => [{ label, detail, time: "Just now" }, ...current.slice(0, 5)]);
   };
 
+  const openRechargeForPaidAction = (actionLabel = "paid AI generation", details = {}) => {
+    if (!tenantId) {
+      flash("Set up organization before using paid Creator generation.", "error");
+      scrollToSection("dashboard");
+      return;
+    }
+    setLowBalanceNotice({
+      actionLabel,
+      openedAt: Date.now(),
+      minimumBalance: Number(details.minimumBalance) > 0 ? Number(details.minimumBalance) : paidGenerationMinimumBalance,
+    });
+  };
+
+  const canRunPaidModelAction = (actionLabel = "paid AI generation") => {
+    if (walletLoading) return true;
+    if (walletHasPaidGenerationBalance) return true;
+    openRechargeForPaidAction(actionLabel);
+    return false;
+  };
+
+  const handlePaidModelError = (error, fallback, actionLabel = "paid AI generation") => {
+    if (isInsufficientBalanceError(error)) {
+      openRechargeForPaidAction(actionLabel, { minimumBalance: minimumBalanceFromError(error) });
+      return;
+    }
+    flash(apiErrorMessage(error, fallback), "error");
+  };
+
   const buildIdeaSelectionPayload = ({ sourceType, idea, trend }) => {
     const isTrendSource = sourceType === "TREND";
     const basePayload = {
@@ -1554,9 +1718,13 @@ export default function PlannerPage() {
       durationSeconds: selectedDuration,
       dialogueLanguage,
       screenType,
+      storytellingType,
+      hookLens,
       selectionPayload: {
         selectedFrom: isTrendSource ? "trend_cloud" : "own_idea",
         aiProvider: aiProviderContext,
+        storytellingType,
+        hookLens,
         idea,
       },
     };
@@ -1608,8 +1776,12 @@ export default function PlannerPage() {
       country,
       trend: selectedTrend,
       durationSeconds: selectedDuration,
+      storytellingType,
+      hookLens,
     });
     let usedFallback = false;
+    let usedBalanceFallback = false;
+    let usedRateLimitFallback = false;
 
     if (brief?.lockedIdeaId && isUuid(brief.lockedIdeaId)) {
       try {
@@ -1647,6 +1819,16 @@ export default function PlannerPage() {
           briefTitle: brief.title || brief.description || null,
         });
         setIdeaGenerationJobId(null);
+        if (isInsufficientBalanceError(asyncError)) {
+          usedFallback = true;
+          usedBalanceFallback = true;
+          openRechargeForPaidAction("AI story idea generation");
+        }
+        if (isRateLimitedError(asyncError)) {
+          usedFallback = true;
+          usedRateLimitFallback = true;
+        }
+        if (!usedBalanceFallback && !usedRateLimitFallback) {
         try {
           const result = await generateLockedIdeaOptions({
             lockedIdeaId: brief.lockedIdeaId,
@@ -1656,6 +1838,13 @@ export default function PlannerPage() {
           return applyIdeaCandidatePage(result, page);
         } catch (error) {
           usedFallback = true;
+          if (isInsufficientBalanceError(error)) {
+            usedBalanceFallback = true;
+            openRechargeForPaidAction("AI story idea generation");
+          }
+          if (isRateLimitedError(error)) {
+            usedRateLimitFallback = true;
+          }
           logCreatorWorkflowError("Story ideas API failed; using local generated options.", error, {
           endpoint: `/creator/locked-ideas/${brief.lockedIdeaId}/ideas/generate`,
           lockedIdeaId: brief.lockedIdeaId,
@@ -1664,6 +1853,7 @@ export default function PlannerPage() {
           provider: selectedAiProvider?.code || selectedProviderCode || null,
           briefTitle: brief.title || brief.description || null,
           });
+        }
         }
         // Use local deterministic ideas while the backend is unavailable.
       }
@@ -1677,7 +1867,7 @@ export default function PlannerPage() {
       totalElements: fallbackIdeasForBrief.length,
       totalPages: Math.max(1, Math.ceil(fallbackIdeasForBrief.length / ideaCandidatePageSize)),
     }, page);
-    return { ...normalized, usedFallback };
+    return { ...normalized, usedFallback, usedBalanceFallback, usedRateLimitFallback };
   };
 
   useEffect(() => {
@@ -1704,6 +1894,7 @@ export default function PlannerPage() {
       setIdeaGenerationJobId(null);
       addActivity("Story ideas job failed", ideaGenerationJob.message || ideaGenerationJob.errorMessage || "Generation failed");
       flash("Story idea generation failed. You can retry from recent jobs.", "error");
+      void refetchWallet?.();
       void refetchIdeaGenerationJobs?.();
       return;
     }
@@ -1730,8 +1921,9 @@ export default function PlannerPage() {
     }
     clearStoredIdeaGenerationJob(ideaGenerationJob.jobId);
     setIdeaGenerationJobId(null);
+    void refetchWallet?.();
     void refetchIdeaGenerationJobs?.();
-  }, [ideaGenerationJob?.jobId, ideaGenerationJob?.status]);
+  }, [ideaGenerationJob?.jobId, ideaGenerationJob?.status, refetchWallet]);
 
   const handleResumeIdeaGenerationJob = async (job) => {
     if (!job?.jobId) return;
@@ -1845,6 +2037,7 @@ export default function PlannerPage() {
       flash("Select a valid platform/category combination first", "error");
       return;
     }
+    if (!canRunPaidModelAction("AI trend prediction")) return;
     let usedFallbackJob = false;
     try {
       const result = await predictTrends({
@@ -1876,7 +2069,11 @@ export default function PlannerPage() {
       } else {
         setPredictionJobId(result.jobId || "job-predict-trends-mock");
       }
-    } catch {
+    } catch (error) {
+      if (isInsufficientBalanceError(error)) {
+        openRechargeForPaidAction("AI trend prediction");
+        return;
+      }
       usedFallbackJob = true;
       setPredictionJobId("job-predict-trends-mock");
     }
@@ -1943,14 +2140,20 @@ export default function PlannerPage() {
   };
 
   const handleGenerateStoryboard = async (options = {}) => {
+    if (productionPlanStartInFlightRef.current || generateProductionPlansState.isLoading || productionPlanJobId) {
+      flash("Shot plan generation is already running.", "info");
+      return;
+    }
     if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
       flash("Generate and review the backend screenplay before shot plans", "error");
       setWorkspacePage("screenplay");
       dispatch(setActiveStep("screenplay"));
       return;
     }
+    if (!canRunPaidModelAction("AI shot plan generation")) return;
     const focusedShotNumber = Number(options.focusedShotNumber || 0) || null;
 
+    productionPlanStartInFlightRef.current = true;
     try {
       const job = await generateProductionPlansAsync({
         scriptId: scriptDetailIdea.scriptId,
@@ -1969,8 +2172,13 @@ export default function PlannerPage() {
       flash(focusedShotNumber ? `Retrying shot ${focusedShotNumber} plan with full screenplay context.` : "Shot plan generation started. Images can be rendered after this step.", "success");
       scrollToSection("storyboard");
     } catch (error) {
+      productionPlanStartInFlightRef.current = false;
       const message = apiErrorMessage(error, "Shot plan generation failed. Check backend logs and try again.");
       const missingDetails = extractMissingDetailsFromApiError(error);
+      if (isInsufficientBalanceError(error)) {
+        openRechargeForPaidAction("AI shot plan generation");
+        return;
+      }
       if (missingDetails.length) {
         setShotPlanRetry({
           shotNumber: null,
@@ -1999,6 +2207,7 @@ export default function PlannerPage() {
       return;
     }
     if (shotGenerationLoading) return;
+    if (!canRunPaidModelAction("AI shot image generation")) return;
 
     try {
       creatorDebugLog("generate shots requested", {
@@ -2030,7 +2239,7 @@ export default function PlannerPage() {
         message,
         error,
       });
-      flash(message, "error");
+      handlePaidModelError(error, message, "AI shot image generation");
     }
   };
 
@@ -2056,23 +2265,31 @@ export default function PlannerPage() {
       flash("Generate screenplay before rendering images.", "error");
       return;
     }
-    const effectivePlans = productionPlanTags.length ? productionPlanTags : extractProductionPlanTagsFromScenes(scenes);
-    if (!effectivePlans.some(hasProductionPlanData) && !hasProductionPlanData(scene)) {
-      flash("Generate shot plans before rendering images.", "error");
+    if (shotPlanLoading) {
+      flash("Shot plans are still generating. Please wait before rendering images.", "warning");
       return;
     }
-    const shotNumber = scene?.shotNumber || 1;
-    const loadingKey = shotImageLoadingKey(shotNumber, imageKind);
+    const normalizedImageKind = normalizeImageAssetKind(imageKind);
+    const shotNumber = Number(scene?.shotNumber || 1);
+    const effectivePlans = productionPlanTags.length ? productionPlanTags : extractProductionPlanTagsFromScenes(scenes);
+    const matchingPlan = productionPlanForShot(effectivePlans, scene, shotNumber);
+    if (!hasProductionPlanImageKindData(matchingPlan || scene, normalizedImageKind)) {
+      const planLabel = normalizedImageKind === "dp" ? "camera/DP" : normalizedImageKind;
+      flash(`Generate ${planLabel} shot plan JSON for shot ${shotNumber} before rendering this image.`, "error");
+      return;
+    }
+    if (!canRunPaidModelAction(`${normalizedImageKind === "dp" ? "DP" : normalizedImageKind} image generation`)) return;
+    const loadingKey = shotImageLoadingKey(shotNumber, normalizedImageKind);
     setShotImageLoadingKeys((current) => current.includes(loadingKey) ? current : [...current, loadingKey]);
     try {
       const result = await generateShotImage({
         scriptId: scriptDetailIdea.scriptId,
         shotNumber,
-        imageKind,
+        imageKind: normalizedImageKind,
         screenType: scriptDetailIdea.screenType || scriptDetailIdea.scriptJson?.screenType || screenType,
         signedUrlTtlSeconds: 604800,
       }).unwrap();
-      const resultScene = normalizeShotImageResult(result, scene, shotNumber, imageKind);
+      const resultScene = normalizeShotImageResult(result, scene, shotNumber, normalizedImageKind);
       const normalizedScene = normalizeStoryboardResponse(
         { scenes: [resultScene], screenType: resultScene.screenType || result.screenType || screenType, renderWidth: resultScene.renderWidth || result.renderWidth, renderHeight: resultScene.renderHeight || result.renderHeight },
         scriptDetailIdea
@@ -2099,10 +2316,10 @@ export default function PlannerPage() {
         ...current,
         scriptScenes: replaceSceneByShotNumber(current.scriptScenes || [], normalizedScene),
       } : current);
-      addActivity(`${imageKind.toUpperCase()} image rendered`, `Shot ${shotNumber}`);
-      flash(`${imageKind === "dp" ? "DP" : imageKind} image generated for shot ${shotNumber}.`, "success");
+      addActivity(`${normalizedImageKind.toUpperCase()} image rendered`, `Shot ${shotNumber}`);
+      flash(`${normalizedImageKind === "dp" ? "DP" : normalizedImageKind} image generated for shot ${shotNumber}.`, "success");
     } catch (error) {
-      flash(apiErrorMessage(error, `Could not render ${imageKind} image for shot ${shotNumber}.`), "error");
+      handlePaidModelError(error, `Could not render ${normalizedImageKind} image for shot ${shotNumber}.`, `${normalizedImageKind === "dp" ? "DP" : normalizedImageKind} image generation`);
     } finally {
       setShotImageLoadingKeys((current) => current.filter((key) => key !== loadingKey));
     }
@@ -2118,6 +2335,7 @@ export default function PlannerPage() {
       flash("Describe what AI should change in this shot.", "error");
       return;
     }
+    if (!canRunPaidModelAction("AI shot editing")) return;
     const shotNumber = Number(scene?.shotNumber || preview.currentSceneIndex + 1 || 1);
     const loadingKey = shotImageLoadingKey(shotNumber, "storyboard");
     setShotImageLoadingKeys((current) => current.includes(loadingKey) ? current : [...current, loadingKey]);
@@ -2136,6 +2354,7 @@ export default function PlannerPage() {
         { scenes: [resultScene], screenType: resultScene.screenType || result.screenType || screenType, renderWidth: resultScene.renderWidth || result.renderWidth, renderHeight: resultScene.renderHeight || result.renderHeight },
         scriptDetailIdea
       ).scenes[0];
+      const editedShot = rawShotFromShotImageResult(result, normalizedScene, shotNumber);
       setGeneratedStoryboard((current) => {
         const baseScenes = current?.scenes?.length ? current.scenes : scenes;
         const updatedScenes = replaceSceneByShotNumber(baseScenes, normalizedScene);
@@ -2157,15 +2376,56 @@ export default function PlannerPage() {
       setScriptDetailIdea((current) => current ? {
         ...current,
         scriptScenes: replaceSceneByShotNumber(current.scriptScenes || [], normalizedScene),
+        scriptJson: editedShot ? replaceShotInScriptJson(current.scriptJson, editedShot) : current.scriptJson,
+        productionPlanTags: mergeProductionPlanTags(current.productionPlanTags || [], extractProductionPlanTagsFromScenes([normalizedScene])),
       } : current);
       addActivity("AI shot edit rendered", `Shot ${shotNumber}`);
       flash(`Shot ${shotNumber} updated with AI.`, "success");
       creatorDebugLog("shot-ai-edit:complete", { scriptId: scriptDetailIdea.scriptId, shotNumber, result });
     } catch (error) {
-      flash(apiErrorMessage(error, `Could not edit shot ${shotNumber}.`), "error");
+      handlePaidModelError(error, `Could not edit shot ${shotNumber}.`, "AI shot editing");
     } finally {
       setShotImageLoadingKeys((current) => current.filter((key) => key !== loadingKey));
     }
+  };
+
+  const handleAddEmptyPostProductionShot = (scene) => {
+    const afterShotNumber = Number(scene?.shotNumber || preview.currentSceneIndex + 1 || scenes.length || 0);
+    if (!afterShotNumber) {
+      flash("Select a shot before adding an empty slot.", "error");
+      return;
+    }
+    const insertedShotNumber = afterShotNumber + 1;
+    const placeholder = createEmptyInsertedShot(scene, insertedShotNumber, afterShotNumber);
+    const updatedScenes = replaceSceneByShotNumber(shiftScenesAfterShotNumber(scenes, afterShotNumber), placeholder);
+    setPostProductionSceneOrder(updatedScenes.map((item, index) => sceneOrderKey(item, index)));
+    setGeneratedStoryboard((current) => {
+      const base = current || currentStoryboard || {};
+      return {
+        ...base,
+        id: base.id || base.storyboardId || activeStoryboardId || scriptDetailIdea?.scriptId,
+        storyboardId: base.storyboardId || base.id || activeStoryboardId || scriptDetailIdea?.scriptId,
+        projectId: base.projectId || scriptDetailIdea?.projectId || activeProjectId,
+        title: base.title || scriptDetailIdea?.title,
+        screenType: base.screenType || scriptDetailIdea?.screenType || screenType,
+        durationSeconds: base.durationSeconds || scriptDetailIdea?.durationSeconds || selectedDuration,
+        totalShots: updatedScenes.length,
+        scenes: updatedScenes,
+        productionPlanTags: extractProductionPlanTagsFromScenes(updatedScenes),
+      };
+    });
+    setScriptDetailIdea((current) => current ? {
+      ...current,
+      scriptScenes: updatedScenes,
+      scriptJson: current.scriptJson ? {
+        ...current.scriptJson,
+        shots: updatedScenes,
+      } : current.scriptJson,
+      productionPlanTags: extractProductionPlanTagsFromScenes(updatedScenes),
+    } : current);
+    dispatch(setCurrentSceneIndex(Math.max(0, insertedShotNumber - 1)));
+    addActivity("Empty shot added", `After shot ${afterShotNumber}`);
+    flash("Empty shot slot added. Describe it in the shot panel to generate it.", "success");
   };
 
   const handleInsertStoryboardTimelineShot = async (scene, instruction) => {
@@ -2178,8 +2438,18 @@ export default function PlannerPage() {
       flash("Describe the shot you want to add.", "error");
       return;
     }
-    const afterShotNumber = Number(scene?.shotNumber || preview.currentSceneIndex + 1 || scenes.length || 0);
-    const expectedShotNumber = afterShotNumber + 1;
+    if (!canRunPaidModelAction("AI timeline shot generation")) return;
+    const replacingPlaceholder = isGeneratedShotPlaceholder(scene);
+    const afterShotNumber = Number(
+      scene?.insertAfterShotNumber
+      || scene?.insert_after_shot_number
+      || (replacingPlaceholder ? Math.max(0, Number(scene?.shotNumber || 1) - 1) : 0)
+      || scene?.shotNumber
+      || preview.currentSceneIndex + 1
+      || scenes.length
+      || 0
+    );
+    const expectedShotNumber = replacingPlaceholder ? Number(scene?.shotNumber || afterShotNumber + 1) : afterShotNumber + 1;
     const loadingKey = shotImageLoadingKey(expectedShotNumber, "storyboard");
     setShotImageLoadingKeys((current) => current.includes(loadingKey) ? current : [...current, loadingKey]);
     try {
@@ -2199,8 +2469,11 @@ export default function PlannerPage() {
       ).scenes[0];
       setGeneratedStoryboard((current) => {
         const baseScenes = current?.scenes?.length ? current.scenes : scenes;
-        const shiftedScenes = shiftScenesAfterShotNumber(baseScenes, afterShotNumber);
-        const updatedScenes = replaceSceneByShotNumber(shiftedScenes, normalizedScene);
+        const baseForInsert = replacingPlaceholder
+          ? removeSceneByOrderKey(baseScenes, scene)
+          : shiftScenesAfterShotNumber(baseScenes, afterShotNumber);
+        const updatedScenes = replaceSceneByShotNumber(baseForInsert, normalizedScene);
+        setPostProductionSceneOrder(updatedScenes.map((item, index) => sceneOrderKey(item, index)));
         return {
           ...(current || {}),
           id: current?.id || current?.storyboardId || activeStoryboardId || scriptDetailIdea.scriptId,
@@ -2218,14 +2491,28 @@ export default function PlannerPage() {
       });
       setScriptDetailIdea((current) => current ? {
         ...current,
-        scriptScenes: replaceSceneByShotNumber(shiftScenesAfterShotNumber(current.scriptScenes || [], afterShotNumber), normalizedScene),
+        scriptScenes: replaceSceneByShotNumber(
+          replacingPlaceholder
+            ? removeSceneByOrderKey(current.scriptScenes?.length ? current.scriptScenes : scenes, scene)
+            : shiftScenesAfterShotNumber(current.scriptScenes || [], afterShotNumber),
+          normalizedScene
+        ),
+        scriptJson: current.scriptJson ? {
+          ...current.scriptJson,
+          shots: replaceSceneByShotNumber(
+            replacingPlaceholder
+              ? removeSceneByOrderKey(current.scriptJson.shots?.length ? current.scriptJson.shots : scenes, scene)
+              : shiftScenesAfterShotNumber(current.scriptJson.shots || [], afterShotNumber),
+            normalizedScene
+          ),
+        } : current.scriptJson,
       } : current);
       dispatch(setCurrentSceneIndex(Math.max(0, insertedShotNumber - 1)));
       addActivity("AI timeline shot added", `After shot ${afterShotNumber}`);
       flash(`Added AI shot after shot ${afterShotNumber}.`, "success");
       creatorDebugLog("shot-ai-insert:complete", { scriptId: scriptDetailIdea.scriptId, afterShotNumber, insertedShotNumber, result });
     } catch (error) {
-      flash(apiErrorMessage(error, `Could not add a shot after shot ${afterShotNumber}.`), "error");
+      handlePaidModelError(error, `Could not add a shot after shot ${afterShotNumber}.`, "AI timeline shot generation");
     } finally {
       setShotImageLoadingKeys((current) => current.filter((key) => key !== loadingKey));
     }
@@ -2255,13 +2542,29 @@ export default function PlannerPage() {
             takeId: uploadedTake.takeId,
             mediaAnalysis,
           }).unwrap();
+          const firstTimelineFrame = mediaAnalysis?.video?.frames?.find((frame) => frame?.thumbnailDataUrl);
+          if (firstTimelineFrame?.thumbnailDataUrl) {
+            try {
+              const referenceFile = await dataUrlToFileForUpload(
+                firstTimelineFrame.thumbnailDataUrl,
+                `shot-${String(shotNumber).padStart(2, "0")}-polish-anchor.jpg`
+              );
+              await uploadShotTakeReferenceFrame({
+                takeId: uploadedTake.takeId,
+                file: referenceFile,
+              }).unwrap();
+            } catch (referenceError) {
+              console.warn("[creator] default polish reference frame upload failed", referenceError);
+              flash("Take uploaded. Click a timeline frame before polishing if the polish button asks for an anchor.", "warning");
+            }
+          }
         } catch (analysisError) {
           console.warn("[creator] video media analysis failed", analysisError);
           flash("Take uploaded. Timeline analysis could not be created in this browser.", "warning");
         }
       }
       addActivity("Shot take uploaded", `Shot ${shotNumber}`);
-      flash(`Shot ${shotNumber} take uploaded. Run review before polish.`, "success");
+      flash(`Shot ${shotNumber} take uploaded. Timeline and polish anchor are ready.`, "success");
       void refetchShotTakes?.();
     } catch (error) {
       flash(apiErrorMessage(error, `Could not upload shot ${shotNumber}.`), "error");
@@ -2270,6 +2573,7 @@ export default function PlannerPage() {
 
   const handleReviewShotTake = async (take) => {
     if (!take?.takeId) return;
+    if (!canRunPaidModelAction("AI shot take review")) return;
     try {
       const job = await reviewShotTakeAsync({ takeId: take.takeId }).unwrap();
       const jobId = job?.jobId || job?.id;
@@ -2277,7 +2581,7 @@ export default function PlannerPage() {
       addActivity("Shot review started", `Shot ${take.shotNumber}`);
       flash("Shot review started. Deterministic checks will finish shortly.", "success");
     } catch (error) {
-      flash(apiErrorMessage(error, "Shot review could not start."), "error");
+      handlePaidModelError(error, "Shot review could not start.", "AI shot take review");
     }
   };
 
@@ -2292,7 +2596,7 @@ export default function PlannerPage() {
         ? ` at ${Number(context.timestampSeconds).toFixed(1)}s`
         : "";
       addActivity(context?.source === "timeline" ? "Timeline frame selected" : "Reference frame saved", `Shot ${take.shotNumber}${timelineSuffix}`);
-      flash(context?.source === "timeline" ? "Timeline frame selected. Gemini image-wise polish preview is now enabled." : "Reference frame saved. Gemini image-wise polish preview is now enabled.", "success");
+      flash(context?.source === "timeline" ? "Timeline frame selected for video polish." : "Reference frame saved for video polish.", "success");
       void refetchShotTakes?.();
     } catch (error) {
       flash(apiErrorMessage(error, "Could not save selected frame."), "error");
@@ -2347,6 +2651,111 @@ export default function PlannerPage() {
     }
   };
 
+  const handleSaveShotTakeTextOverlay = async (take, overlay = {}) => {
+    if (!take?.takeId) return;
+    const currentAnalysis = take.mediaAnalysis && typeof take.mediaAnalysis === "object" ? take.mediaAnalysis : {};
+    const currentOverlays = Array.isArray(currentAnalysis.textOverlays) ? currentAnalysis.textOverlays : [];
+    const overlayId = overlay.id || `text-${Math.round(Number(overlay.timestampSeconds || 0) * 1000)}`;
+    const nextOverlays = overlay.remove
+      ? currentOverlays.filter((item) => String(item.id || "") !== String(overlayId))
+      : [
+          ...currentOverlays.filter((item) => String(item.id || "") !== String(overlayId)),
+          {
+            id: overlayId,
+            text: String(overlay.text || "").trim(),
+            timestampSeconds: Number(overlay.timestampSeconds || 0),
+            startSeconds: Number(overlay.startSeconds || 0),
+            endSeconds: Number(overlay.endSeconds || 2),
+            color: overlay.color || "#ffffff",
+            fontFamily: overlay.fontFamily || "Inter",
+            fontSize: Number(overlay.fontSize || 28),
+            captionStyle: overlay.captionStyle || overlay.caption_style || "classic",
+            backgroundColor: overlay.backgroundColor || overlay.background_color || "#000000",
+            backgroundOpacity: Number(overlay.backgroundOpacity ?? overlay.background_opacity ?? 0.28),
+            textTransform: overlay.textTransform || overlay.text_transform || "none",
+            position: overlay.position || "bottom",
+            fontWeight: overlay.fontWeight || 900,
+            x: Number(overlay.x ?? 12),
+            y: Number(overlay.y ?? 68),
+            width: Number(overlay.width ?? 76),
+            height: Number(overlay.height ?? 16),
+            frameSource: overlay.frameSource || overlay.source || "polished_timeline",
+          },
+        ];
+    try {
+      const response = await saveShotTakeMediaAnalysis({
+        takeId: take.takeId,
+        mediaAnalysis: {
+          ...currentAnalysis,
+          textOverlays: nextOverlays.sort((left, right) => Number(left.startSeconds || 0) - Number(right.startSeconds || 0)),
+          updatedAt: new Date().toISOString(),
+        },
+      }).unwrap();
+      addActivity(overlay.remove ? "Shot text removed" : "Shot text saved", `Shot ${take.shotNumber}`);
+      flash(overlay.remove ? "Text removed from this shot." : "Text saved on this shot frame.", "success");
+      void refetchShotTakes?.();
+      return response;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not save text overlay."), "error");
+      throw error;
+    }
+  };
+
+  const handleSaveShotTakePolishedVideoFrames = async (take, polishedVideoAnalysis = {}) => {
+    if (!take?.takeId || !Array.isArray(polishedVideoAnalysis.frames) || !polishedVideoAnalysis.frames.length) return;
+    const currentAnalysis = take.mediaAnalysis && typeof take.mediaAnalysis === "object" ? take.mediaAnalysis : {};
+    const currentPolishedVideo = currentAnalysis.polishedVideo && typeof currentAnalysis.polishedVideo === "object"
+      ? currentAnalysis.polishedVideo
+      : {};
+    try {
+      await saveShotTakeMediaAnalysis({
+        takeId: take.takeId,
+        mediaAnalysis: {
+          ...currentAnalysis,
+          polishedVideo: {
+            ...currentPolishedVideo,
+            ...polishedVideoAnalysis,
+            updatedAt: new Date().toISOString(),
+          },
+          updatedAt: new Date().toISOString(),
+        },
+      }).unwrap();
+      creatorDebugLog("polished video frames saved", {
+        takeId: take.takeId,
+        shotNumber: take.shotNumber,
+        frameCount: polishedVideoAnalysis.frames.length,
+      });
+      void refetchShotTakes?.();
+    } catch (error) {
+      console.warn("[creator] could not save polished video frames", error);
+    }
+  };
+
+  const handleGenerateShotTakePolishedFrames = async (take, payload = {}) => {
+    if (!take?.takeId) return null;
+    try {
+      const response = await generateShotTakePolishedFrames({
+        takeId: take.takeId,
+        variantId: payload.variantId,
+        sampleCount: payload.sampleCount || 10,
+        persist: payload.persist ?? true,
+        metadata: payload.metadata || {},
+      }).unwrap();
+      const frames = response?.mediaAnalysis?.polishedVideo?.frames || [];
+      creatorDebugLog("backend polished frames generated", {
+        takeId: take.takeId,
+        shotNumber: take.shotNumber,
+        variantId: payload.variantId,
+        frameCount: Array.isArray(frames) ? frames.length : 0,
+      });
+      void refetchShotTakes?.();
+      return response;
+    } catch (error) {
+      console.warn("[creator] backend polished frame extraction failed", error);
+      return null;
+    }
+  };
+
   const handleUploadShotTakeSoundSnippet = async (take, file, metadata = {}) => {
     if (!take?.takeId || !file) return;
     try {
@@ -2365,6 +2774,7 @@ export default function PlannerPage() {
 
   const handleGenerateShotTakeSound = async (take, payload = {}) => {
     if (!take?.takeId) return;
+    if (!canRunPaidModelAction("AI sound generation")) return;
     try {
       const job = await generateShotTakeSoundAsync({
         takeId: take.takeId,
@@ -2376,16 +2786,17 @@ export default function PlannerPage() {
       flash("Sound generation task prepared and added to the timeline.", "success");
       void refetchShotTakes?.();
     } catch (error) {
-      flash(apiErrorMessage(error, "Could not prepare generated sound."), "error");
+      handlePaidModelError(error, "Could not prepare generated sound.", "AI sound generation");
     }
   };
 
   const handleEnhanceShotTakeAudio = async (take, payload = {}) => {
     if (!take?.takeId) return;
+    if (!canRunPaidModelAction("AI audio enhancement")) return;
     try {
       const job = await enhanceShotTakeAudioAsync({
         takeId: take.takeId,
-        editNote: payload.editNote || "Clean production audio and mix uploaded snippets according to the saved timeline.",
+        editNote: payload.editNote || "Enhance audio quality for this video while preserving the original voice, words, timing, and texture.",
         preserveVoiceTexture: true,
         preserveRoomTone: true,
         overrides: {
@@ -2397,7 +2808,48 @@ export default function PlannerPage() {
       addActivity("Audio enhancement prepared", `Shot ${take.shotNumber}`);
       flash("Audio enhancement task prepared with the saved foley/music timeline.", "success");
     } catch (error) {
-      flash(apiErrorMessage(error, "Could not start audio enhancement."), "error");
+      handlePaidModelError(error, "Could not start audio enhancement.", "AI audio enhancement");
+    }
+  };
+
+  const handleMixShotTakeAudio = async (take, payload = {}) => {
+    if (!take?.takeId) return;
+    if (!canRunPaidModelAction("AI audio mix render")) return;
+    try {
+      const job = await mixShotTakeAudioAsync({
+        takeId: take.takeId,
+        layers: payload.layers || take.mediaAnalysis?.soundTimeline?.layers || [],
+        mixSettings: payload.mixSettings || take.mediaAnalysis?.soundTimeline?.mixSettings || {},
+        renderMode: "polished_timeline_audio",
+      }).unwrap();
+      const jobId = job?.jobId || job?.id;
+      if (jobId) setShotTakeJobId(jobId);
+      addActivity("Audio mix render started", `Shot ${take.shotNumber}`);
+      flash("Audio mix render started. The mixed track will appear in the polished panel when ready.", "success");
+      void refetchShotTakes?.();
+    } catch (error) {
+      handlePaidModelError(error, "Could not render audio mix.", "AI audio mix render");
+    }
+  };
+
+  const handleRenderShotTakeFinalVideo = async (take, payload = {}) => {
+    if (!take?.takeId) return;
+    if (!canRunPaidModelAction("final MP4 render")) return;
+    try {
+      const job = await renderShotTakeFinalVideoAsync({
+        takeId: take.takeId,
+        variantId: payload.variantId,
+        burnTextOverlays: payload.burnTextOverlays ?? true,
+        useMixedAudio: payload.useMixedAudio ?? true,
+        metadata: payload.metadata || {},
+      }).unwrap();
+      const jobId = job?.jobId || job?.id;
+      if (jobId) setShotTakeJobId(jobId);
+      addActivity("Final MP4 render started", `Shot ${take.shotNumber}`);
+      flash("Final MP4 render started. The baked video will appear in the polished panel when ready.", "success");
+      void refetchShotTakes?.();
+    } catch (error) {
+      handlePaidModelError(error, "Could not render final MP4.", "final MP4 render");
     }
   };
 
@@ -2410,8 +2862,21 @@ export default function PlannerPage() {
         note: accepted ? "User confirmed shot matches plan." : "User requested re-shoot.",
       }).unwrap();
       addActivity(accepted ? "Shot take accepted" : "Shot take marked re-shoot", `Shot ${take.shotNumber}`);
-      flash(accepted ? "Shot take accepted. Polish preview is enabled." : "Shot take marked for re-shoot.", accepted ? "success" : "warning");
+      if (accepted && scriptDetailIdea?.scriptId) {
+        try {
+          const job = await renderAcceptedShotSequenceAsync({ scriptId: scriptDetailIdea.scriptId }).unwrap();
+          const jobId = job?.jobId || job?.id;
+          if (jobId) setShotTakeJobId(jobId);
+          addActivity("Final shot preview rebuilding", `Accepted through Shot ${take.shotNumber}`);
+          flash("Shot accepted. Rebuilding the mobile final preview.", "success");
+        } catch (sequenceError) {
+          flash(apiErrorMessage(sequenceError, "Shot accepted, but final preview could not start."), "warning");
+        }
+      } else {
+        flash(accepted ? "Shot take accepted. Polish preview is enabled." : "Shot take marked for re-shoot.", accepted ? "success" : "warning");
+      }
       void refetchShotTakes?.();
+      void refetchAcceptedShotSequence?.();
     } catch (error) {
       flash(apiErrorMessage(error, "Could not update shot take."), "error");
     }
@@ -2419,6 +2884,7 @@ export default function PlannerPage() {
 
   const handleEnhanceShotTakePreview = async (take, editNote = "") => {
     if (!take?.takeId) return;
+    if (!canRunPaidModelAction("AI polish preview")) return;
     try {
       const job = await enhanceShotTakePreviewAsync({
         takeId: take.takeId,
@@ -2430,7 +2896,7 @@ export default function PlannerPage() {
       addActivity("Polish preview started", `Shot ${take.shotNumber}`);
       flash("Gemini frame preview started from the uploaded image/frame.", "success");
     } catch (error) {
-      flash(apiErrorMessage(error, "Could not start polish preview."), "error");
+      handlePaidModelError(error, "Could not start polish preview.", "AI polish preview");
     }
   };
 
@@ -2467,6 +2933,11 @@ export default function PlannerPage() {
 
   const handleStudioPolishShotTake = async (take, polishPayload = {}) => {
     if (!take?.takeId) return;
+    if (polishBlockedReason) {
+      flash(polishBlockedReason, "error");
+      return;
+    }
+    if (!canRunPaidModelAction("AI video polish")) return;
     const payload = typeof polishPayload === "string" ? { editNote: polishPayload } : (polishPayload || {});
     try {
       const job = await studioPolishShotTakeAsync({
@@ -2477,10 +2948,10 @@ export default function PlannerPage() {
       }).unwrap();
       const jobId = job?.jobId || job?.id;
       if (jobId) setShotTakeJobId(jobId);
-      addActivity("Studio Polish prepared", `Shot ${take.shotNumber}`);
-      flash("Low-cost Studio Polish task started for this shot.", "success");
+      addActivity("Video polish started", `Shot ${take.shotNumber}`);
+      flash("Video polish started. Production design, Studio Look, continuity, and your prompt will be used together.", "success");
     } catch (error) {
-      flash(apiErrorMessage(error, "Could not start Studio Polish."), "error");
+      handlePaidModelError(error, "Could not start video polish.", "AI video polish");
     }
   };
 
@@ -2489,6 +2960,11 @@ export default function PlannerPage() {
       flash("Generate screenplay before Studio Polish.", "error");
       return;
     }
+    if (polishBlockedReason) {
+      flash(polishBlockedReason, "error");
+      return;
+    }
+    if (!canRunPaidModelAction("Studio Polish for accepted shots")) return;
     const payload = typeof polishPayload === "string" ? { editNote: polishPayload } : (polishPayload || {});
     try {
       const job = await studioPolishAllShotTakesAsync({
@@ -2498,10 +2974,10 @@ export default function PlannerPage() {
       }).unwrap();
       const jobId = job?.jobId || job?.id;
       if (jobId) setShotTakeJobId(jobId);
-      addActivity("Studio Polish prepared", "Accepted shot takes");
-      flash("Low-cost Studio Polish tasks started for accepted shots.", "success");
+      addActivity("Studio Polish started", "Accepted shot takes");
+      flash("Studio Polish started for accepted shots.", "success");
     } catch (error) {
-      flash(apiErrorMessage(error, "Could not start Studio Polish for accepted shots."), "error");
+      handlePaidModelError(error, "Could not start Studio Polish for accepted shots.", "Studio Polish for accepted shots");
     }
   };
 
@@ -2510,6 +2986,7 @@ export default function PlannerPage() {
       flash("Generate screenplay before applying polish.", "error");
       return;
     }
+    if (!canRunPaidModelAction("apply-all video polish")) return;
     try {
       const job = await enhanceAllShotTakesAsync({
         scriptId: scriptDetailIdea.scriptId,
@@ -2517,10 +2994,10 @@ export default function PlannerPage() {
       }).unwrap();
       const jobId = job?.jobId || job?.id;
       if (jobId) setShotTakeJobId(jobId);
-      addActivity("Veo video polish started", "Accepted shot takes");
-      flash("Google Veo video + sound generation started.", "success");
+      addActivity("Video polish started", "Accepted shot takes");
+      flash("Video polish generation started.", "success");
     } catch (error) {
-      flash(apiErrorMessage(error, "Could not start apply-all polish job."), "error");
+      handlePaidModelError(error, "Could not start apply-all polish job.", "apply-all video polish");
     }
   };
 
@@ -2540,6 +3017,9 @@ export default function PlannerPage() {
     }
     if (step === "storyboard" && !effectiveScreenplayReady) {
       return "Generate and review the screenplay before storyboard generation";
+    }
+    if (step === "shoot-polish" && polishBlockedReason) {
+      return polishBlockedReason;
     }
     return "";
   }
@@ -2677,6 +3157,8 @@ export default function PlannerPage() {
       durationSeconds: draftScript.duration || selectedDuration,
       dialogueLanguage: draftScript.dialogueLanguage || dialogueLanguage,
       screenType: draftScript.screenType || screenType,
+      storytellingType: draftScript.storytellingType || storytellingType,
+      hookLens: draftScript.hookLens || hookLens,
       scriptText: buildStoryScriptTextFromDraft(draftScript),
       scriptJson: revisionPayload,
     };
@@ -2711,6 +3193,8 @@ export default function PlannerPage() {
       storyScriptJson: result.scriptJson || payload.scriptJson,
       projectId: result.projectId || storyScriptIdea.projectId || activeProjectId,
       durationSeconds: result.durationSeconds || payload.durationSeconds,
+      storytellingType: result.scriptJson?.storytellingType || payload.storytellingType,
+      hookLens: result.scriptJson?.hookLens || payload.hookLens,
       status: result.status || "SCRIPT_GENERATED",
     });
     setStoryScriptIdea(updatedIdea);
@@ -2735,6 +3219,8 @@ export default function PlannerPage() {
       durationSeconds: draftScript.duration || selectedDuration,
       dialogueLanguage: draftScript.dialogueLanguage || dialogueLanguage,
       screenType: draftScript.screenType || screenType,
+      storytellingType: draftScript.storytellingType || storytellingType,
+      hookLens: draftScript.hookLens || hookLens,
       scriptJson: draftScript,
       scenes: draftScript.shots || [],
     };
@@ -2777,6 +3263,8 @@ export default function PlannerPage() {
       productionPlanError: result.productionPlanError || result.scriptJson?.productionPlanError || scriptDetailIdea.productionPlanError || "",
       productionPlanDebug: result.productionPlanDebug || result.scriptJson?.productionPlanDebug || scriptDetailIdea.productionPlanDebug || null,
       durationSeconds: result.durationSeconds || payload.durationSeconds,
+      storytellingType: result.scriptJson?.storytellingType || payload.storytellingType,
+      hookLens: result.scriptJson?.hookLens || payload.hookLens,
       status: result.status || "SCRIPT_EDITED",
     });
     setScriptDetailIdea(updatedIdea);
@@ -2816,6 +3304,47 @@ export default function PlannerPage() {
     flash(`Selected ${trend?.title || "trend"}`);
   };
 
+  const handleSelectWeeklyIdeaTag = (tag) => {
+    const text = String(tag?.prompt || tag?.title || tag?.label || "").trim();
+    if (!text) return;
+    setTrendChoiceMode("original");
+    setManualIdeaDraft(text);
+    addActivity("Weekly idea selected", tag?.title || tag?.label || "Idea tag");
+    flash("Idea copied into the topic box.", "success");
+  };
+
+  const handleLoadWeeklyIdeaTags = async () => {
+    if (!tenantId) return;
+    let latestTags = weeklyIdeaTags;
+    try {
+      const result = await refetchWeeklyIdeaTags?.();
+      latestTags = result?.data || result?.currentData || latestTags;
+    } catch {
+      // If cached lookup fails, fall through to paid refresh so wallet/API errors surface normally.
+    }
+    if (hasWeeklyIdeaTagsPayload(latestTags)) return;
+    if (!canRunPaidModelAction("weekly idea cloud refresh")) return;
+    try {
+      await refreshWeeklyIdeaTags().unwrap();
+      await refetchWeeklyIdeaTags?.();
+      addActivity("Weekly idea cloud loaded", "Next 7 days");
+    } catch (error) {
+      handlePaidModelError(error, "Could not load weekly idea tags.", "weekly idea cloud refresh");
+    }
+  };
+
+  const handleRefreshWeeklyIdeaTags = async () => {
+    if (!canRunPaidModelAction("weekly idea cloud refresh")) return;
+    try {
+      await refreshWeeklyIdeaTags().unwrap();
+      await refetchWeeklyIdeaTags?.();
+      addActivity("Weekly idea cloud refreshed", "Next 7 days");
+      flash("Weekly idea cloud refreshed.", "success");
+    } catch (error) {
+      handlePaidModelError(error, "Could not refresh weekly idea tags.", "weekly idea cloud refresh");
+    }
+  };
+
   const generateStoryIdeasForBrief = async (brief) => {
     if (!brief) {
       flash(TREND_DISCOVERY_ENABLED ? "Save a trend or original idea first" : "Write and save a topic first", "error");
@@ -2835,7 +3364,11 @@ export default function PlannerPage() {
     setWorkspacePage("ideas");
     addActivity("Generated story ideas", `${generated.pageInfo.totalElements || generated.items.length || 20} options from saved brief`);
     flash(
-      generated.usedFallback ? "Story ideas API failed; showing local generated options." : "Story ideas generated in creative workflow",
+      generated.usedBalanceFallback
+        ? "Showing local story ideas now. Recharge to run paid AI idea generation."
+        : generated.usedRateLimitFallback
+          ? "Gemini is rate-limited right now, so local story ideas are shown. Try paid AI generation again in a minute."
+        : generated.usedFallback ? "Story ideas API failed; showing local generated options." : "Story ideas generated in creative workflow",
       generated.usedFallback ? "warning" : "success"
     );
     scrollToSection("workflow");
@@ -2922,7 +3455,27 @@ export default function PlannerPage() {
       flash(TREND_DISCOVERY_ENABLED ? "Save the current trend or idea before generating" : "Save the current topic before generating", "error");
       return;
     }
-    await generateStoryIdeasForBrief(lockedBrief);
+    let generationBrief = lockedBrief;
+    if (!isUuid(generationBrief.lockedIdeaId)) {
+      const sourceType = generationBrief.source === "trend" ? "TREND" : "ORIGINAL";
+      const lockedSelection = await persistIdeaSelection({
+        sourceType,
+        idea: generationBrief,
+        trend: sourceType === "TREND" ? selectedTrend : null,
+      });
+      if (lockedSelection?.ideaId) {
+        generationBrief = {
+          ...generationBrief,
+          id: lockedSelection.ideaId,
+          backendLocked: true,
+          lockedIdeaId: lockedSelection.ideaId,
+          projectId: lockedSelection.projectId || generationBrief.projectId || activeProjectId,
+        };
+        setLockedBrief(generationBrief);
+        setExtraIdeas((current) => mergeUniqueIdeas(current, [generationBrief]));
+      }
+    }
+    await generateStoryIdeasForBrief(generationBrief);
   };
 
   const handleIdeaCandidatePageChange = async (page) => {
@@ -2932,7 +3485,9 @@ export default function PlannerPage() {
     }
     const normalizedPage = Math.max(0, page);
     const generated = await loadIdeaCandidatesForBrief(lockedBrief, normalizedPage);
-    if (generated.usedFallback) {
+    if (generated.usedBalanceFallback) {
+      flash("Showing local story ideas for this page. Recharge to run paid AI idea generation.", "warning");
+    } else if (generated.usedFallback) {
       flash("Story idea page API failed; showing local options.", "warning");
     }
   };
@@ -3003,6 +3558,7 @@ export default function PlannerPage() {
       flash("Story generation needs saved UUIDs. Save the topic again so the workflow can continue.", "error");
       return;
     }
+    if (!canRunPaidModelAction("AI story script generation")) return;
 
     let scriptResult;
     try {
@@ -3014,10 +3570,12 @@ export default function PlannerPage() {
         idea: `${sourceStoryIdea.title}\n${sourceStoryIdea.description || ""}`.trim(),
         dialogueLanguage,
         screenType,
-        context: { aiProvider: providerMemory },
+        storytellingType,
+        hookLens,
+        context: { aiProvider: providerMemory, storytellingType, hookLens },
       }).unwrap(), providerMemory);
     } catch (error) {
-      flash(apiErrorMessage(error, "Story generation failed. Please regenerate with complete storyline, character, and beat JSON."), "error");
+      handlePaidModelError(error, "Story generation failed. Please regenerate with complete storyline, character, and beat JSON.", "AI story script generation");
       return;
     }
 
@@ -3032,6 +3590,8 @@ export default function PlannerPage() {
       status: scriptResult.status || "SCRIPT_GENERATED",
       dialogueLanguage: scriptResult.scriptJson?.dialogueLanguage || scriptResult.dialogueLanguage || dialogueLanguage,
       screenType: scriptResult.scriptJson?.screenType || scriptResult.screenType || screenType,
+      storytellingType: scriptResult.scriptJson?.storytellingType || scriptResult.storytellingType || storytellingType,
+      hookLens: scriptResult.scriptJson?.hookLens || scriptResult.hookLens || hookLens,
       provider: scriptResult.provider,
       model: scriptResult.model,
     });
@@ -3069,6 +3629,8 @@ export default function PlannerPage() {
       status: screenplayResult.status || "SCREENPLAY_GENERATED",
       dialogueLanguage: screenplayResult.scriptJson?.dialogueLanguage || screenplayResult.dialogueLanguage || dialogueLanguage,
       screenType: screenplayResult.scriptJson?.screenType || screenplayResult.screenType || screenType,
+      storytellingType: screenplayResult.scriptJson?.storytellingType || screenplayResult.storytellingType || storytellingType,
+      hookLens: screenplayResult.scriptJson?.hookLens || screenplayResult.hookLens || hookLens,
       provider: screenplayResult.provider,
       model: screenplayResult.model,
       storyScriptJson: sourceIdea.storyScriptJson || buildInitialStoryRevisionPayload(draftStoryScript),
@@ -3095,20 +3657,37 @@ export default function PlannerPage() {
       dispatch(setActiveStep("cast"));
       return;
     }
-    let sourceIdea = storyIdea;
-    if (draftStoryScript) {
-      sourceIdea = await handleSaveStoryScript(draftStoryScript) || storyIdea;
-    }
-
-    const providerMemory = aiProviderContext;
-    const screenplayCategoryCode = resolveWorkflowCategoryCode(lockedBrief, sourceIdea, filters.category);
-    if (!isUuid(lockedBrief.lockedIdeaId) || !isUuid(sourceIdea.id)) {
-      flash("Screenplay generation needs saved UUIDs. Save the topic again so the workflow can continue.", "error");
+    if (screenplayStartInFlightRef.current || generateScreenplayAsyncState.isLoading || screenplayJobId) {
+      flash("Screenplay generation is already running.", "warning");
       return;
     }
+    screenplayStartInFlightRef.current = true;
 
     try {
+      let sourceIdea = storyIdea;
+      if (draftStoryScript) {
+        sourceIdea = await handleSaveStoryScript(draftStoryScript) || storyIdea;
+      }
+
+      const providerMemory = aiProviderContext;
+      const screenplayCategoryCode = resolveWorkflowCategoryCode(lockedBrief, sourceIdea, filters.category);
+      if (!isUuid(lockedBrief.lockedIdeaId) || !isUuid(sourceIdea.id)) {
+        screenplayStartInFlightRef.current = false;
+        flash("Screenplay generation needs saved UUIDs. Save the topic again so the workflow can continue.", "error");
+        return;
+      }
+      if (!canRunPaidModelAction("AI screenplay generation")) {
+        screenplayStartInFlightRef.current = false;
+        return;
+      }
+
       const productionContext = buildScreenplayProductionContext();
+      setProductionPlanJobId(null);
+      productionPlanStartInFlightRef.current = false;
+      setShotPlanRetry(null);
+      setShotPlanRetrySeconds(0);
+      setStoryboardJobId(null);
+      setGeneratedStoryboard(null);
       const job = await generateStoryIdeaScreenplayAsync({
         lockedIdeaId: lockedBrief.lockedIdeaId,
         storyIdeaId: sourceIdea.id,
@@ -3117,6 +3696,8 @@ export default function PlannerPage() {
         idea: `${sourceIdea.title}\n${sourceIdea.description || ""}`.trim(),
         dialogueLanguage,
         screenType,
+        storytellingType,
+        hookLens,
         budgetTier: productionContext.budgetTier,
         characterCastMappings: productionContext.characterCastMappings,
         availableActors: productionContext.availableActors,
@@ -3126,6 +3707,8 @@ export default function PlannerPage() {
         context: {
           aiProvider: providerMemory,
           workflowLockedAt: new Date().toISOString(),
+          storytellingType,
+          hookLens,
           lockedPackage: productionContext,
         },
       }).unwrap();
@@ -3133,9 +3716,12 @@ export default function PlannerPage() {
         setScreenplayJobId(job.jobId);
         addActivity("Screenplay generation started", sourceIdea.title);
         flash("Screenplay generation started. Shot-wise JSON will appear when ready.", "success");
+      } else {
+        screenplayStartInFlightRef.current = false;
       }
     } catch (error) {
-      flash(apiErrorMessage(error, "Screenplay generation failed. Please regenerate with complete shots, timing, audio, lighting, blocking, and production metadata."), "error");
+      screenplayStartInFlightRef.current = false;
+      handlePaidModelError(error, "Screenplay generation failed. Please regenerate with complete shots, timing, audio, lighting, blocking, and production metadata.", "AI screenplay generation");
     }
   };
 
@@ -3162,6 +3748,8 @@ export default function PlannerPage() {
       durationSeconds: selectedDuration,
       dialogueLanguage,
       screenType,
+      storytellingType,
+      hookLens,
       source: "creator-ui",
     },
   });
@@ -3181,10 +3769,14 @@ export default function PlannerPage() {
       lockedBrief,
       dialogueLanguage,
       screenType,
+      storytellingType,
+      hookLens,
       durationSeconds: selectedDuration,
     };
     return {
       budgetTier: selectedDuration <= 60 ? "zero_budget" : selectedDuration <= 180 ? "micro_budget" : "indie",
+      storytellingType,
+      hookLens,
       characterCastMappings,
       availableActors,
       audienceDecision: selectedAudienceDecision || selectedAudienceSummary,
@@ -3194,11 +3786,16 @@ export default function PlannerPage() {
   };
 
   const handleSuggestAudience = async (audienceDraft) => {
+    if (!canRunPaidModelAction("AI audience suggestion")) return null;
     let result = null;
     let usedLocalSuggestion = false;
     try {
       result = await suggestAudience(buildAudienceDecisionPayload(audienceDraft)).unwrap();
-    } catch {
+    } catch (error) {
+      if (isInsufficientBalanceError(error)) {
+        openRechargeForPaidAction("AI audience suggestion");
+        return null;
+      }
       usedLocalSuggestion = true;
       result = {
         ...selectedAudienceSummary,
@@ -3402,11 +3999,18 @@ export default function PlannerPage() {
       && isUuid(planner.selectedTrendId)
       && isUuid(planner.selectedAudienceId)
       && isUuid(planner.selectedCreatorId)) {
-      try {
-        await generateIdeas({ trendId: planner.selectedTrendId, audienceId: planner.selectedAudienceId, creatorId: planner.selectedCreatorId }).unwrap();
-      } catch {
+      if (!canRunPaidModelAction("AI trend idea generation")) {
         usedLocalBatch = true;
-        // The local mock batch below keeps the CTA useful if a real API is unavailable.
+      } else {
+        try {
+          await generateIdeas({ trendId: planner.selectedTrendId, audienceId: planner.selectedAudienceId, creatorId: planner.selectedCreatorId }).unwrap();
+        } catch (error) {
+          if (isInsufficientBalanceError(error)) {
+            openRechargeForPaidAction("AI trend idea generation");
+          }
+          usedLocalBatch = true;
+          // The local mock batch below keeps the CTA useful if a real API is unavailable.
+        }
       }
     }
     const batchIndex = Math.floor(extraIdeas.length / 2) % mockIdeaBatches.length;
@@ -3564,8 +4168,8 @@ export default function PlannerPage() {
       const report = buildStoryboardPdfReport({
         projectId: activeProjectId,
         scriptId: scriptDetailIdea?.scriptId || "",
-        title: currentStoryboard?.projectTitle || currentStoryboard?.title || selectedIdea?.title || scriptDetailIdea?.title || "Storyboard",
-        storyline: buildExportStoryline({ storyScriptIdea, scriptDetailIdea, selectedIdea, currentStoryboard }),
+        title: buildExportTitle({ activeProjectId, storyScriptIdea, scriptDetailIdea, selectedIdea, currentStoryboard }),
+        storyline: buildExportStoryline({ activeProjectId, storyScriptIdea, scriptDetailIdea, selectedIdea, currentStoryboard }),
         scenes: scenes.slice(0, shotExportSummary.expected),
         durationSeconds: currentStoryboard?.durationSeconds || currentStoryboard?.duration || selectedDuration,
         screenType: currentStoryboard?.screenType || screenType,
@@ -3618,12 +4222,47 @@ export default function PlannerPage() {
     dispatch(setCursorMs(Math.min(preview.durationMs, index * sceneMs)));
   };
 
+  const handleReorderPostProductionShots = (fromIndex, toIndex) => {
+    const from = Number(fromIndex);
+    const to = Number(toIndex);
+    if (!Number.isFinite(from) || !Number.isFinite(to) || from === to || from < 0 || to < 0 || from >= scenes.length || to >= scenes.length) return;
+    const orderedKeys = scenes.map(sceneOrderKey);
+    const nextOrder = moveArrayItem(orderedKeys, from, to);
+    const reorderedScenes = moveArrayItem(scenes, from, to);
+    setPostProductionSceneOrder(nextOrder);
+    setGeneratedStoryboard((current) => {
+      const base = current || currentStoryboard || {};
+      if (!base && !reorderedScenes.length) return current;
+      return {
+        ...base,
+        scenes: reorderedScenes,
+        shots: Array.isArray(base.shots) && base.shots.length ? sortScenesLikeOrder(base.shots, reorderedScenes) : base.shots,
+        totalShots: reorderedScenes.length,
+        productionPlanTags: extractProductionPlanTagsFromScenes(reorderedScenes),
+      };
+    });
+    setScriptDetailIdea((current) => current ? {
+      ...current,
+      scriptScenes: sortScenesLikeOrder(current.scriptScenes?.length ? current.scriptScenes : reorderedScenes, reorderedScenes),
+      scriptJson: current.scriptJson ? {
+        ...current.scriptJson,
+        shots: sortScenesLikeOrder(current.scriptJson.shots || current.scriptScenes || reorderedScenes, reorderedScenes),
+      } : current.scriptJson,
+      productionPlanTags: extractProductionPlanTagsFromScenes(reorderedScenes),
+    } : current);
+    dispatch(setCurrentSceneIndex(to));
+    const sceneMs = preview.durationMs / Math.max(1, scenes.length);
+    dispatch(setCursorMs(Math.min(preview.durationMs, to * sceneMs)));
+    addActivity("Shot sequence reordered", `Moved shot ${from + 1} to ${to + 1}`);
+  };
+
   const handleOpenRecharge = () => {
     if (!tenantId) {
       flash("Set up organization before wallet recharge", "error");
       scrollToSection("dashboard");
       return;
     }
+    setLowBalanceNotice(null);
     setRechargeOpen(true);
   };
 
@@ -3818,6 +4457,8 @@ export default function PlannerPage() {
       }
       setStoryScriptIdea(restored.storyScriptIdea || null);
       setScriptDetailIdea(restored.scriptDetailIdea || null);
+      setStorytellingType(restored.storytellingType || DEFAULT_STORYTELLING_TYPE);
+      setHookLens(restored.hookLens || DEFAULT_HOOK_LENS);
       setCastPlan(restored.castPlan || null);
       setSelectedAudienceDecision(restored.audienceDecision || null);
       setGeneratedStoryboard(restored.storyboard || null);
@@ -3893,6 +4534,8 @@ export default function PlannerPage() {
         : await fetchScriptHistoryItem(id).unwrap();
       if (type === "storyline") {
         const storyIdea = normalizeBackendStorylineDetail(detail);
+        setStorytellingType(storyIdea.storytellingType || DEFAULT_STORYTELLING_TYPE);
+        setHookLens(storyIdea.hookLens || DEFAULT_HOOK_LENS);
         setStoryScriptIdea(storyIdea);
         if (storyIdea?.id) {
           setSavedStoryIdeaId(storyIdea.id);
@@ -3908,6 +4551,8 @@ export default function PlannerPage() {
         scrollToSection("workflow");
       } else {
         const scriptIdea = normalizeBackendScriptDetail(detail);
+        setStorytellingType(scriptIdea.storytellingType || DEFAULT_STORYTELLING_TYPE);
+        setHookLens(scriptIdea.hookLens || DEFAULT_HOOK_LENS);
         setScriptDetailIdea(scriptIdea);
         if (scriptIdea?.id) {
           setStoryScriptIdea((current) => current || normalizeGeneratedIdea(scriptIdea));
@@ -3935,6 +4580,10 @@ export default function PlannerPage() {
           onDialogueLanguageChange={setDialogueLanguage}
           screenType={screenType}
           onScreenTypeChange={setScreenType}
+          storytellingType={storytellingType}
+          onStorytellingTypeChange={setStorytellingType}
+          hookLens={hookLens}
+          onHookLensChange={setHookLens}
           aiProviders={availableAiProviders}
           selectedProviderCode={selectedAiProvider?.code || selectedProviderCode}
           selectedProvider={selectedAiProvider}
@@ -3959,6 +4608,11 @@ export default function PlannerPage() {
           onShowScreenplay={handleShowScreenplay}
           onShowShots={handleShowShots}
           projectMode={projectWorkspaceMode}
+          weeklyIdeaTags={weeklyIdeaTags}
+          weeklyIdeaTagsLoading={weeklyIdeaTagsLoading || refreshWeeklyIdeaTagsState.isLoading}
+          onLoadWeeklyIdeaTags={handleLoadWeeklyIdeaTags}
+          onSelectWeeklyIdeaTag={handleSelectWeeklyIdeaTag}
+          onRefreshWeeklyIdeaTags={handleRefreshWeeklyIdeaTags}
         />
       );
     }
@@ -3968,6 +4622,11 @@ export default function PlannerPage() {
         <StoryScriptPanel
           storyIdea={storyScriptIdea}
           duration={selectedDuration}
+          onDurationChange={setSelectedDuration}
+          storytellingType={storytellingType}
+          onStorytellingTypeChange={setStorytellingType}
+          hookLens={hookLens}
+          onHookLensChange={setHookLens}
           onSave={handleSaveStoryScript}
           isSaving={saveStoryScriptState.isLoading}
           onGenerateScreenplay={handleContinueFromStoryline}
@@ -3993,6 +4652,8 @@ export default function PlannerPage() {
           <ScriptReviewPanel
             scriptIdea={scriptDetailIdea}
             duration={selectedDuration}
+            storytellingType={storytellingType}
+            hookLens={hookLens}
             onGenerate={handleGenerateScreenplayForStoryIdea}
             isGenerating={generateScreenplayState.isLoading || generateScreenplayAsyncState.isLoading || Boolean(screenplayJobId)}
             onSave={handleSaveGeneratedScript}
@@ -4046,14 +4707,12 @@ export default function PlannerPage() {
                 <span className="rounded bg-purple-400/10 px-1.5 py-0.5 text-[10px] font-black text-purple-200">{displayedProjectHistory.length}</span>
               )}
             </button>
-            {!projectWorkspaceMode && (
-              <button type="button" onClick={() => setRecentIdeaJobsOpen(true)} className="creator-control flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-300">
-                <History size={16} /> Recent Ideas
-                {recentIdeaGenerationJobs.length > 0 && (
-                  <span className="rounded bg-emerald-400/10 px-1.5 py-0.5 text-[10px] font-black text-emerald-200">{recentIdeaGenerationJobs.length}</span>
-                )}
-              </button>
-            )}
+            <button type="button" onClick={() => setRecentIdeaJobsOpen(true)} className="creator-control flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-300">
+              <History size={16} /> Recent Ideas
+              {recentIdeaGenerationJobs.length > 0 && (
+                <span className="rounded bg-emerald-400/10 px-1.5 py-0.5 text-[10px] font-black text-emerald-200">{recentIdeaGenerationJobs.length}</span>
+              )}
+            </button>
             <button type="button" onClick={() => setModal("help")} className="creator-control flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-300">
               <HelpCircle size={16} /> How it works
             </button>
@@ -4239,7 +4898,9 @@ export default function PlannerPage() {
             <ChevronLeft size={16} /> Previous
           </button>
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-white">{activeWorkflowSlide.label}: {selectedIdea?.title || "Select a trend or original idea first"}</p>
+            <p className="truncate text-sm font-bold text-white">
+              {activeWorkflowSlide.label}: {selectedIdea?.title || (activeWorkflowSlide.id === "ideas" ? "Pick a trend tag or save a topic" : "Start from Creative Brief")}
+            </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="text-xs font-semibold text-slate-500">Step {workflowIndex + 1} of {workflowDisplaySlides.length}</span>
               {workflowIndex < workflowDisplaySlides.length - 1 && (
@@ -4360,17 +5021,23 @@ export default function PlannerPage() {
       {effectiveShotPlansReady && (
         <div className="creator-panel-muted flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-normal text-emerald-200">Ready for real footage</p>
+            <p className={`text-xs font-black uppercase tracking-normal ${polishUnlocked ? "text-emerald-200" : "text-amber-200"}`}>
+              {polishUnlocked ? "Ready for real footage" : "Generate shots first"}
+            </p>
             <p className="mt-1 text-sm font-semibold text-slate-300">
-              Upload each recorded take in Polish, review camera/dialogue fit, then generate a preview pass for lighting, background, production design, and sound direction.
+              {polishUnlocked
+                ? "Upload each recorded take in Polish, review camera/dialogue fit, then generate a preview pass for lighting, background, production design, and sound direction."
+                : polishBlockedReason}
             </p>
           </div>
           <button
             type="button"
+            disabled={!polishUnlocked}
             onClick={() => handleWorkspacePageClick("shoot-polish")}
-            className="creator-primary flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white"
+            className="creator-primary flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            title={polishBlockedReason || "Open Polish"}
           >
-            Open Polish <ChevronRight size={16} />
+            {shotGenerationLoading ? "Generating Shots" : "Open Polish"} <ChevronRight size={16} />
           </button>
         </div>
       )}
@@ -4385,38 +5052,48 @@ export default function PlannerPage() {
 
       {workspacePage === "shoot-polish" && (
       <section id="shoot-polish" className="creator-section space-y-5">
-        {!effectiveShotPlansReady && (
+        {polishBlockedReason && (
           <div className="creator-panel border-amber-300/20 bg-amber-400/[0.045] p-4">
-            <p className="text-xs font-black uppercase tracking-normal text-amber-200">Shot design needed</p>
+            <p className="text-xs font-black uppercase tracking-normal text-amber-200">
+              {effectiveShotPlansReady ? "Generated shots needed" : "Shot design needed"}
+            </p>
             <p className="mt-1 text-sm font-semibold leading-6 text-slate-300">
-              Generate shot plans first. Once every shot has camera, lighting, production design, and sound direction, upload the recorded take here and polish it.
+              {polishBlockedReason}
             </p>
             <button
               type="button"
               onClick={() => handleWorkspacePageClick("storyboard")}
-              className="creator-primary mt-3 inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white"
+              disabled={shotGenerationLoading}
+              className="creator-primary mt-3 inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Open Shot Design <ChevronRight size={16} />
+              {shotGenerationLoading ? "Generating Shots" : effectiveShotPlansReady ? "Open Shot Design" : "Open Shot Design"} <ChevronRight size={16} />
             </button>
           </div>
         )}
-        <div className={`grid gap-5 ${postProductionShotRailCollapsed ? "xl:grid-cols-[4.25rem_minmax(0,1fr)]" : "xl:grid-cols-[minmax(18rem,0.85fr)_minmax(0,1.35fr)]"}`}>
+        <div className={`grid gap-5 ${postProductionShotRailCollapsed ? "xl:grid-cols-[4.25rem_minmax(0,1fr)]" : "xl:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]"}`}>
           <PostProductionShotStrip
             scenes={scenes}
             activeIndex={preview.currentSceneIndex}
             onSelect={handleSceneSelect}
             collapsed={postProductionShotRailCollapsed}
             onToggle={() => setPostProductionShotRailCollapsed((collapsed) => !collapsed)}
+            disabled={shotTakeBusy || insertStoryboardTimelineShotState.isLoading}
+            onInsertShot={handleAddEmptyPostProductionShot}
+            onReorderShots={handleReorderPostProductionShots}
           />
           <ShotTakePanel
             scenes={scenes}
             takes={shotTakes}
             scriptId={scriptDetailIdea?.scriptId}
-            pricingMatrix={creatorAiPricing}
             focusedShotNumber={selectedScene?.shotNumber || preview.currentSceneIndex + 1}
             isLoading={shotTakesLoading}
             isBusy={shotTakeBusy}
             activeJob={shotTakeJob}
+            acceptedSequence={acceptedShotSequence}
+            acceptedSequenceLoading={acceptedShotSequenceLoading || renderAcceptedShotSequenceState.isLoading}
+            providerCredits={creatorProviderCredits}
+            polishLocked={!polishUnlocked}
+            polishBlockedReason={polishBlockedReason}
             onUpload={handleUploadShotTake}
             onUploadReferenceFrame={handleUploadShotTakeReferenceFrame}
             onDeleteTimelineFrame={handleDeleteShotTakeTimelineFrame}
@@ -4426,16 +5103,75 @@ export default function PlannerPage() {
             onReview={handleReviewShotTake}
             onConfirm={handleConfirmShotTake}
             onEnhancePreview={handleEnhanceShotTakePreview}
-            onApplyPreviewToTimeline={handleApplyShotTakePreviewToTimeline}
             onStudioPolish={handleStudioPolishShotTake}
-            onStudioPolishAll={handleStudioPolishAllShotTakes}
+            onSaveTextOverlay={handleSaveShotTakeTextOverlay}
+            onSavePolishedVideoFrames={handleSaveShotTakePolishedVideoFrames}
+            onGeneratePolishedVideoFrames={handleGenerateShotTakePolishedFrames}
             onEnhanceAudio={handleEnhanceShotTakeAudio}
+            onMixAudio={handleMixShotTakeAudio}
+            onRenderFinalVideo={handleRenderShotTakeFinalVideo}
+            onGenerateInsertedShot={handleInsertStoryboardTimelineShot}
+            isInsertingShot={insertStoryboardTimelineShotState.isLoading}
             onFeedback={handleShotTakeFeedback}
             onEnhanceAll={handleEnhanceAllShotTakes}
           />
         </div>
-        <GenerationStatusBar job={shotTakeJob || (shotTakeJobId ? { status: "RUNNING", progress: 35, message: "Processing shoot and polish job" } : null)} label="Shoot & Polish" />
+        <GenerationStatusBar job={shotTakeJob || (shotTakeJobId && !shotTakeJobIsError ? { status: "RUNNING", progress: 35, message: "Processing shoot and polish job" } : null)} label="Shoot & Polish" />
       </section>
+      )}
+
+      {tenantId && !rechargeOpen && lowBalanceNotice && (
+        <div
+          className="fixed inset-0 z-[75] bg-slate-950/45 p-4 backdrop-blur-[2px]"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Recharge wallet"
+          onClick={() => setLowBalanceNotice(null)}
+        >
+          <div
+            className="absolute bottom-4 right-4 w-[min(24rem,calc(100vw-2rem))] rounded-lg border border-amber-300/35 bg-[#16110a]/90 p-3 text-amber-50 shadow-2xl shadow-black/55 backdrop-blur-md"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-amber-300/15 text-amber-200">
+                <WalletCards size={17} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-amber-100">Recharge wallet</p>
+                <p className="mt-1 text-xs leading-5 text-amber-100/80">
+                  Recharge to run {lowBalanceNotice.actionLabel || "paid AI generation"}. Your generated ideas and scripts stay visible after closing this.
+                </p>
+                <p className="mt-1 text-[11px] font-semibold uppercase tracking-normal text-amber-200/80">
+                  Balance {formatWalletAmount(walletBalanceAmount, walletCurrencyCode)} · Minimum {formatWalletAmount(lowBalanceNotice.minimumBalance || paidGenerationMinimumBalance, walletCurrencyCode)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLowBalanceNotice(null)}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/10 text-amber-100/80 hover:border-amber-200/40 hover:text-amber-50"
+                aria-label="Close low balance notice"
+              >
+                <X size={15} />
+              </button>
+            </div>
+            <div className="mt-3 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setLowBalanceNotice(null)}
+                className="creator-control px-3 py-2 text-xs font-bold text-slate-100"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenRecharge}
+                className="creator-primary flex items-center gap-2 px-3 py-2 text-xs font-bold text-white"
+              >
+                <WalletCards size={14} /> Recharge
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <RechargeWalletModal
@@ -5217,8 +5953,33 @@ function normalizeGeneratedIdea(idea) {
     source: idea?.source || "AI_FROM_LOCKED_BRIEF",
     lockedIdeaId: idea?.lockedIdeaId,
     projectId: idea?.projectId,
+    storytellingType: idea?.storytellingType || idea?.storyScriptJson?.storytellingType || idea?.scriptJson?.storytellingType || DEFAULT_STORYTELLING_TYPE,
+    storytellingGuidance: idea?.storytellingGuidance || idea?.storyScriptJson?.storytellingGuidance || idea?.scriptJson?.storytellingGuidance || {},
+    hookLens: idea?.hookLens || idea?.storyScriptJson?.hookLens || idea?.scriptJson?.hookLens || DEFAULT_HOOK_LENS,
+    hookLensGuidance: idea?.hookLensGuidance || idea?.storyScriptJson?.hookLensGuidance || idea?.scriptJson?.hookLensGuidance || {},
+    hookBridge: idea?.hookBridge || idea?.storyScriptJson?.hookBridge || idea?.scriptJson?.hookBridge || {},
+    factualityNotes: idea?.factualityNotes || idea?.storyScriptJson?.factualityNotes || idea?.scriptJson?.factualityNotes || {},
     creativeNotes: idea?.creativeNotes || idea?.notes || {},
   };
+}
+
+function hasWeeklyIdeaTagsPayload(payload = {}) {
+  const hasText = (item = {}) => Boolean(String(
+    item?.title
+    || item?.label
+    || item?.tag
+    || item?.topic
+    || item?.prompt
+    || item?.creatorPrompt
+    || item?.brief
+    || ""
+  ).trim());
+  const categories = Array.isArray(payload?.categories) ? payload.categories : [];
+  if (categories.some((category) => Array.isArray(category?.ideas) && category.ideas.some(hasText))) {
+    return true;
+  }
+  const tags = Array.isArray(payload?.tags) ? payload.tags : [];
+  return tags.some(hasText);
 }
 
 function buildLocalGeneratedIdeasFromBrief(brief, context = {}) {
@@ -5244,7 +6005,7 @@ function buildLocalGeneratedIdeasFromBrief(brief, context = {}) {
     ["Emotional payoff", "Build toward one sincere line or look that closes the loop."],
     ["Shareable punchline", "End with a line viewers would send to a friend."],
   ];
-  const baseTitle = truncateText(brief?.title || context.trend?.title || "Locked brief", 72);
+  const baseTitle = truncateText(brief?.title || context.trend?.title || "Saved brief", 72);
   const categoryLabel = filterLabels.category?.[context.filters?.category] || context.filters?.category || "Creator";
   const seed = String(brief?.lockedIdeaId || brief?.id || "local").replace(/[^a-z0-9]/gi, "").slice(0, 10) || "local";
 
@@ -5256,6 +6017,8 @@ function buildLocalGeneratedIdeasFromBrief(brief, context = {}) {
     description,
     source: "AI_FROM_LOCKED_BRIEF",
     durationSeconds: context.durationSeconds || 30,
+    storytellingType: context.storytellingType || DEFAULT_STORYTELLING_TYPE,
+    hookLens: context.hookLens || DEFAULT_HOOK_LENS,
     hashtags: [`#${String(categoryLabel).replace(/[^a-z0-9]/gi, "")}`, `#${angle.replace(/[^a-z0-9]/gi, "")}`, "#ShortsIdea"],
     creativeNotes: {
       hook: angle,
@@ -5265,9 +6028,11 @@ function buildLocalGeneratedIdeasFromBrief(brief, context = {}) {
   }));
 }
 
-function buildLocalStoryScriptFromIdea(idea, durationSeconds = 30, dialogueLanguage = "English", screenType = "vertical", category = "creator") {
+function buildLocalStoryScriptFromIdea(idea, durationSeconds = 30, dialogueLanguage = "English", screenType = "vertical", category = "creator", storytellingType = DEFAULT_STORYTELLING_TYPE, hookLens = DEFAULT_HOOK_LENS) {
   const title = idea?.title || "Creator Story Script";
   const { spokenLines } = localLanguageLines(dialogueLanguage, title);
+  const normalizedStorytellingType = normalizeStorytellingType(storytellingType);
+  const normalizedHookLens = normalizeHookLens(hookLens);
   const characters = [
     {
       name: dialogueLanguage?.toLowerCase?.().includes("hindi") || dialogueLanguage?.toLowerCase?.().includes("hinglish") ? "Priya" : "Asha",
@@ -5314,6 +6079,12 @@ function buildLocalStoryScriptFromIdea(idea, durationSeconds = 30, dialogueLangu
     category,
     dialogueLanguage,
     screenType,
+    storytellingType: normalizedStorytellingType,
+    storytellingGuidance: storytellingGuidanceFor(normalizedStorytellingType),
+    hookLens: normalizedHookLens,
+    hookLensGuidance: hookLensGuidanceFor(normalizedHookLens),
+    hookBridge: defaultHookBridgeFor(normalizedHookLens),
+    factualityNotes: defaultFactualityNotesFor(normalizedHookLens),
     logline: `A beginner-friendly short where ${characters[0].name} turns "${title}" into one small believable decision.`,
     centralConflict: `${characters[0].name} wants the payoff, but hesitation and social pressure make the first step feel too big.`,
     storyline: `The story opens on ${characters[0].name} stuck at the decision point. ${characters[1].name} notices the hesitation and gives a tiny practical nudge. Instead of solving everything, ${characters[0].name} takes one small action. The final moment shows a visible emotional shift that makes the idea feel repeatable.`,
@@ -5336,11 +6107,13 @@ function buildLocalStoryScriptFromIdea(idea, durationSeconds = 30, dialogueLangu
   };
 }
 
-function buildLocalGeneratedScriptFromIdea(idea, durationSeconds = 30, dialogueLanguage = "English", screenType = "vertical", category = "creator") {
+function buildLocalGeneratedScriptFromIdea(idea, durationSeconds = 30, dialogueLanguage = "English", screenType = "vertical", category = "creator", storytellingType = DEFAULT_STORYTELLING_TYPE, hookLens = DEFAULT_HOOK_LENS) {
   const sceneCount = Number(durationSeconds) >= 60 ? 10 : Number(durationSeconds) >= 45 ? 8 : 6;
   const segment = Math.max(1, Math.round(Number(durationSeconds) / sceneCount));
   const hook = idea?.creativeNotes?.hook || idea?.title || "Selected story idea";
   const { spokenLines, screenCopy } = localLanguageLines(dialogueLanguage, hook);
+  const normalizedStorytellingType = normalizeStorytellingType(storytellingType);
+  const normalizedHookLens = normalizeHookLens(hookLens);
   const scenes = Array.from({ length: sceneCount }, (_, index) => {
     const start = index * segment;
     const end = index === sceneCount - 1 ? Number(durationSeconds) : Math.min(Number(durationSeconds), (index + 1) * segment);
@@ -5373,6 +6146,13 @@ function buildLocalGeneratedScriptFromIdea(idea, durationSeconds = 30, dialogueL
       projectTitle: idea?.title || "Generated Script",
       duration: durationSeconds,
       totalShots: scenes.length,
+      storytellingType: normalizedStorytellingType,
+      storytellingGuidance: storytellingGuidanceFor(normalizedStorytellingType),
+      shotMixPlan: shotMixPlanFor(normalizedStorytellingType),
+      hookLens: normalizedHookLens,
+      hookLensGuidance: hookLensGuidanceFor(normalizedHookLens),
+      hookBridge: defaultHookBridgeFor(normalizedHookLens),
+      factualityNotes: defaultFactualityNotesFor(normalizedHookLens),
       pacingStyle: "Local preview pacing with a clear hook, middle action, and saveable close",
       emotionalArc: "Decision point -> small action -> visible payoff",
       hookStrategy: "Start with the human hesitation before explaining the idea.",
@@ -5382,32 +6162,135 @@ function buildLocalGeneratedScriptFromIdea(idea, durationSeconds = 30, dialogueL
       category,
       dialogueLanguage,
       screenType,
-      shots: scenes.map((scene, index) => ({
-        shotNumber: index + 1,
-        title: scene.camera,
-        purpose: scene.intent,
-        shotType: scene.camera,
-        cameraAngle: screenType === "horizontal" ? "Centered 16:9 frame" : "Centered 9:16 frame",
-        cameraMovement: index % 2 === 0 ? "Static" : "Handheld light",
-        fps: 30,
-        setDesign: screenType === "horizontal"
-          ? "Simple everyday set arranged for a 16:9 frame, with subject center-safe and side clutter removed."
-          : "Simple everyday set arranged for a 9:16 phone frame, with clean background and safe text space.",
-        peopleInFrame: index === 2 || index === 3 ? 2 : 1,
-        primaryActors: ["Main creator"],
-        sideActors: index === 2 || index === 3 ? ["Support friend"] : [],
-        primaryActorAction: scene.visual,
-        sideActorAction: index === 2 || index === 3 ? "Support friend reacts subtly or gives a small practical nudge without taking focus." : "No side actor required in this shot.",
-        action: scene.visual,
-        voiceOver: scene.dialogue,
-        dialogue: { creator: scene.dialogue },
-        textOverlay: scene.screenText,
-        creatorDirection: scene.directorNote,
-        sketchPrompt: `Monochrome storyboard sketch, ${scene.camera}, ${screenType === "horizontal" ? "horizontal 16:9 composition" : "vertical 9:16 composition"}, phone-friendly creator short.`,
-      })),
+      shots: scenes.map((scene, index) => {
+        const storytellingRole = localStorytellingRoleFor(index, normalizedStorytellingType);
+        const relatedVisual = storytellingRole === "related_visual";
+        return {
+          shotNumber: index + 1,
+          title: scene.camera,
+          purpose: scene.intent,
+          shotType: scene.camera,
+          cameraAngle: screenType === "horizontal" ? "Centered 16:9 frame" : "Centered 9:16 frame",
+          cameraMovement: index % 2 === 0 ? "Static" : "Handheld light",
+          fps: 30,
+          storytellingRole,
+          assetCaptureMode: relatedVisual ? "record_or_generate" : "record",
+          assetGenerationPrompt: relatedVisual ? `Create a clean, phone-friendly visual metaphor or B-roll frame for: ${scene.visual}` : "",
+          setDesign: screenType === "horizontal"
+            ? "Simple everyday set arranged for a 16:9 frame, with subject center-safe and side clutter removed."
+            : "Simple everyday set arranged for a 9:16 phone frame, with clean background and safe text space.",
+          peopleInFrame: relatedVisual ? 0 : index === 2 || index === 3 ? 2 : 1,
+          primaryActors: relatedVisual ? [] : ["Main creator"],
+          sideActors: relatedVisual ? [] : index === 2 || index === 3 ? ["Support friend"] : [],
+          primaryActorAction: relatedVisual ? "No actor required; show the related visual clearly." : scene.visual,
+          sideActorAction: relatedVisual ? "No side actor required in this shot." : index === 2 || index === 3 ? "Support friend reacts subtly or gives a small practical nudge without taking focus." : "No side actor required in this shot.",
+          action: scene.visual,
+          voiceOver: scene.dialogue,
+          dialogue: relatedVisual ? {} : { creator: scene.dialogue },
+          textOverlay: scene.screenText,
+          creatorDirection: relatedVisual ? "Use this as recordable B-roll or generate it as a visual insert." : scene.directorNote,
+          sketchPrompt: `Professional storyboard sketch panel, hand-drawn animatic linework, loose pencil construction marks, clean ink outlines, selective muted marker color accents, ${scene.camera}, ${screenType === "horizontal" ? "horizontal 16:9 composition" : "vertical 9:16 composition"}, phone-friendly creator short with natural light notes, visible wardrobe/set cues, not a black-and-white photo or glossy cinematic still.`,
+        };
+      }),
     },
     durationSeconds,
     status: "SCRIPT_GENERATED",
+  };
+}
+
+function normalizeStorytellingType(value) {
+  const normalized = String(value || DEFAULT_STORYTELLING_TYPE)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (["talking_head", "talking_head_explainer"].includes(normalized)) return "talking_head_explainer";
+  if (["visual_voiceover", "visual_vo", "broll_voiceover"].includes(normalized)) return "visual_voiceover";
+  if (["dialogue_scene", "acted_dialogue", "character_dialogue"].includes(normalized)) return "dialogue_scene";
+  if (["dramatic_scene", "drama", "cinematic_drama"].includes(normalized)) return "dramatic_scene";
+  return "narrator_visual_mix";
+}
+
+function storytellingGuidanceFor(storytellingType = DEFAULT_STORYTELLING_TYPE) {
+  const normalized = normalizeStorytellingType(storytellingType);
+  if (normalized === "talking_head_explainer") {
+    return { primaryMode: "narrator_face", narratorFacePercent: 80, relatedVisualPercent: 20, dialogueStyle: "simple narration with direct creator address" };
+  }
+  if (normalized === "visual_voiceover") {
+    return { primaryMode: "related_visual", narratorFacePercent: 10, relatedVisualPercent: 90, dialogueStyle: "voice over with minimal on-camera dialogue" };
+  }
+  if (normalized === "dialogue_scene") {
+    return { primaryMode: "acted_dialogue", narratorFacePercent: 10, relatedVisualPercent: 20, dialogueStyle: "natural character dialogue" };
+  }
+  if (normalized === "dramatic_scene") {
+    return { primaryMode: "dramatic_scene", narratorFacePercent: 0, relatedVisualPercent: 20, dialogueStyle: "cinematic acted dialogue" };
+  }
+  return { primaryMode: "narrator_visual_mix", narratorFacePercent: 40, relatedVisualPercent: 60, dialogueStyle: "simple narration with engaging dialogue", recordOrGenerateVisuals: true };
+}
+
+function shotMixPlanFor(storytellingType = DEFAULT_STORYTELLING_TYPE) {
+  const guidance = storytellingGuidanceFor(storytellingType);
+  return {
+    narratorFacePercent: guidance.narratorFacePercent || 0,
+    relatedVisualPercent: guidance.relatedVisualPercent || 0,
+    recordOrGenerateVisualsNote: guidance.recordOrGenerateVisuals ? "Related visual shots can be recorded by the user or generated from assetGenerationPrompt." : "",
+  };
+}
+
+function localStorytellingRoleFor(index, storytellingType = DEFAULT_STORYTELLING_TYPE) {
+  const normalized = normalizeStorytellingType(storytellingType);
+  if (normalized === "talking_head_explainer") return index % 5 === 2 ? "related_visual" : "narrator_face";
+  if (normalized === "visual_voiceover") return index === 0 ? "narrator_face" : "related_visual";
+  if (normalized === "dialogue_scene" || normalized === "dramatic_scene") return "acted_dialogue";
+  return index % 3 === 0 ? "narrator_face" : "related_visual";
+}
+
+function normalizeHookLens(value) {
+  const normalized = String(value || DEFAULT_HOOK_LENS)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (["historical", "history"].includes(normalized)) return "history";
+  if (["geo", "geography", "place"].includes(normalized)) return "geography";
+  if (["philosophy", "philosophical"].includes(normalized)) return "philosophy";
+  if (["science", "scientific"].includes(normalized)) return "science";
+  if (["culture", "cultural", "arts"].includes(normalized)) return "culture";
+  if (["psychology", "human_behavior"].includes(normalized)) return "psychology";
+  if (["economics", "economy", "money"].includes(normalized)) return "economics";
+  return "direct";
+}
+
+function hookLensGuidanceFor(hookLens = DEFAULT_HOOK_LENS) {
+  const normalized = normalizeHookLens(hookLens);
+  return {
+    hookLens: normalized,
+    useExternalBridge: normalized !== "direct",
+    factualityRule: "Use only reliable, commonly known facts. Do not invent dates, places, people, causal links, or analogies.",
+    fallbackRule: "If no accurate bridge exists, use a direct hook and mark relationConfidence as none.",
+    bridgeStyle: normalized === "direct" ? "start directly from the original story" : `open with a factual ${normalized} reference only when it truthfully relates to the story`,
+  };
+}
+
+function defaultHookBridgeFor(hookLens = DEFAULT_HOOK_LENS) {
+  const normalized = normalizeHookLens(hookLens);
+  return {
+    hookLens: normalized,
+    factualHook: "",
+    bridgeLine: "",
+    relationConfidence: normalized === "direct" ? "not_applicable" : "none",
+    noFalseLinkReason: normalized === "direct"
+      ? "Direct hook selected."
+      : "Local fallback does not invent external facts. Use direct opening unless the AI can supply a reliable factual bridge.",
+  };
+}
+
+function defaultFactualityNotesFor(hookLens = DEFAULT_HOOK_LENS) {
+  return {
+    hookLens: normalizeHookLens(hookLens),
+    verifiedFacts: [],
+    avoidedClaims: ["No unsupported historical, geographical, philosophical, or causal links."],
+    requiresHumanFactCheck: normalizeHookLens(hookLens) !== "direct",
   };
 }
 
@@ -5598,8 +6481,89 @@ function normalizeShotImageFields(scene = {}) {
   };
 }
 
+function normalizeShotDesignThumbnailFields(scene = {}) {
+  const storyboardTag = firstObject(scene.storyboardTag, scene.storyboard_tag) || {};
+  const lightingTag = firstObject(scene.lightingBuildSheetTag, scene.lighting_build_sheet_tag) || {};
+  const cameraTag = firstObject(scene.cameraPlanSheetTag, scene.camera_plan_sheet_tag) || {};
+  const shotPayload = firstObject(scene.shotPayload, scene.shot_payload, scene.payload) || {};
+  const imageAssets = collectStoryboardImageAssets(scene).filter((asset) => !isTakeLikeShotAsset(imageUrlFromObject(asset), asset));
+  const storyboardImageUrl = firstText(
+    designImageUrl(scene.storyboardImageUrl, scene),
+    designImageUrl(scene.storyboard_image_url, scene),
+    designImageUrl(scene.shotDesignImageUrl, scene),
+    designImageUrl(scene.shot_design_image_url, scene),
+    designImageUrl(shotPayload.storyboardImageUrl, shotPayload),
+    designImageUrl(shotPayload.storyboard_image_url, shotPayload),
+    designImageUrl(storyboardTag.storyboardImageUrl, storyboardTag),
+    designImageUrl(storyboardTag.storyboard_image_url, storyboardTag),
+    designImageUrl(scene.storyboardImage, scene.storyboardImage),
+    designImageUrl(scene.storyboard_image, scene.storyboard_image),
+    designImageUrl(scene.storyboardAsset, scene.storyboardAsset),
+    designImageUrl(scene.storyboard_asset, scene.storyboard_asset),
+    designImageUrl(imageUrlByKind(imageAssets, "storyboard"))
+  );
+  return {
+    storyboardImageUrl,
+    lightingImageUrl: firstText(
+      designImageUrl(scene.lightingImageUrl, scene),
+      designImageUrl(scene.lighting_image_url, scene),
+      designImageUrl(shotPayload.lightingImageUrl, shotPayload),
+      designImageUrl(shotPayload.lighting_image_url, shotPayload),
+      designImageUrl(lightingTag.lightingImageUrl, lightingTag),
+      designImageUrl(lightingTag.lighting_image_url, lightingTag),
+      designImageUrl(scene.lightingImage, scene.lightingImage),
+      designImageUrl(scene.lighting_image, scene.lighting_image),
+      designImageUrl(scene.lightingAsset, scene.lightingAsset),
+      designImageUrl(scene.lighting_asset, scene.lighting_asset),
+      designImageUrl(imageUrlByKind(imageAssets, "lighting"))
+    ),
+    cameraPlanImageUrl: firstText(
+      designImageUrl(scene.cameraPlanImageUrl, scene),
+      designImageUrl(scene.camera_plan_image_url, scene),
+      designImageUrl(scene.dpImageUrl, scene),
+      designImageUrl(scene.dp_image_url, scene),
+      designImageUrl(shotPayload.cameraPlanImageUrl, shotPayload),
+      designImageUrl(shotPayload.camera_plan_image_url, shotPayload),
+      designImageUrl(shotPayload.dpImageUrl, shotPayload),
+      designImageUrl(shotPayload.dp_image_url, shotPayload),
+      designImageUrl(cameraTag.cameraPlanImageUrl, cameraTag),
+      designImageUrl(cameraTag.camera_plan_image_url, cameraTag),
+      designImageUrl(cameraTag.dpImageUrl, cameraTag),
+      designImageUrl(cameraTag.dp_image_url, cameraTag),
+      designImageUrl(scene.cameraPlanImage, scene.cameraPlanImage),
+      designImageUrl(scene.camera_plan_image, scene.camera_plan_image),
+      designImageUrl(scene.cameraPlanAsset, scene.cameraPlanAsset),
+      designImageUrl(scene.camera_plan_asset, scene.camera_plan_asset),
+      designImageUrl(scene.dpImage, scene.dpImage),
+      designImageUrl(scene.dp_image, scene.dp_image),
+      designImageUrl(imageUrlByKind(imageAssets, "dp"))
+    ),
+  };
+}
+
+function designImageUrl(value = "", source = {}) {
+  const url = typeof value === "string" ? value : imageUrlFromObject(value);
+  if (!url) return "";
+  if (isVideoLikeShotAsset(url, source) || isTakeLikeShotAsset(url, source)) return "";
+  return url;
+}
+
 function normalizeShotImageResult(result = {}, baseScene = {}, shotNumber = 1, imageKind = "storyboard") {
   const data = firstObject(result?.data) || {};
+  const rawShot = firstObject(
+    result?.rawShot,
+    result?.raw_shot,
+    result?.shotJson,
+    result?.shot_json,
+    result?.updatedShot,
+    result?.updated_shot,
+    data.rawShot,
+    data.raw_shot,
+    data.shotJson,
+    data.shot_json,
+    data.updatedShot,
+    data.updated_shot
+  ) || {};
   const nestedScene = firstObject(
     result?.scene,
     result?.shot,
@@ -5622,9 +6586,11 @@ function normalizeShotImageResult(result = {}, baseScene = {}, shotNumber = 1, i
   ) || {};
   const candidate = {
     ...baseScene,
+    ...rawShot,
     ...nestedScene,
     ...data,
     ...result,
+    rawShot: rawShot && Object.keys(rawShot).length ? rawShot : result?.rawShot,
     image: nestedImage,
     asset: firstObject(result?.asset, data.asset, nestedImage) || nestedImage,
     images: firstArray(result?.images, result?.assets, result?.shotImages, result?.shot_images, data.images, data.assets, data.shotImages, data.shot_images),
@@ -5779,9 +6745,48 @@ function mergeShotImageUrlsIntoScenes(scenes = [], shotImages = []) {
     const shotNumber = Number(scene?.shotNumber || scene?.shot_number || index + 1);
     const image = imageByShot.get(shotNumber);
     if (!image) return scene;
-    const storyboardUrl = firstText(image.storyboardImageUrl, image.storyboard_image_url, image.signedUrl, image.signed_url, image.imageUrl, image.image_url);
-    const lightingUrl = firstText(image.lightingImageUrl, image.lighting_image_url);
-    const cameraUrl = firstText(image.cameraPlanImageUrl, image.camera_plan_image_url, image.dpImageUrl, image.dp_image_url);
+    const imageAssets = collectStoryboardImageAssets(image);
+    const storyboardUrl = firstText(
+      image.storyboardImageUrl,
+      image.storyboard_image_url,
+      image.signedUrl,
+      image.signed_url,
+      image.imageUrl,
+      image.image_url,
+      imageUrlFromObject(image.storyboardImage),
+      imageUrlFromObject(image.storyboard_image),
+      imageUrlFromObject(image.storyboardAsset),
+      imageUrlFromObject(image.storyboard_asset),
+      imageUrlByKind(imageAssets, "storyboard")
+    );
+    const lightingUrl = firstText(
+      image.lightingImageUrl,
+      image.lighting_image_url,
+      image.lightImageUrl,
+      image.light_image_url,
+      imageUrlFromObject(image.lightingImage),
+      imageUrlFromObject(image.lighting_image),
+      imageUrlFromObject(image.lightingAsset),
+      imageUrlFromObject(image.lighting_asset),
+      imageUrlByKind(imageAssets, "lighting")
+    );
+    const cameraUrl = firstText(
+      image.cameraPlanImageUrl,
+      image.camera_plan_image_url,
+      image.dpImageUrl,
+      image.dp_image_url,
+      image.cameraImageUrl,
+      image.camera_image_url,
+      imageUrlFromObject(image.cameraPlanImage),
+      imageUrlFromObject(image.camera_plan_image),
+      imageUrlFromObject(image.cameraPlanAsset),
+      imageUrlFromObject(image.camera_plan_asset),
+      imageUrlFromObject(image.dpImage),
+      imageUrlFromObject(image.dp_image),
+      imageUrlFromObject(image.dpAsset),
+      imageUrlFromObject(image.dp_asset),
+      imageUrlByKind(imageAssets, "dp")
+    );
     return {
       ...scene,
       shotNumber,
@@ -5796,9 +6801,11 @@ function mergeShotImageUrlsIntoScenes(scenes = [], shotImages = []) {
       lightingImageAssetId: image.lightingImageAssetId || image.lighting_image_asset_id || scene.lightingImageAssetId,
       lightingObjectKey: image.lightingObjectKey || image.lighting_object_key || scene.lightingObjectKey,
       lightingImageUrl: lightingUrl || scene.lightingImageUrl,
+      lightImageUrl: lightingUrl || scene.lightImageUrl,
       cameraPlanImageAssetId: image.cameraPlanImageAssetId || image.camera_plan_image_asset_id || scene.cameraPlanImageAssetId,
       cameraPlanObjectKey: image.cameraPlanObjectKey || image.camera_plan_object_key || scene.cameraPlanObjectKey,
       cameraPlanImageUrl: cameraUrl || scene.cameraPlanImageUrl,
+      dpImageUrl: cameraUrl || scene.dpImageUrl,
     };
   });
 }
@@ -5818,10 +6825,25 @@ function hasShotImageUrlData(item = {}) {
       item.image_url,
       item.lightingImageUrl,
       item.lighting_image_url,
+      item.lightImageUrl,
+      item.light_image_url,
       item.cameraPlanImageUrl,
       item.camera_plan_image_url,
       item.dpImageUrl,
-      item.dp_image_url
+      item.dp_image_url,
+      item.cameraImageUrl,
+      item.camera_image_url,
+      imageUrlFromObject(item.storyboardImage),
+      imageUrlFromObject(item.storyboard_image),
+      imageUrlFromObject(item.lightingImage),
+      imageUrlFromObject(item.lighting_image),
+      imageUrlFromObject(item.cameraPlanImage),
+      imageUrlFromObject(item.camera_plan_image),
+      imageUrlFromObject(item.dpImage),
+      imageUrlFromObject(item.dp_image),
+      imageUrlByKind(collectStoryboardImageAssets(item), "storyboard"),
+      imageUrlByKind(collectStoryboardImageAssets(item), "lighting"),
+      imageUrlByKind(collectStoryboardImageAssets(item), "dp")
     )
     || item.storyboardImageAssetId
     || item.storyboard_image_asset_id
@@ -6320,21 +7342,171 @@ function buildExportSoundText(scene = {}, storyboardTag = {}) {
   ], " ");
 }
 
-function buildExportStoryline({ storyScriptIdea, scriptDetailIdea, selectedIdea, currentStoryboard } = {}) {
-  return trimText(firstText(
+function buildExportTitle({ activeProjectId, storyScriptIdea, scriptDetailIdea, selectedIdea, currentStoryboard } = {}) {
+  const scope = buildExportScope({ activeProjectId, scriptDetailIdea, currentStoryboard });
+  const matchingStoryScriptIdea = matchesExportScope(storyScriptIdea, scope) ? storyScriptIdea : null;
+  const matchingSelectedIdea = matchesExportScope(selectedIdea, scope) ? selectedIdea : null;
+  return firstText(
+    currentStoryboard?.projectTitle,
+    currentStoryboard?.title,
+    scriptDetailIdea?.title,
+    scriptDetailIdea?.scriptJson?.projectTitle,
+    matchingStoryScriptIdea?.title,
+    matchingSelectedIdea?.title,
+    "Storyboard"
+  );
+}
+
+function buildExportStoryline({ activeProjectId, storyScriptIdea, scriptDetailIdea, selectedIdea, currentStoryboard } = {}) {
+  const scope = buildExportScope({ activeProjectId, scriptDetailIdea, currentStoryboard });
+  const matchingStoryScriptIdea = matchesExportScope(storyScriptIdea, scope) ? storyScriptIdea : null;
+  const matchingSelectedIdea = matchesExportScope(selectedIdea, scope) ? selectedIdea : null;
+  const scopedStoryline = trimText(firstText(
     currentStoryboard?.storyline,
     currentStoryboard?.logline,
+    currentStoryboard?.storyScriptJson?.storyline,
+    currentStoryboard?.storyScriptJson?.logline,
     scriptDetailIdea?.storyline,
     scriptDetailIdea?.scriptJson?.storyline,
     scriptDetailIdea?.scriptJson?.logline,
-    storyScriptIdea?.storyScriptJson?.storyline,
-    storyScriptIdea?.storyScriptJson?.logline,
-    storyScriptIdea?.storyScriptText,
-    storyScriptIdea?.description,
-    selectedIdea?.description,
-    selectedIdea?.summary,
+    buildSceneStorylineSnippet(scriptDetailIdea?.scriptScenes || scriptDetailIdea?.scriptJson?.shots || currentStoryboard?.scenes),
+    matchingStoryScriptIdea?.storyScriptJson?.storyline,
+    matchingStoryScriptIdea?.storyScriptJson?.logline,
+    matchingStoryScriptIdea?.storyScriptText,
+    matchingStoryScriptIdea?.description,
+    matchingSelectedIdea?.storyScriptJson?.storyline,
+    matchingSelectedIdea?.storyScriptJson?.logline,
+    matchingSelectedIdea?.description,
+    matchingSelectedIdea?.summary,
     scriptDetailIdea?.scriptText
   ), 900);
+  return scopedStoryline || "Storyline not available for this storyboard.";
+}
+
+function buildExportScope({ activeProjectId, scriptDetailIdea, currentStoryboard } = {}) {
+  return {
+    projectIds: exportIdSet(
+      activeProjectId,
+      scriptDetailIdea?.projectId,
+      scriptDetailIdea?.project_id,
+      currentStoryboard?.projectId,
+      currentStoryboard?.project_id
+    ),
+    scriptIds: exportIdSet(
+      scriptDetailIdea?.scriptId,
+      scriptDetailIdea?.script_id,
+      currentStoryboard?.scriptId,
+      currentStoryboard?.script_id,
+      currentStoryboard?.screenplayId,
+      currentStoryboard?.screenplay_id
+    ),
+    storyIdeaIds: exportIdSet(
+      scriptDetailIdea?.storyIdeaId,
+      scriptDetailIdea?.story_idea_id,
+      scriptDetailIdea?.ideaId,
+      scriptDetailIdea?.idea_id,
+      scriptDetailIdea?.id,
+      currentStoryboard?.storyIdeaId,
+      currentStoryboard?.story_idea_id,
+      currentStoryboard?.ideaId,
+      currentStoryboard?.idea_id
+    ),
+    lockedIdeaIds: exportIdSet(
+      scriptDetailIdea?.lockedIdeaId,
+      scriptDetailIdea?.locked_idea_id,
+      currentStoryboard?.lockedIdeaId,
+      currentStoryboard?.locked_idea_id
+    ),
+  };
+}
+
+function matchesExportScope(entity = {}, scope = {}) {
+  if (!entity || typeof entity !== "object") return false;
+  const scopeScriptIds = scope.scriptIds || new Set();
+  const scopeProjectIds = scope.projectIds || new Set();
+  const scopeStoryIdeaIds = scope.storyIdeaIds || new Set();
+  const scopeLockedIdeaIds = scope.lockedIdeaIds || new Set();
+  const scriptJson = entity.scriptJson || {};
+  const storyScriptJson = entity.storyScriptJson || {};
+  const entityIds = {
+    projectIds: exportIdSet(
+      entity.projectId,
+      entity.project_id,
+      scriptJson.projectId,
+      scriptJson.project_id,
+      storyScriptJson.projectId,
+      storyScriptJson.project_id
+    ),
+    scriptIds: exportIdSet(
+      entity.scriptId,
+      entity.script_id,
+      entity.screenplayId,
+      entity.screenplay_id,
+      scriptJson.scriptId,
+      scriptJson.script_id,
+      scriptJson.id
+    ),
+    storyIdeaIds: exportIdSet(
+      entity.storyIdeaId,
+      entity.story_idea_id,
+      entity.ideaId,
+      entity.idea_id,
+      entity.id,
+      scriptJson.storyIdeaId,
+      scriptJson.story_idea_id,
+      storyScriptJson.storyIdeaId,
+      storyScriptJson.story_idea_id
+    ),
+    lockedIdeaIds: exportIdSet(
+      entity.lockedIdeaId,
+      entity.locked_idea_id,
+      scriptJson.lockedIdeaId,
+      scriptJson.locked_idea_id,
+      storyScriptJson.lockedIdeaId,
+      storyScriptJson.locked_idea_id
+    ),
+  };
+  if (scopeScriptIds.size && entityIds.scriptIds.size) {
+    return hasIdOverlap(scopeScriptIds, entityIds.scriptIds);
+  }
+  if (scopeStoryIdeaIds.size && entityIds.storyIdeaIds.size) {
+    return hasIdOverlap(scopeStoryIdeaIds, entityIds.storyIdeaIds);
+  }
+  if (scopeLockedIdeaIds.size && entityIds.lockedIdeaIds.size) {
+    return hasIdOverlap(scopeLockedIdeaIds, entityIds.lockedIdeaIds);
+  }
+  return hasIdOverlap(scopeProjectIds, entityIds.projectIds);
+}
+
+function exportIdSet(...values) {
+  return new Set(values
+    .map((value) => String(value || "").trim().toLowerCase())
+    .filter(Boolean));
+}
+
+function hasIdOverlap(left = new Set(), right = new Set()) {
+  if (!left.size || !right.size) return false;
+  for (const value of left) {
+    if (right.has(value)) return true;
+  }
+  return false;
+}
+
+function buildSceneStorylineSnippet(scenes = []) {
+  if (!Array.isArray(scenes) || !scenes.length) return "";
+  return scenes
+    .slice(0, 5)
+    .map((scene) => firstText(
+      scene?.title,
+      scene?.beatTitle,
+      scene?.narrativeBeat,
+      scene?.description,
+      scene?.visual,
+      scene?.action,
+      scene?.directorNote
+    ))
+    .filter(Boolean)
+    .join(" ");
 }
 
 function buildPdfCallbackUrl(projectId, scriptId) {
@@ -6476,6 +7648,29 @@ function hasProductionPlanData(value = {}) {
   return Boolean(extractStoryboardTag(value) || extractLightingTag(value) || extractCameraTag(value));
 }
 
+function hasProductionPlanImageKindData(value = {}, imageKind = "storyboard") {
+  const normalizedKind = normalizeImageAssetKind(imageKind);
+  if (normalizedKind === "lighting") return Boolean(extractLightingTag(value));
+  if (normalizedKind === "dp") return Boolean(extractCameraTag(value));
+  return Boolean(extractStoryboardTag(value));
+}
+
+function productionPlanForShot(plans = [], scene = {}, shotNumber = 1) {
+  const targetShotNumber = Number(shotNumber || scene?.shotNumber || scene?.shot_number || 1);
+  const source = Array.isArray(plans) ? plans : [];
+  return source.find((plan, index) => Number(
+    plan?.shotNumber
+    || plan?.shot_number
+    || plan?.storyboardTag?.shotNumber
+    || plan?.storyboard_tag?.shot_number
+    || plan?.lightingBuildSheetTag?.shotNumber
+    || plan?.lighting_build_sheet_tag?.shot_number
+    || plan?.cameraPlanSheetTag?.shotNumber
+    || plan?.camera_plan_sheet_tag?.shot_number
+    || index + 1
+  ) === targetShotNumber) || (Number(scene?.shotNumber || scene?.shot_number || 0) === targetShotNumber ? scene : null);
+}
+
 function extractStoryboardTag(value = {}) {
   const tag = firstObject(
     value.storyboardTag,
@@ -6544,6 +7739,62 @@ function replaceSceneByShotNumber(scenes = [], replacement = {}) {
   return replaced ? updated : [...updated, replacement].sort((a, b) => Number(a?.shotNumber || 0) - Number(b?.shotNumber || 0));
 }
 
+function replaceShotInScriptJson(scriptJson = {}, replacement = {}) {
+  if (!scriptJson || typeof scriptJson !== "object" || !replacement || typeof replacement !== "object") {
+    return scriptJson;
+  }
+  const shotNumber = Number(replacement.shotNumber || replacement.shot_number || 0);
+  if (!shotNumber) return scriptJson;
+  const sourceShots = Array.isArray(scriptJson.shots) ? scriptJson.shots : [];
+  let replaced = false;
+  const shots = sourceShots.map((shot, index) => {
+    const currentShotNumber = Number(shot?.shotNumber || shot?.shot_number || index + 1);
+    if (currentShotNumber === shotNumber) {
+      replaced = true;
+      return {
+        ...shot,
+        ...replacement,
+        shotNumber,
+      };
+    }
+    return shot;
+  });
+  if (!replaced) {
+    shots.push({ ...replacement, shotNumber });
+  }
+  shots.sort((left, right) => Number(left?.shotNumber || left?.shot_number || 0) - Number(right?.shotNumber || right?.shot_number || 0));
+  return {
+    ...scriptJson,
+    shots,
+    totalShots: scriptJson.totalShots || shots.length,
+  };
+}
+
+function rawShotFromShotImageResult(result = {}, fallbackScene = {}, shotNumber = 1) {
+  const data = firstObject(result?.data) || {};
+  const rawShot = firstObject(
+    result?.rawShot,
+    result?.raw_shot,
+    result?.shotJson,
+    result?.shot_json,
+    result?.updatedShot,
+    result?.updated_shot,
+    data.rawShot,
+    data.raw_shot,
+    data.shotJson,
+    data.shot_json,
+    data.updatedShot,
+    data.updated_shot,
+    fallbackScene?.rawShot,
+    fallbackScene?.raw_shot
+  );
+  if (!rawShot || !Object.keys(rawShot).length) return null;
+  return {
+    ...rawShot,
+    shotNumber: Number(rawShot.shotNumber || rawShot.shot_number || fallbackScene?.shotNumber || shotNumber),
+  };
+}
+
 function shiftScenesAfterShotNumber(scenes = [], afterShotNumber = 0) {
   const after = Number(afterShotNumber || 0);
   return (Array.isArray(scenes) ? scenes : [])
@@ -6560,9 +7811,45 @@ function shiftScenesAfterShotNumber(scenes = [], afterShotNumber = 0) {
     .sort((a, b) => Number(a?.shotNumber || 0) - Number(b?.shotNumber || 0));
 }
 
+function createEmptyInsertedShot(afterScene = {}, insertedShotNumber = 1, afterShotNumber = 0) {
+  const placeholderId = `empty-inserted-shot-${Date.now()}-${insertedShotNumber}`;
+  return {
+    id: placeholderId,
+    sceneId: placeholderId,
+    shotNumber: Number(insertedShotNumber || 1),
+    title: "Empty shot slot",
+    description: "Describe this shot to generate storyboard, production, lighting, camera, and sound direction.",
+    timestamp: "",
+    storyboardTag: {},
+    lightingBuildSheetTag: {},
+    cameraPlanSheetTag: {},
+    shotPayload: {},
+    needsShotGeneration: true,
+    emptyShotSlot: true,
+    placeholderType: "inserted-shot",
+    insertAfterShotNumber: Number(afterShotNumber || afterScene?.shotNumber || 0),
+    insertAfterSceneId: afterScene?.sceneId || afterScene?.id || "",
+  };
+}
+
+function isGeneratedShotPlaceholder(scene = {}) {
+  return Boolean(
+    scene?.needsShotGeneration
+    || scene?.needs_shot_generation
+    || scene?.emptyShotSlot
+    || scene?.empty_shot_slot
+    || scene?.placeholderType === "inserted-shot"
+  );
+}
+
+function removeSceneByOrderKey(scenes = [], scene = {}) {
+  const targetKey = sceneOrderKey(scene, Number(scene?.shotNumber || 1) - 1);
+  return (Array.isArray(scenes) ? scenes : []).filter((item, index) => sceneOrderKey(item, index) !== targetKey);
+}
+
 function mergeScenePreservingImages(existing = {}, replacement = {}) {
   const merged = { ...existing, ...replacement };
-  ["signedUrl", "imageUrl", "storyboardImageUrl", "publicUrl", "assetUrl", "lightingImageUrl", "cameraPlanImageUrl"].forEach((field) => {
+  ["signedUrl", "imageUrl", "storyboardImageUrl", "publicUrl", "assetUrl", "lightingImageUrl", "lightImageUrl", "cameraPlanImageUrl", "dpImageUrl", "cameraImageUrl"].forEach((field) => {
     if (!replacement[field] && existing[field]) {
       merged[field] = existing[field];
     }
@@ -6602,6 +7889,9 @@ function buildStoryScriptTextFromDraft(scriptJson = {}) {
     `Duration: ${scriptJson.duration || 30}s`,
     `Dialogue Language: ${scriptJson.dialogueLanguage || "English"}`,
     `Screen Type: ${scriptJson.screenType || "vertical"}`,
+    `Storytelling Type: ${scriptJson.storytellingType || DEFAULT_STORYTELLING_TYPE}`,
+    `Hook Lens: ${scriptJson.hookLens || DEFAULT_HOOK_LENS}`,
+    `Hook Bridge: ${textValue(scriptJson.hookBridge || {})}`,
     "",
     "Logline:",
     scriptJson.logline || "",
@@ -6635,6 +7925,9 @@ function buildScriptTextFromDraft(scriptJson = {}) {
     `Duration: ${scriptJson.duration || 30}s`,
     `Dialogue Language: ${scriptJson.dialogueLanguage || "English"}`,
     `Screen Type: ${scriptJson.screenType || "vertical"}`,
+    `Storytelling Type: ${scriptJson.storytellingType || DEFAULT_STORYTELLING_TYPE}`,
+    `Hook Lens: ${scriptJson.hookLens || DEFAULT_HOOK_LENS}`,
+    `Hook Bridge: ${textValue(scriptJson.hookBridge || {})}`,
     "",
     ...shots.map((shot, index) => [
       `Shot ${shot.shotNumber || index + 1}: ${shot.title || "Untitled"}`,
@@ -6643,6 +7936,9 @@ function buildScriptTextFromDraft(scriptJson = {}) {
       `Dialogue: ${textValue(shot.dialogue)}`,
       `Voice Over: ${shot.voiceOver || ""}`,
       `Text Overlay: ${shot.textOverlay || ""}`,
+      `Story Role: ${shot.storytellingRole || ""}`,
+      `Asset Mode: ${shot.assetCaptureMode || ""}`,
+      `Asset Prompt: ${shot.assetGenerationPrompt || ""}`,
       `Camera: ${shot.shotType || ""} / ${shot.cameraAngle || ""} / ${shot.cameraMovement || ""}`,
       `Set Design: ${shot.setDesign || ""}`,
       `People In Frame: ${shot.peopleInFrame || 1}`,
@@ -6788,6 +8084,12 @@ async function analyzeVideoTakeFile(file, shotNumber) {
     video,
     audio,
   };
+}
+
+async function dataUrlToFileForUpload(dataUrl, fileName) {
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  return new File([blob], fileName, { type: blob.type || "image/jpeg" });
 }
 
 function isSameTimelineFrame(candidate = {}, target = {}) {
@@ -7053,6 +8355,101 @@ function normalizeApiErrorForLog(error) {
   };
 }
 
+function walletBalanceValue(wallet = {}) {
+  const value = Number(
+    wallet?.availableBalance
+    ?? wallet?.available_balance
+    ?? wallet?.balance
+    ?? wallet?.amount
+    ?? wallet?.totalBalance
+    ?? wallet?.total_balance
+    ?? 0
+  );
+  return Number.isFinite(value) ? value : 0;
+}
+
+function normalizeProviderCreditsWallet(wallet = null) {
+  if (!wallet || typeof wallet !== "object") return null;
+  if (!wallet.checked && wallet.balance == null) return null;
+  return {
+    ...wallet,
+    balance: wallet.balance ?? wallet.currentBalance ?? wallet.availableBalance ?? 0,
+    currency: wallet.currency || "INR",
+    minimumBalance: wallet.minimumBalance ?? wallet.minimum_wallet_balance,
+  };
+}
+
+function walletMinimumBalanceValue(wallet = {}, fallback = MINIMUM_PAID_GENERATION_WALLET_BALANCE) {
+  const value = Number(
+    wallet?.minimumBalance
+    ?? wallet?.minimum_balance
+    ?? wallet?.minimumWalletBalance
+    ?? wallet?.minimum_wallet_balance
+    ?? wallet?.requiredMinimumBalance
+    ?? wallet?.required_minimum_balance
+    ?? fallback
+  );
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function formatWalletAmount(amount = 0, currency = "INR") {
+  const value = Number.isFinite(Number(amount)) ? Number(amount) : 0;
+  return `${currency || "INR"} ${value.toFixed(value % 1 === 0 ? 0 : 2)}`;
+}
+
+function minimumBalanceFromError(error = {}) {
+  const data = error?.data || error?.response?.data || {};
+  const direct = Number(
+    data?.minimumBalance
+    ?? data?.minimum_balance
+    ?? data?.minimumWalletBalance
+    ?? data?.minimum_wallet_balance
+    ?? data?.requiredMinimumBalance
+    ?? data?.required_minimum_balance
+  );
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  const text = [
+    data?.message,
+    data?.error,
+    data?.reason,
+    error?.message,
+    error?.error,
+  ].filter(Boolean).join(" ");
+  const match = text.match(/minimum(?:\s+wallet)?\s+balance(?:\s+is)?\s+([0-9]+(?:\.[0-9]+)?)/i);
+  const parsed = Number(match?.[1]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function isInsufficientBalanceError(error = {}) {
+  const data = error?.data || error?.response?.data || {};
+  const status = Number(error?.status || error?.originalStatus || error?.response?.status || data?.status || data?.statusCode || 0);
+  const text = [
+    data?.message,
+    data?.error,
+    data?.reason,
+    data?.code,
+    error?.message,
+    error?.error,
+  ].filter(Boolean).join(" ").toLowerCase();
+  return status === 402
+    || /insufficient|low balance|wallet balance|recharge|payment required|not enough|no credits|credits are not available|balance is zero/.test(text);
+}
+
+function isRateLimitedError(error = {}) {
+  const data = error?.data || error?.response?.data || {};
+  const status = Number(error?.status || error?.originalStatus || error?.response?.status || data?.status || data?.statusCode || 0);
+  const text = [
+    data?.message,
+    data?.error,
+    data?.reason,
+    data?.code,
+    error?.message,
+    error?.error,
+  ].filter(Boolean).join(" ").toLowerCase();
+  return status === 429
+    || /too many requests|rate limit|rate-limited|quota exceeded|resource exhausted|429/.test(text);
+}
+
 function apiErrorMessage(error, fallback = "Request failed. Please check the missing fields and try again.") {
   const data = error?.data || error?.response?.data || null;
   const fieldMessages = data?.fields && typeof data.fields === "object" ? Object.values(data.fields).filter(Boolean) : [];
@@ -7294,6 +8691,8 @@ function buildWorkflowStateFromProject(project = {}) {
 
   return {
     projectId,
+    storytellingType: scriptDetailIdea?.storytellingType || storyScriptIdea?.storytellingType || savedStoryIdea?.storytellingType || lockedBrief?.storytellingType || DEFAULT_STORYTELLING_TYPE,
+    hookLens: scriptDetailIdea?.hookLens || storyScriptIdea?.hookLens || savedStoryIdea?.hookLens || lockedBrief?.hookLens || DEFAULT_HOOK_LENS,
     lockedBrief,
     ideaCandidates,
     savedStoryIdea,
@@ -7358,6 +8757,8 @@ function buildLockedBriefFromProject(project = {}) {
     title,
     description,
     durationSeconds: project.durationSeconds || lockedIdea.durationSeconds || 30,
+    storytellingType: project.storytellingType || lockedIdea.storytellingType || lockedIdea.selectionPayload?.storytellingType || DEFAULT_STORYTELLING_TYPE,
+    hookLens: project.hookLens || lockedIdea.hookLens || lockedIdea.selectionPayload?.hookLens || DEFAULT_HOOK_LENS,
     source: String(project.sourceType || lockedIdea.source || lockedIdea.sourceType || "original").toLowerCase(),
   };
 }
@@ -7376,6 +8777,8 @@ function normalizeProjectStoryIdeas(project = {}, lockedBrief = null) {
     ...idea,
     lockedIdeaId: idea.lockedIdeaId || lockedBrief?.lockedIdeaId,
     projectId: idea.projectId || project.projectId || project.project_id || project.id,
+    storytellingType: idea.storytellingType || lockedBrief?.storytellingType || DEFAULT_STORYTELLING_TYPE,
+    hookLens: idea.hookLens || lockedBrief?.hookLens || DEFAULT_HOOK_LENS,
   }));
 }
 
@@ -7398,6 +8801,8 @@ function normalizeProjectSavedStoryIdea(project = {}, ideaCandidates = [], locke
     status: source.status || "SELECTED",
     lockedIdeaId: source.lockedIdeaId || lockedBrief?.lockedIdeaId,
     projectId: source.projectId || project.projectId || project.project_id || project.id,
+    storytellingType: source.storytellingType || lockedBrief?.storytellingType || DEFAULT_STORYTELLING_TYPE,
+    hookLens: source.hookLens || lockedBrief?.hookLens || DEFAULT_HOOK_LENS,
   });
 }
 
@@ -7417,6 +8822,12 @@ function normalizeProjectStoryScript(project = {}, sourceIdea = null, lockedBrie
     storyScriptJson: buildInitialStoryRevisionPayload(rawScript?.scriptJson || rawScript?.storyScriptJson || sourceIdea?.storyScriptJson || sourceIdea?.selectionContext?.storyScript || {}),
     lockedIdeaId: rawScript?.lockedIdeaId || sourceIdea?.lockedIdeaId || lockedBrief?.lockedIdeaId,
     projectId: rawScript?.projectId || sourceIdea?.projectId || project.projectId || project.project_id || project.id,
+    storytellingType: rawScript?.scriptJson?.storytellingType || rawScript?.storyScriptJson?.storytellingType || sourceIdea?.storytellingType || DEFAULT_STORYTELLING_TYPE,
+    storytellingGuidance: rawScript?.scriptJson?.storytellingGuidance || rawScript?.storyScriptJson?.storytellingGuidance || sourceIdea?.storytellingGuidance || {},
+    hookLens: rawScript?.scriptJson?.hookLens || rawScript?.storyScriptJson?.hookLens || sourceIdea?.hookLens || DEFAULT_HOOK_LENS,
+    hookLensGuidance: rawScript?.scriptJson?.hookLensGuidance || rawScript?.storyScriptJson?.hookLensGuidance || sourceIdea?.hookLensGuidance || {},
+    hookBridge: rawScript?.scriptJson?.hookBridge || rawScript?.storyScriptJson?.hookBridge || sourceIdea?.hookBridge || {},
+    factualityNotes: rawScript?.scriptJson?.factualityNotes || rawScript?.storyScriptJson?.factualityNotes || sourceIdea?.factualityNotes || {},
     status: rawScript?.status || sourceIdea?.status || "SCRIPT_GENERATED",
   });
 }
@@ -7444,6 +8855,12 @@ function normalizeProjectScreenplay(project = {}, sourceIdea = null, lockedBrief
     productionPlanTags: rawScreenplay?.productionPlanTags || project.productionPlanTags || sourceIdea?.productionPlanTags || [],
     lockedIdeaId: rawScreenplay?.lockedIdeaId || sourceIdea?.lockedIdeaId || lockedBrief?.lockedIdeaId,
     projectId: rawScreenplay?.projectId || sourceIdea?.projectId || project.projectId || project.project_id || project.id,
+    storytellingType: scriptJson.storytellingType || sourceIdea?.storytellingType || DEFAULT_STORYTELLING_TYPE,
+    storytellingGuidance: scriptJson.storytellingGuidance || sourceIdea?.storytellingGuidance || {},
+    hookLens: scriptJson.hookLens || sourceIdea?.hookLens || DEFAULT_HOOK_LENS,
+    hookLensGuidance: scriptJson.hookLensGuidance || sourceIdea?.hookLensGuidance || {},
+    hookBridge: scriptJson.hookBridge || sourceIdea?.hookBridge || {},
+    factualityNotes: scriptJson.factualityNotes || sourceIdea?.factualityNotes || {},
     status: rawScreenplay?.status || sourceIdea?.status || "SCREENPLAY_GENERATED",
   });
 }
@@ -7638,12 +9055,150 @@ function buildAiProviderContext(provider) {
   };
 }
 
-function PostProductionShotStrip({ scenes = [], activeIndex = 0, onSelect, collapsed = false, onToggle }) {
+function isVideoLikeShotAsset(value = "", source = {}) {
+  const contentType = firstText(
+    source.contentType,
+    source.content_type,
+    source.mimeType,
+    source.mime_type,
+    source.assetContentType,
+    source.asset_content_type
+  ).toLowerCase();
+  if (contentType.startsWith("video/")) return true;
+  return /\.(mp4|mov|m4v|webm|avi|mkv)(?:$|[?#])/i.test(String(value || ""));
+}
+
+function isTakeLikeShotAsset(value = "", source = {}) {
+  const sourceText = [
+    source.assetType,
+    source.asset_type,
+    source.kind,
+    source.assetKind,
+    source.asset_kind,
+    source.type,
+    source.role,
+    source.source,
+    source.objectKey,
+    source.object_key,
+    source.key,
+    source.path,
+    source.takeId,
+    source.take_id,
+    source.referenceFrameAssetId,
+    source.reference_frame_asset_id,
+    source.metadata?.source,
+    source.metadata?.assetType,
+    source.metadata?.asset_type,
+    source.metadata?.kind,
+  ].filter(Boolean).join(" ").toLowerCase();
+  if (/\b(shot_take|shot-take|take_frame|take-frame|reference_frame|reference-frame|timeline_frame|timeline-frame|polish_anchor|polish-anchor|user_upload|user-upload|raw_take|raw-take|uploaded_take|uploaded-take|recorded_take|recorded-take)\b/.test(sourceText)) {
+    return true;
+  }
+  const urlText = String(value || "").toLowerCase();
+  return /(shot[-_/]?takes|take[-_/]?frames|reference[-_/]?frames?|timeline[-_/]?frames?|polish[-_/]?anchor|user[-_/]?upload|raw[-_/]?take|uploaded[-_/]?take|recorded[-_/]?take)/.test(urlText);
+}
+
+function sceneOrderKey(scene = {}, index = 0) {
+  return String(
+    scene.id
+    || scene.sceneId
+    || scene.scene_id
+    || scene.planId
+    || scene.plan_id
+    || scene.storyboardTag?.shotId
+    || scene.storyboard_tag?.shotId
+    || `shot-${scene.shotNumber || scene.shot_number || index + 1}`
+  );
+}
+
+function applySceneOrder(scenes = [], order = []) {
+  const source = Array.isArray(scenes) ? scenes : [];
+  const keys = Array.isArray(order) ? order : [];
+  if (!source.length || !keys.length) return source;
+  const byKey = new Map(source.map((scene, index) => [sceneOrderKey(scene, index), scene]));
+  const ordered = keys.map((key) => byKey.get(key)).filter(Boolean);
+  const orderedKeys = new Set(keys);
+  const missing = source.filter((scene, index) => !orderedKeys.has(sceneOrderKey(scene, index)));
+  return [...ordered, ...missing];
+}
+
+function reconcileSceneOrder(scenes = [], current = []) {
+  const source = Array.isArray(scenes) ? scenes : [];
+  const order = Array.isArray(current) ? current : [];
+  if (!source.length) return order.length ? [] : order;
+  if (!order.length) return order;
+  const existingKeys = new Set(source.map(sceneOrderKey));
+  const next = order.filter((key) => existingKeys.has(key));
+  source.forEach((scene, index) => {
+    const key = sceneOrderKey(scene, index);
+    if (!next.includes(key)) next.push(key);
+  });
+  return arraysShallowEqual(next, order) ? order : next;
+}
+
+function moveArrayItem(values = [], fromIndex = 0, toIndex = 0) {
+  const next = [...values];
+  const from = Math.max(0, Math.min(next.length - 1, Number(fromIndex) || 0));
+  const to = Math.max(0, Math.min(next.length - 1, Number(toIndex) || 0));
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
+
+function sortScenesLikeOrder(source = [], orderedScenes = []) {
+  const orderMap = new Map((Array.isArray(orderedScenes) ? orderedScenes : []).map((scene, index) => [sceneOrderKey(scene, index), index]));
+  return [...(Array.isArray(source) ? source : [])].sort((left, right) => {
+    const leftOrder = orderMap.get(sceneOrderKey(left, 0));
+    const rightOrder = orderMap.get(sceneOrderKey(right, 0));
+    return (leftOrder ?? 9999) - (rightOrder ?? 9999);
+  });
+}
+
+function arraysShallowEqual(left = [], right = []) {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function postProductionShotThumbnailUrl(shot = {}) {
+  const images = normalizeShotDesignThumbnailFields(shot);
+  return firstText(
+    !isVideoLikeShotAsset(images.storyboardImageUrl, shot) ? images.storyboardImageUrl : "",
+    !isVideoLikeShotAsset(images.lightingImageUrl, shot) ? images.lightingImageUrl : "",
+    !isVideoLikeShotAsset(images.cameraPlanImageUrl, shot) ? images.cameraPlanImageUrl : ""
+  );
+}
+
+function PostProductionShotStrip({ scenes = [], activeIndex = 0, onSelect, collapsed = false, onToggle, disabled = false, onInsertShot, onReorderShots }) {
+  const [draggingIndex, setDraggingIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
   const selectedScene = scenes[activeIndex] || scenes[0] || null;
-  const selectedImages = normalizeShotImageFields(selectedScene || {});
+  const selectedSequenceNumber = activeIndex + 1;
+  const canDrag = Boolean(onReorderShots) && !disabled;
+  const startDrag = (event, index) => {
+    if (!canDrag) return;
+    setDraggingIndex(index);
+    setDragOverIndex(index);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(index));
+  };
+  const dropShot = (event, index) => {
+    if (!canDrag) return;
+    event.preventDefault();
+    const from = draggingIndex ?? Number(event.dataTransfer.getData("text/plain"));
+    setDraggingIndex(null);
+    setDragOverIndex(null);
+    onReorderShots?.(from, index);
+  };
+  const endDrag = () => {
+    setDraggingIndex(null);
+    setDragOverIndex(null);
+  };
+  const submitInsertShot = () => {
+    if (!selectedScene) return;
+    onInsertShot?.(selectedScene);
+  };
   if (collapsed) {
     return (
-      <section className="creator-panel flex min-h-[4.25rem] flex-row items-center gap-3 p-2 xl:min-h-[32rem] xl:flex-col">
+      <section className="creator-panel flex min-h-[4.25rem] flex-row items-center gap-3 p-2 xl:sticky xl:top-4 xl:min-h-[32rem] xl:flex-col">
         <button
           type="button"
           onClick={onToggle}
@@ -7656,29 +9211,41 @@ function PostProductionShotStrip({ scenes = [], activeIndex = 0, onSelect, colla
         <div className="h-10 w-px bg-white/10 xl:h-px xl:w-full" />
         <div className="custom-scrollbar flex w-full flex-1 gap-2 overflow-x-auto pb-1 xl:flex-col xl:overflow-x-hidden xl:overflow-y-auto xl:pb-0 xl:pr-1">
           {scenes.map((scene, index) => {
-            const images = normalizeShotImageFields(scene);
+            const shotImageUrl = postProductionShotThumbnailUrl(scene);
             const active = index === activeIndex;
             return (
               <button
                 key={scene.id || scene.sceneId || `post-shot-rail-${index}`}
                 type="button"
+                draggable={canDrag}
+                onDragStart={(event) => startDrag(event, index)}
+                onDragOver={(event) => {
+                  if (!canDrag) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                  setDragOverIndex(index);
+                }}
+                onDrop={(event) => dropShot(event, index)}
+                onDragEnd={endDrag}
                 onClick={() => onSelect?.(index)}
-                title={scene.title || `Shot ${index + 1}`}
+                title={`Open ${scene.title || `Shot ${index + 1}`}`}
                 className={`grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-lg border text-[10px] font-black transition ${
                   active
                     ? "border-emerald-300/50 bg-emerald-300/[0.12] text-white"
-                    : "border-white/10 bg-white/[0.035] text-slate-400 hover:border-emerald-300/25 hover:text-slate-200"
+                    : dragOverIndex === index
+                      ? "border-cyan-300/50 bg-cyan-300/[0.1] text-white"
+                      : "border-white/10 bg-white/[0.035] text-slate-400 hover:border-emerald-300/25 hover:text-slate-200"
                 }`}
               >
-                {images.storyboardImageUrl ? (
+                {shotImageUrl ? (
                   <span className="relative h-full w-full">
-                    <img src={images.storyboardImageUrl} alt="" className="h-full w-full object-cover opacity-75" loading="lazy" />
+                    <img src={shotImageUrl} alt="" className="h-full w-full object-cover opacity-75" loading="lazy" />
                     <span className="absolute inset-0 grid place-items-center bg-black/35">
-                      {String(scene.shotNumber || index + 1).padStart(2, "0")}
+                      {String(index + 1).padStart(2, "0")}
                     </span>
                   </span>
                 ) : (
-                  String(scene.shotNumber || index + 1).padStart(2, "0")
+                  String(index + 1).padStart(2, "0")
                 )}
               </button>
             );
@@ -7689,13 +9256,12 @@ function PostProductionShotStrip({ scenes = [], activeIndex = 0, onSelect, colla
   }
 
   return (
-    <section className="creator-panel p-4">
+    <section className="creator-panel p-3 xl:sticky xl:top-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-black uppercase tracking-normal text-emerald-200">Storyboard Shot</p>
-          <h3 className="mt-1 truncate text-lg font-extrabold text-white">{selectedScene?.title || "Select a shot"}</h3>
-          <p className="mt-1 text-sm font-semibold text-slate-500">
-            Shot {String(selectedScene?.shotNumber || activeIndex + 1).padStart(2, "0")}
+          <p className="text-xs font-black uppercase tracking-normal text-emerald-200">Shot Navigator</p>
+          <p className="mt-1 text-[11px] font-bold text-slate-500">
+            Sequence {String(selectedSequenceNumber).padStart(2, "0")} selected
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -7714,62 +9280,89 @@ function PostProductionShotStrip({ scenes = [], activeIndex = 0, onSelect, colla
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-white/10 bg-black/30">
-        {selectedImages.storyboardImageUrl ? (
-          <img src={selectedImages.storyboardImageUrl} alt="" className="h-72 w-full object-contain" loading="lazy" />
-        ) : (
-          <div className="grid h-72 place-items-center text-center text-xs font-bold text-slate-500">
-            <div>
-              <ImageIcon size={24} className="mx-auto mb-2 text-slate-600" />
-              Storyboard image pending
-            </div>
-          </div>
-        )}
-      </div>
-      <p className="mt-3 line-clamp-4 text-sm font-medium leading-6 text-slate-400">
-        {selectedScene?.description || selectedScene?.visualDirection || selectedScene?.action || "Open a shot to upload the actual recorded take beside its storyboard."}
-      </p>
-
-      <div className="custom-scrollbar mt-4 max-h-[23rem] space-y-2 overflow-y-auto pr-1">
+      <div className="custom-scrollbar max-h-[32rem] space-y-2 overflow-y-auto pr-1">
         {scenes.map((scene, index) => {
-          const images = normalizeShotImageFields(scene);
+          const shotImageUrl = postProductionShotThumbnailUrl(scene);
           const active = index === activeIndex;
           return (
-            <button
+            <div
               key={scene.id || scene.sceneId || `post-shot-${index}`}
-              type="button"
-              onClick={() => onSelect?.(index)}
-              className={`flex w-full items-center gap-3 rounded-lg border p-2 text-left transition ${
+              draggable={canDrag}
+              onDragStart={(event) => startDrag(event, index)}
+              onDragOver={(event) => {
+                if (!canDrag) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                setDragOverIndex(index);
+              }}
+              onDrop={(event) => dropShot(event, index)}
+              onDragEnd={endDrag}
+              className={`group flex w-full items-center gap-2 rounded-lg border p-2 transition ${
                 active
                   ? "border-emerald-300/40 bg-emerald-400/[0.08]"
-                  : "border-white/10 bg-white/[0.025] hover:border-emerald-300/25 hover:bg-white/[0.055]"
+                  : dragOverIndex === index
+                    ? "border-cyan-300/45 bg-cyan-400/[0.08]"
+                    : "border-white/10 bg-white/[0.025] hover:border-emerald-300/25 hover:bg-white/[0.055]"
               }`}
             >
-              <span className="grid h-14 w-10 shrink-0 place-items-center overflow-hidden rounded-md bg-black/40">
-                {images.storyboardImageUrl ? (
-                  <img src={images.storyboardImageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+              <span
+                className={`grid h-8 w-5 shrink-0 place-items-center rounded text-slate-500 ${canDrag ? "cursor-grab active:cursor-grabbing group-hover:text-slate-300" : ""}`}
+                title={canDrag ? "Drag to reorder" : "Reorder disabled while processing"}
+              >
+                <GripVertical size={14} />
+              </span>
+              <button
+                type="button"
+                onClick={() => onSelect?.(index)}
+                title={`Open ${scene.title || `Shot ${index + 1}`}`}
+                className="flex min-w-0 flex-1 items-center gap-3 text-left outline-none"
+              >
+              <span className="grid h-16 w-11 shrink-0 place-items-center overflow-hidden rounded-md bg-black/40">
+                {shotImageUrl ? (
+                  <img src={shotImageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
                 ) : (
                   <ImageIcon size={14} className="text-slate-600" />
                 )}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[10px] font-black uppercase tracking-normal text-slate-500">
-                  Shot {String(scene.shotNumber || index + 1).padStart(2, "0")}
+                  Sequence {String(index + 1).padStart(2, "0")}
                 </span>
                 <span className="mt-0.5 line-clamp-2 text-xs font-bold leading-5 text-slate-200">{scene.title || scene.description || `Shot ${index + 1}`}</span>
+                {active && (
+                  <span className="mt-1 inline-flex rounded bg-emerald-300/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-normal text-emerald-100">
+                    Open
+                  </span>
+                )}
               </span>
-            </button>
+              </button>
+            </div>
           );
         })}
+      </div>
+
+      <div className="mt-3 rounded-lg border border-white/10 bg-black/25 p-2">
+        <p className="mb-2 text-[10px] font-black uppercase tracking-normal text-slate-400">
+          Add after Sequence {String(selectedSequenceNumber).padStart(2, "0")}
+        </p>
+        <button
+          type="button"
+          disabled={disabled || !selectedScene}
+          onClick={submitInsertShot}
+          className="creator-control mt-2 flex w-full items-center justify-center gap-2 px-3 py-2 text-xs font-bold text-slate-200 disabled:opacity-50"
+          title="Add an empty shot slot after the selected shot."
+        >
+          <Plus size={13} /> Add Empty Shot
+        </button>
       </div>
     </section>
   );
 }
 
 function PostProductionShotThumb({ shot = {} }) {
-  const images = normalizeShotImageFields(shot);
-  if (images.storyboardImageUrl) {
-    return <img src={images.storyboardImageUrl} alt="" className="h-36 w-full bg-black object-cover" loading="lazy" />;
+  const shotImageUrl = postProductionShotThumbnailUrl(shot);
+  if (shotImageUrl) {
+    return <img src={shotImageUrl} alt="" className="h-36 w-full bg-black object-cover" loading="lazy" />;
   }
   return (
     <span className="grid h-36 w-full place-items-center bg-black/40 text-center text-xs font-bold text-slate-500">
@@ -7923,6 +9516,12 @@ function isFailedJobStatus(status) {
   return ["FAILED", "FAILURE", "ERROR", "ERRORED", "CANCELED", "CANCELLED"].includes(String(status || "").toUpperCase());
 }
 
+function queryErrorStatus(error) {
+  const raw = error?.status ?? error?.originalStatus ?? error?.data?.status ?? error?.data?.statusCode;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
 function CreatorModal({ title, onClose, children }) {
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
@@ -8045,6 +9644,12 @@ function normalizeBackendStorylineDetail(detail = {}) {
     lockedIdeaId: detail.lockedIdeaId || selectedIdea.lockedIdeaId,
     projectId: detail.projectId || selectedIdea.projectId,
     durationSeconds: detail.durationSeconds || selectedIdea.durationSeconds,
+    storytellingType: payload.storyScriptJson?.storytellingType || selectedIdea.storytellingType || selectedIdea.selectionContext?.storyScript?.storytellingType || DEFAULT_STORYTELLING_TYPE,
+    storytellingGuidance: payload.storyScriptJson?.storytellingGuidance || selectedIdea.storytellingGuidance || selectedIdea.selectionContext?.storyScript?.storytellingGuidance || {},
+    hookLens: payload.storyScriptJson?.hookLens || selectedIdea.hookLens || selectedIdea.selectionContext?.storyScript?.hookLens || DEFAULT_HOOK_LENS,
+    hookLensGuidance: payload.storyScriptJson?.hookLensGuidance || selectedIdea.hookLensGuidance || selectedIdea.selectionContext?.storyScript?.hookLensGuidance || {},
+    hookBridge: payload.storyScriptJson?.hookBridge || selectedIdea.hookBridge || selectedIdea.selectionContext?.storyScript?.hookBridge || {},
+    factualityNotes: payload.storyScriptJson?.factualityNotes || selectedIdea.factualityNotes || selectedIdea.selectionContext?.storyScript?.factualityNotes || {},
     status: detail.status || selectedIdea.status || "SCRIPT_GENERATED",
     saved: true,
   });
@@ -8068,6 +9673,12 @@ function normalizeBackendScriptDetail(detail = {}) {
     lockedIdeaId: detail.lockedIdeaId || selectedIdea.lockedIdeaId,
     projectId: detail.projectId || selectedIdea.projectId,
     durationSeconds: detail.durationSeconds || selectedIdea.durationSeconds || scriptJson.duration,
+    storytellingType: scriptJson.storytellingType || selectedIdea.storytellingType || DEFAULT_STORYTELLING_TYPE,
+    storytellingGuidance: scriptJson.storytellingGuidance || selectedIdea.storytellingGuidance || {},
+    hookLens: scriptJson.hookLens || selectedIdea.hookLens || DEFAULT_HOOK_LENS,
+    hookLensGuidance: scriptJson.hookLensGuidance || selectedIdea.hookLensGuidance || {},
+    hookBridge: scriptJson.hookBridge || selectedIdea.hookBridge || {},
+    factualityNotes: scriptJson.factualityNotes || selectedIdea.factualityNotes || {},
     status: detail.status || "SCREENPLAY_GENERATED",
     saved: true,
   });
@@ -8207,7 +9818,7 @@ function normalizePostProductionShot(shot = {}, index = 0) {
     lightingBuildSheetTag,
     cameraPlanSheetTag,
   };
-  const imageFields = normalizeShotImageFields(merged);
+  const imageFields = normalizeShotDesignThumbnailFields(merged);
   const title = firstText(
     shot.title,
     shot.shotTitle,
@@ -8231,8 +9842,7 @@ function normalizePostProductionShot(shot = {}, index = 0) {
     lightingBuildSheetTag,
     cameraPlanSheetTag,
     shotPayload,
-    signedUrl: imageFields.storyboardImageUrl,
-    imageUrl: imageFields.storyboardImageUrl,
+    shotDesignImageUrl: imageFields.storyboardImageUrl,
     storyboardImageUrl: imageFields.storyboardImageUrl,
     lightingImageUrl: imageFields.lightingImageUrl,
     cameraPlanImageUrl: imageFields.cameraPlanImageUrl,
@@ -8312,11 +9922,12 @@ function buildPostProductionShotsFromRestored(restored = {}) {
 
   return sourceScenes
     .map((scene, index) => {
-      const imageFields = normalizeShotImageFields(scene);
+      const imageFields = normalizeShotDesignThumbnailFields(scene);
       return {
         ...scene,
         shotNumber: Number(scene.shotNumber || scene.shot_number || index + 1),
         title: scene.title || scene.shotTitle || scene.storyboardTag?.shotTitle || `Shot ${index + 1}`,
+        shotDesignImageUrl: imageFields.storyboardImageUrl,
         storyboardImageUrl: imageFields.storyboardImageUrl,
         lightingImageUrl: imageFields.lightingImageUrl,
         cameraPlanImageUrl: imageFields.cameraPlanImageUrl,

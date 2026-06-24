@@ -1,6 +1,6 @@
 // @ts-nocheck
-import React, { useState } from "react";
-import { Check, ChevronLeft, ChevronRight, FileText, Loader2, Save, Sparkles } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Check, ChevronLeft, ChevronRight, FileText, Loader2, RefreshCw, Save, Sparkles } from "lucide-react";
 import AiProviderSelect from "../ai/AiProviderSelect.jsx";
 
 export default function IdeaCandidatesPanel({
@@ -13,6 +13,10 @@ export default function IdeaCandidatesPanel({
   onDialogueLanguageChange,
   screenType = "vertical",
   onScreenTypeChange,
+  storytellingType = "narrator_visual_mix",
+  onStorytellingTypeChange,
+  hookLens = "direct",
+  onHookLensChange,
   aiProviders = [],
   selectedProviderCode,
   selectedProvider,
@@ -37,13 +41,21 @@ export default function IdeaCandidatesPanel({
   onShowScreenplay,
   onShowShots,
   projectMode = false,
+  weeklyIdeaTags = {},
+  weeklyIdeaTagsLoading = false,
+  onLoadWeeklyIdeaTags,
+  onSelectWeeklyIdeaTag,
+  onRefreshWeeklyIdeaTags,
 }) {
   const [expandedIdeaIds, setExpandedIdeaIds] = useState(() => new Set());
+  const weeklyTagsAutoLoadRef = useRef(false);
   const page = pageInfo?.number || 0;
   const totalPages = Math.max(1, pageInfo?.totalPages || 1);
   const totalElements = pageInfo?.totalElements || ideas.length;
   const selectedIdea = ideas.find((idea) => idea.id === selectedIdeaId);
   const hasIdeas = ideas.length > 0;
+  const weeklyIdeaCloud = normalizeWeeklyIdeaTags(weeklyIdeaTags);
+  const hasWeeklyIdeaTags = weeklyIdeaCloud.tags.length > 0;
 
   const toggleIdeaDetails = (ideaId) => {
     setExpandedIdeaIds((current) => {
@@ -54,6 +66,18 @@ export default function IdeaCandidatesPanel({
     });
   };
 
+  const handleWeeklyIdeaTagClick = (tag) => {
+    const prompt = limitWords(String(tag?.prompt || tag?.title || tag?.label || "").trim(), 50);
+    if (!prompt) return;
+    onSelectWeeklyIdeaTag?.({ ...tag, prompt });
+  };
+
+  useEffect(() => {
+    if (lockedBrief || projectMode || weeklyIdeaTagsLoading || hasWeeklyIdeaTags || weeklyTagsAutoLoadRef.current) return;
+    weeklyTagsAutoLoadRef.current = true;
+    onLoadWeeklyIdeaTags?.();
+  }, [hasWeeklyIdeaTags, lockedBrief, onLoadWeeklyIdeaTags, projectMode, weeklyIdeaTagsLoading]);
+
   return (
     <section className="creator-panel flex h-full min-h-0 flex-col p-4">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -62,39 +86,69 @@ export default function IdeaCandidatesPanel({
             <Sparkles size={15} />
             {projectMode && !hasIdeas ? "Project idea generation" : projectMode ? "Project story idea" : "20 AI story ideas"}
           </div>
-          <h2 className="mt-2 text-xl font-extrabold text-white">{projectMode && !hasIdeas ? "Generate story ideas" : projectMode ? "Selected story idea" : "Select story idea"}</h2>
+          <h2 className="mt-2 text-xl font-extrabold text-white">{projectMode && !hasIdeas ? "Generate story ideas" : projectMode ? "Selected story idea" : lockedBrief ? "Story ideas" : "New idea"}</h2>
           <p className="mt-1 max-w-3xl text-sm font-medium leading-6 text-slate-400">
             {projectMode && !hasIdeas
               ? "Generate story ideas from this project's saved brief before opening the story."
               : projectMode
               ? "This project already has generated story ideas. Review the selected idea and continue from the saved stage."
-              : "Generated from the locked brief. Save one story idea, then generate the complete script."}
+              : lockedBrief
+              ? "Review generated ideas, save one, then continue to the script."
+              : "Pick a trend tag below or save your own topic from Creative Brief."}
           </p>
         </div>
-        <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-right">
-          <p className="text-[11px] font-bold uppercase text-slate-500">Locked brief</p>
-          <p className="mt-1 max-w-[22rem] truncate text-sm font-extrabold text-white">
-            {lockedBrief?.title || "Select a trend or original idea first"}
-          </p>
-        </div>
+        {lockedBrief ? (
+          <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-right">
+            <p className="text-[11px] font-bold uppercase text-slate-500">Saved brief</p>
+            <p className="mt-1 max-w-[22rem] truncate text-sm font-extrabold text-white">{lockedBrief.title}</p>
+          </div>
+        ) : null}
       </div>
 
       {!lockedBrief ? (
-        <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-white/10 bg-black/20 p-8 text-center">
-          <p className="max-w-md text-sm font-semibold leading-6 text-slate-400">
-            {projectMode
-              ? "No project story idea was restored for this project yet."
-              : "Lock a trend or original idea from the Creative Brief panel to generate paginated AI idea options here."}
-          </p>
+        <div className="flex flex-1 flex-col justify-center rounded-lg border border-dashed border-white/10 bg-black/20 p-5">
+          <div className="mx-auto w-full max-w-5xl">
+            {projectMode ? (
+              <p className="text-center text-sm font-semibold leading-6 text-slate-400">
+                No project story idea was restored for this project yet.
+              </p>
+            ) : (
+              <WeeklyIdeaCloud
+                cloud={weeklyIdeaCloud}
+                isLoading={weeklyIdeaTagsLoading}
+                hasTags={hasWeeklyIdeaTags}
+                onRefresh={onRefreshWeeklyIdeaTags}
+                onSelectTag={handleWeeklyIdeaTagClick}
+              />
+            )}
+          </div>
         </div>
       ) : !ideas.length ? (
         <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-white/10 bg-black/20 p-8 text-center">
-          <div className="max-w-md">
+          <div className="w-full max-w-2xl">
             <p className="text-sm font-semibold leading-6 text-slate-400">
               {isLoading
                 ? "Generating story ideas from the saved brief..."
                 : "No story ideas are available for this project yet."}
             </p>
+            <WorkflowSetupControls
+              duration={duration}
+              onDurationChange={onDurationChange}
+              dialogueLanguage={dialogueLanguage}
+              onDialogueLanguageChange={onDialogueLanguageChange}
+              screenType={screenType}
+              onScreenTypeChange={onScreenTypeChange}
+              storytellingType={storytellingType}
+              onStorytellingTypeChange={onStorytellingTypeChange}
+              hookLens={hookLens}
+              onHookLensChange={onHookLensChange}
+              aiProviders={aiProviders}
+              selectedProviderCode={selectedProviderCode}
+              selectedProvider={selectedProvider}
+              onProviderChange={onProviderChange}
+              providersLoading={providersLoading}
+              providersError={providersError}
+            />
             {showGenerateIdeasAction && (
               <button
                 type="button"
@@ -266,6 +320,30 @@ export default function IdeaCandidatesPanel({
                   </button>
                 ))}
               </div>
+              <select
+                value={storytellingType}
+                onChange={(event) => onStorytellingTypeChange?.(event.target.value)}
+                className="creator-control min-h-[2.125rem] rounded-lg px-3 py-2 text-xs font-bold text-slate-200 outline-none"
+                aria-label="Storytelling type"
+              >
+                {storytellingTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value} className="bg-slate-950 text-slate-100">
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={hookLens}
+                onChange={(event) => onHookLensChange?.(event.target.value)}
+                className="creator-control min-h-[2.125rem] rounded-lg px-3 py-2 text-xs font-bold text-slate-200 outline-none"
+                aria-label="Opening hook lens"
+              >
+                {hookLensOptions.map((option) => (
+                  <option key={option.value} value={option.value} className="bg-slate-950 text-slate-100">
+                    {option.label}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 onClick={onSaveStoryIdea}
@@ -329,12 +407,211 @@ export default function IdeaCandidatesPanel({
   );
 }
 
+function WorkflowSetupControls({
+  duration,
+  onDurationChange,
+  dialogueLanguage,
+  onDialogueLanguageChange,
+  screenType,
+  onScreenTypeChange,
+  storytellingType,
+  onStorytellingTypeChange,
+  hookLens,
+  onHookLensChange,
+  aiProviders,
+  selectedProviderCode,
+  selectedProvider,
+  onProviderChange,
+  providersLoading,
+  providersError,
+}) {
+  return (
+    <div className="mx-auto mt-5 grid min-w-0 gap-3 rounded-lg border border-white/10 bg-white/[0.035] p-3 text-left sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+      <div className="min-w-0 sm:col-span-2 lg:col-span-1">
+        <p className="mb-2 text-[10px] font-black uppercase tracking-normal text-slate-500">Video Duration</p>
+        <div className="grid min-h-[2.75rem] grid-cols-4 gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
+          {[15, 30, 45, 60].map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onDurationChange?.(value)}
+              className={`min-w-0 rounded-md px-2 py-1.5 text-xs font-black transition ${
+                Number(duration) === value
+                  ? "bg-purple-600 text-white"
+                  : "text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+              }`}
+            >
+              {value}s
+            </button>
+          ))}
+        </div>
+      </div>
+      <label className="block min-w-0">
+        <span className="mb-2 block text-[10px] font-black uppercase tracking-normal text-slate-500">Language</span>
+        <select
+          value={dialogueLanguage}
+          onChange={(event) => onDialogueLanguageChange?.(event.target.value)}
+          className="creator-control min-h-[2.75rem] w-full rounded-lg px-3 py-2 text-xs font-bold text-slate-200 outline-none"
+          aria-label="Dialogue language"
+        >
+          {dialogueLanguageOptions.map((option) => (
+            <option key={option} value={option} className="bg-slate-950 text-slate-100">
+              {option}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="min-w-0">
+        <p className="mb-2 text-[10px] font-black uppercase tracking-normal text-slate-500">Format</p>
+        <div className="grid min-h-[2.75rem] grid-cols-2 gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
+          {screenTypeOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onScreenTypeChange?.(option.value)}
+              className={`min-w-0 rounded-md px-2 py-1.5 text-xs font-black transition ${
+                screenType === option.value
+                  ? "bg-purple-600 text-white"
+                  : "text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+              }`}
+            >
+              <span className="block truncate">{option.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <label className="block min-w-0">
+        <span className="mb-2 block text-[10px] font-black uppercase tracking-normal text-slate-500">Storytelling</span>
+        <select
+          value={storytellingType}
+          onChange={(event) => onStorytellingTypeChange?.(event.target.value)}
+          className="creator-control min-h-[2.75rem] w-full rounded-lg px-3 py-2 text-xs font-bold text-slate-200 outline-none"
+          aria-label="Storytelling type"
+        >
+          {storytellingTypeOptions.map((option) => (
+            <option key={option.value} value={option.value} className="bg-slate-950 text-slate-100">
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="block min-w-0">
+        <span className="mb-2 block text-[10px] font-black uppercase tracking-normal text-slate-500">Hook Lens</span>
+        <select
+          value={hookLens}
+          onChange={(event) => onHookLensChange?.(event.target.value)}
+          className="creator-control min-h-[2.75rem] w-full rounded-lg px-3 py-2 text-xs font-bold text-slate-200 outline-none"
+          aria-label="Opening hook lens"
+        >
+          {hookLensOptions.map((option) => (
+            <option key={option.value} value={option.value} className="bg-slate-950 text-slate-100">
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="min-w-0 sm:col-span-2 lg:col-span-3 2xl:col-span-1">
+        <p className="mb-2 text-[10px] font-black uppercase tracking-normal text-slate-500">AI</p>
+        <AiProviderSelect
+          providers={aiProviders}
+          value={selectedProviderCode}
+          selectedProvider={selectedProvider}
+          onChange={onProviderChange}
+          isLoading={providersLoading}
+          isError={providersError}
+          compact
+        />
+      </div>
+    </div>
+  );
+}
+
 const dialogueLanguageOptions = ["English", "Hinglish", "Hindi", "Tamil", "Telugu", "Bengali", "Marathi"];
 
 const screenTypeOptions = [
   { value: "vertical", label: "Vertical" },
   { value: "horizontal", label: "Horizontal" },
 ];
+
+const storytellingTypeOptions = [
+  { value: "narrator_visual_mix", label: "Narrator + Visuals" },
+  { value: "talking_head_explainer", label: "Talking Head" },
+  { value: "visual_voiceover", label: "Visual VO" },
+  { value: "dialogue_scene", label: "Dialogue Scene" },
+  { value: "dramatic_scene", label: "Drama Scene" },
+];
+
+const hookLensOptions = [
+  { value: "direct", label: "Direct" },
+  { value: "history", label: "History" },
+  { value: "geography", label: "Geography" },
+  { value: "philosophy", label: "Philosophy" },
+  { value: "science", label: "Science" },
+  { value: "culture", label: "Culture" },
+  { value: "psychology", label: "Psychology" },
+  { value: "economics", label: "Economics" },
+];
+
+function WeeklyIdeaCloud({ cloud, isLoading, hasTags, onRefresh, onSelectTag }) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4 text-left">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-2">
+          <Sparkles size={16} className="mt-0.5 shrink-0 text-purple-200" />
+          <div className="min-w-0">
+            <p className="text-xs font-extrabold uppercase tracking-normal text-purple-100">Next 7 days trend tags</p>
+            <p className="mt-1 text-xs font-medium text-slate-500">
+              Pick a tag to copy its brief into the Creative Brief topic box.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={isLoading}
+          className="creator-control inline-flex shrink-0 items-center justify-center gap-2 px-3 py-2 text-[11px] font-bold text-slate-100 disabled:opacity-50"
+        >
+          <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
+          Refresh tags
+        </button>
+      </div>
+
+      <div className="mt-4 space-y-4">
+        {isLoading && !hasTags ? (
+          <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs font-semibold text-slate-400">
+            Loading weekly trend tags...
+          </p>
+        ) : null}
+        {cloud.categories.map((category) => {
+          if (!category.ideas.length) return null;
+          return (
+            <div key={category.category || category.label}>
+              <p className="mb-2 text-[11px] font-extrabold uppercase tracking-normal text-slate-500">{category.label}</p>
+              <div className="flex flex-wrap gap-2">
+                {category.ideas.map((tag) => (
+                  <button
+                    key={tag.id || `${category.category}-${tag.title || tag.label}`}
+                    type="button"
+                    onClick={() => onSelectTag?.(tag)}
+                    className="max-w-full rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-xs font-bold text-slate-200 transition hover:border-purple-300/50 hover:bg-purple-500/15 hover:text-white"
+                    title={tag.prompt || tag.title || tag.label}
+                  >
+                    <span className="block max-w-[220px] truncate">{tag.label || tag.title}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+        {!isLoading && !hasTags ? (
+          <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs font-semibold text-slate-400">
+            Weekly trend tags are not loaded yet. Refresh tags to create the first cloud.
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 function noteToText(value) {
   if (value == null) return "";
@@ -343,4 +620,75 @@ function noteToText(value) {
     return Object.entries(value).map(([key, item]) => `${key}: ${noteToText(item)}`).join("; ");
   }
   return String(value);
+}
+
+function normalizeWeeklyIdeaTags(payload = {}) {
+  const categoryOrder = ["history", "politics", "sports", "entertainment", "bollywood"];
+  const labels = {
+    history: "History",
+    politics: "Politics",
+    sports: "Sports",
+    entertainment: "Entertainment",
+    bollywood: "Bollywood",
+  };
+  const categories = Array.isArray(payload?.categories) ? payload.categories : [];
+  const normalizedCategories = categoryOrder.map((categoryCode) => {
+    const matched = categories.find((category) => normalizeCode(category?.category || category?.code || category?.label) === categoryCode) || {};
+    const ideas = Array.isArray(matched?.ideas) ? matched.ideas : [];
+    return {
+      category: categoryCode,
+      label: matched?.label || labels[categoryCode],
+      ideas: ideas
+        .map((idea, index) => normalizeWeeklyIdeaTag(idea, categoryCode, index))
+        .filter((idea) => idea.title || idea.prompt),
+    };
+  });
+
+  const tagsFromCategories = normalizedCategories.flatMap((category) => category.ideas);
+  const flatTags = Array.isArray(payload?.tags)
+    ? payload.tags
+        .map((tag, index) => normalizeWeeklyIdeaTag(tag, normalizeCode(tag?.category || tag?.categoryCode || "misc"), index))
+        .filter((tag) => tag.title || tag.prompt)
+    : [];
+  const displayCategories = tagsFromCategories.length
+    ? normalizedCategories
+    : normalizedCategories.map((category) => ({
+        ...category,
+        ideas: flatTags.filter((tag) => tag.category === category.category),
+      }));
+
+  return {
+    categories: displayCategories,
+    tags: displayCategories.flatMap((category) => category.ideas),
+  };
+}
+
+function normalizeWeeklyIdeaTag(item = {}, categoryCode, index) {
+  const title = String(item?.title || item?.label || item?.tag || item?.topic || "").trim();
+  const prompt = String(item?.prompt || item?.creatorPrompt || item?.brief || title).trim();
+  return {
+    ...item,
+    id: item?.id || `${categoryCode}-${index}-${title}`,
+    category: categoryCode,
+    label: title,
+    title,
+    prompt,
+  };
+}
+
+function normalizeCode(value) {
+  const code = String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (code === "sport") return "sports";
+  if (code === "bolly_wood" || code === "bolly") return "bollywood";
+  if (["political", "political_news", "current_affairs", "election", "elections"].includes(code)) return "politics";
+  return code;
+}
+
+function limitWords(value, maxWords) {
+  const words = String(value || "").split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return value;
+  return words.slice(0, maxWords).join(" ");
 }

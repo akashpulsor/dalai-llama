@@ -1,11 +1,37 @@
 // @ts-nocheck
 import React, { useEffect, useRef, useState } from "react";
-import { Check, Eye, FileText, Loader2, RotateCcw, Sparkles, UserRound } from "lucide-react";
+import { Check, Clock3, Eye, FileText, Loader2, RotateCcw, Sparkles, UserRound } from "lucide-react";
 import AiProviderSelect from "../ai/AiProviderSelect.jsx";
+
+const durationOptions = [15, 30, 45, 60];
+
+const storytellingTypeOptions = [
+  { value: "narrator_visual_mix", label: "Narrator + Visuals" },
+  { value: "talking_head_explainer", label: "Talking Head" },
+  { value: "visual_voiceover", label: "Visual VO" },
+  { value: "dialogue_scene", label: "Dialogue Scene" },
+  { value: "dramatic_scene", label: "Drama Scene" },
+];
+
+const hookLensOptions = [
+  { value: "direct", label: "Direct" },
+  { value: "history", label: "History" },
+  { value: "geography", label: "Geography" },
+  { value: "philosophy", label: "Philosophy" },
+  { value: "science", label: "Science" },
+  { value: "culture", label: "Culture" },
+  { value: "psychology", label: "Psychology" },
+  { value: "economics", label: "Economics" },
+];
 
 export default function StoryScriptPanel({
   storyIdea,
   duration = 30,
+  onDurationChange,
+  storytellingType = "narrator_visual_mix",
+  onStorytellingTypeChange,
+  hookLens = "direct",
+  onHookLensChange,
   onSave,
   onGenerateScreenplay,
   generateScreenplayLabel = "Generate Screenplay",
@@ -22,7 +48,7 @@ export default function StoryScriptPanel({
   providersLoading,
   providersError,
 }) {
-  const initialBundle = normalizeStoryScriptBundle(storyIdea, duration);
+  const initialBundle = normalizeStoryScriptBundle(storyIdea, duration, storytellingType, hookLens);
   const [draft, setDraft] = useState(() => initialBundle.current);
   const [originalDraft, setOriginalDraft] = useState(() => initialBundle.original);
   const [dirty, setDirty] = useState(false);
@@ -39,13 +65,13 @@ export default function StoryScriptPanel({
   }, [draft]);
 
   useEffect(() => {
-    const nextBundle = normalizeStoryScriptBundle(storyIdea, duration);
+    const nextBundle = normalizeStoryScriptBundle(storyIdea, duration, storytellingType, hookLens);
     setDraft(nextBundle.current);
     setOriginalDraft(nextBundle.original);
     latestRef.current = nextBundle.current;
     setDirty(false);
     setSaveState(hasScript ? "saved" : "idle");
-  }, [duration, hasScript, storyIdea]);
+  }, [duration, hasScript, hookLens, storyIdea, storytellingType]);
 
   useEffect(() => {
     if (!hasScript || !dirty || !onSave) return undefined;
@@ -109,6 +135,58 @@ export default function StoryScriptPanel({
               ? `Selected idea: ${sourceIdea.title}. Generate the full storyline, character names, personas, and backstories here.`
               : "Generate the full storyline, character names, personas, and backstories here."}
           </p>
+          <div className="mx-auto mt-5 max-w-sm rounded-lg border border-white/10 bg-black/20 p-3 text-left">
+            <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-slate-400">
+              <Clock3 size={14} className="text-purple-300" />
+              Video Duration
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {durationOptions.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => onDurationChange?.(value)}
+                  className={`rounded-lg border px-3 py-2 text-sm font-bold transition ${
+                    Number(duration) === value
+                      ? "border-purple-400 bg-purple-500/20 text-white"
+                      : "border-white/10 bg-white/[0.035] text-slate-300 hover:border-purple-300/40"
+                  }`}
+                >
+                  {value}s
+                </button>
+              ))}
+            </div>
+            <label className="mt-4 block">
+              <span className="mb-2 block text-xs font-bold uppercase text-slate-400">Storytelling Type</span>
+              <select
+                value={storytellingType}
+                onChange={(event) => onStorytellingTypeChange?.(event.target.value)}
+                className="creator-control min-h-[2.4rem] w-full rounded-lg px-3 py-2 text-sm font-bold text-slate-200 outline-none"
+                aria-label="Storytelling type"
+              >
+                {storytellingTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value} className="bg-slate-950 text-slate-100">
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="mt-4 block">
+              <span className="mb-2 block text-xs font-bold uppercase text-slate-400">Opening Hook Lens</span>
+              <select
+                value={hookLens}
+                onChange={(event) => onHookLensChange?.(event.target.value)}
+                className="creator-control min-h-[2.4rem] w-full rounded-lg px-3 py-2 text-sm font-bold text-slate-200 outline-none"
+                aria-label="Opening hook lens"
+              >
+                {hookLensOptions.map((option) => (
+                  <option key={option.value} value={option.value} className="bg-slate-950 text-slate-100">
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           {canGenerateStoryScript && (
             <button
               type="button"
@@ -193,6 +271,8 @@ export default function StoryScriptPanel({
               <StoryChip label={`${draft.duration || duration}s`} />
               <StoryChip label={draft.dialogueLanguage || "English"} />
               <StoryChip label={draft.screenType || "vertical"} />
+              <StoryChip label={storytellingLabelFor(draft.storytellingType || storytellingType)} />
+              <StoryChip label={`Hook: ${hookLensLabelFor(draft.hookLens || hookLens)}`} />
               {draft.category && <StoryChip label={draft.category} />}
             </div>
           </div>
@@ -413,23 +493,29 @@ function ScriptArea({ value, onChange, rows = 3, roomy = false }) {
   );
 }
 
-function normalizeStoryScriptBundle(idea, duration) {
+function normalizeStoryScriptBundle(idea, duration, storytellingType = "narrator_visual_mix", hookLens = "direct") {
   const source = idea?.storyScriptJson || idea?.scriptJson || {};
   const originalSource = source?.llmGeneratedScript || source?.originalLlmScript || source?.generatedScript || stripRevisionMeta(source);
   const currentSource = source?.userRevision || source?.acceptedScript || source?.currentRevision || stripRevisionMeta(source);
   return {
-    original: normalizeStoryScriptSource(originalSource, idea, duration),
-    current: normalizeStoryScriptSource(currentSource, idea, duration),
+    original: normalizeStoryScriptSource(originalSource, idea, duration, storytellingType, hookLens),
+    current: normalizeStoryScriptSource(currentSource, idea, duration, storytellingType, hookLens),
   };
 }
 
-function normalizeStoryScriptSource(source = {}, idea, duration) {
+function normalizeStoryScriptSource(source = {}, idea, duration, storytellingType = "narrator_visual_mix", hookLens = "direct") {
   return {
     projectTitle: source.projectTitle || idea?.title || "Creator Story Script",
     duration: source.duration || idea?.durationSeconds || duration || 30,
     category: source.category || idea?.category || "",
     dialogueLanguage: source.dialogueLanguage || idea?.dialogueLanguage || "English",
     screenType: source.screenType || idea?.screenType || "vertical",
+    storytellingType: source.storytellingType || idea?.storytellingType || storytellingType || "narrator_visual_mix",
+    storytellingGuidance: source.storytellingGuidance || idea?.storytellingGuidance || {},
+    hookLens: source.hookLens || idea?.hookLens || hookLens || "direct",
+    hookLensGuidance: source.hookLensGuidance || idea?.hookLensGuidance || {},
+    hookBridge: source.hookBridge || idea?.hookBridge || {},
+    factualityNotes: source.factualityNotes || idea?.factualityNotes || {},
     provider: source.provider || idea?.provider || "",
     model: source.model || idea?.model || "",
     logline: source.logline || idea?.description || "A short-form story generated from the saved idea.",
@@ -506,11 +592,25 @@ function normalizeDraftForSave(draft) {
   return {
     ...draft,
     duration: Number(draft.duration || 30),
+    storytellingType: draft.storytellingType || "narrator_visual_mix",
+    storytellingGuidance: draft.storytellingGuidance || {},
+    hookLens: draft.hookLens || "direct",
+    hookLensGuidance: draft.hookLensGuidance || {},
+    hookBridge: draft.hookBridge || {},
+    factualityNotes: draft.factualityNotes || {},
     provider: draft.provider || "",
     model: draft.model || "",
     characters: normalizeCharacters(draft.characters),
     beats: normalizeBeats(draft.beats),
   };
+}
+
+function storytellingLabelFor(value) {
+  return storytellingTypeOptions.find((option) => option.value === value)?.label || "Narrator + Visuals";
+}
+
+function hookLensLabelFor(value) {
+  return hookLensOptions.find((option) => option.value === value)?.label || "Direct";
 }
 
 function buildChangeSummary(original = {}, current = {}) {

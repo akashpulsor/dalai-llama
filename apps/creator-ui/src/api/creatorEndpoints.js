@@ -175,6 +175,14 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: () => "/creator/trend-combinations",
       providesTags: ["CreatorTrends"],
     }),
+    getWeeklyIdeaTags: builder.query({
+      query: () => "/creator/weekly-idea-tags",
+      providesTags: ["CreatorTrends"],
+    }),
+    refreshWeeklyIdeaTags: builder.mutation({
+      query: () => ({ url: "/creator/weekly-idea-tags/refresh", method: "POST" }),
+      invalidatesTags: ["CreatorTrends"],
+    }),
     getCreatorPlatforms: builder.query({
       query: () => "/creator/platforms",
       transformResponse: normalizeCreatorMasterOptions,
@@ -192,6 +200,10 @@ export const creatorApi = apiSlice.injectEndpoints({
     }),
     getCreatorAiPricing: builder.query({
       query: () => "/creator/ai-pricing",
+      providesTags: ["CreatorAiProviders"],
+    }),
+    getCreatorProviderCredits: builder.query({
+      query: () => "/creator/ai-pricing/provider-credits",
       providesTags: ["CreatorAiProviders"],
     }),
     getTrends: builder.query({
@@ -220,6 +232,206 @@ export const creatorApi = apiSlice.injectEndpoints({
         url: "/creator/jobs",
         params: { jobType, lockedIdeaId },
       }),
+    }),
+    getShortVideos: builder.query({
+      query: () => "/creator/shorts",
+      providesTags: ["CreatorProjects"],
+    }),
+    getShortVideo: builder.query({
+      query: (videoId) => `/creator/shorts/${videoId}`,
+      providesTags: (_result, _error, videoId) => [{ type: "CreatorProjects", id: `short-${videoId || "detail"}` }],
+    }),
+    generateShorts: builder.mutation({
+      query: ({ file, ...fields }) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        Object.entries(fields || {}).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== "") {
+            formData.append(key, value);
+          }
+        });
+        return {
+          url: "/creator/shorts/generate",
+          method: "POST",
+          body: formData,
+        };
+      },
+      invalidatesTags: ["CreatorProjects"],
+    }),
+    createShortMultipartUpload: builder.mutation({
+      query: (body = {}) => ({
+        url: "/creator/shorts/uploads/multipart",
+        method: "POST",
+        body,
+      }),
+    }),
+    presignShortMultipartUploadPart: builder.mutation({
+      query: ({ uploadId, partNumber, ...body }) => ({
+        url: `/creator/shorts/uploads/${uploadId}/multipart/parts/${partNumber}/presign`,
+        method: "POST",
+        body,
+      }),
+    }),
+    completeShortMultipartUpload: builder.mutation({
+      query: ({ uploadId, ...body }) => ({
+        url: `/creator/shorts/uploads/${uploadId}/multipart/complete`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["CreatorProjects"],
+    }),
+    createTimelineIngestion: builder.mutation({
+      query: (body = {}) => ({
+        url: "/creator/shorts/timeline-ingestions",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["CreatorProjects"],
+    }),
+    uploadTimelineIngestionPart: builder.mutation({
+      query: ({ videoId, partNumber, part, ...fields }) => {
+        const formData = new FormData();
+        formData.append("part", part);
+        Object.entries(fields || {}).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== "") {
+            formData.append(key, value);
+          }
+        });
+        return {
+          url: `/creator/shorts/timeline-ingestions/${videoId}/parts/${partNumber}`,
+          method: "POST",
+          body: formData,
+        };
+      },
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorProjects", id: `timeline-ingestion-${args?.videoId || "detail"}` },
+        "CreatorProjects",
+      ],
+    }),
+    getTimelineIngestion: builder.query({
+      query: (videoId) => `/creator/shorts/timeline-ingestions/${videoId}`,
+      providesTags: (_result, _error, videoId) => [{ type: "CreatorProjects", id: `timeline-ingestion-${videoId || "detail"}` }],
+    }),
+    completeTimelineIngestion: builder.mutation({
+      query: ({ videoId, ...body }) => ({
+        url: `/creator/shorts/timeline-ingestions/${videoId}/complete`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorProjects", id: `timeline-ingestion-${args?.videoId || "detail"}` },
+        "CreatorProjects",
+      ],
+    }),
+    requestTimelineFabric: builder.mutation({
+      query: ({ videoId, ...body }) => ({
+        url: `/creator/shorts/timeline-ingestions/${videoId}/fabric-timeline`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorProjects", id: `timeline-ingestion-${args?.videoId || "detail"}` },
+        "CreatorProjects",
+      ],
+    }),
+    requestTimelineTranscript: builder.mutation({
+      query: ({ videoId, ...body }) => ({
+        url: `/creator/shorts/timeline-ingestions/${videoId}/transcript-timeline`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorProjects", id: `timeline-ingestion-${args?.videoId || "detail"}` },
+        "CreatorProjects",
+      ],
+    }),
+    requestTimelineVideoAnalysis: builder.mutation({
+      query: ({ videoId, ...body }) => ({
+        url: `/creator/shorts/timeline-ingestions/${videoId}/video-analysis`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorProjects", id: `timeline-ingestion-${args?.videoId || "detail"}` },
+        "CreatorProjects",
+      ],
+    }),
+    requestTimelineStoryShots: builder.mutation({
+      query: ({ videoId, ...body }) => ({
+        url: `/creator/shorts/timeline-ingestions/${videoId}/story-shots`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorProjects", id: `timeline-ingestion-${args?.videoId || "detail"}` },
+        "CreatorProjects",
+      ],
+    }),
+    pauseShortGeneration: builder.mutation({
+      query: ({ videoId, ...body }) => ({
+        url: `/creator/shorts/${videoId}/pause`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorProjects", id: `short-${args?.videoId || "detail"}` },
+        "CreatorProjects",
+      ],
+    }),
+    saveShortProcessingTimeline: builder.mutation({
+      query: ({ videoId, ...body }) => ({
+        url: `/creator/shorts/${videoId}/timeline`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorProjects", id: `short-${args?.videoId || "detail"}` },
+        "CreatorProjects",
+      ],
+    }),
+    resumeShortGeneration: builder.mutation({
+      query: ({ videoId, ...body }) => ({
+        url: `/creator/shorts/${videoId}/resume`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorProjects", id: `short-${args?.videoId || "detail"}` },
+        "CreatorProjects",
+      ],
+    }),
+    restartShortGeneration: builder.mutation({
+      query: ({ videoId, ...body }) => ({
+        url: `/creator/shorts/${videoId}/restart`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorProjects", id: `short-${args?.videoId || "detail"}` },
+        "CreatorProjects",
+      ],
+    }),
+    runShortVisualAnalysis: builder.mutation({
+      query: ({ videoId, ...body }) => ({
+        url: `/creator/shorts/${videoId}/visual-analysis`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorProjects", id: `short-${args?.videoId || "detail"}` },
+        "CreatorProjects",
+      ],
+    }),
+    reviewShortCandidate: builder.mutation({
+      query: ({ videoId, candidateId, action, payload = {} }) => ({
+        url: `/creator/shorts/${videoId}/candidates/${candidateId}/review`,
+        method: "POST",
+        body: { action, payload },
+      }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorProjects", id: `short-${args?.videoId || "detail"}` },
+        "CreatorProjects",
+      ],
     }),
     getCreatorProjects: builder.query({
       query: ({ page = 0, limit = 20, size = limit } = {}) => ({
@@ -470,6 +682,20 @@ export const creatorApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Storyboard"],
     }),
+    getAcceptedShotSequence: builder.query({
+      query: ({ scriptId }) => `/creator/storyboards/scripts/${scriptId}/accepted-sequence`,
+      providesTags: (_result, _error, params) => [{ type: "Storyboard", id: `accepted-sequence-${params?.scriptId || "current"}` }],
+    }),
+    renderAcceptedShotSequenceAsync: builder.mutation({
+      query: ({ scriptId }) => ({
+        url: `/creator/storyboards/scripts/${scriptId}/accepted-sequence/final-render-async`,
+        method: "POST",
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `accepted-sequence-${body?.scriptId || "current"}` },
+        "Storyboard",
+      ],
+    }),
     enhanceShotTakePreviewAsync: builder.mutation({
       query: ({ takeId, ...body }) => ({
         url: `/creator/storyboards/shots/takes/${takeId}/enhance-preview-async`,
@@ -497,6 +723,30 @@ export const creatorApi = apiSlice.injectEndpoints({
     enhanceShotTakeAudioAsync: builder.mutation({
       query: ({ takeId, ...body }) => ({
         url: `/creator/storyboards/shots/takes/${takeId}/enhance-audio-async`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Storyboard"],
+    }),
+    mixShotTakeAudioAsync: builder.mutation({
+      query: ({ takeId, ...body }) => ({
+        url: `/creator/storyboards/shots/takes/${takeId}/audio-mix-async`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Storyboard"],
+    }),
+    generateShotTakePolishedFrames: builder.mutation({
+      query: ({ takeId, ...body }) => ({
+        url: `/creator/storyboards/shots/takes/${takeId}/polished-frames`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Storyboard"],
+    }),
+    renderShotTakeFinalVideoAsync: builder.mutation({
+      query: ({ takeId, ...body }) => ({
+        url: `/creator/storyboards/shots/takes/${takeId}/final-render-async`,
         method: "POST",
         body,
       }),
@@ -715,16 +965,39 @@ export const {
   useGetOrganizationQuery,
   useSetupOrganizationMutation,
   useGetTrendCombinationsQuery,
+  useGetWeeklyIdeaTagsQuery,
+  useRefreshWeeklyIdeaTagsMutation,
   useGetCreatorPlatformsQuery,
   useGetCreatorCategoriesQuery,
   useGetAiProvidersQuery,
   useGetCreatorAiPricingQuery,
+  useGetCreatorProviderCreditsQuery,
   useGetTrendsQuery,
   useGetTrendInsightQuery,
   usePredictTrendsMutation,
   useGetJobQuery,
   useLazyGetJobQuery,
   useGetJobsQuery,
+  useGetShortVideosQuery,
+  useGetShortVideoQuery,
+  useGenerateShortsMutation,
+  useCreateShortMultipartUploadMutation,
+  usePresignShortMultipartUploadPartMutation,
+  useCompleteShortMultipartUploadMutation,
+  useCreateTimelineIngestionMutation,
+  useUploadTimelineIngestionPartMutation,
+  useGetTimelineIngestionQuery,
+  useCompleteTimelineIngestionMutation,
+  useRequestTimelineFabricMutation,
+  useRequestTimelineTranscriptMutation,
+  useRequestTimelineVideoAnalysisMutation,
+  useRequestTimelineStoryShotsMutation,
+  usePauseShortGenerationMutation,
+  useSaveShortProcessingTimelineMutation,
+  useResumeShortGenerationMutation,
+  useRestartShortGenerationMutation,
+  useRunShortVisualAnalysisMutation,
+  useReviewShortCandidateMutation,
   useGetCreatorProjectsQuery,
   useLazyGetCreatorProjectQuery,
   useGetPostProductionProjectsQuery,
@@ -761,10 +1034,15 @@ export const {
   useGenerateShotTakeSoundAsyncMutation,
   useReviewShotTakeAsyncMutation,
   useConfirmShotTakeMutation,
+  useGetAcceptedShotSequenceQuery,
+  useRenderAcceptedShotSequenceAsyncMutation,
   useEnhanceShotTakePreviewAsyncMutation,
   useStudioPolishShotTakeAsyncMutation,
   useStudioPolishAllShotTakesAsyncMutation,
   useEnhanceShotTakeAudioAsyncMutation,
+  useMixShotTakeAudioAsyncMutation,
+  useGenerateShotTakePolishedFramesMutation,
+  useRenderShotTakeFinalVideoAsyncMutation,
   useSaveShotTakeEnhancementFeedbackMutation,
   useApplyShotTakePreviewToTimelineMutation,
   useEnhanceAllShotTakesAsyncMutation,

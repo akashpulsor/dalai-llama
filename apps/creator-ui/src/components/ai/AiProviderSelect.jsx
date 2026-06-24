@@ -32,7 +32,7 @@ export default function AiProviderSelect({
   };
 
   return (
-    <div className={`relative ${compact ? "min-w-[12.75rem]" : "min-w-[15.5rem]"}`}>
+    <div className={`relative w-full min-w-0 ${compact ? "" : "sm:min-w-[15.5rem]"}`}>
       <button
         type="button"
         disabled={disabled}
@@ -51,11 +51,11 @@ export default function AiProviderSelect({
             {isLoading ? <Loader2 size={15} className="animate-spin" /> : hasWarning ? <AlertTriangle size={15} /> : <Bot size={15} />}
           </span>
           <span className="min-w-0">
-            <span className="block text-[10px] font-black uppercase leading-none text-slate-500">AI</span>
+            {!compact && <span className="block text-[10px] font-black uppercase leading-none text-slate-500">AI</span>}
             <span className="mt-1 flex min-w-0 items-center gap-1.5">
               <span className="truncate text-sm font-extrabold text-white">{activeLabel}</span>
               {activeProvider?.defaultProvider && (
-                <span className="rounded bg-emerald-400/12 px-1.5 py-0.5 text-[9px] font-black uppercase text-emerald-200">
+                <span className="shrink-0 rounded bg-emerald-400/12 px-1.5 py-0.5 text-[9px] font-black uppercase text-emerald-200">
                   Default
                 </span>
               )}
