@@ -93,7 +93,26 @@ const MOCK_RESPONSES = {
   ],
 
   "/wallet/balance": { balance: 1200.75, currency: "INR", lastUpdated: Date.now() },
-  "/wallet/add-balance": { success: true, balance: 0, currency: "INR", transactionId: "txn_mock_001" },
+  "/wallet/add-balance": {
+    paymentId: "pay_mock_001",
+    gatewayOrderId: "order_MOCK001",
+    order_id: "order_MOCK001",
+    amount: 1000,
+    amountPaise: 100000,
+    currency: "INR",
+    keyId: "",
+    checkoutDetails: {
+      key: "",
+      keyId: "",
+      order_id: "order_MOCK001",
+      amount: 100000,
+      currency: "INR",
+      name: "Dalai Llama Platform",
+      description: "Wallet recharge",
+    },
+    status: "PENDING",
+  },
+  "/wallet/verify-payment": { paymentId: "pay_mock_001", status: "SUCCESS", message: "Payment verified and wallet credited" },
   "/tenants/me": {
     hasTenant: false,
     needsOnboarding: true,
@@ -1246,14 +1265,32 @@ const mockBaseQuery = async (args) => {
   const tenantWalletRechargeMatch = key.match(/^\/billing\/([^/]+)\/wallet\/recharge$/);
   if (tenantWalletRechargeMatch) {
     const [, tenantId] = tenantWalletRechargeMatch;
+    const amount = Number(body.amount || 1000);
+    const currency = body.currency || "INR";
+    const amountPaise = Math.max(100, Math.round(amount * 100));
+    const gatewayOrderId = "order_MOCK001";
+    const keyId = import.meta.env?.VITE_RAZORPAY_KEY_ID || "";
     return {
       data: {
         tenantId,
-        success: true,
-        rechargeId: "wallet-recharge-mock",
-        transactionId: "txn_creator_recharge_mock",
-        currency: "INR",
-        paymentUrl: "https://billing.dalaillama.in/mock/recharge"
+        paymentId: "pay_mock_001",
+        gatewayOrderId,
+        order_id: gatewayOrderId,
+        amount,
+        amountPaise,
+        currency,
+        keyId,
+        checkoutDetails: {
+          key: keyId,
+          keyId,
+          order_id: gatewayOrderId,
+          amount: amountPaise,
+          currency,
+          name: "Dalai Llama Platform",
+          description: "Wallet recharge",
+        },
+        status: "PENDING",
+        message: "Payment order created. Complete payment to credit wallet."
       }
     };
   }
@@ -1412,6 +1449,22 @@ const mockBaseQuery = async (args) => {
         downloadUrl: "/mocks/storyboard/she-almost-storyboard.pdf"
       },
     };
+  }
+
+  if (/^\/billing\/[^/]+\/wallet\/recharge$/.test(key) && method === "POST") {
+    const amount = Number(body.amount || 1000);
+    return {
+      data: {
+        ...MOCK_RESPONSES["/wallet/add-balance"],
+        amount,
+        amountPaise: Math.max(100, Math.round(amount * 100)),
+        currency: body.currency || "INR",
+      },
+    };
+  }
+
+  if (/^\/billing\/[^/]+\/payments\/[^/]+\/verify$/.test(key) && method === "POST") {
+    return { data: MOCK_RESPONSES["/wallet/verify-payment"] };
   }
 
   if (Object.prototype.hasOwnProperty.call(MOCK_RESPONSES, key)) {
@@ -1619,7 +1672,7 @@ const unwrapJavaTypedJson = (value) => {
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithMetrics,
-  tagTypes: ["CreatorTrends", "CreatorMasterData", "CreatorProfiles", "Storyboard", "CreatorWallet", "CreatorSubscription", "CreatorOrganization", "CreatorAiProviders", "CreatorProjects"],
+  tagTypes: ["CreatorTrends", "CreatorMasterData", "CreatorProfiles", "Storyboard", "CreatorHumanWorkOrders", "CreatorWallet", "CreatorSubscription", "CreatorOrganization", "CreatorAiProviders", "CreatorProjects"],
 
   endpoints: (builder) => ({
 
@@ -1724,6 +1777,17 @@ export const api = createApi({
         const { tenantId, ...payload } = body || {};
         return {
           url: tenantId ? `/billing/${tenantId}/wallet/recharge` : "/wallet/add-balance",
+          method: "POST",
+          body: payload,
+        };
+      },
+      invalidatesTags: ["CreatorWallet"],
+    }),
+    verifyWalletPayment: builder.mutation({
+      query: (/** @type {{ tenantId?: string, paymentId?: string, [key: string]: any } | undefined} */ body) => {
+        const { tenantId, paymentId, ...payload } = body || {};
+        return {
+          url: tenantId && paymentId ? `/billing/${tenantId}/payments/${paymentId}/verify` : "/wallet/verify-payment",
           method: "POST",
           body: payload,
         };
@@ -2506,6 +2570,7 @@ export const {
   useGetAgentsQuery,
   useGetWalletBalanceQuery,
   useAddWalletBalanceMutation,
+  useVerifyWalletPaymentMutation,
   useGetLiveCallQuery,
   useGetInvoicesQuery,
   useGetDashboardStatsQuery,

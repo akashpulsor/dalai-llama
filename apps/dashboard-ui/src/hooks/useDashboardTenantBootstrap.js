@@ -118,12 +118,22 @@ export default function useDashboardTenantBootstrap() {
   useEffect(() => {
     if (!token || !tenantContext.slug) return;
 
-    // Dashboard-ui already has Keycloak config from appConfig (platform realm).
-    // The public endpoint is optional — only needed for apps/features metadata.
-    // STOMP WS URL is derived from appConfig.API_BASE_URL in setTenantIdentity.
+    const websocketReady = tenantState.tenantWsUrl || tenantState.stompWsUrl || tenantState.websocketUrl;
+    if (
+      tenantState.isResolved &&
+      websocketReady &&
+      tenantState.slug === tenantContext.slug
+    ) {
+      persistTenantContext({
+        tenantId: tenantState.tenantId || tenantContext.tenantId || null,
+        slug: tenantState.slug || tenantContext.slug,
+      });
+      return;
+    }
+
     if (
       lastLoadedSlugRef.current === tenantContext.slug &&
-      tenantState.isResolved &&
+      websocketReady &&
       tenantState.slug === tenantContext.slug
     ) {
       return;
@@ -145,8 +155,6 @@ export default function useDashboardTenantBootstrap() {
         );
 
         if (!response.ok) {
-          const errBody = await response.text().catch(() => '');
-          console.error(`[dashboard] tenant-config ${response.status}:`, errBody);
           if (response.status === 404 || response.status === 403) {
             return;
           }
@@ -185,7 +193,9 @@ export default function useDashboardTenantBootstrap() {
     tenantContext.tenantId,
     tenantState.isResolved,
     tenantState.slug,
+    tenantState.stompWsUrl,
     tenantState.tenantId,
+    tenantState.websocketUrl,
     token,
   ]);
 }

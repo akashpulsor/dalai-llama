@@ -1,0 +1,52 @@
+global:
+  cors:
+    allowOrigins:
+      - type: exact
+        value: "https://dashboard.dalaillama.in"
+      - type: exact
+        value: "https://creator.dalaillama.in"
+      - type: exact
+        value: "https://platform.dalaillama.in"
+      - type: regex
+        value: "https://.*\\.dalaillama\\.in"
+      - type: prefix
+        value: "http://localhost"
+
+services:
+  productService:
+    enabled: false
+
+  pbxCoreService:
+    enabled: false
+
+  aiService:
+    enabled: false
+
+  tenantService:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 384Mi
+      limits:
+        cpu: 500m
+        memory: 768Mi
+
+  billingService:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 384Mi
+      limits:
+        cpu: 500m
+        memory: 768Mi
+
+  creatorService:
+    resources:
+      requests:
+        cpu: 250m
+        memory: 1Gi
+      limits:
+        cpu: 1500m
+        memory: 2Gi
+    env:
+      CREATOR_PROVIDER_CREDIT_CHECK_ENABLED: "false"

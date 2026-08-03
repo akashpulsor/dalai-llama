@@ -1,0 +1,170 @@
+﻿{
+    "status":  "COMPLETED",
+    "provider":  "dalai_llama",
+    "model":  "faster_whisper",
+    "engine":  "faster_whisper",
+    "language":  "en",
+    "segments":  [
+                     {
+                         "start":  7.28,
+                         "end":  17.23,
+                         "text":  "And if you do do then, what feeling am I avoiding, then swing the next step, open the document,",
+                         "words":  [
+                                       {
+                                           "start":  7.28,
+                                           "end":  7.84,
+                                           "word":  " And"
+                                       },
+                                       {
+                                           "start":  7.84,
+                                           "end":  8.06,
+                                           "word":  " if"
+                                       },
+                                       {
+                                           "start":  8.06,
+                                           "end":  8.18,
+                                           "word":  " you"
+                                       },
+                                       {
+                                           "start":  8.18,
+                                           "end":  8.42,
+                                           "word":  " do"
+                                       },
+                                       {
+                                           "start":  8.42,
+                                           "end":  8.64,
+                                           "word":  " do"
+                                       },
+                                       {
+                                           "start":  8.64,
+                                           "end":  9.34,
+                                           "word":  " then,"
+                                       },
+                                       {
+                                           "start":  9.96,
+                                           "end":  10.12,
+                                           "word":  " what"
+                                       },
+                                       {
+                                           "start":  10.12,
+                                           "end":  10.36,
+                                           "word":  " feeling"
+                                       },
+                                       {
+                                           "start":  10.36,
+                                           "end":  10.64,
+                                           "word":  " am"
+                                       },
+                                       {
+                                           "start":  10.64,
+                                           "end":  10.74,
+                                           "word":  " I"
+                                       },
+                                       {
+                                           "start":  10.74,
+                                           "end":  11.18,
+                                           "word":  " avoiding,"
+                                       },
+                                       {
+                                           "start":  14.35,
+                                           "end":  14.53,
+                                           "word":  " then"
+                                       },
+                                       {
+                                           "start":  14.53,
+                                           "end":  14.73,
+                                           "word":  " swing"
+                                       },
+                                       {
+                                           "start":  14.73,
+                                           "end":  14.99,
+                                           "word":  " the"
+                                       },
+                                       {
+                                           "start":  14.99,
+                                           "end":  15.21,
+                                           "word":  " next"
+                                       },
+                                       {
+                                           "start":  15.21,
+                                           "end":  15.71,
+                                           "word":  " step,"
+                                       },
+                                       {
+                                           "start":  16.35,
+                                           "end":  16.51,
+                                           "word":  " open"
+                                       },
+                                       {
+                                           "start":  16.51,
+                                           "end":  16.75,
+                                           "word":  " the"
+                                       },
+                                       {
+                                           "start":  16.75,
+                                           "end":  17.23,
+                                           "word":  " document,"
+                                       }
+                                   ]
+                     },
+                     {
+                         "start":  18.03,
+                         "end":  20.59,
+                         "text":  "write one line or work for just two minutes.",
+                         "words":  [
+                                       {
+                                           "start":  18.03,
+                                           "end":  18.21,
+                                           "word":  " write"
+                                       },
+                                       {
+                                           "start":  18.21,
+                                           "end":  18.51,
+                                           "word":  " one"
+                                       },
+                                       {
+                                           "start":  18.51,
+                                           "end":  18.95,
+                                           "word":  " line"
+                                       },
+                                       {
+                                           "start":  18.95,
+                                           "end":  19.41,
+                                           "word":  " or"
+                                       },
+                                       {
+                                           "start":  19.41,
+                                           "end":  19.65,
+                                           "word":  " work"
+                                       },
+                                       {
+                                           "start":  19.65,
+                                           "end":  19.85,
+                                           "word":  " for"
+                                       },
+                                       {
+                                           "start":  19.85,
+                                           "end":  20.05,
+                                           "word":  " just"
+                                       },
+                                       {
+                                           "start":  20.05,
+                                           "end":  20.23,
+                                           "word":  " two"
+                                       },
+                                       {
+                                           "start":  20.23,
+                                           "end":  20.59,
+                                           "word":  " minutes."
+                                       }
+                                   ]
+                     }
+                 ],
+    "srt":  "1\n00:00:07,280 --\u003e 00:00:17,230\nAnd if you do do then, what feeling am I avoiding, then swing the next step, open the document,\n\n2\n00:00:18,030 --\u003e 00:00:20,590\nwrite one line or work for just two minutes.\n",
+    "srtFile":  {
+                    "filename":  "captions.srt",
+                    "contentType":  "application/x-subrip",
+                    "cueCount":  2,
+                    "content":  "1\n00:00:07,280 --\u003e 00:00:17,230\nAnd if you do do then, what feeling am I avoiding, then swing the next step, open the document,\n\n2\n00:00:18,030 --\u003e 00:00:20,590\nwrite one line or work for just two minutes.\n"
+                }
+}

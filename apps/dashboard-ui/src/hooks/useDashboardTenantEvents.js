@@ -26,10 +26,8 @@ const normalizeTenantEvent = (payload, tenantId) => {
     const eventName =
       payload.event ||
       payload.eventType ||
-      payload.EventType ||
       baseData.event ||
       baseData.eventType ||
-      baseData.EventType ||
       null;
     const status =
       payload.status ||
@@ -97,22 +95,8 @@ export default function useDashboardTenantEvents() {
   const tenantId = useSelector(selectTenantId);
   const token = useSelector((s) => s.auth.keycloakToken || s.auth.token);
   const tenantWsUrl = useSelector(selectTenantWsUrl);
-  const stompWsUrl = useSelector((s) => s.tenant.stompWsUrl);
-
   const { isConnected, subscribe, send } = useStompEvents(token, tenantWsUrl);
   const pingTenantRef = useRef(null);
-  const previousConnectionRef = useRef(null);
-
-  useEffect(() => {
-    console.log("[dashboard-events] STOMP endpoint state", {
-      tenantWsUrl,
-      fallbackStompWsUrl: stompWsUrl,
-      selectedWsUrl: tenantWsUrl || stompWsUrl || null,
-      tenantId,
-      hasToken: !!token,
-      isConnected,
-    });
-  }, [isConnected, stompWsUrl, tenantId, tenantWsUrl, token]);
 
   const topics = useMemo(() => {
     if (!tenantId) return null;
@@ -126,20 +110,10 @@ export default function useDashboardTenantEvents() {
   }, [tenantId]);
 
   useEffect(() => {
-    if (!topics || !tenantId || !isConnected) {
-      console.log("[dashboard-events] Waiting to subscribe", {
-        hasTopics: !!topics,
-        tenantId,
-        isConnected,
-      });
-      return;
-    }
-
-    console.log("[dashboard-events] Subscribing tenant topics", topics);
+    if (!topics || !tenantId || !isConnected) return;
 
     const walletSub = subscribe(topics.wallet, (payload) => {
       const event = normalizeTenantEvent(payload, tenantId);
-      console.log("[dashboard-events] Wallet event", event);
       const eventName = String(event.event || "").toUpperCase();
       const walletData =
         event.data && typeof event.data === "object" && event.data.data
@@ -167,7 +141,6 @@ export default function useDashboardTenantEvents() {
 
     const billingSub = subscribe(topics.billing, (payload) => {
       const event = normalizeTenantEvent(payload, tenantId);
-      console.log("[dashboard-events] Billing event", event);
       emitBrowserEvent("tenant-billing-event", event);
       dispatch(
         showFlash({
@@ -179,7 +152,6 @@ export default function useDashboardTenantEvents() {
 
     const appsSub = subscribe(topics.apps, (payload) => {
       const event = normalizeTenantEvent(payload, tenantId);
-      console.log("[dashboard-events] App event", event);
       emitBrowserEvent("tenant-app-event", event);
       dispatch(
         showFlash({
@@ -191,7 +163,6 @@ export default function useDashboardTenantEvents() {
 
     const notificationSub = subscribe(topics.notifications, (payload) => {
       const event = normalizeTenantEvent(payload, tenantId);
-      console.log("[dashboard-events] Notification event", event);
       emitBrowserEvent("tenant-notification-event", event);
       dispatch(
         showFlash({
@@ -203,7 +174,6 @@ export default function useDashboardTenantEvents() {
 
     const provisioningSub = subscribe(topics.provisioning, (payload) => {
       const event = normalizeTenantEvent(payload, tenantId);
-      console.log("[dashboard-events] Provisioning event", event);
       emitBrowserEvent("tenant-provisioning-event", event);
       dispatch(
         showFlash({
@@ -214,7 +184,6 @@ export default function useDashboardTenantEvents() {
     });
 
     return () => {
-      console.log("[dashboard-events] Unsubscribing tenant topics", topics);
       walletSub.unsubscribe();
       billingSub.unsubscribe();
       appsSub.unsubscribe();
@@ -222,24 +191,6 @@ export default function useDashboardTenantEvents() {
       provisioningSub.unsubscribe();
     };
   }, [dispatch, isConnected, subscribe, tenantId, topics]);
-
-  useEffect(() => {
-    if (previousConnectionRef.current === isConnected) return;
-
-    if (previousConnectionRef.current === false && isConnected) {
-      emitBrowserEvent("tenant-provisioning-event", {
-        connection: "connected",
-        message: "Realtime connection restored.",
-      });
-    } else if (previousConnectionRef.current === true && !isConnected) {
-      emitBrowserEvent("tenant-provisioning-event", {
-        connection: "reconnecting",
-        message: "Realtime connection lost. Reconnecting...",
-      });
-    }
-
-    previousConnectionRef.current = isConnected;
-  }, [isConnected]);
 
   useEffect(() => {
     if (!isConnected) {

@@ -24,6 +24,8 @@ export default function OrganizationSetupCard({
   wallet,
   isLoading,
   walletLoading,
+  minimumBalance = 300,
+  minimumLabel = "paid generation",
   isSaving,
   onSubmit,
   onRecharge,
@@ -42,18 +44,19 @@ export default function OrganizationSetupCard({
   const displayTenantId = tenantId || organization?.tenantId || organization?.id;
   const walletAmount = Number(wallet?.balance ?? wallet?.totalBalance ?? 0);
   const walletCurrency = wallet?.currency || draft.currency || "INR";
+  const requiredWalletBalance = Number(minimumBalance) > 0 ? Number(minimumBalance) : 300;
   const showWalletStatus = isConfigured && !walletLoading;
   const walletStatus = showWalletStatus && walletAmount <= 0
     ? {
         tone: "error",
         icon: AlertCircle,
-        message: "Wallet balance is zero. Please recharge.",
+        message: `Wallet balance is zero. Recharge at least ${currency(requiredWalletBalance, walletCurrency)} before starting the ${minimumLabel}.`,
       }
-    : showWalletStatus && walletAmount < 300
+    : showWalletStatus && walletAmount < requiredWalletBalance
       ? {
           tone: "warning",
           icon: AlertTriangle,
-          message: `Low balance. Keep at least ${currency(300, walletCurrency)} for smooth paid generation.`,
+          message: `Low balance. Keep at least ${currency(requiredWalletBalance, walletCurrency)} for the ${minimumLabel}.`,
         }
       : null;
 
@@ -184,7 +187,7 @@ export default function OrganizationSetupCard({
           </button>
         </div>
         <p className="mt-3 text-xs font-medium leading-5 text-slate-500">
-          Paid storyboard generation will use the tenant wallet balance returned by the billing service.
+          Keep at least {currency(requiredWalletBalance, walletCurrency)} in this wallet before starting the {minimumLabel}. Paid actions use the tenant wallet balance returned by billing service.
         </p>
         {walletStatus && (
           <WalletStatusMessage status={walletStatus} />

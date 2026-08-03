@@ -1,0 +1,15 @@
+postgres:
+  persistence:
+    size: 2Gi
+
+redis:
+  persistence:
+    size: 1Gi
+
+kafka:
+  persistence:
+    size: 2Gi
+
+minio:
+  persistence:
+    size: 5Gi

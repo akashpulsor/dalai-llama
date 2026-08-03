@@ -1,0 +1,64 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: video-repair-46815b2f-r3
+  namespace: infra
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: repair
+          image: dalai-video-repair:20260715
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: minio-root-user
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: minio-root-password
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              work_dir=/work
+              mkdir -p "$work_dir"
+              mc alias set creator-assets http://minio.infra.svc.cluster.local:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"
+
+              total_duration=0
+              index=1
+              for object_key in \
+                screenplay-videos/36e7c8de-1ca9-4735-9140-3ed11f2df599/46815b2f-def0-4898-8764-5343a2b2e2ae/scenes/001-shot-1-5a13f374-d887-4cd6-aa98-16fdfde72b6f.mp4 \
+                screenplay-videos/36e7c8de-1ca9-4735-9140-3ed11f2df599/46815b2f-def0-4898-8764-5343a2b2e2ae/scenes/002-shot-2-939e3f78-6b65-4488-95fa-65c560470947.mp4 \
+                screenplay-videos/36e7c8de-1ca9-4735-9140-3ed11f2df599/46815b2f-def0-4898-8764-5343a2b2e2ae/scenes/003-shot-3-47b2bab9-895a-4bd1-8f56-87a1c17c34c3.mp4 \
+                screenplay-videos/36e7c8de-1ca9-4735-9140-3ed11f2df599/46815b2f-def0-4898-8764-5343a2b2e2ae/scenes/004-shot-4-5f55f5cc-c22a-487e-a6d6-6d73ead29b2e.mp4 \
+                screenplay-videos/36e7c8de-1ca9-4735-9140-3ed11f2df599/46815b2f-def0-4898-8764-5343a2b2e2ae/scenes/005-shot-5-9a4fba81-ccc6-42d4-8687-574d743b6958.mp4 \
+                screenplay-videos/36e7c8de-1ca9-4735-9140-3ed11f2df599/46815b2f-def0-4898-8764-5343a2b2e2ae/scenes/006-shot-6-58991f1f-4e45-4c14-8af6-ae4ca641fc2f.mp4 \
+                screenplay-videos/36e7c8de-1ca9-4735-9140-3ed11f2df599/46815b2f-def0-4898-8764-5343a2b2e2ae/scenes/007-shot-7-eb220d43-0aff-480c-a8f3-c66f20b084b6.mp4 \
+                screenplay-videos/36e7c8de-1ca9-4735-9140-3ed11f2df599/46815b2f-def0-4898-8764-5343a2b2e2ae/scenes/008-shot-8-6c5be9de-07ed-4a8d-97e3-f55bc2a4c5c8.mp4 \
+                screenplay-videos/36e7c8de-1ca9-4735-9140-3ed11f2df599/46815b2f-def0-4898-8764-5343a2b2e2ae/scenes/009-shot-9-45fd7849-b9d4-4807-895d-4ac98e72b53c.mp4
+              do
+                clip_path=$(printf '%s/%03d.mp4' "$work_dir" "$index")
+                mc cp "creator-assets/creator-assets/$object_key" "$clip_path"
+                duration=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$clip_path")
+                total_duration=$(awk -v total="$total_duration" -v clip_duration="$duration" 'BEGIN { printf "%.3f", total + clip_duration }')
+                printf "file '%s'\\n" "$clip_path" >> "$work_dir/concat.txt"
+                printf 'SCENE_%02d_DURATION_SECONDS=%s\\n' "$index" "$duration"
+                index=$((index + 1))
+              done
+
+              ffmpeg -hide_banner -y -f concat -safe 0 -i "$work_dir/concat.txt" -c:v libx264 -c:a aac -pix_fmt yuv420p -movflags +faststart "$work_dir/final.mp4"
+              final_duration=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$work_dir/final.mp4")
+              printf 'SOURCE_DURATION_SUM_SECONDS=%s\\n' "$total_duration"
+              printf 'FINAL_DURATION_SECONDS=%s\\n' "$final_duration"
+
+              final_key=screenplay-videos/36e7c8de-1ca9-4735-9140-3ed11f2df599/46815b2f-def0-4898-8764-5343a2b2e2ae/final/video_generated_audio-c53c1b69-d6b9-4385-b0e0-b3d894ca16db.mp4
+              mc cp "$work_dir/final.mp4" "creator-assets/creator-assets/$final_key"
+              mc stat --json "creator-assets/creator-assets/$final_key"

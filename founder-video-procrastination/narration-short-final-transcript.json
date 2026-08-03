@@ -1,0 +1,439 @@
+﻿{
+    "status":  "COMPLETED",
+    "provider":  "dalai_llama",
+    "model":  "faster_whisper",
+    "engine":  "faster_whisper",
+    "language":  "en",
+    "segments":  [
+                     {
+                         "start":  1.04,
+                         "end":  4.6,
+                         "text":  "Procrastination is not simply a well-powered problem,",
+                         "words":  [
+                                       {
+                                           "start":  1.04,
+                                           "end":  2.24,
+                                           "word":  " Procrastination"
+                                       },
+                                       {
+                                           "start":  2.24,
+                                           "end":  2.66,
+                                           "word":  " is"
+                                       },
+                                       {
+                                           "start":  2.66,
+                                           "end":  2.88,
+                                           "word":  " not"
+                                       },
+                                       {
+                                           "start":  2.88,
+                                           "end":  3.2,
+                                           "word":  " simply"
+                                       },
+                                       {
+                                           "start":  3.2,
+                                           "end":  3.4,
+                                           "word":  " a"
+                                       },
+                                       {
+                                           "start":  3.4,
+                                           "end":  3.62,
+                                           "word":  " well"
+                                       },
+                                       {
+                                           "start":  3.62,
+                                           "end":  3.94,
+                                           "word":  "-powered"
+                                       },
+                                       {
+                                           "start":  3.94,
+                                           "end":  4.6,
+                                           "word":  " problem,"
+                                       }
+                                   ]
+                     },
+                     {
+                         "start":  5.06,
+                         "end":  8.22,
+                         "text":  "psychologically, it is often emotional avoidance.",
+                         "words":  [
+                                       {
+                                           "start":  5.06,
+                                           "end":  5.52,
+                                           "word":  " psychologically,"
+                                       },
+                                       {
+                                           "start":  6.34,
+                                           "end":  6.34,
+                                           "word":  " it"
+                                       },
+                                       {
+                                           "start":  6.34,
+                                           "end":  6.6,
+                                           "word":  " is"
+                                       },
+                                       {
+                                           "start":  6.6,
+                                           "end":  6.82,
+                                           "word":  " often"
+                                       },
+                                       {
+                                           "start":  6.82,
+                                           "end":  7.32,
+                                           "word":  " emotional"
+                                       },
+                                       {
+                                           "start":  7.32,
+                                           "end":  8.22,
+                                           "word":  " avoidance."
+                                       }
+                                   ]
+                     },
+                     {
+                         "start":  8.98,
+                         "end":  11.46,
+                         "text":  "Important tasks can trigger fear of failure,",
+                         "words":  [
+                                       {
+                                           "start":  8.98,
+                                           "end":  9.2,
+                                           "word":  " Important"
+                                       },
+                                       {
+                                           "start":  9.2,
+                                           "end":  9.78,
+                                           "word":  " tasks"
+                                       },
+                                       {
+                                           "start":  9.78,
+                                           "end":  10.16,
+                                           "word":  " can"
+                                       },
+                                       {
+                                           "start":  10.16,
+                                           "end":  10.52,
+                                           "word":  " trigger"
+                                       },
+                                       {
+                                           "start":  10.52,
+                                           "end":  10.86,
+                                           "word":  " fear"
+                                       },
+                                       {
+                                           "start":  10.86,
+                                           "end":  11.08,
+                                           "word":  " of"
+                                       },
+                                       {
+                                           "start":  11.08,
+                                           "end":  11.46,
+                                           "word":  " failure,"
+                                       }
+                                   ]
+                     },
+                     {
+                         "start":  12.38,
+                         "end":  15.3,
+                         "text":  "perfectionism, uncertainty, or overwhelm.",
+                         "words":  [
+                                       {
+                                           "start":  12.38,
+                                           "end":  13.1,
+                                           "word":  " perfectionism,"
+                                       },
+                                       {
+                                           "start":  13.94,
+                                           "end":  13.94,
+                                           "word":  " uncertainty,"
+                                       },
+                                       {
+                                           "start":  14.32,
+                                           "end":  14.48,
+                                           "word":  " or"
+                                       },
+                                       {
+                                           "start":  14.48,
+                                           "end":  15.3,
+                                           "word":  " overwhelm."
+                                       }
+                                   ]
+                     },
+                     {
+                         "start":  16.38,
+                         "end":  19.74,
+                         "text":  "Avoidance gives quick gruey, so the habit gets stronger.",
+                         "words":  [
+                                       {
+                                           "start":  16.38,
+                                           "end":  16.82,
+                                           "word":  " Avoidance"
+                                       },
+                                       {
+                                           "start":  16.82,
+                                           "end":  17.08,
+                                           "word":  " gives"
+                                       },
+                                       {
+                                           "start":  17.08,
+                                           "end":  17.4,
+                                           "word":  " quick"
+                                       },
+                                       {
+                                           "start":  17.4,
+                                           "end":  17.98,
+                                           "word":  " gruey,"
+                                       },
+                                       {
+                                           "start":  18.2,
+                                           "end":  18.26,
+                                           "word":  " so"
+                                       },
+                                       {
+                                           "start":  18.26,
+                                           "end":  18.48,
+                                           "word":  " the"
+                                       },
+                                       {
+                                           "start":  18.48,
+                                           "end":  18.7,
+                                           "word":  " habit"
+                                       },
+                                       {
+                                           "start":  18.7,
+                                           "end":  19.18,
+                                           "word":  " gets"
+                                       },
+                                       {
+                                           "start":  19.18,
+                                           "end":  19.74,
+                                           "word":  " stronger."
+                                       }
+                                   ]
+                     },
+                     {
+                         "start":  21.78,
+                         "end":  25.36,
+                         "text":  "Instead of asking, why am I lazy, ask,",
+                         "words":  [
+                                       {
+                                           "start":  21.78,
+                                           "end":  21.96,
+                                           "word":  " Instead"
+                                       },
+                                       {
+                                           "start":  21.96,
+                                           "end":  22.2,
+                                           "word":  " of"
+                                       },
+                                       {
+                                           "start":  22.2,
+                                           "end":  22.56,
+                                           "word":  " asking,"
+                                       },
+                                       {
+                                           "start":  23.28,
+                                           "end":  23.46,
+                                           "word":  " why"
+                                       },
+                                       {
+                                           "start":  23.46,
+                                           "end":  23.74,
+                                           "word":  " am"
+                                       },
+                                       {
+                                           "start":  23.74,
+                                           "end":  23.78,
+                                           "word":  " I"
+                                       },
+                                       {
+                                           "start":  23.78,
+                                           "end":  24.22,
+                                           "word":  " lazy,"
+                                       },
+                                       {
+                                           "start":  24.88,
+                                           "end":  25.36,
+                                           "word":  " ask,"
+                                       }
+                                   ]
+                     },
+                     {
+                         "start":  25.62,
+                         "end":  29.46,
+                         "text":  "what feeling am I avoiding, then make the next step smaller?",
+                         "words":  [
+                                       {
+                                           "start":  25.62,
+                                           "end":  25.84,
+                                           "word":  " what"
+                                       },
+                                       {
+                                           "start":  25.84,
+                                           "end":  26.22,
+                                           "word":  " feeling"
+                                       },
+                                       {
+                                           "start":  26.22,
+                                           "end":  26.56,
+                                           "word":  " am"
+                                       },
+                                       {
+                                           "start":  26.56,
+                                           "end":  26.62,
+                                           "word":  " I"
+                                       },
+                                       {
+                                           "start":  26.62,
+                                           "end":  27.18,
+                                           "word":  " avoiding,"
+                                       },
+                                       {
+                                           "start":  28.0,
+                                           "end":  28.16,
+                                           "word":  " then"
+                                       },
+                                       {
+                                           "start":  28.16,
+                                           "end":  28.4,
+                                           "word":  " make"
+                                       },
+                                       {
+                                           "start":  28.4,
+                                           "end":  28.62,
+                                           "word":  " the"
+                                       },
+                                       {
+                                           "start":  28.62,
+                                           "end":  28.8,
+                                           "word":  " next"
+                                       },
+                                       {
+                                           "start":  28.8,
+                                           "end":  29.08,
+                                           "word":  " step"
+                                       },
+                                       {
+                                           "start":  29.08,
+                                           "end":  29.46,
+                                           "word":  " smaller?"
+                                       }
+                                   ]
+                     },
+                     {
+                         "start":  30.42,
+                         "end":  35.22,
+                         "text":  "Open the document, write one nine, or a word for two minutes.",
+                         "words":  [
+                                       {
+                                           "start":  30.42,
+                                           "end":  30.84,
+                                           "word":  " Open"
+                                       },
+                                       {
+                                           "start":  30.84,
+                                           "end":  31.04,
+                                           "word":  " the"
+                                       },
+                                       {
+                                           "start":  31.04,
+                                           "end":  31.56,
+                                           "word":  " document,"
+                                       },
+                                       {
+                                           "start":  32.1,
+                                           "end":  32.26,
+                                           "word":  " write"
+                                       },
+                                       {
+                                           "start":  32.26,
+                                           "end":  32.68,
+                                           "word":  " one"
+                                       },
+                                       {
+                                           "start":  32.68,
+                                           "end":  33.16,
+                                           "word":  " nine,"
+                                       },
+                                       {
+                                           "start":  33.6,
+                                           "end":  33.76,
+                                           "word":  " or"
+                                       },
+                                       {
+                                           "start":  33.76,
+                                           "end":  33.86,
+                                           "word":  " a"
+                                       },
+                                       {
+                                           "start":  33.86,
+                                           "end":  34.1,
+                                           "word":  " word"
+                                       },
+                                       {
+                                           "start":  34.1,
+                                           "end":  34.5,
+                                           "word":  " for"
+                                       },
+                                       {
+                                           "start":  34.5,
+                                           "end":  34.72,
+                                           "word":  " two"
+                                       },
+                                       {
+                                           "start":  34.72,
+                                           "end":  35.22,
+                                           "word":  " minutes."
+                                       }
+                                   ]
+                     },
+                     {
+                         "start":  35.78,
+                         "end":  38.86,
+                         "text":  "Procrastate with feeling safe, not judging yourself.",
+                         "words":  [
+                                       {
+                                           "start":  35.78,
+                                           "end":  36.48,
+                                           "word":  " Procrastate"
+                                       },
+                                       {
+                                           "start":  36.48,
+                                           "end":  36.72,
+                                           "word":  " with"
+                                       },
+                                       {
+                                           "start":  36.72,
+                                           "end":  37.06,
+                                           "word":  " feeling"
+                                       },
+                                       {
+                                           "start":  37.06,
+                                           "end":  37.54,
+                                           "word":  " safe,"
+                                       },
+                                       {
+                                           "start":  37.84,
+                                           "end":  38.0,
+                                           "word":  " not"
+                                       },
+                                       {
+                                           "start":  38.0,
+                                           "end":  38.3,
+                                           "word":  " judging"
+                                       },
+                                       {
+                                           "start":  38.3,
+                                           "end":  38.86,
+                                           "word":  " yourself."
+                                       }
+                                   ]
+                     }
+                 ],
+    "srt":  "1\n00:00:01,040 --\u003e 00:00:04,600\nProcrastination is not simply a well-powered problem,\n\n2\n00:00:05,060 --\u003e 00:00:08,220\npsychologically, it is often emotional avoidance.\n\n3\n00:00:08,980 --\u003e 00:00:11,460\nImportant tasks can trigger fear of failure,\n\n4\n00:00:12,380 --\u003e 00:00:15,300\nperfectionism, uncertainty, or overwhelm.\n\n5\n00:00:16,380 --\u003e 00:00:19,740\nAvoidance gives quick gruey, so the habit gets stronger.\n\n6\n00:00:21,780 --\u003e 00:00:25,360\nInstead of asking, why am I lazy, ask,\n\n7\n00:00:25,620 --\u003e 00:00:29,460\nwhat feeling am I avoiding, then make the next step smaller?\n\n8\n00:00:30,420 --\u003e 00:00:35,220\nOpen the document, write one nine, or a word for two minutes.\n\n9\n00:00:35,780 --\u003e 00:00:38,860\nProcrastate with feeling safe, not judging yourself.\n",
+    "srtFile":  {
+                    "filename":  "captions.srt",
+                    "contentType":  "application/x-subrip",
+                    "cueCount":  9,
+                    "content":  "1\n00:00:01,040 --\u003e 00:00:04,600\nProcrastination is not simply a well-powered problem,\n\n2\n00:00:05,060 --\u003e 00:00:08,220\npsychologically, it is often emotional avoidance.\n\n3\n00:00:08,980 --\u003e 00:00:11,460\nImportant tasks can trigger fear of failure,\n\n4\n00:00:12,380 --\u003e 00:00:15,300\nperfectionism, uncertainty, or overwhelm.\n\n5\n00:00:16,380 --\u003e 00:00:19,740\nAvoidance gives quick gruey, so the habit gets stronger.\n\n6\n00:00:21,780 --\u003e 00:00:25,360\nInstead of asking, why am I lazy, ask,\n\n7\n00:00:25,620 --\u003e 00:00:29,460\nwhat feeling am I avoiding, then make the next step smaller?\n\n8\n00:00:30,420 --\u003e 00:00:35,220\nOpen the document, write one nine, or a word for two minutes.\n\n9\n00:00:35,780 --\u003e 00:00:38,860\nProcrastate with feeling safe, not judging yourself.\n"
+                }
+}

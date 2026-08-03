@@ -9,11 +9,12 @@ const currency = (amount, code = "INR") =>
     maximumFractionDigits: 0,
   }).format(Number(amount) || 0);
 
-export default function WalletBalanceButton({ wallet, isLoading, onRecharge }) {
+export default function WalletBalanceButton({ wallet, isLoading, onRecharge, minimumBalance = 300, minimumLabel = "paid generation" }) {
   const balance = Number(wallet?.balance ?? wallet?.totalBalance ?? 0);
   const currencyCode = wallet?.currency || "INR";
+  const requiredBalance = Number(minimumBalance) > 0 ? Number(minimumBalance) : 300;
   const isEmpty = !isLoading && balance <= 0;
-  const isLow = !isLoading && balance > 0 && balance < 300;
+  const isLow = !isLoading && balance > 0 && balance < requiredBalance;
 
   return (
     <div className={`creator-control flex items-center gap-3 px-3 py-2 ${
@@ -27,7 +28,12 @@ export default function WalletBalanceButton({ wallet, isLoading, onRecharge }) {
         <p className="text-sm font-bold text-white">{currency(balance, currencyCode)}</p>
         {(isEmpty || isLow) && (
           <p className={`mt-0.5 text-[10px] font-bold ${isEmpty ? "text-rose-200" : "text-amber-200"}`}>
-            {isEmpty ? "Please recharge" : "Low balance"}
+            {isEmpty ? "Please recharge" : `Keep ${currency(requiredBalance, currencyCode)}`}
+          </p>
+        )}
+        {!isLoading && !isEmpty && !isLow && (
+          <p className="mt-0.5 text-[10px] font-semibold text-slate-500">
+            Ready for {minimumLabel}
           </p>
         )}
       </div>

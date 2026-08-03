@@ -7,7 +7,6 @@ import {
   selectTenantId,
   setTenantIdentity,
   showFlash,
-  useAddWalletBalanceMutation,
 } from "@dalaillama/shared-store";
 import {
   useGetOrganizationQuery,
@@ -171,7 +170,6 @@ export default function CreatorTenantOnboardingModal() {
     refetch,
   } = useGetOrganizationQuery(undefined, { refetchOnMountOrArgChange: true });
   const [setupOrganization, setupState] = useSetupOrganizationMutation();
-  const [createWalletRecharge] = useAddWalletBalanceMutation();
   const [serverError, setServerError] = useState(null);
   const [completedTenantId, setCompletedTenantId] = useState(null);
   const [touched, setTouched] = useState({});
@@ -301,27 +299,8 @@ export default function CreatorTenantOnboardingModal() {
     persistTenant(identity);
     setCompletedTenantId(identity.tenantId);
 
-    let walletRechargeFailed = false;
-    if (Number(form.initialWalletAmount) >= 100) {
-      try {
-        await createWalletRecharge({
-          tenantId: identity.tenantId,
-          amount: Number(form.initialWalletAmount),
-          currency: payload.currency,
-          source: "creator_onboarding",
-        }).unwrap();
-      } catch {
-        walletRechargeFailed = true;
-      }
-    }
-
     void refetch?.();
-    flash(
-      walletRechargeFailed
-        ? "Organization created; wallet recharge API needs a retry."
-        : "Organization created and wallet service connected.",
-      walletRechargeFailed ? "warning" : "success"
-    );
+    flash("Organization created and wallet service connected.");
   };
 
   if (!shouldShow) return null;

@@ -1,0 +1,3 @@
+FROM akashtripathi/creator-ui:0.1.152-client-rvc-english
+
+COPY apps/creator-ui/dist /usr/share/nginx/html

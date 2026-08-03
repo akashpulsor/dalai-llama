@@ -1,0 +1,4 @@
+task_0:
+  video_path: "C:/Users/Akash/workspace/v4/dalai-llama/artifacts/musetalk-happy-horse-comparison/happy-horse-silent.mp4"
+  audio_path: "C:/Users/Akash/workspace/v4/dalai-llama/artifacts/musetalk-happy-horse-comparison/approved-voice.wav"
+  result_name: "happy-horse-musetalk-v15.mp4"

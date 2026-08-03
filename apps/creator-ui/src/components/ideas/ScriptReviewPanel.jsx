@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, FileText, GripVertical, Loader2, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, FileText, GripVertical, Loader2, MessageSquareText, Plus, RefreshCw, Save, Send, Sparkles, Trash2, Users } from "lucide-react";
 
 const AUTOSAVE_DELAY_MS = 1800;
 
@@ -23,7 +23,20 @@ const hookLensOptions = [
   { value: "economics", label: "Economics" },
 ];
 
-export default function ScriptReviewPanel({ scriptIdea, duration = 30, storytellingType = "narrator_visual_mix", hookLens = "direct", onContinue, onSave, onGenerate, isGenerating = false, isSaving }) {
+export default function ScriptReviewPanel({
+  scriptIdea,
+  duration = 30,
+  storytellingType = "narrator_visual_mix",
+  hookLens = "direct",
+  onContinue,
+  onSave,
+  onGenerate,
+  isGenerating = false,
+  isSaving,
+  humanReviewOrder,
+  onSubmitHumanReview,
+  isSubmittingHumanReview = false,
+}) {
   const [pageIndex, setPageIndex] = useState(0);
   const [draft, setDraft] = useState(() => normalizeEditableScript(scriptIdea, duration, storytellingType, hookLens));
   const [draggedShotIndex, setDraggedShotIndex] = useState(null);
@@ -124,6 +137,15 @@ export default function ScriptReviewPanel({ scriptIdea, duration = 30, storytell
     updateShot({ [root]: { ...(page?.[root] || {}), [key]: value } });
   };
 
+  const updateVisualTreatment = (key, value) => {
+    updateShot({
+      visualTreatment: {
+        ...(page?.visualTreatment || {}),
+        [key]: value,
+      },
+    });
+  };
+
   const updateGuideList = (key, value) => {
     updateShot({
       rookieFriendlyGuide: {
@@ -161,6 +183,22 @@ export default function ScriptReviewPanel({ scriptIdea, duration = 30, storytell
   const markDirty = () => {
     setDirty(true);
     setSaveState("dirty");
+  };
+
+  const saveDraftNow = async () => {
+    if (!hasScript || !onSave || isSaving) return;
+    window.clearTimeout(saveTimerRef.current);
+    const normalized = normalizeDraftForSave(latestDraftRef.current);
+    setSaveState("saving");
+    try {
+      await onSave(normalized);
+      latestDraftRef.current = normalized;
+      setDraft(normalized);
+      setDirty(false);
+      setSaveState("saved");
+    } catch {
+      setSaveState("error");
+    }
   };
 
   return (
@@ -207,6 +245,15 @@ export default function ScriptReviewPanel({ scriptIdea, duration = 30, storytell
       ) : (
         <>
           <div className="min-h-0 flex-1 space-y-4">
+            <HumanReviewCard
+              order={humanReviewOrder}
+              disabled={!hasScript || dirty || saveState === "saving" || isSaving || isSubmittingHumanReview}
+              isSubmitting={isSubmittingHumanReview}
+              onSubmit={() => onSubmitHumanReview?.({
+                requesterNotes: "Please review and improve the screenplay for hook strength, scene clarity, pacing, visual continuity, dialogue, and production readiness.",
+              })}
+            />
+
             <ScriptPageNavigator
               draft={draft}
               duration={duration}
@@ -247,6 +294,7 @@ export default function ScriptReviewPanel({ scriptIdea, duration = 30, storytell
                       shotIndex={shotIndex}
                       updateShot={updateShot}
                       updateShotPath={updateShotPath}
+                      updateVisualTreatment={updateVisualTreatment}
                       updateShotList={updateShotList}
                       updateGuideList={updateGuideList}
                       updateDialogueAt={updateDialogueAt}
@@ -264,6 +312,16 @@ export default function ScriptReviewPanel({ scriptIdea, duration = 30, storytell
               {saveState === "dirty" ? "Autosaving after you pause..." : saveState === "saving" ? "Saving screenplay..." : saveState === "saved" ? "Screenplay saved automatically." : saveState === "error" ? "Save failed. Edit again to retry." : isOverviewPage ? "Editing the screenplay title page." : `Editing shot ${shotIndex + 1} of ${shots.length}.`}
             </p>
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={saveDraftNow}
+                disabled={!dirty || saveState === "saving" || isSaving}
+                className="creator-control flex items-center gap-2 px-3 py-2 text-xs font-bold text-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                title="Save the current shot-plan edits now."
+              >
+                {saveState === "saving" || isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                Save Changes
+              </button>
               <button type="button" onClick={() => setPageIndex((current) => Math.max(0, current - 1))} disabled={pageIndex <= 0} className="creator-control flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-200 disabled:opacity-40">
                 <ChevronLeft size={14} /> Previous Page
               </button>
@@ -287,6 +345,47 @@ export default function ScriptReviewPanel({ scriptIdea, duration = 30, storytell
           </div>
         </>
       )}
+    </section>
+  );
+}
+
+function HumanReviewCard({ order, disabled, isSubmitting, onSubmit }) {
+  const status = humanOrderStatus(order);
+  const active = Boolean(order) && !["APPROVED", "REJECTED", "CANCELLED", "CANCELED"].includes(status);
+  const delivered = ["DELIVERED", "APPROVED"].includes(status);
+  const reviewerNotes = order?.reviewerNotes || order?.deliveryPayload?.reviewerNotes || order?.deliveryPayload?.summary || "";
+  return (
+    <section className="creator-panel-muted grid gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-2 rounded-md border border-purple-300/20 bg-purple-400/10 px-2.5 py-1 text-[11px] font-black uppercase tracking-normal text-purple-100">
+            <Users size={13} /> Human screenplay review
+          </span>
+          {order && (
+            <span className="rounded-md border border-white/10 bg-black/20 px-2.5 py-1 text-[11px] font-black uppercase tracking-normal text-slate-300">
+              {humanStatusLabel(status)}
+            </span>
+          )}
+        </div>
+        <p className="mt-2 text-xs font-semibold leading-5 text-slate-400">
+          Send the saved screenplay to a human reviewer for expert structure, hook, dialogue, and production polish.
+        </p>
+        {reviewerNotes && (
+          <p className="mt-2 line-clamp-2 text-xs font-semibold leading-5 text-emerald-100">
+            <MessageSquareText size={13} className="mr-1 inline" /> {reviewerNotes}
+          </p>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={onSubmit}
+        disabled={disabled || active || delivered || isSubmitting}
+        className="creator-control inline-flex min-h-10 items-center justify-center gap-2 px-4 py-2 text-xs font-black uppercase text-slate-200 disabled:opacity-50"
+        title={delivered ? "The latest human review has been delivered." : active ? "This screenplay is already in the human review queue." : "Send this screenplay for human review."}
+      >
+        {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+        {active ? "Review queued" : delivered ? "Review delivered" : order ? "Send again" : "Send to reviewer"}
+      </button>
     </section>
   );
 }
@@ -528,6 +627,7 @@ function ShotScriptPage({
   shotIndex,
   updateShot,
   updateShotPath,
+  updateVisualTreatment,
   updateShotList,
   updateGuideList,
   updateDialogueAt,
@@ -679,6 +779,60 @@ function ShotScriptPage({
         </div>
       </PaperSection>
 
+      <PaperSection title="Visual Treatment" description="Per-shot motion and colour treatment. These settings are saved into the storyboard and final video render brief.">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ScriptSelectNote
+            label="Motion Effect"
+            description="How time and movement should feel in this shot."
+            value={page?.visualTreatment?.motionStyle}
+            onChange={(value) => updateVisualTreatment("motionStyle", value)}
+            options={[
+              { value: "natural motion", label: "Natural motion" },
+              { value: "slow motion", label: "Slow motion" },
+              { value: "speed ramp", label: "Speed ramp" },
+              { value: "time-lapse", label: "Time-lapse" },
+              { value: "stop motion", label: "Stop motion" },
+            ]}
+          />
+          <ScriptSelectNote
+            label="Colour Grade"
+            description="The final-video colour language for this one shot."
+            value={page?.visualTreatment?.colorGrade}
+            onChange={(value) => updateVisualTreatment("colorGrade", value)}
+            options={[
+              { value: "natural colour", label: "Natural colour" },
+              { value: "black and white", label: "Black and white" },
+              { value: "high contrast", label: "High contrast" },
+              { value: "warm premium", label: "Warm premium" },
+              { value: "cool clean", label: "Cool clean" },
+              { value: "vintage film", label: "Vintage film" },
+            ]}
+          />
+          <ScriptSelectNote
+            label="Editorial Effect"
+            description="A visible effect or transition treatment."
+            value={page?.visualTreatment?.editorialEffect}
+            onChange={(value) => updateVisualTreatment("editorialEffect", value)}
+            options={[
+              { value: "none", label: "None" },
+              { value: "freeze frame", label: "Freeze frame" },
+              { value: "match cut", label: "Match cut" },
+              { value: "film grain", label: "Film grain" },
+              { value: "split screen", label: "Split screen" },
+              { value: "light leak", label: "Light leak" },
+            ]}
+          />
+        </div>
+        <div className="mt-5">
+          <ScriptNote
+            label="Visual Treatment Notes"
+            description="Add the exact creative instruction for the shot. Example: slow-motion ingredient fall; monochrome image with the pack kept in colour."
+            value={page?.visualTreatment?.notes}
+            onChange={(value) => updateVisualTreatment("notes", value)}
+          />
+        </div>
+      </PaperSection>
+
       <PaperSection title="Rookie-Friendly Guide" description="Plain-language instructions for a creator who needs practical shoot guidance.">
         <div className="grid gap-5 lg:grid-cols-2">
           <ScriptNote label="What Is This?" description="Plain explanation of this shot type." value={page?.rookieFriendlyGuide?.whatIsThis} onChange={(value) => updateShotPath("rookieFriendlyGuide.whatIsThis", value)} />
@@ -716,6 +870,14 @@ function AutoSaveBadge({ state, isSaving, duration }) {
       </p>
     </div>
   );
+}
+
+function humanOrderStatus(order) {
+  return String(order?.status || "NOT_SUBMITTED").toUpperCase();
+}
+
+function humanStatusLabel(status) {
+  return String(status || "NOT_SUBMITTED").replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function ScreenplayInline({ value, onChange, className = "", readOnly = false }) {
@@ -762,6 +924,24 @@ function ScriptCompactNote({ label, description, value, onChange, readOnly = fal
         onChange={onChange}
         className="mt-2 w-full border-b border-dotted border-black/25 text-sm font-bold text-black"
       />
+    </label>
+  );
+}
+
+function ScriptSelectNote({ label, description, value, onChange, options = [] }) {
+  return (
+    <label className="block rounded-sm border border-black/10 bg-[#fff8e9]/55 p-3">
+      <span className="block text-[10px] font-black uppercase tracking-normal text-black/45">{label}</span>
+      {description && <span className="block text-[10px] font-semibold leading-4 text-black/30">{description}</span>}
+      <select
+        value={textValue(value)}
+        onChange={(event) => onChange?.(event.target.value)}
+        className="mt-2 w-full border-0 border-b border-dotted border-black/25 bg-transparent px-0 py-1 text-sm font-bold text-black outline-none focus:border-black/45 focus:ring-0"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
     </label>
   );
 }
@@ -911,40 +1091,40 @@ function normalizeShot(shot = {}) {
     startTime: shot.startTime ?? parseTime(shot.time, 0) ?? `0:${String((shotNumber - 1) * 3).padStart(2, "0")}`,
     endTime: shot.endTime ?? parseTime(shot.time, 1) ?? `0:${String(shotNumber * 3).padStart(2, "0")}`,
     durationSeconds: shot.durationSeconds === "" ? "" : Number(shot.durationSeconds || 3),
-    title: stripShotPrefix(shot.title ?? `Shot ${shotNumber}`),
-    purpose: shot.purpose ?? shot.intent ?? "Move the short forward.",
-    shotType: shot.shotType ?? shot.camera ?? "Medium Shot",
-    cameraAngle: shot.cameraAngle ?? "Front vertical angle",
-    cameraMovement: shot.cameraMovement ?? "Static",
-    lensSuggestion: shot.lensSuggestion ?? "1x phone camera",
+    title: stripShotPrefix(plainText(shot.title, `Shot ${shotNumber}`)),
+    purpose: plainText(shot.purpose ?? shot.intent, "Move the short forward."),
+    shotType: plainText(shot.shotType ?? shot.camera, "Medium Shot"),
+    cameraAngle: plainText(shot.cameraAngle, "Front vertical angle"),
+    cameraMovement: plainText(shot.cameraMovement, "Static"),
+    lensSuggestion: plainText(shot.lensSuggestion, "1x phone camera"),
     fps: shot.fps === "" ? "" : Number(shot.fps || shot.cinematicExecution?.recommendedFPS || 30),
-    composition: shot.composition ?? "Keep the main action centered for mobile viewing.",
-    setDesign: shot.setDesign ?? "",
+    composition: plainText(shot.composition, "Keep the main action centered for mobile viewing."),
+    setDesign: plainText(shot.setDesign),
     peopleInFrame: shot.peopleInFrame === "" ? "" : Number(shot.peopleInFrame || 1),
-    primaryActors: Array.isArray(shot.primaryActors) ? shot.primaryActors : textToList(shot.primaryActors || "Main creator"),
-    sideActors: Array.isArray(shot.sideActors) ? shot.sideActors : textToList(shot.sideActors || ""),
-    primaryActorAction: shot.primaryActorAction ?? "",
-    sideActorAction: shot.sideActorAction ?? "",
-    expression: shot.expression ?? "",
-    emotion: shot.emotion ?? "",
-    bodyLanguage: shot.bodyLanguage ?? "",
-    lighting: shot.lighting ?? "Natural light",
-    environment: shot.environment ?? "",
-    action: shot.action ?? shot.visual ?? shot.description ?? "",
-    voiceOver: shot.voiceOver ?? shot.vo ?? "",
+    primaryActors: textToList(shot.primaryActors || "Main creator"),
+    sideActors: textToList(shot.sideActors || ""),
+    primaryActorAction: plainText(shot.primaryActorAction),
+    sideActorAction: plainText(shot.sideActorAction),
+    expression: plainText(shot.expression),
+    emotion: plainText(shot.emotion),
+    bodyLanguage: plainText(shot.bodyLanguage),
+    lighting: plainText(shot.lighting, "Natural light"),
+    environment: plainText(shot.environment),
+    action: plainText(shot.action ?? shot.visual ?? shot.description),
+    voiceOver: plainText(shot.voiceOver ?? shot.vo),
     dialogue: normalizeDialogue(shot.dialogue),
-    textOverlay: shot.textOverlay ?? shot.screenText ?? "",
-    transition: shot.transition ?? "Hard Cut",
+    textOverlay: plainText(shot.textOverlay ?? shot.screenText),
+    transition: plainText(shot.transition, "Hard Cut"),
     storytellingRole: shot.storytellingRole || shot.storyRole || "narrator_face",
     assetCaptureMode: shot.assetCaptureMode || shot.captureMode || "record",
-    assetGenerationPrompt: shot.assetGenerationPrompt || "",
-    soundDesign: Array.isArray(shot.soundDesign) ? shot.soundDesign : [],
-    editingNotes: Array.isArray(shot.editingNotes) ? shot.editingNotes : [],
-    retentionGoal: shot.retentionGoal ?? shot.intent ?? "",
-    creatorDirection: shot.creatorDirection ?? shot.directorNote ?? "",
-    subtitlePosition: shot.subtitlePosition ?? "lower-middle",
-    mobileFocusArea: shot.mobileFocusArea ?? "faces",
-    safeZoneNotes: shot.safeZoneNotes ?? "Keep subtitles above platform UI.",
+    assetGenerationPrompt: plainText(shot.assetGenerationPrompt),
+    soundDesign: textToList(shot.soundDesign),
+    editingNotes: textToList(shot.editingNotes),
+    retentionGoal: plainText(shot.retentionGoal ?? shot.intent),
+    creatorDirection: plainText(shot.creatorDirection ?? shot.directorNote),
+    subtitlePosition: plainText(shot.subtitlePosition, "lower-middle"),
+    mobileFocusArea: plainText(shot.mobileFocusArea, "faces"),
+    safeZoneNotes: plainText(shot.safeZoneNotes, "Keep subtitles above platform UI."),
     executionDifficulty: {
       score: shot.executionDifficulty?.score === "" ? "" : Number(shot.executionDifficulty?.score || 1),
       level: shot.executionDifficulty?.level ?? "Beginner",
@@ -954,14 +1134,20 @@ function normalizeShot(shot = {}) {
     },
     cinematicExecution: {
       recommendedFPS: shot.cinematicExecution?.recommendedFPS === "" ? "" : Number(shot.cinematicExecution?.recommendedFPS || shot.fps || 30),
-      captureMode: shot.cinematicExecution?.captureMode ?? "normal",
-      playbackSpeed: shot.cinematicExecution?.playbackSpeed ?? "1x",
-      cameraStyle: shot.cinematicExecution?.cameraStyle ?? "static",
-      stabilization: shot.cinematicExecution?.stabilization ?? "",
-      transitionStyle: shot.cinematicExecution?.transitionStyle ?? "",
-      zoomRecommendation: shot.cinematicExecution?.zoomRecommendation ?? "",
-      motionIntensity: shot.cinematicExecution?.motionIntensity ?? "",
-      editingComplexity: shot.cinematicExecution?.editingComplexity ?? "easy",
+      captureMode: plainText(shot.cinematicExecution?.captureMode, "normal"),
+      playbackSpeed: plainText(shot.cinematicExecution?.playbackSpeed, "1x"),
+      cameraStyle: plainText(shot.cinematicExecution?.cameraStyle, "static"),
+      stabilization: plainText(shot.cinematicExecution?.stabilization),
+      transitionStyle: plainText(shot.cinematicExecution?.transitionStyle),
+      zoomRecommendation: plainText(shot.cinematicExecution?.zoomRecommendation),
+      motionIntensity: plainText(shot.cinematicExecution?.motionIntensity),
+      editingComplexity: plainText(shot.cinematicExecution?.editingComplexity, "easy"),
+    },
+    visualTreatment: {
+      motionStyle: plainText(shot.visualTreatment?.motionStyle ?? shot.cinematicExecution?.captureMode, "natural motion"),
+      colorGrade: plainText(shot.visualTreatment?.colorGrade, "natural colour"),
+      editorialEffect: plainText(shot.visualTreatment?.editorialEffect, "none"),
+      notes: plainText(shot.visualTreatment?.notes),
     },
     rookieFriendlyGuide: {
       whatIsThis: shot.rookieFriendlyGuide?.whatIsThis || "",
@@ -1042,6 +1228,12 @@ function createInsertedShot(shotNumber) {
       motionIntensity: "",
       editingComplexity: "",
     },
+    visualTreatment: {
+      motionStyle: "natural motion",
+      colorGrade: "natural colour",
+      editorialEffect: "none",
+      notes: "",
+    },
     rookieFriendlyGuide: {
       whatIsThis: "",
       whyThisWorks: "",
@@ -1118,10 +1310,12 @@ function textToDialogue(value) {
 }
 
 function listToText(value) {
-  return Array.isArray(value) ? value.join("\n") : textValue(value);
+  return textValue(value);
 }
 
 function textToList(value) {
+  if (Array.isArray(value)) return value.flatMap((item) => textToList(item));
+  if (value && typeof value === "object") return Object.values(value).flatMap((item) => textToList(item));
   return String(value || "").split("\n").map((line) => line.trim()).filter(Boolean);
 }
 
@@ -1131,7 +1325,7 @@ function parseTime(value, part) {
 }
 
 function stripShotPrefix(value) {
-  return String(value || "").replace(/^\d+\.\s*/, "");
+  return textValue(value).replace(/^\d+\.\s*/, "");
 }
 
 function textValue(value) {
@@ -1141,4 +1335,9 @@ function textValue(value) {
     return Object.entries(value).map(([key, item]) => `${key}: ${textValue(item)}`).join("\n");
   }
   return String(value);
+}
+
+function plainText(value, fallback = "") {
+  const text = textValue(value).trim();
+  return text || fallback;
 }

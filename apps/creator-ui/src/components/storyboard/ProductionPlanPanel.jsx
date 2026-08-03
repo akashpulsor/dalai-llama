@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React from "react";
-import { Aperture, Camera, ClipboardList, Lightbulb, Loader2, Sparkles, Volume2 } from "lucide-react";
+import { Aperture, Camera, ClipboardList, Lightbulb, Loader2, Sparkles, Type, Volume2 } from "lucide-react";
 
 export default function ProductionPlanPanel({ plans = [], scenes = [], compact = false, isLoading = false }) {
   const normalizedPlans = normalizePlans(plans, scenes);
@@ -102,6 +102,13 @@ function ShotPlanCard({ plan }) {
   const wardrobeValue = firstValue(storyboard.wardrobeThisShot, storyboard.wardrobe, lighting.characterContinuityWardrobe);
   const propsValue = firstValue(storyboard.keyProps, storyboard.props, lighting.keyProps);
   const safetyValue = firstValue(storyboard.safetyFlags, lighting.safetyFlags, camera.safetyFlags);
+  const overlayPlan = firstObject(
+    storyboard.overlayPlan,
+    storyboard.overlay_plan,
+    plan.sourceScene?.overlayPlan,
+    plan.sourceScene?.overlay_plan
+  ) || {};
+  const typography = firstObject(storyboard.typographySystem, storyboard.typography_system) || {};
 
   return (
     <article className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
@@ -170,6 +177,26 @@ function ShotPlanCard({ plan }) {
             ["Resources", firstValue(storyboard.resourceRequirements, lighting.resourceRequirements, camera.resourceRequirements)],
             ["Post Notes", firstValue(storyboard.postProductionNotes, lighting.postProductionNotes, camera.postProductionNotes)],
             ["Creator Guide", firstValue(storyboard.creatorSetupGuide, lighting.creatorSetupGuide, camera.directorNotes)],
+          ]}
+        />
+        <PlanSection
+          icon={Type}
+          title="Text Overlay And Motion"
+          rows={[
+            ["Use Overlay", overlayPlan.enabled === false ? "No; visual-only beat" : overlayPlan.enabled ? "Yes" : ""],
+            ["Copy", overlayPlan.text || storyboard.textOverlay],
+            ["Font", firstValue(
+              overlayPlan.fontFamily && `${overlayPlan.fontFamily} ${overlayPlan.fontWeight || ""}`,
+              typography.primaryFont
+            )],
+            ["Entrance", firstValue(
+              overlayPlan.entrance,
+              overlayPlan.entranceDurationMs ? `${overlayPlan.entranceDurationMs} ms` : ""
+            )],
+            ["Speed", firstValue(overlayPlan.speed, overlayPlan.holdDurationMs ? `${overlayPlan.holdDurationMs} ms hold` : "")],
+            ["Position", overlayPlan.position],
+            ["Safe Zone", overlayPlan.safeZone],
+            ["AI Rationale", overlayPlan.rationale],
           ]}
         />
       </div>

@@ -5,32 +5,27 @@ import {
   BarChart3,
   Clapperboard,
   FileText,
+  Film,
   FolderOpen,
-  History,
   ListChecks,
-  Scissors,
+  MessageSquareText,
   Sparkles,
   Users,
   Wand2,
 } from "lucide-react";
-import { enableShortGeneration } from "../config/featureFlags.js";
 import UpgradeCard from "./UpgradeCard.jsx";
 import UserChip from "./UserChip.jsx";
 
 const navItems = [
   { id: "ideas", label: "New Idea", icon: Wand2 },
-  { id: "projects", label: "Projects", icon: FolderOpen },
-  { id: "post-production", label: "Post Production", icon: Clapperboard },
   { id: "generated-ideas", label: "Generated Ideas", icon: ListChecks },
-  { id: "past-storyline", label: "Past Storyline", icon: Sparkles },
-  { id: "past-script", label: "Past Script", icon: FileText },
-  { id: "cast", label: "Actor", icon: Users },
-  ...(enableShortGeneration
-    ? [
-        { id: "generate-shorts", label: "Generate Shorts", icon: Scissors, path: "/generate-shorts" },
-        { id: "shorts-history", label: "Shorts History", icon: History, path: "/shorts-history" },
-      ]
-    : []),
+  { id: "script", label: "Storyline", icon: Sparkles },
+  { id: "cast", label: "Cast", icon: Users },
+  { id: "screenplay", label: "Screenplay", icon: FileText },
+  { id: "storyboard", label: "Storyboard", icon: Clapperboard },
+  { id: "client-review", label: "Client Review", icon: MessageSquareText },
+  { id: "video", label: "Video", icon: Film },
+  { id: "projects", label: "Projects", icon: FolderOpen },
 ];
 
 export default function Sidebar() {
@@ -97,12 +92,6 @@ export default function Sidebar() {
       window.history.replaceState(null, "", "/#projects");
       return;
     }
-    if (id === "post-production") {
-      window.dispatchEvent(new CustomEvent("creator:open-post-production"));
-      window.history.replaceState(null, "", "/#post-production");
-      return;
-    }
-
     const dispatchWorkspaceNavigation = () => {
       window.dispatchEvent(new CustomEvent("creator:navigate-workspace", { detail: { id } }));
     };
@@ -124,8 +113,8 @@ export default function Sidebar() {
             <BarChart3 size={22} />
           </div>
           <div>
-            <p className="text-lg font-bold">DalaiLlama</p>
-            <p className="text-xs font-medium text-slate-400">AI Short Planner</p>
+            <p className="text-lg font-bold">Dalaillama</p>
+            <p className="text-xs font-medium text-slate-400">Creator Studio</p>
           </div>
         </a>
 
@@ -174,8 +163,7 @@ export default function Sidebar() {
 }
 
 function sectionForPath(pathname) {
-  if (pathname === "/generate-shorts") return "generate-shorts";
-  if (pathname === "/shorts-history") return "shorts-history";
+  if (pathname === "/generate-shorts" || pathname === "/shorts-history" || pathname === "/shorts") return "projects";
   return "ideas";
 }
 

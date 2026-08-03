@@ -1,0 +1,15 @@
+{
+  "endpoint": "fal-ai/musetalk",
+  "requestId": "019f9aeb-a0fd-7443-8dac-d67971dabd0f",
+  "status": "completed",
+  "outputUrl": "https://v3b.fal.media/files/b/0aa3b5f3/tIZG9y9dyRgfKhdzzncYi.mp4",
+  "outputBytes": 4784816,
+  "result": {
+    "video": {
+      "url": "https://v3b.fal.media/files/b/0aa3b5f3/tIZG9y9dyRgfKhdzzncYi.mp4",
+      "content_type": "video/mp4",
+      "file_name": "tIZG9y9dyRgfKhdzzncYi.mp4",
+      "file_size": 4784816
+    }
+  }
+}

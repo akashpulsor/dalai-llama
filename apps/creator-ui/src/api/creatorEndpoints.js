@@ -224,6 +224,34 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: (body) => ({ url: "/creator/trends/predict", method: "POST", body }),
       invalidatesTags: ["CreatorTrends"],
     }),
+    generateProductAdPipeline: builder.mutation({
+      query: (body = {}) => ({
+        url: "/creator/product-ads/pipeline/generate-async",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["CreatorProjects", "CreatorTrends"],
+    }),
+    uploadProductReferenceImages: builder.mutation({
+      query: (files = []) => {
+        const formData = new FormData();
+        (Array.isArray(files) ? files : [files])
+          .filter(Boolean)
+          .forEach((file) => formData.append("files", file));
+        return {
+          url: "/creator/product-ads/reference-images",
+          method: "POST",
+          body: formData,
+        };
+      },
+    }),
+    getProductAdAssets: builder.query({
+      query: ({ jobId } = {}) => ({
+        url: "/creator/product-ads/assets",
+        params: { jobId },
+      }),
+      providesTags: (_result, _error, args) => [{ type: "CreatorProjects", id: `product-ad-assets-${args?.jobId || "latest"}` }],
+    }),
     getJob: builder.query({
       query: (jobId) => `/creator/jobs/${jobId}`,
     }),
@@ -465,6 +493,17 @@ export const creatorApi = apiSlice.injectEndpoints({
     suggestAudience: builder.mutation({
       query: (body = {}) => ({ url: "/creator/audience/suggest", method: "POST", body }),
     }),
+    suggestCampaignAngles: builder.mutation({
+      query: (body = {}) => ({ url: "/creator/angles/suggest", method: "POST", body }),
+    }),
+    selectLockedCampaignAngle: builder.mutation({
+      query: ({ lockedIdeaId, campaignAngle }) => ({
+        url: `/creator/locked-ideas/${lockedIdeaId}/campaign-angle`,
+        method: "PUT",
+        body: { campaignAngle },
+      }),
+      invalidatesTags: ["CreatorProjects"],
+    }),
     confirmAudience: builder.mutation({
       query: (audience) => ({ url: "/creator/audience/confirm", method: "POST", body: audience }),
       invalidatesTags: ["CreatorProjects"],
@@ -496,17 +535,19 @@ export const creatorApi = apiSlice.injectEndpoints({
       invalidatesTags: ["CreatorProjects"],
     }),
     generateLockedIdeaOptions: builder.mutation({
-      query: ({ lockedIdeaId, page = 0, size = 5 }) => ({
+      query: ({ lockedIdeaId, page = 0, size = 5, ...body }) => ({
         url: `/creator/locked-ideas/${lockedIdeaId}/ideas/generate`,
         method: "POST",
         params: { page, size },
+        body: Object.keys(body).length ? body : undefined,
       }),
     }),
     generateLockedIdeaOptionsAsync: builder.mutation({
-      query: ({ lockedIdeaId, page = 0, size = 5 }) => ({
+      query: ({ lockedIdeaId, page = 0, size = 5, ...body }) => ({
         url: `/creator/locked-ideas/${lockedIdeaId}/ideas/generate-async`,
         method: "POST",
         params: { page, size },
+        body: Object.keys(body).length ? body : undefined,
       }),
     }),
     saveStoryIdea: builder.mutation({
@@ -528,6 +569,10 @@ export const creatorApi = apiSlice.injectEndpoints({
         method: "PUT",
         body,
       }),
+      invalidatesTags: (_result, _error, args) => [
+        "CreatorProjects",
+        { type: "CreatorProjects", id: `storyline-${args?.storyIdeaId || "detail"}` },
+      ],
     }),
     getCharacterCastMappings: builder.query({
       query: ({ lockedIdeaId, storyIdeaId }) => `/creator/locked-ideas/${lockedIdeaId}/story-ideas/${storyIdeaId}/cast-mappings`,
@@ -565,6 +610,434 @@ export const creatorApi = apiSlice.injectEndpoints({
         body,
       }),
     }),
+    approveScreenplay: builder.mutation({
+      query: ({ lockedIdeaId, storyIdeaId, scriptId, ...body }) => ({
+        url: `/creator/locked-ideas/${lockedIdeaId}/story-ideas/${storyIdeaId}/screenplay/${scriptId}/approve`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["CreatorProjects"],
+    }),
+    generateScreenplayVideoAsync: builder.mutation({
+      query: ({ scriptId, ...body }) => ({
+        url: `/creator/storyboards/scripts/${scriptId}/videos/generate-async`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-${body?.scriptId || "current"}` },
+        "Storyboard",
+        "CreatorProjects",
+      ],
+    }),
+    uploadScreenplayVideoReferenceImage: builder.mutation({
+      query: ({ scriptId, file, details, enhanceScreenplay }) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        if (details) formData.append("details", details);
+        if (enhanceScreenplay != null) formData.append("enhanceScreenplay", String(Boolean(enhanceScreenplay)));
+        return {
+          url: `/creator/storyboards/scripts/${scriptId}/reference-images`,
+          method: "POST",
+          body: formData,
+        };
+      },
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-reference-${body?.scriptId || "current"}` },
+        "Storyboard",
+      ],
+    }),
+    uploadScreenplayFounderAvatarSource: builder.mutation({
+      query: ({
+        scriptId,
+        file,
+        details,
+        providerMode,
+        synthesiaAvatarId,
+        synthesiaVoiceId,
+        localVoiceModel,
+        voiceProfileId,
+        localTalkingAvatarModel,
+        localLipSyncModel,
+        localImageModel,
+        localVideoModel,
+        referenceTranscript,
+        previewText,
+        spokenText,
+        pronunciationGuide,
+        elevenLabsVoiceId,
+        sarvamVoiceId,
+        productionEnhancementEnabled,
+        productionEnhancementPrompt,
+        consentConfirmed,
+        language,
+        languageCode,
+      }) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        if (details) formData.append("details", details);
+        if (providerMode) formData.append("providerMode", providerMode);
+        if (synthesiaAvatarId) formData.append("synthesiaAvatarId", synthesiaAvatarId);
+        if (synthesiaVoiceId) formData.append("synthesiaVoiceId", synthesiaVoiceId);
+        if (localVoiceModel) formData.append("localVoiceModel", localVoiceModel);
+        if (voiceProfileId) formData.append("voiceProfileId", voiceProfileId);
+        if (localTalkingAvatarModel) formData.append("localTalkingAvatarModel", localTalkingAvatarModel);
+        if (localLipSyncModel) formData.append("localLipSyncModel", localLipSyncModel);
+        if (localImageModel) formData.append("localImageModel", localImageModel);
+        if (localVideoModel) formData.append("localVideoModel", localVideoModel);
+        if (referenceTranscript) formData.append("referenceTranscript", referenceTranscript);
+        if (previewText) formData.append("previewText", previewText);
+        if (spokenText) formData.append("spokenText", spokenText);
+        if (pronunciationGuide) formData.append("pronunciationGuide", pronunciationGuide);
+        if (elevenLabsVoiceId) formData.append("elevenLabsVoiceId", elevenLabsVoiceId);
+        if (sarvamVoiceId) formData.append("sarvamVoiceId", sarvamVoiceId);
+        if (productionEnhancementEnabled != null) formData.append("productionEnhancementEnabled", String(Boolean(productionEnhancementEnabled)));
+        if (productionEnhancementPrompt) formData.append("productionEnhancementPrompt", productionEnhancementPrompt);
+        if (consentConfirmed != null) formData.append("consentConfirmed", String(Boolean(consentConfirmed)));
+        if (language) formData.append("language", language);
+        if (languageCode) formData.append("languageCode", languageCode);
+        return {
+          url: `/creator/storyboards/scripts/${scriptId}/founder-avatar-source`,
+          method: "POST",
+          body: formData,
+        };
+      },
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-founder-${body?.scriptId || "current"}` },
+        { type: "Storyboard", id: `screenplay-video-latest-${body?.scriptId || "current"}` },
+        "Storyboard",
+        "CreatorProjects",
+      ],
+    }),
+    prepareFounderAvatarPortrait: builder.mutation({
+      query: ({ scriptId, file, sourceMode = "extract", timestampSeconds = 0.5, consentConfirmed }) => {
+        const formData = new FormData();
+        if (file) formData.append("file", file);
+        formData.append("sourceMode", sourceMode);
+        formData.append("timestampSeconds", String(timestampSeconds));
+        formData.append("consentConfirmed", String(Boolean(consentConfirmed)));
+        return {
+          url: `/creator/storyboards/scripts/${scriptId}/founder-avatar-portrait`,
+          method: "POST",
+          body: formData,
+        };
+      },
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-founder-${body?.scriptId || "current"}` },
+        { type: "Storyboard", id: `screenplay-video-latest-${body?.scriptId || "current"}` },
+        "Storyboard",
+        "CreatorProjects",
+      ],
+    }),
+    generateFounderAvatarTest: builder.mutation({
+      query: ({ scriptId, ...body }) => ({
+        url: `/creator/storyboards/scripts/${scriptId}/founder-avatar-test`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-founder-${body?.scriptId || "current"}` },
+        { type: "Storyboard", id: `screenplay-video-latest-${body?.scriptId || "current"}` },
+        "Storyboard",
+        "CreatorProjects",
+      ],
+    }),
+    prepareFounderEnglishDialogue: builder.mutation({
+      query: ({ scriptId, ...body }) => ({
+        url: `/creator/storyboards/scripts/${scriptId}/founder-dialogue/english`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-founder-${body?.scriptId || "current"}` },
+        { type: "Storyboard", id: `screenplay-video-latest-${body?.scriptId || "current"}` },
+        "Storyboard",
+        "CreatorProjects",
+      ],
+    }),
+    listReusableFounderAvatars: builder.query({
+      query: ({ scriptId }) => `/creator/storyboards/scripts/${scriptId}/founder-avatars`,
+      providesTags: (_result, _error, args) => [
+        { type: "Storyboard", id: `screenplay-video-founder-library-${args?.scriptId || "current"}` },
+      ],
+    }),
+    selectReusableFounderAvatar: builder.mutation({
+      query: ({ scriptId, ...body }) => ({
+        url: `/creator/storyboards/scripts/${scriptId}/founder-avatar-selection`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-founder-${body?.scriptId || "current"}` },
+        { type: "Storyboard", id: `screenplay-video-founder-library-${body?.scriptId || "current"}` },
+        { type: "Storyboard", id: `screenplay-video-latest-${body?.scriptId || "current"}` },
+        "Storyboard",
+        "CreatorProjects",
+      ],
+    }),
+    generateFounderVoicePreview: builder.mutation({
+      query: ({ scriptId, ...body }) => ({
+        url: `/creator/storyboards/scripts/${scriptId}/founder-voice-preview`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-founder-${body?.scriptId || "current"}` },
+        "Storyboard",
+        "CreatorProjects",
+      ],
+    }),
+    approveFounderVoicePreview: builder.mutation({
+      query: ({ scriptId, ...body }) => ({
+        url: `/creator/storyboards/scripts/${scriptId}/founder-voice-approval`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-founder-${body?.scriptId || "current"}` },
+        "Storyboard",
+        "CreatorProjects",
+      ],
+    }),
+    generateFounderAvatarPreview: builder.mutation({
+      query: ({ scriptId, ...body }) => ({
+        url: `/creator/storyboards/scripts/${scriptId}/founder-avatar-preview`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-founder-${body?.scriptId || "current"}` },
+        { type: "Storyboard", id: `screenplay-video-latest-${body?.scriptId || "current"}` },
+        "Storyboard",
+        "CreatorProjects",
+      ],
+    }),
+    approveFounderAvatarPreview: builder.mutation({
+      query: ({ scriptId, ...body }) => ({
+        url: `/creator/storyboards/scripts/${scriptId}/founder-avatar-approval`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-founder-${body?.scriptId || "current"}` },
+        { type: "Storyboard", id: `screenplay-video-latest-${body?.scriptId || "current"}` },
+        "Storyboard",
+        "CreatorProjects",
+      ],
+    }),
+    uploadFounderFinalAudio: builder.mutation({
+      query: ({ scriptId, file, captionText, consentConfirmed }) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        if (captionText) formData.append("captionText", captionText);
+        formData.append("consentConfirmed", String(Boolean(consentConfirmed)));
+        return {
+          url: `/creator/storyboards/scripts/${scriptId}/founder-final-audio`,
+          method: "POST",
+          body: formData,
+        };
+      },
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-founder-${body?.scriptId || "current"}` },
+        "Storyboard",
+        "CreatorProjects",
+      ],
+    }),
+    getLatestScreenplayVideoRun: builder.query({
+      query: ({ scriptId }) => `/creator/storyboards/scripts/${scriptId}/videos/latest`,
+      providesTags: (_result, _error, args) => [
+        { type: "Storyboard", id: `screenplay-video-latest-${args?.scriptId || "current"}` },
+      ],
+    }),
+    getScreenplayVideoRun: builder.query({
+      query: ({ scriptId, runId }) => `/creator/storyboards/scripts/${scriptId}/videos/${runId}`,
+      providesTags: (_result, _error, args) => [
+        { type: "Storyboard", id: `screenplay-video-${args?.runId || args?.scriptId || "current"}` },
+      ],
+    }),
+    chatScreenplayVideoScene: builder.mutation({
+      query: ({ runId, sceneId, ...body }) => ({
+        url: `/creator/storyboards/videos/${runId}/scenes/${sceneId}/chat`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-${body?.runId || "current"}` },
+      ],
+    }),
+    generateScreenplaySceneDialogueVoice: builder.mutation({
+      query: ({ runId, sceneId, ...body }) => ({
+        url: `/creator/storyboards/videos/${runId}/scenes/${sceneId}/dialogue-voice`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-${body?.runId || "current"}` },
+        "Storyboard",
+      ],
+    }),
+    decideScreenplaySceneDialogueVoice: builder.mutation({
+      query: ({ runId, sceneId, ...body }) => ({
+        url: `/creator/storyboards/videos/${runId}/scenes/${sceneId}/dialogue-voice/decision`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-${body?.runId || "current"}` },
+        "Storyboard",
+      ],
+    }),
+    combineScreenplaySceneDialogueAudio: builder.mutation({
+      query: ({ runId }) => ({
+        url: `/creator/storyboards/videos/${runId}/dialogue-audio/combine`,
+        method: "POST",
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-${body?.runId || "current"}` },
+        "Storyboard",
+      ],
+    }),
+    uploadScreenplaySceneAvatarImage: builder.mutation({
+      query: ({ runId, sceneId, file }) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        return {
+          url: `/creator/storyboards/videos/${runId}/scenes/${sceneId}/avatar-image`,
+          method: "POST",
+          body: formData,
+        };
+      },
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-${body?.runId || "current"}` },
+        "Storyboard",
+      ],
+    }),
+    uploadScreenplaySceneProductionImage: builder.mutation({
+      query: ({ runId, sceneId, file, details }) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        if (details) formData.append("details", details);
+        return {
+          url: `/creator/storyboards/videos/${runId}/scenes/${sceneId}/production-image`,
+          method: "POST",
+          body: formData,
+        };
+      },
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-${body?.runId || "current"}` },
+        "Storyboard",
+      ],
+    }),
+    regenerateScreenplayVideoSceneAsync: builder.mutation({
+      query: ({ runId, sceneId, ...body }) => ({
+        url: `/creator/storyboards/videos/${runId}/scenes/${sceneId}/regenerate-async`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-${body?.runId || "current"}` },
+        "Storyboard",
+      ],
+    }),
+    generateScreenplayVideoSceneAsync: builder.mutation({
+      query: ({ runId, sceneId, ...body }) => ({
+        url: `/creator/storyboards/videos/${runId}/scenes/${sceneId}/generate-async`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-${body?.runId || "current"}` },
+        "Storyboard",
+      ],
+    }),
+    renderScreenplayVideoFinalAsync: builder.mutation({
+      query: ({ runId, ...body }) => ({
+        url: `/creator/storyboards/videos/${runId}/final-render-async`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-${body?.runId || "current"}` },
+        "Storyboard",
+      ],
+    }),
+    generateScreenplayVideoAudioPackAsync: builder.mutation({
+      query: ({ runId, ...body }) => ({
+        url: `/creator/storyboards/videos/${runId}/audio-pack-async`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `screenplay-video-${body?.runId || "current"}` },
+        "Storyboard",
+      ],
+    }),
+    submitHumanWorkOrder: builder.mutation({
+      query: (body) => ({
+        url: "/creator/human-work-orders",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "CreatorHumanWorkOrders", id: body?.scriptId || "LIST" },
+        "CreatorHumanWorkOrders",
+        "CreatorProjects",
+      ],
+    }),
+    getHumanWorkOrders: builder.query({
+      query: (params = {}) => ({ url: "/creator/human-work-orders", params }),
+      providesTags: (_result, _error, params) => [
+        { type: "CreatorHumanWorkOrders", id: params?.scriptId || "LIST" },
+        "CreatorHumanWorkOrders",
+      ],
+    }),
+    getHumanWorkOrderQueue: builder.query({
+      query: (params = {}) => ({ url: "/creator/human-work-orders/queue", params }),
+      providesTags: ["CreatorHumanWorkOrders"],
+    }),
+    updateHumanWorkOrderQueueItem: builder.mutation({
+      query: ({ workOrderId, ...body }) => ({
+        url: `/creator/human-work-orders/queue/${workOrderId}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: ["CreatorHumanWorkOrders"],
+    }),
+    addHumanWorkOrderMessage: builder.mutation({
+      query: ({ workOrderId, ...body }) => ({
+        url: `/creator/human-work-orders/${workOrderId}/messages`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "CreatorHumanWorkOrders", id: body?.scriptId || "LIST" },
+        "CreatorHumanWorkOrders",
+      ],
+    }),
+    requestHumanWorkOrderChanges: builder.mutation({
+      query: ({ workOrderId, ...body }) => ({
+        url: `/creator/human-work-orders/${workOrderId}/request-changes`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "CreatorHumanWorkOrders", id: body?.scriptId || "LIST" },
+        "CreatorHumanWorkOrders",
+      ],
+    }),
+    approveHumanWorkOrder: builder.mutation({
+      query: ({ workOrderId, ...body }) => ({
+        url: `/creator/human-work-orders/${workOrderId}/approve`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "CreatorHumanWorkOrders", id: body?.scriptId || "LIST" },
+        "CreatorHumanWorkOrders",
+        "CreatorWallet",
+        "CreatorProjects",
+      ],
+    }),
     lockIdeaGenerateStoryboard: builder.mutation({
       query: (body) => ({ url: "/creator/locked-ideas/generate-storyboard", method: "POST", body }),
       invalidatesTags: (_result, _error, body) => [{ type: "Storyboard", id: body?.projectId || "latest" }],
@@ -596,6 +1069,94 @@ export const creatorApi = apiSlice.injectEndpoints({
     getProductionPlans: builder.query({
       query: ({ scriptId }) => `/creator/storyboards/scripts/${scriptId}/plans`,
       providesTags: (_result, _error, args) => [{ type: "Storyboard", id: `plans-${args?.scriptId || "current"}` }],
+    }),
+    getStoryboardClientReview: builder.query({
+      query: ({ scriptId }) => `/creator/storyboards/scripts/${scriptId}/client-review`,
+      providesTags: (_result, _error, args) => [{ type: "Storyboard", id: `client-review-${args?.scriptId || "current"}` }],
+    }),
+    saveStoryboardClientReview: builder.mutation({
+      query: ({ scriptId, ...body }) => ({
+        url: `/creator/storyboards/scripts/${scriptId}/client-review`,
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `client-review-${body?.scriptId || "current"}` },
+        "Storyboard",
+        "CreatorProjects",
+      ],
+    }),
+    chatStoryboardClientReview: builder.mutation({
+      query: ({ scriptId, ...body }) => ({
+        url: `/creator/storyboards/scripts/${scriptId}/client-review/chat`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `client-review-${body?.scriptId || "current"}` },
+      ],
+    }),
+    applyStoryboardClientReview: builder.mutation({
+      query: ({ scriptId, ...body }) => ({
+        url: `/creator/storyboards/scripts/${scriptId}/client-review/apply`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `client-review-${body?.scriptId || "current"}` },
+        { type: "Storyboard", id: `plans-${body?.scriptId || "current"}` },
+        "Storyboard",
+        "CreatorProjects",
+      ],
+    }),
+    revertStoryboardClientReview: builder.mutation({
+      query: ({ scriptId }) => ({
+        url: `/creator/storyboards/scripts/${scriptId}/client-review/revert`,
+        method: "POST",
+      }),
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `client-review-${body?.scriptId || "current"}` },
+        { type: "Storyboard", id: `plans-${body?.scriptId || "current"}` },
+        "Storyboard",
+        "CreatorProjects",
+      ],
+    }),
+    uploadStoryboardFontReferenceImage: builder.mutation({
+      query: ({ scriptId, file }) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        return {
+          url: `/creator/storyboards/scripts/${scriptId}/client-review/font-references`,
+          method: "POST",
+          body: formData,
+        };
+      },
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `client-review-${body?.scriptId || "current"}` },
+        "CreatorProjects",
+      ],
+    }),
+    uploadStoryboardVisualReferenceImage: builder.mutation({
+      query: ({ scriptId, file }) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        return {
+          url: `/creator/storyboards/scripts/${scriptId}/client-review/visual-references`,
+          method: "POST",
+          body: formData,
+        };
+      },
+      invalidatesTags: (_result, _error, body) => [
+        { type: "Storyboard", id: `client-review-${body?.scriptId || "current"}` },
+        "CreatorProjects",
+      ],
+    }),
+    getAnimatedStoryboardPreview: builder.query({
+      query: ({ scriptId }) => ({
+        url: `/creator/storyboards/scripts/${scriptId}/animated-preview`,
+        responseHandler: (response) => response.text(),
+      }),
+      keepUnusedDataFor: 0,
     }),
     getShotImageUrls: builder.query({
       query: ({ scriptId }) => `/creator/storyboards/scripts/${scriptId}/shots/images`,
@@ -975,6 +1536,9 @@ export const {
   useGetTrendsQuery,
   useGetTrendInsightQuery,
   usePredictTrendsMutation,
+  useGenerateProductAdPipelineMutation,
+  useUploadProductReferenceImagesMutation,
+  useGetProductAdAssetsQuery,
   useGetJobQuery,
   useLazyGetJobQuery,
   useGetJobsQuery,
@@ -1003,6 +1567,8 @@ export const {
   useGetPostProductionProjectsQuery,
   useCreateCreatorProjectMutation,
   useSuggestAudienceMutation,
+  useSuggestCampaignAnglesMutation,
+  useSelectLockedCampaignAngleMutation,
   useConfirmAudienceMutation,
   useListCreatorsQuery,
   useCreateCreatorMutation,
@@ -1020,10 +1586,51 @@ export const {
   useGenerateStoryIdeaScreenplayMutation,
   useGenerateStoryIdeaScreenplayAsyncMutation,
   useSaveGeneratedScriptMutation,
+  useApproveScreenplayMutation,
+  useGenerateScreenplayVideoAsyncMutation,
+  useUploadScreenplayVideoReferenceImageMutation,
+  useUploadScreenplayFounderAvatarSourceMutation,
+  usePrepareFounderAvatarPortraitMutation,
+  useGenerateFounderAvatarTestMutation,
+  usePrepareFounderEnglishDialogueMutation,
+  useListReusableFounderAvatarsQuery,
+  useSelectReusableFounderAvatarMutation,
+  useGenerateFounderVoicePreviewMutation,
+  useApproveFounderVoicePreviewMutation,
+  useGenerateFounderAvatarPreviewMutation,
+  useApproveFounderAvatarPreviewMutation,
+  useUploadFounderFinalAudioMutation,
+  useGetLatestScreenplayVideoRunQuery,
+  useGetScreenplayVideoRunQuery,
+  useChatScreenplayVideoSceneMutation,
+  useGenerateScreenplaySceneDialogueVoiceMutation,
+  useDecideScreenplaySceneDialogueVoiceMutation,
+  useCombineScreenplaySceneDialogueAudioMutation,
+  useUploadScreenplaySceneAvatarImageMutation,
+  useUploadScreenplaySceneProductionImageMutation,
+  useRegenerateScreenplayVideoSceneAsyncMutation,
+  useGenerateScreenplayVideoSceneAsyncMutation,
+  useRenderScreenplayVideoFinalAsyncMutation,
+  useGenerateScreenplayVideoAudioPackAsyncMutation,
+  useSubmitHumanWorkOrderMutation,
+  useGetHumanWorkOrdersQuery,
+  useGetHumanWorkOrderQueueQuery,
+  useUpdateHumanWorkOrderQueueItemMutation,
+  useAddHumanWorkOrderMessageMutation,
+  useRequestHumanWorkOrderChangesMutation,
+  useApproveHumanWorkOrderMutation,
   useLockIdeaGenerateStoryboardMutation,
   useGenerateStoryboardFromScriptMutation,
   useGenerateStoryboardFromScriptAsyncMutation,
   useGetProductionPlansQuery,
+  useGetStoryboardClientReviewQuery,
+  useSaveStoryboardClientReviewMutation,
+  useChatStoryboardClientReviewMutation,
+  useApplyStoryboardClientReviewMutation,
+  useRevertStoryboardClientReviewMutation,
+  useUploadStoryboardFontReferenceImageMutation,
+  useUploadStoryboardVisualReferenceImageMutation,
+  useLazyGetAnimatedStoryboardPreviewQuery,
   useGetShotImageUrlsQuery,
   useGetShotTakesQuery,
   useUploadShotTakeMutation,

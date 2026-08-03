@@ -10,7 +10,7 @@ export default function GenerationStatusBar({ job, label }) {
   const failed = ["FAILED", "ERROR"].includes(status);
   const paused = status === "PAUSED";
   const progress = Math.max(5, Math.min(100, Number(job.progress ?? (done ? 100 : 42))));
-  const usage = done ? completedUsageSummary(job) : null;
+  const chargeSummary = done ? completedChargeSummary(job) : null;
   const steps = buildJobSteps(job, label, progress, done, failed);
 
   return (
@@ -23,9 +23,9 @@ export default function GenerationStatusBar({ job, label }) {
           <div>
             <p className="text-sm font-bold text-white">{label || "Generation job"}</p>
             <p className="text-xs font-semibold text-slate-400">{job.message || status}</p>
-            {usage && (
+            {chargeSummary && (
               <p className="mt-1 text-[11px] font-bold text-slate-500">
-                {usage}
+                {chargeSummary}
               </p>
             )}
           </div>
@@ -141,40 +141,78 @@ function stepStatus(completed, running, failed) {
   return "pending";
 }
 
-function completedUsageSummary(job = {}) {
+function completedChargeSummary(job = {}) {
   const output = job.outputPayload || job.result || {};
-  const tokenMetadata = output.tokenMetadata || output.usageMetadata || {};
-  const costMetadata = output.costMetadata || output.providerCost || output.audioEnhancement?.costMetadata || {};
-  const inputTokens = Number(tokenMetadata.billableInputTokens ?? tokenMetadata.inputTokens ?? tokenMetadata.totalInputTokens ?? costMetadata.usage?.billableInputTokens ?? costMetadata.usage?.inputTokens ?? 0);
-  const outputTokens = Number(tokenMetadata.billableOutputTokens ?? tokenMetadata.outputTokens ?? tokenMetadata.totalOutputTokens ?? costMetadata.usage?.billableOutputTokens ?? costMetadata.usage?.outputTokens ?? 0);
-  const totalTokens = Number(tokenMetadata.billableTotalTokens ?? tokenMetadata.totalTokens ?? tokenMetadata.totalRequestUsage ?? costMetadata.usage?.billableTotalTokens ?? inputTokens + outputTokens);
-  const cost = Number(costMetadata.billableTotalCost ?? costMetadata.customerTotalCost ?? costMetadata.totalCost ?? costMetadata.amount ?? output.amount ?? 0);
-  const currency = costMetadata.currency || output.currency || "";
-  const durationSeconds = Number(costMetadata.usage?.customerBillableSeconds ?? costMetadata.usage?.billableDurationSeconds ?? costMetadata.usage?.billableSeconds ?? costMetadata.usage?.durationSeconds ?? costMetadata.usage?.requestedDurationSeconds ?? output.durationSeconds ?? 0);
-  const parts = [];
-  if (Number.isFinite(totalTokens) && totalTokens > 0) {
-    parts.push(`Tokens ${Math.round(inputTokens)} in / ${Math.round(outputTokens)} out`);
-  } else if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
-    parts.push(`Usage ${formatSeconds(durationSeconds)}`);
-  }
-  if (Number.isFinite(cost) && cost > 0) {
-    parts.push(`Charged ${formatCost(cost, currency)}`);
-  }
-  return parts.length ? parts.join(" | ") : "";
+  const costMetadata = output.costMetadata || output.audioEnhancement?.costMetadata || {};
+  const charge = resolveChargeAmount(output, costMetadata);
+  return charge.amount > 0 ? `Charged ${formatCost(charge.amount, charge.currency)}` : "";
 }
 
-function formatSeconds(value) {
-  const seconds = Number(value || 0);
-  if (!Number.isFinite(seconds)) return "0s";
-  if (seconds < 60) return `${seconds.toFixed(seconds % 1 ? 1 : 0)}s`;
-  const minutes = Math.floor(seconds / 60);
-  const rest = Math.round(seconds % 60);
-  return rest ? `${minutes}m ${rest}s` : `${minutes}m`;
+function resolveChargeAmount(output = {}, costMetadata = {}) {
+  const currency = String(firstText(costMetadata.currency, output.currency, "INR")).toUpperCase();
+  const explicitCharge = firstMoneyValue(
+    costMetadata.chargedAmountInr,
+    costMetadata.walletChargeInr,
+    costMetadata.totalWalletChargeInr,
+    costMetadata.customerTotalCostInr,
+    costMetadata.billableTotalCostInr,
+    output.chargedAmountInr,
+    output.walletChargeInr,
+    output.totalWalletChargeInr,
+    output.customerTotalCostInr,
+    output.billableTotalCostInr,
+    costMetadata.chargedAmount,
+    costMetadata.walletCharge,
+    costMetadata.walletDebitAmount,
+    costMetadata.debitAmount,
+    costMetadata.customerTotalCost,
+    costMetadata.billableTotalCost,
+    output.chargedAmount,
+    output.walletCharge,
+    output.walletDebitAmount,
+    output.debitAmount,
+    output.amount
+  );
+  const explicitMinorCharge = firstMoneyValue(
+    costMetadata.chargedAmountPaise,
+    costMetadata.walletChargePaise,
+    costMetadata.walletDebitAmountPaise,
+    costMetadata.debitAmountPaise,
+    output.chargedAmountPaise,
+    output.walletChargePaise,
+    output.walletDebitAmountPaise,
+    output.debitAmountPaise
+  );
+  const charge = Math.max(explicitCharge, explicitMinorCharge / 100);
+  return {
+    amount: Number.isFinite(charge) ? charge : 0,
+    currency,
+  };
 }
 
 function formatCost(value, currency = "") {
   const amount = Number(value || 0);
-  const code = String(currency || "").toUpperCase();
-  if (code === "USD" || !code) return `$${amount < 0.01 ? amount.toFixed(4) : amount.toFixed(2)}`;
-  return `${code} ${amount < 1 ? amount.toFixed(4) : amount.toFixed(2)}`;
+  const code = String(currency || "INR").toUpperCase();
+  try {
+    return new Intl.NumberFormat(code === "INR" ? "en-IN" : undefined, {
+      style: "currency",
+      currency: code,
+      maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
+    }).format(amount);
+  } catch {
+    if (code === "USD") return `$${amount < 0.01 ? amount.toFixed(4) : amount.toFixed(2)}`;
+    return `${code} ${amount < 1 ? amount.toFixed(4) : amount.toFixed(2)}`;
+  }
+}
+
+function firstMoneyValue(...values) {
+  for (const value of values) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return 0;
+}
+
+function firstText(...values) {
+  return values.find((value) => typeof value === "string" && value.trim()) || "";
 }

@@ -1,0 +1,25 @@
+{
+  "clientId": "platform-ui",
+  "name": "Platform UI",
+  "protocol": "openid-connect",
+  "enabled": true,
+  "publicClient": true,
+  "standardFlowEnabled": true,
+  "directAccessGrantsEnabled": true,
+  "implicitFlowEnabled": false,
+  "serviceAccountsEnabled": false,
+  "redirectUris": [
+    "http://localhost:5173/*",
+    "http://127.0.0.1:5173/*",
+    "https://platform.dalaillama.in/*"
+  ],
+  "webOrigins": [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://platform.dalaillama.in"
+  ],
+  "attributes": {
+    "pkce.code.challenge.method": "S256"
+  },
+  "fullScopeAllowed": true
+}

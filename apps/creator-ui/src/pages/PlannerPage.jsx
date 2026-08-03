@@ -7,8 +7,9 @@ import {
   showFlash,
   useAddWalletBalanceMutation,
   useGetWalletBalanceQuery,
+  useVerifyWalletPaymentMutation,
 } from "@dalaillama/shared-store";
-import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle, Clapperboard, FolderOpen, GripVertical, HelpCircle, History, Image as ImageIcon, ListChecks, Loader2, LockKeyhole, Plus, RefreshCw, Sparkles, WalletCards, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle, Clapperboard, FolderOpen, GripVertical, HelpCircle, History, Image as ImageIcon, ListChecks, Loader2, LockKeyhole, MessageSquareText, Plus, RefreshCw, Sparkles, WalletCards, X } from "lucide-react";
 import {
   useConfirmAudienceMutation,
   useCreateCreatorMutation,
@@ -36,7 +37,6 @@ import {
   useGetTrendsQuery,
   useGetTrendCombinationsQuery,
   useGetWeeklyIdeaTagsQuery,
-  useGetCreatorSubscriptionQuery,
   useLockIdeaSelectionMutation,
   useGenerateStoryboardFromScriptMutation,
   useGenerateStoryboardFromScriptAsyncMutation,
@@ -45,6 +45,14 @@ import {
   useEditStoryboardShotWithAiMutation,
   useInsertStoryboardTimelineShotMutation,
   useGetProductionPlansQuery,
+  useGetStoryboardClientReviewQuery,
+  useSaveStoryboardClientReviewMutation,
+  useChatStoryboardClientReviewMutation,
+  useApplyStoryboardClientReviewMutation,
+  useRevertStoryboardClientReviewMutation,
+  useUploadStoryboardFontReferenceImageMutation,
+  useUploadStoryboardVisualReferenceImageMutation,
+  useLazyGetAnimatedStoryboardPreviewQuery,
   useGetShotImageUrlsQuery,
   useGetShotTakesQuery,
   useUploadShotTakeMutation,
@@ -73,6 +81,8 @@ import {
   useLazyGetCreatorScriptHistoryItemQuery,
   useListCreatorsQuery,
   usePredictTrendsMutation,
+  useGenerateProductAdPipelineMutation,
+  useUploadProductReferenceImagesMutation,
   useRefreshWeeklyIdeaTagsMutation,
   useSaveStoryIdeaMutation,
   useSaveStoryIdeaScriptMutation,
@@ -80,9 +90,40 @@ import {
   useSaveCharacterCastMappingsMutation,
   useGenerateStoryIdeaScreenplayMutation,
   useSaveStoryboardMutation,
+  useApproveScreenplayMutation,
+  useGenerateScreenplayVideoAsyncMutation,
+  useUploadScreenplayVideoReferenceImageMutation,
+  useUploadScreenplayFounderAvatarSourceMutation,
+  usePrepareFounderAvatarPortraitMutation,
+  useGenerateFounderAvatarTestMutation,
+  usePrepareFounderEnglishDialogueMutation,
+  useListReusableFounderAvatarsQuery,
+  useSelectReusableFounderAvatarMutation,
+  useGenerateFounderVoicePreviewMutation,
+  useApproveFounderVoicePreviewMutation,
+  useGenerateFounderAvatarPreviewMutation,
+  useApproveFounderAvatarPreviewMutation,
+  useUploadFounderFinalAudioMutation,
+  useGetLatestScreenplayVideoRunQuery,
+  useGetScreenplayVideoRunQuery,
+  useChatScreenplayVideoSceneMutation,
+  useGenerateScreenplaySceneDialogueVoiceMutation,
+  useDecideScreenplaySceneDialogueVoiceMutation,
+  useCombineScreenplaySceneDialogueAudioMutation,
+  useUploadScreenplaySceneAvatarImageMutation,
+  useUploadScreenplaySceneProductionImageMutation,
+  useGenerateScreenplayVideoSceneAsyncMutation,
+  useRegenerateScreenplayVideoSceneAsyncMutation,
+  useRenderScreenplayVideoFinalAsyncMutation,
+  useGenerateScreenplayVideoAudioPackAsyncMutation,
+  useSubmitHumanWorkOrderMutation,
+  useGetHumanWorkOrdersQuery,
+  useRequestHumanWorkOrderChangesMutation,
+  useApproveHumanWorkOrderMutation,
   useSetupOrganizationMutation,
   useSuggestAudienceMutation,
-  useStartSubscriptionUpgradeMutation,
+  useSuggestCampaignAnglesMutation,
+  useSelectLockedCampaignAngleMutation,
   useUpdateCreatorMutation,
   useUnsaveStoryboardMutation,
 } from "../api/creatorEndpoints.js";
@@ -114,20 +155,50 @@ import StoryboardGrid from "../components/storyboard/StoryboardGrid.jsx";
 import ShotTakePanel from "../components/storyboard/ShotTakePanel.jsx";
 import StoryboardHistoryPanel from "../components/storyboard/StoryboardHistoryPanel.jsx";
 import ProductionPlanPanel from "../components/storyboard/ProductionPlanPanel.jsx";
+import ClientReviewPanel from "../components/storyboard/ClientReviewPanel.jsx";
+import ScreenplayVideoGenerationPanel from "../components/storyboard/ScreenplayVideoGenerationPanel.jsx";
 import MobileFrame from "../components/preview/MobileFrame.jsx";
 import GenerationStatusBar from "../components/jobs/GenerationStatusBar.jsx";
 import OrganizationSetupCard from "../components/billing/OrganizationSetupCard.jsx";
 import RechargeWalletModal from "../components/billing/RechargeWalletModal.jsx";
-import SubscriptionBadge from "../components/billing/SubscriptionBadge.jsx";
+import WalletBalanceButton from "../components/billing/WalletBalanceButton.jsx";
+import { animatedStoryboardFileName, buildAnimatedStoryboardHtml } from "../utils/storyboardAnimatedExport.js";
 
 const MINIMUM_PAID_GENERATION_WALLET_BALANCE = 100;
+const AI_SHORT_STARTER_PRICE_INR = 5999;
+const SCREENPLAY_REVIEW_PRICE_INR = 999;
+const USD_INR_RATE = 95;
+const MEDIA_URL_RENEWAL_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const CLIENT_REVIEW_DIALOGUE_FIELDS = [
+  "dialogue",
+  "primaryDialogue",
+  "voiceOver",
+  "voiceover",
+  "dialogueScript",
+  "exactDialogue",
+  "spokenDialogue",
+  "spokenText",
+  "caption",
+  "captionText",
+  "subtitle",
+  "subtitles",
+];
 
 const countryOptions = [
   { code: "IN", label: "India" },
   { code: "US", label: "United States" },
   { code: "GB", label: "United Kingdom" },
   { code: "AE", label: "UAE" },
+  { code: "SG", label: "Singapore" },
 ];
+
+const REGION_CURRENCY = {
+  IN: { currency: "INR", label: "India" },
+  US: { currency: "USD", label: "United States" },
+  GB: { currency: "GBP", label: "United Kingdom" },
+  AE: { currency: "AED", label: "UAE" },
+  SG: { currency: "SGD", label: "Singapore" },
+};
 
 const sanitizeTenantId = (tenantId) => {
   if (!tenantId) return null;
@@ -150,6 +221,121 @@ function creatorDebugLog(label, payload = {}) {
   if (!creatorDebugEnabled()) return;
   // eslint-disable-next-line no-console
   console.debug(`[creator-ui] ${label}`, payload);
+}
+
+const RAZORPAY_CHECKOUT_SCRIPT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
+let razorpayCheckoutScriptPromise = null;
+
+function loadRazorpayCheckoutScript() {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return Promise.reject(new Error("Razorpay checkout is only available in the browser."));
+  }
+  if (window.Razorpay) return Promise.resolve();
+  if (razorpayCheckoutScriptPromise) return razorpayCheckoutScriptPromise;
+
+  razorpayCheckoutScriptPromise = new Promise((resolve, reject) => {
+    const existingScript = document.querySelector(`script[src="${RAZORPAY_CHECKOUT_SCRIPT_SRC}"]`);
+    if (existingScript) {
+      existingScript.addEventListener("load", resolve, { once: true });
+      existingScript.addEventListener("error", () => reject(new Error("Could not load Razorpay checkout.")), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = RAZORPAY_CHECKOUT_SCRIPT_SRC;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("Could not load Razorpay checkout."));
+    document.body.appendChild(script);
+  });
+
+  return razorpayCheckoutScriptPromise;
+}
+
+function orderCheckoutDetails(order = {}) {
+  return order.checkoutDetails || order.checkout_details || order.checkout || {};
+}
+
+function paymentOrderId(order = {}) {
+  const checkout = orderCheckoutDetails(order);
+  return firstText(
+    checkout.order_id,
+    checkout.orderId,
+    checkout.gatewayOrderId,
+    checkout.gateway_order_id,
+    order.order_id,
+    order.orderId,
+    order.gatewayOrderId,
+    order.gateway_order_id
+  );
+}
+
+function paymentKeyId(order = {}) {
+  const checkout = orderCheckoutDetails(order);
+  return firstText(
+    checkout.key,
+    checkout.keyId,
+    checkout.key_id,
+    order.key,
+    order.keyId,
+    order.key_id,
+    import.meta.env?.VITE_RAZORPAY_KEY_ID
+  );
+}
+
+function paymentAmountPaise(order = {}, requestedAmount) {
+  const checkout = orderCheckoutDetails(order);
+  const amountPaise = Number(
+    checkout.amount
+    ?? checkout.amountPaise
+    ?? checkout.amount_paise
+    ?? order.amountPaise
+    ?? order.amount_paise
+    ?? order.amountInPaise
+    ?? order.amount_in_paise
+  );
+  if (Number.isFinite(amountPaise) && amountPaise >= 100) return Math.round(amountPaise);
+  const amount = Number(order.amount ?? checkout.amountMajor ?? checkout.amount_major ?? requestedAmount);
+  return Number.isFinite(amount) ? Math.round(amount * 100) : 0;
+}
+
+function normalizeCurrencyCode(value = "INR") {
+  const currency = String(value || "INR").trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(currency) ? currency : "INR";
+}
+
+function normalizeRegionCode(value = "") {
+  const region = String(value || "").trim().toUpperCase();
+  if (REGION_CURRENCY[region]) return region;
+  return "";
+}
+
+function detectBrowserRegionCode() {
+  if (typeof window === "undefined") return "IN";
+  try {
+    const locale = window.navigator?.language || window.navigator?.languages?.[0] || "";
+    const localeRegion = typeof Intl.Locale === "function" && locale ? new Intl.Locale(locale).region : "";
+    const normalizedLocaleRegion = normalizeRegionCode(localeRegion);
+    if (normalizedLocaleRegion) return normalizedLocaleRegion;
+
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    if (/kolkata|calcutta/i.test(timezone)) return "IN";
+    if (/dubai/i.test(timezone)) return "AE";
+    if (/london/i.test(timezone)) return "GB";
+    if (/singapore/i.test(timezone)) return "SG";
+    if (/america\//i.test(timezone)) return "US";
+  } catch {
+    // Default below keeps billing usable if browser locale APIs are unavailable.
+  }
+  return "IN";
+}
+
+function currencyForRegion(regionCode = "IN") {
+  return REGION_CURRENCY[normalizeRegionCode(regionCode)]?.currency || "INR";
+}
+
+function labelForRegion(regionCode = "IN") {
+  return REGION_CURRENCY[normalizeRegionCode(regionCode)]?.label || "India";
 }
 
 const fallbackTrends = [
@@ -237,17 +423,256 @@ const filterLabels = {
 const TREND_DISCOVERY_ENABLED = false;
 const DEFAULT_STORYTELLING_TYPE = "narrator_visual_mix";
 const DEFAULT_HOOK_LENS = "direct";
+const DEFAULT_TOPIC_TYPE = "lifestyle";
+const DEFAULT_PRODUCTION_STYLE = "hybrid";
+const DEFAULT_HYBRID_SCENE_MODE = "ask_speaking_scenes";
+const DEFAULT_BROLL_STYLE = "cinematic_social";
+const DEFAULT_CAPTION_STYLE = "bold_keyword";
+const DEFAULT_VIDEO_FINISHING_PLAN = {
+  backgroundMusicMode: "auto",
+  backgroundMusicPrompt: "",
+  musicVolume: 22,
+  ambiencePrompt: "",
+  soundFxPrompt: "",
+  voiceMixMode: "balanced",
+  useStoryboardReferences: true,
+  imageLedAdMode: false,
+  referenceImageMode: "prompt_only",
+  requireImageAnchors: false,
+  productMotionPrompt: "",
+  voiceDialoguePrompt: "",
+  editingPlanPrompt: "",
+  burnCaptions: true,
+  useMixedAudio: true,
+};
+const DEFAULT_AUDIO_MIX_STANDARDS = {
+  dialogueLevel: "consistent_speech_first",
+  backgroundMusicDucking: "duck_under_speech",
+  ambientRoomTone: "maintain_low_scene_matched_room_tone",
+  soundEffectsUse: "small_sfx_sparingly_for_whooshes_clicks_transitions",
+  reverbMatch: "match_scene_space_and_camera_distance",
+  fades: "smooth_fades_between_audio_segments",
+  dialogueTargetDb: -3,
+  musicBedDb: -18,
+  ambienceBedDb: -22,
+  sfxPeakDb: -9,
+  fadeMs: 120,
+};
+
+const TOPIC_TYPE_OPTIONS = [
+  {
+    value: "education",
+    label: "Education",
+    hint: "Explain, teach, compare",
+    angles: [
+      ["Beginner explainer", "Turn the topic into a clear first-step lesson with one visual example."],
+      ["Myth correction", "Open with a common belief, then correct it through a short story."],
+      ["3-part framework", "Package the idea as three memorable steps viewers can save."],
+    ],
+  },
+  {
+    value: "technology",
+    label: "Technology",
+    hint: "AI, tools, workflows",
+    angles: [
+      ["Tool before-after", "Show the old workflow, the new tool moment, and the time saved."],
+      ["Human problem first", "Start with the daily frustration before revealing the tech fix."],
+      ["Tiny automation", "Make one small automation feel practical enough to try today."],
+    ],
+  },
+  {
+    value: "business",
+    label: "Business",
+    hint: "Brand, startup, sales",
+    angles: [
+      ["Founder mistake", "Frame the story around one avoidable mistake and the sharper alternative."],
+      ["Customer moment", "Show the customer pain first, then the offer as the natural answer."],
+      ["Proof beat", "Use a fast proof point, result, or contrast to make the idea credible."],
+    ],
+  },
+  {
+    value: "product",
+    label: "Product",
+    hint: "Demo, use case, offer",
+    angles: [
+      ["Problem demo", "Open with the messy problem and let the product cleanly solve it."],
+      ["One feature story", "Make one feature the hero instead of listing everything."],
+      ["Unexpected use", "Show a surprising use case that makes the product feel memorable."],
+    ],
+  },
+  {
+    value: "health",
+    label: "Health",
+    hint: "Wellness, habits, care",
+    angles: [
+      ["Tiny habit", "Show one small habit shift with a realistic emotional payoff."],
+      ["Confusion to clarity", "Start with overwhelm, then make the next action feel simple."],
+      ["Routine reset", "Turn the topic into a morning, evening, or recovery routine beat."],
+    ],
+  },
+  {
+    value: "fitness",
+    label: "Fitness",
+    hint: "Gym, body, movement",
+    angles: [
+      ["Beginner courage", "Follow the moment before starting, then make one small win visible."],
+      ["Form fix", "Show the mistake, the correction, and the immediate confidence shift."],
+      ["Challenge timer", "Turn the idea into a quick timed challenge with a visible result."],
+    ],
+  },
+  {
+    value: "food",
+    label: "Food",
+    hint: "Recipe, meal, kitchen",
+    angles: [
+      ["Saveable recipe", "Build the short around ingredients, quick steps, and a final reveal."],
+      ["Kitchen shortcut", "Show one practical shortcut that solves a familiar meal problem."],
+      ["Taste reaction", "Let the payoff land through a reaction instead of explanation."],
+    ],
+  },
+  {
+    value: "beauty",
+    label: "Beauty",
+    hint: "Skin, makeup, style",
+    angles: [
+      ["Routine reveal", "Show a simple routine with a visible before and after beat."],
+      ["Product-light fix", "Make the story about technique or habit, not only products."],
+      ["Mirror moment", "Use a self-confidence moment as the emotional close."],
+    ],
+  },
+  {
+    value: "travel",
+    label: "Travel",
+    hint: "Places, itineraries",
+    angles: [
+      ["Hidden spot", "Open on the unexpected place, then reveal why it is worth saving."],
+      ["Mistake to itinerary", "Turn a common travel mistake into a cleaner route or checklist."],
+      ["Budget contrast", "Compare the expensive version with a smarter local alternative."],
+    ],
+  },
+  {
+    value: "finance",
+    label: "Finance",
+    hint: "Money, career, saving",
+    angles: [
+      ["Small money move", "Make one financial action feel doable and non-intimidating."],
+      ["Bad advice flip", "Start with common advice, then show the missing nuance."],
+      ["Future-self payoff", "Connect today's tiny decision to a believable future benefit."],
+    ],
+  },
+  {
+    value: "relationships",
+    label: "Relationships",
+    hint: "Family, couples, friends",
+    angles: [
+      ["Two-person tension", "Use a small disagreement to create a natural emotional hook."],
+      ["Unsaid feeling", "Let the story hinge on what one person is not saying yet."],
+      ["Relatable punchline", "Close with a line viewers would send to someone they know."],
+    ],
+  },
+  {
+    value: "comedy",
+    label: "Comedy",
+    hint: "POV, skit, satire",
+    angles: [
+      ["POV escalation", "Start with a tiny absurd truth and escalate it in three beats."],
+      ["Character contrast", "Let two different personalities collide around the same topic."],
+      ["Expectation flip", "Set up the obvious ending, then land the opposite."],
+    ],
+  },
+  {
+    value: "culture",
+    label: "Culture",
+    hint: "Society, identity, place",
+    angles: [
+      ["Then versus now", "Use a cultural contrast to make the topic instantly recognizable."],
+      ["Local detail", "Ground the story in one specific detail only insiders notice."],
+      ["Shared memory", "Build toward a nostalgic or familiar emotional beat."],
+    ],
+  },
+  {
+    value: "lifestyle",
+    label: "Lifestyle",
+    hint: "Daily life, habits, POV",
+    angles: [
+      ["Day-in-life shift", "Show one daily moment changing from messy to intentional."],
+      ["Relatable confession", "Open with an honest admission, then resolve it practically."],
+      ["Small upgrade", "Make one tiny upgrade feel worth copying."],
+    ],
+  },
+];
+
+const PRODUCTION_STYLE_OPTIONS = [
+  {
+    value: "hybrid",
+    label: "Hybrid",
+    hint: "Talking head + AI scenes",
+    aiScenePercent: 55,
+    talkingHeadPercent: 45,
+  },
+  {
+    value: "full_ai",
+    label: "Full AI",
+    hint: "All scenes generated",
+    aiScenePercent: 100,
+    talkingHeadPercent: 0,
+  },
+];
+
+const HYBRID_SCENE_MODE_OPTIONS = [
+  {
+    value: "full_founder",
+    label: "Full Founder (60 sec)",
+    hint: "Use the uploaded founder in every scene",
+  },
+  {
+    value: "ask_speaking_scenes",
+    label: "Ask on speaking scenes",
+    hint: "Choose Human or AI where a person speaks",
+  },
+  {
+    value: "auto_mix",
+    label: "Auto mix",
+    hint: "Let backend decide human vs AI scene",
+  },
+  {
+    value: "human_first",
+    label: "Human first",
+    hint: "Prefer talking head for dialogue moments",
+  },
+  {
+    value: "ai_first",
+    label: "AI first",
+    hint: "Prefer AI scenes unless human is needed",
+  },
+];
+
+const BROLL_STYLE_OPTIONS = [
+  { value: "cinematic_social", label: "Cinematic Social", hint: "Polished motion B-roll with creator-safe framing" },
+  { value: "ugc_real", label: "UGC Real", hint: "Phone-shot, natural, believable inserts" },
+  { value: "kinetic_product", label: "Kinetic Product", hint: "Fast macro details, transitions, and proof shots" },
+  { value: "documentary_clean", label: "Documentary Clean", hint: "Grounded context, soft motion, real-world texture" },
+  { value: "surreal_ai", label: "Stylized AI", hint: "Expressive metaphor shots and generated visual moments" },
+];
+
+const CAPTION_STYLE_OPTIONS = [
+  { value: "bold_keyword", label: "Bold Keywords", hint: "Large captions with highlighted words" },
+  { value: "karaoke_pop", label: "Karaoke Pop", hint: "Word-by-word animated captions" },
+  { value: "clean_subtitle", label: "Clean Subtitle", hint: "Minimal readable lower captions" },
+  { value: "creator_meme", label: "Creator Meme", hint: "Punchy top/bottom caption beats" },
+  { value: "none", label: "No Captions", hint: "Use only visuals and spoken audio" },
+];
 
 const workflowSlides = [
   { id: "ideas", label: "New Ideas", caption: "Write a topic and pick one of the generated angles" },
   { id: "script", label: "Storyline", caption: "Shape the story, characters, personas, and backstories" },
-  { id: "cast", label: "Actor", caption: "Add actors and map them to story characters" },
-  { id: "screenplay", label: "Script", caption: "Convert the locked story and actors into shot-wise pages" },
+  { id: "cast", label: "Cast", caption: "Add actors and map them to story characters" },
+  { id: "screenplay", label: "Screenplay", caption: "Convert the locked story and cast into shot-wise pages" },
 ];
 
 const workflowStepIds = new Set(workflowSlides.map((slide) => slide.id));
-const workspacePageIds = new Set(["ideas", "generated-ideas", "script", "screenplay", "cast", "storyboard", "shoot-polish"]);
-const modalHashIds = new Set(["projects", "post-production", "past-storyline", "past-script"]);
+const workspacePageIds = new Set(["ideas", "generated-ideas", "script", "screenplay", "cast", "video", "storyboard", "client-review"]);
+const modalHashIds = new Set(["projects", "past-storyline", "past-script"]);
 
 const pageFromHash = (hash) => {
   const id = String(hash || "").replace(/^#/, "");
@@ -289,6 +714,179 @@ function initialWorkspacePageFromLocation() {
 }
 
 const CREATOR_WORKFLOW_STORAGE_KEY = "creatorPlannerWorkflow";
+const PRODUCT_AD_BRIEF_MODE = "product_ad_agent";
+const DEFAULT_PRODUCT_AD_BRIEF = {
+  productInput: "",
+  imageUrlsText: "",
+  imageUrls: [],
+  sourceProductImageUrls: [],
+  imageAssets: [],
+  ingredientDetails: "",
+  targetAudience: "",
+  campaignObjective: "",
+  adFormat: "product_showcase",
+  selectedShotTypes: [],
+  shotRecipeSource: "auto_product",
+  noHumans: false,
+};
+const PRODUCT_AD_FORMAT_OPTIONS = [
+  { value: "product_showcase", label: "Product Showcase", description: "A clear product-first commercial that makes the offer easy to understand." },
+  { value: "problem_solution", label: "Problem -> Solution", description: "Open on a relatable problem, demonstrate the answer, then close with a clear CTA." },
+  { value: "lifestyle", label: "Lifestyle", description: "Show how the product fits naturally into a customer’s day." },
+  { value: "storytelling", label: "Storytelling", description: "Build a short narrative around a moment, need, or payoff." },
+  { value: "demonstration", label: "Demonstration", description: "Show the product working, step by step, with proof beats." },
+  { value: "feature_highlight", label: "Feature Highlight", description: "Make one or two differentiating features memorable." },
+  { value: "comparison", label: "Comparison", description: "Contrast a current friction point with the better product choice." },
+  { value: "explainer", label: "Explainer", description: "Make a new product or benefit simple in a short, visual sequence." },
+  { value: "testimonial_ugc", label: "Testimonial / UGC", description: "Use an authentic social-first recommendation or proof moment." },
+  { value: "emotional_brand_film", label: "Emotional Brand Film", description: "Lead with feeling, identity, and a memorable brand payoff." },
+  { value: "promotional_offer", label: "Promotional / Offer", description: "Prioritize the offer, urgency, product proof, and CTA." },
+  { value: "luxury_cinematic", label: "Luxury Cinematic", description: "Use premium composition, texture, controlled movement, and restraint." },
+  { value: "motion_graphics", label: "Motion Graphics", description: "Use product visuals with clear graphic explanations and text moments." },
+  { value: "documentary_bts", label: "Documentary / Behind the Scenes", description: "Show process, craft, origin, or proof in a grounded style." },
+  { value: "announcement_launch", label: "Announcement / Launch", description: "Introduce a new product, feature, event, or release with momentum." },
+];
+const PRODUCT_AD_FORMAT_PLAYBOOKS = {
+  product_showcase: {
+    shotTypes: ["hero_shot", "beauty_shot", "macro_shot", "texture_shot", "pack_shot"],
+    structure: "Product reveal -> sensory proof -> key detail -> packshot CTA",
+    hookStyle: "Show the product at its most desirable before explaining it.",
+    retentionStyle: "Move from broad beauty to tighter proof, then reward attention with a clear finish.",
+    musicStyle: "Confident modern commercial bed with a clean opening accent.",
+  },
+  problem_solution: {
+    shotTypes: ["action_shot", "hero_shot", "cutaway_shot", "macro_shot", "pack_shot"],
+    structure: "Relatable friction -> product switch -> proof -> result -> CTA",
+    hookStyle: "Open on the costly, annoying, or familiar problem.",
+    retentionStyle: "Contrast the before and after, escalating proof toward the payoff.",
+    musicStyle: "Tension at the problem, then a brighter release when the product appears.",
+  },
+  lifestyle: {
+    shotTypes: ["lifestyle_shot", "action_shot", "hero_shot", "beauty_shot", "pack_shot"],
+    structure: "Real-life moment -> natural use -> product benefit -> routine payoff -> CTA",
+    hookStyle: "Start inside a recognisable customer moment rather than a product pedestal.",
+    retentionStyle: "Keep changing the everyday context while the product stays useful and believable.",
+    musicStyle: "Warm, natural, lightly rhythmic music that supports the routine.",
+  },
+  storytelling: {
+    shotTypes: ["lifestyle_shot", "action_shot", "macro_shot", "beauty_shot", "pack_shot"],
+    structure: "Character moment -> tension -> product choice -> emotional payoff -> CTA",
+    hookStyle: "Begin mid-moment with a human question, choice, or small tension.",
+    retentionStyle: "Advance the story with a new reveal or decision in each beat.",
+    musicStyle: "A small emotional arc with a gentle lift into the payoff.",
+  },
+  demonstration: {
+    shotTypes: ["hero_shot", "action_shot", "assembly_shot", "cutaway_shot", "pack_shot"],
+    structure: "Claim -> show it working -> how it works -> proof -> CTA",
+    hookStyle: "Lead with the result the viewer wants to see proven.",
+    retentionStyle: "Make every beat answer the next practical question about the product.",
+    musicStyle: "Precise, energetic product-demo pulse with room for explanation.",
+  },
+  feature_highlight: {
+    shotTypes: ["hero_shot", "macro_shot", "cutaway_shot", "floating_shot", "pack_shot"],
+    structure: "Feature promise -> detail reveal -> mechanism -> benefit -> CTA",
+    hookStyle: "Put the most differentiated feature or outcome on screen immediately.",
+    retentionStyle: "Reveal one feature layer at a time, with visual evidence for each claim.",
+    musicStyle: "Clean, premium tech-commercial rhythm with small feature accents.",
+  },
+  comparison: {
+    shotTypes: ["action_shot", "hero_shot", "cutaway_shot", "macro_shot", "pack_shot"],
+    structure: "Old way -> better product -> side-by-side proof -> winning result -> CTA",
+    hookStyle: "Make the old choice visibly less useful before revealing the alternative.",
+    retentionStyle: "Alternate contrast and evidence so the viewer keeps evaluating the difference.",
+    musicStyle: "A restrained tension-to-resolution cue that makes the improvement land.",
+  },
+  explainer: {
+    shotTypes: ["hero_shot", "assembly_shot", "cutaway_shot", "floating_shot", "pack_shot"],
+    structure: "Simple question -> visual explanation -> mechanism -> benefit -> CTA",
+    hookStyle: "Open with the confusing thing made simple in one visual statement.",
+    retentionStyle: "Use each visual change to answer one question without overloading the frame.",
+    musicStyle: "Clear, unobtrusive explanatory bed with soft transitions.",
+  },
+  testimonial_ugc: {
+    shotTypes: ["lifestyle_shot", "action_shot", "hero_shot", "beauty_shot", "pack_shot"],
+    structure: "Personal discovery -> real use -> honest proof -> recommendation -> CTA",
+    hookStyle: "Start with a believable first-person reaction or outcome.",
+    retentionStyle: "Use small proof details and natural reactions instead of polished claims.",
+    musicStyle: "Light social rhythm, mixed below a conversational voice.",
+  },
+  emotional_brand_film: {
+    shotTypes: ["lifestyle_shot", "beauty_shot", "macro_shot", "slow_motion_shot", "pack_shot"],
+    structure: "Feeling -> sensory world -> product meaning -> emotional payoff -> CTA",
+    hookStyle: "Open with a feeling or aspiration the product helps express.",
+    retentionStyle: "Build sensory detail and emotional progression without rushing the product read.",
+    musicStyle: "Cinematic emotional score with space, texture, and a measured resolve.",
+  },
+  promotional_offer: {
+    shotTypes: ["hero_shot", "action_shot", "splash_shot", "beauty_shot", "pack_shot"],
+    structure: "Offer hook -> product proof -> urgency -> offer lockup -> CTA",
+    hookStyle: "Lead with the benefit or offer that makes action feel timely.",
+    retentionStyle: "Refresh the offer with proof, visual energy, and a single readable reason to act.",
+    musicStyle: "Upbeat commercial energy with crisp transitions and a firm CTA ending.",
+  },
+  luxury_cinematic: {
+    shotTypes: ["beauty_shot", "macro_shot", "texture_shot", "ingredient_shot", "pack_shot"],
+    structure: "Brand-world mystery -> artifact-like partial reveal -> texture and craft -> ingredients -> earned hero packshot -> CTA",
+    hookStyle: "Use the first 2–3 seconds to establish desire, mystery, scale, and premium positioning. Do not explain ingredients or reveal the full pack.",
+    retentionStyle: "Let viewers discover the product through 10–20% partial reveals, moving light, macro detail, controlled camera drift, and one distinct visual idea per shot. Treat every ad as a professional cinema production, never a rookie or casual camera setup.",
+    musicStyle: "Spacious premium score with restrained percussion, tactile detail, and silence around reveal moments.",
+  },
+  motion_graphics: {
+    shotTypes: ["hero_shot", "floating_shot", "assembly_shot", "cutaway_shot", "pack_shot"],
+    structure: "Animated claim -> graphic breakdown -> benefit sequence -> CTA lockup",
+    hookStyle: "Open with one bold animated product claim or transformation, not a generic title card.",
+    retentionStyle: "Use purposeful kinetic typography, callouts, and transitions to reveal one idea per beat.",
+    musicStyle: "Rhythmic, precise motion-design bed with cuts and text movement landing on beat.",
+  },
+  documentary_bts: {
+    shotTypes: ["action_shot", "ingredient_shot", "macro_shot", "texture_shot", "pack_shot"],
+    structure: "Origin or process -> craft proof -> close detail -> finished product -> CTA",
+    hookStyle: "Start with a real process detail, maker action, or material truth.",
+    retentionStyle: "Reveal the next part of the making process while building trust in the finished product.",
+    musicStyle: "Grounded, tactile score with subtle natural ambience and minimal polish.",
+  },
+  announcement_launch: {
+    shotTypes: ["hero_shot", "floating_shot", "beauty_shot", "action_shot", "pack_shot"],
+    structure: "What is new -> reveal -> why it matters -> launch energy -> CTA",
+    hookStyle: "Make the new thing visible in the first beat, with a clear reason it matters.",
+    retentionStyle: "Escalate reveal, feature proof, and launch momentum toward the CTA.",
+    musicStyle: "Forward launch cue with a reveal hit and confident close.",
+  },
+};
+const PRODUCT_AD_SHOT_TYPE_OPTIONS = [
+  { value: "hero_shot", label: "Hero Shot", description: "The product at its most attractive, usually opening or closing." },
+  { value: "beauty_shot", label: "Beauty Shot", description: "Premium lighting and composition focused on the product." },
+  { value: "macro_shot", label: "Macro Shot", description: "Extreme detail for texture, craftsmanship, or fine features." },
+  { value: "texture_shot", label: "Texture Shot", description: "Surface, material, crispness, creaminess, or finish." },
+  { value: "ingredient_shot", label: "Ingredient Shot", description: "Ingredients or components shown separately or together." },
+  { value: "pour_shot", label: "Pour Shot", description: "A liquid pour over, into, or from the product." },
+  { value: "splash_shot", label: "Splash Shot", description: "Dynamic liquid impact around the product." },
+  { value: "slow_motion_shot", label: "Slow Motion Shot", description: "A dramatic movement or payoff in slow motion." },
+  { value: "floating_shot", label: "Floating Shot", description: "Product, ingredients, or components suspended in motion." },
+  { value: "explosion_shot", label: "Explosion Shot", description: "A controlled burst of ingredients or energy around the product." },
+  { value: "assembly_shot", label: "Assembly Shot", description: "Components or layers coming together." },
+  { value: "cutaway_shot", label: "Cutaway Shot", description: "Reveal what is inside or how the product is made." },
+  { value: "action_shot", label: "Action Shot", description: "A hand or person naturally using the product." },
+  { value: "pack_shot", label: "Pack Shot", description: "A clear packaging and logo view, usually near the end." },
+  { value: "lifestyle_shot", label: "Lifestyle Shot", description: "The product in a believable real-world setting." },
+];
+const PRODUCT_AD_CONCEPT_LANES = [
+  {
+    key: "problem_solution",
+    title: "Problem -> Solution",
+    description: "Direct response concept that names the pain, shows the product solving it, and closes with purchase intent.",
+  },
+  {
+    key: "luxury_brand_story",
+    title: "Luxury Brand Story",
+    description: "Premium concept built around atmosphere, packaging, sensory detail, and high-trust brand perception.",
+  },
+  {
+    key: "ugc_testimonial",
+    title: "UGC/Testimonial Style",
+    description: "Social-first concept that feels like a buyer discovery, proof moment, or creator recommendation.",
+  },
+];
 
 const fallbackIdeas = [
   {
@@ -383,7 +981,11 @@ export default function PlannerPage() {
   const [trendPage, setTrendPage] = useState(0);
   const trendPageSize = 8;
   const [trendChoiceMode, setTrendChoiceMode] = useState(TREND_DISCOVERY_ENABLED ? "trend" : "original");
-  const [country, setCountry] = useState(countryOptions[0]);
+  const [creativeFlow, setCreativeFlow] = useState(() => storedWorkflowSnapshot?.creativeFlow === "autonomous_product_ad" ? "autonomous_product_ad" : "guided");
+  const [country, setCountry] = useState(() => {
+    const detectedRegion = detectBrowserRegionCode();
+    return countryOptions.find((option) => option.code === detectedRegion) || countryOptions[0];
+  });
   const [countryOpen, setCountryOpen] = useState(false);
   const [modal, setModal] = useState(null);
   const [projectsOpen, setProjectsOpen] = useState(false);
@@ -402,9 +1004,28 @@ export default function PlannerPage() {
   const [storyboardSaved, setStoryboardSaved] = useState(() => Boolean(storedWorkflowSnapshot?.storyboardSaved));
   const [selectedDuration, setSelectedDuration] = useState(() => Number(storedWorkflowSnapshot?.selectedDuration) || 30);
   const [dialogueLanguage, setDialogueLanguage] = useState(() => storedWorkflowSnapshot?.dialogueLanguage || "Hinglish");
+  const [clientReview, setClientReview] = useState(() => normalizeClientReview(
+    storedWorkflowSnapshot?.clientReview,
+    storedWorkflowSnapshot?.dialogueLanguage || "Hinglish"
+  ));
+  const [clientReviewDirty, setClientReviewDirty] = useState(false);
+  const [reviewFrameUpdateKey, setReviewFrameUpdateKey] = useState("");
   const [screenType, setScreenType] = useState(() => storedWorkflowSnapshot?.screenType || "vertical");
   const [storytellingType, setStorytellingType] = useState(() => storedWorkflowSnapshot?.storytellingType || DEFAULT_STORYTELLING_TYPE);
   const [hookLens, setHookLens] = useState(() => storedWorkflowSnapshot?.hookLens || DEFAULT_HOOK_LENS);
+  const [topicType, setTopicType] = useState(() => storedWorkflowSnapshot?.topicType || inferTopicTypeFromText(storedWorkflowSnapshot?.manualIdeaDraft, filters.category));
+  const [productionStyle, setProductionStyle] = useState(() => storedWorkflowSnapshot?.productionStyle || DEFAULT_PRODUCTION_STYLE);
+  const [hybridSceneMode, setHybridSceneMode] = useState(() => storedWorkflowSnapshot?.hybridSceneMode || DEFAULT_HYBRID_SCENE_MODE);
+  const [brollStyle, setBrollStyle] = useState(() => storedWorkflowSnapshot?.brollStyle || DEFAULT_BROLL_STYLE);
+  const [captionStyle, setCaptionStyle] = useState(() => storedWorkflowSnapshot?.captionStyle || DEFAULT_CAPTION_STYLE);
+  const [videoFinishingPlan, setVideoFinishingPlan] = useState(() => normalizeVideoFinishingPlan(storedWorkflowSnapshot?.videoFinishingPlan));
+  const [screenplayVideoProvider, setScreenplayVideoProvider] = useState(() => normalizeScreenplayVideoProvider(storedWorkflowSnapshot?.screenplayVideoProvider || "gemini_omni"));
+  const [screenplayVideoModel, setScreenplayVideoModel] = useState(() => {
+    const provider = normalizeScreenplayVideoProvider(storedWorkflowSnapshot?.screenplayVideoProvider || "gemini_omni");
+    const storedModel = String(storedWorkflowSnapshot?.screenplayVideoModel || "").trim();
+    return compatibleScreenplayVideoModelForProvider(provider, storedModel);
+  });
+  const [founderAvatarProfile, setFounderAvatarProfile] = useState(() => storedWorkflowSnapshot?.founderAvatarProfile || storedWorkflowSnapshot?.founderKit || {});
   const [selectedProviderCode, setSelectedProviderCode] = useState(() => {
     try {
       return window.localStorage.getItem("creatorAiProviderCode") || "";
@@ -413,6 +1034,17 @@ export default function PlannerPage() {
     }
   });
   const [manualIdeaDraft, setManualIdeaDraft] = useState(() => storedWorkflowSnapshot?.manualIdeaDraft || "");
+  const [campaignAngleSuggestions, setCampaignAngleSuggestions] = useState([]);
+  const [selectedCampaignAngle, setSelectedCampaignAngle] = useState(() => campaignAngleFromEntity(
+    storedWorkflowSnapshot?.lockedBrief,
+    storedWorkflowSnapshot?.productAdBrief
+  ));
+  const [productAdBrief, setProductAdBrief] = useState(() => normalizeProductAdBrief(
+    storedWorkflowSnapshot?.productAdBrief
+    || storedWorkflowSnapshot?.lockedBrief?.productIntelligenceBrief
+    || storedWorkflowSnapshot?.lockedBrief?.selectionPayload?.productIntelligenceBrief
+    || DEFAULT_PRODUCT_AD_BRIEF
+  ));
   const [lockedBrief, setLockedBrief] = useState(() => storedWorkflowSnapshot?.lockedBrief || null);
   const [lockedIdeaOptions, setLockedIdeaOptions] = useState(() => normalizeStoredIdeas(storedWorkflowSnapshot?.lockedIdeaOptions));
   const [ideaCandidatePageItems, setIdeaCandidatePageItems] = useState(() => normalizeStoredIdeas(storedWorkflowSnapshot?.ideaCandidatePageItems));
@@ -425,12 +1057,25 @@ export default function PlannerPage() {
   const [scriptModalMode, setScriptModalMode] = useState("brief");
   const [storyScriptIdea, setStoryScriptIdea] = useState(() => storedWorkflowSnapshot?.storyScriptIdea || null);
   const [scriptDetailIdea, setScriptDetailIdea] = useState(() => storedWorkflowSnapshot?.scriptDetailIdea || null);
+  const [storyboardReferenceDetails, setStoryboardReferenceDetails] = useState(() => storedWorkflowSnapshot?.storyboardReferenceDetails || "");
+  const [storyboardReferenceAssets, setStoryboardReferenceAssets] = useState(() => firstArray(storedWorkflowSnapshot?.storyboardReferenceAssets));
+  const [storyboardEnhanceWithReference, setStoryboardEnhanceWithReference] = useState(() => Boolean(storedWorkflowSnapshot?.storyboardEnhanceWithReference));
+  const [storyboardReferenceUploadError, setStoryboardReferenceUploadError] = useState("");
   const [predictionJobId, setPredictionJobId] = useState(null);
   const [localPredictedTrends, setLocalPredictedTrends] = useState([]);
   const [castPlan, setCastPlan] = useState(() => storedWorkflowSnapshot?.castPlan || null);
   const [selectedAudienceDecision, setSelectedAudienceDecision] = useState(() => storedWorkflowSnapshot?.selectedAudienceDecision || null);
   const [ideaGenerationJobId, setIdeaGenerationJobId] = useState(() => shouldRestoreStoredWorkflow ? readStoredIdeaGenerationJob()?.jobId || null : null);
+  const [productAdPipelineJobId, setProductAdPipelineJobId] = useState(() => storedWorkflowSnapshot?.productAdPipelineJobId || null);
   const [screenplayJobId, setScreenplayJobId] = useState(null);
+  const [screenplayApprovedForVideo, setScreenplayApprovedForVideo] = useState(() => Boolean(storedWorkflowSnapshot?.screenplayApprovedForVideo));
+  const [screenplayVideoRunId, setScreenplayVideoRunId] = useState(() => storedWorkflowSnapshot?.screenplayVideoRunId || null);
+  // Queue job IDs are transient. The persisted run remains the source of truth after a reload.
+  const [screenplayVideoJobId, setScreenplayVideoJobId] = useState(null);
+  const [screenplayVideoSceneJobId, setScreenplayVideoSceneJobId] = useState(null);
+  const [screenplayVideoActiveSceneId, setScreenplayVideoActiveSceneId] = useState(null);
+  const [screenplayVideoFinalJobId, setScreenplayVideoFinalJobId] = useState(() => storedWorkflowSnapshot?.screenplayVideoFinalJobId || null);
+  const [screenplayVideoAudioJobId, setScreenplayVideoAudioJobId] = useState(() => storedWorkflowSnapshot?.screenplayVideoAudioJobId || null);
   const [productionPlanJobId, setProductionPlanJobId] = useState(null);
   const screenplayStartInFlightRef = useRef(false);
   const productionPlanStartInFlightRef = useRef(false);
@@ -447,7 +1092,10 @@ export default function PlannerPage() {
   const [storyboardJobId, setStoryboardJobId] = useState(null);
   const [generatedStoryboard, setGeneratedStoryboard] = useState(() => storedWorkflowSnapshot?.generatedStoryboard || null);
   const [shotImageLoadingKeys, setShotImageLoadingKeys] = useState([]);
+  const [productShotImagesGenerating, setProductShotImagesGenerating] = useState(false);
   const [pdfExporting, setPdfExporting] = useState(false);
+  const [animatedPreviewLoading, setAnimatedPreviewLoading] = useState(false);
+  const [animatedHtmlExporting, setAnimatedHtmlExporting] = useState(false);
   const [activity, setActivity] = useState([
     { label: "Storyboard generated", detail: "14-shot short preview", time: "4 min ago" },
     { label: "Audience confirmed", detail: "Women 22-35 in India", time: "2 min ago" },
@@ -481,12 +1129,21 @@ export default function PlannerPage() {
     refetchOnFocus: true,
   });
   const walletFromProviderCredits = normalizeProviderCreditsWallet(creatorProviderCredits?.wallet);
-  const wallet = walletFromService || walletFromProviderCredits || eventWallet || { balance: 0, currency: organization?.currency || "INR" };
+  const detectedBillingRegionCode = normalizeRegionCode(firstText(
+    organization?.countryCode,
+    organization?.country_code,
+    organization?.country,
+    country?.code,
+    detectBrowserRegionCode()
+  )) || "IN";
+  const detectedBillingRegionLabel = labelForRegion(detectedBillingRegionCode);
+  const detectedBillingCurrencyCode = currencyForRegion(detectedBillingRegionCode);
+  const wallet = walletFromService || walletFromProviderCredits || eventWallet || { balance: 0, currency: organization?.currency || detectedBillingCurrencyCode };
   const walletBalanceAmount = walletBalanceValue(wallet);
   const paidGenerationMinimumBalance = walletMinimumBalanceValue(wallet, MINIMUM_PAID_GENERATION_WALLET_BALANCE);
-  const walletHasPaidGenerationBalance = walletBalanceAmount >= paidGenerationMinimumBalance;
-  const walletCurrencyCode = wallet?.currency || wallet?.currencyCode || organization?.currency || "INR";
-  const { data: subscription = { planName: "Creator Starter", creatorEntitlements: {} }, isFetching: subscriptionLoading } = useGetCreatorSubscriptionQuery();
+  const walletCurrencyCode = normalizeCurrencyCode(wallet?.currency || wallet?.currencyCode || organization?.currency || detectedBillingCurrencyCode);
+  const creatorFlowMinimumBalance = walletMinimumBalanceForInrPrice(AI_SHORT_STARTER_PRICE_INR, walletCurrencyCode);
+  const screenplayReviewMinimumBalance = walletMinimumBalanceForInrPrice(SCREENPLAY_REVIEW_PRICE_INR, walletCurrencyCode);
   const { data: trendsData = [], isFetching } = useGetTrendsQuery(
     {
       ...filters,
@@ -501,11 +1158,15 @@ export default function PlannerPage() {
   const [predictTrends, predictState] = usePredictTrendsMutation();
   const [refreshWeeklyIdeaTags, refreshWeeklyIdeaTagsState] = useRefreshWeeklyIdeaTagsMutation();
   const [suggestAudience, suggestAudienceState] = useSuggestAudienceMutation();
+  const [suggestCampaignAngles, campaignAngleSuggestionState] = useSuggestCampaignAnglesMutation();
+  const [selectLockedCampaignAngle, selectLockedCampaignAngleState] = useSelectLockedCampaignAngleMutation();
   const [confirmAudience, confirmAudienceState] = useConfirmAudienceMutation();
   const { data: creators = [] } = useListCreatorsQuery();
   const [createCreator, createCreatorState] = useCreateCreatorMutation();
   const [updateCreator, updateCreatorState] = useUpdateCreatorMutation();
   const [generateIdeas, ideasState] = useGenerateIdeasMutation();
+  const [generateProductAdPipeline, productAdPipelineState] = useGenerateProductAdPipelineMutation();
+  const [uploadProductReferenceImages, uploadProductReferenceImagesState] = useUploadProductReferenceImagesMutation();
   const [generateLockedIdeaOptions, generatedIdeaState] = useGenerateLockedIdeaOptionsMutation();
   const [generateLockedIdeaOptionsAsync, generatedIdeaAsyncState] = useGenerateLockedIdeaOptionsAsyncMutation();
   const [fetchJobStatus] = useLazyGetJobQuery();
@@ -516,10 +1177,43 @@ export default function PlannerPage() {
   const [generateStoryIdeaScreenplay, generateScreenplayState] = useGenerateStoryIdeaScreenplayMutation();
   const [generateStoryIdeaScreenplayAsync, generateScreenplayAsyncState] = useGenerateStoryIdeaScreenplayAsyncMutation();
   const [saveGeneratedScript, saveGeneratedScriptState] = useSaveGeneratedScriptMutation();
+  const [approveScreenplay, approveScreenplayState] = useApproveScreenplayMutation();
+  const [generateScreenplayVideoAsync, generateScreenplayVideoState] = useGenerateScreenplayVideoAsyncMutation();
+  const [uploadScreenplayVideoReferenceImage, uploadScreenplayVideoReferenceImageState] = useUploadScreenplayVideoReferenceImageMutation();
+  const [uploadScreenplayFounderAvatarSource, uploadScreenplayFounderAvatarSourceState] = useUploadScreenplayFounderAvatarSourceMutation();
+  const [prepareFounderEnglishDialogue, prepareFounderEnglishDialogueState] = usePrepareFounderEnglishDialogueMutation();
+  const [selectReusableFounderAvatar, selectReusableFounderAvatarState] = useSelectReusableFounderAvatarMutation();
+  const [generateFounderVoicePreview, generateFounderVoicePreviewState] = useGenerateFounderVoicePreviewMutation();
+  const [approveFounderVoicePreview, approveFounderVoicePreviewState] = useApproveFounderVoicePreviewMutation();
+  const [generateFounderAvatarPreview, generateFounderAvatarPreviewState] = useGenerateFounderAvatarPreviewMutation();
+  const [approveFounderAvatarPreview, approveFounderAvatarPreviewState] = useApproveFounderAvatarPreviewMutation();
+  const [uploadFounderFinalAudio, uploadFounderFinalAudioState] = useUploadFounderFinalAudioMutation();
+  const [prepareFounderAvatarPortrait, prepareFounderAvatarPortraitState] = usePrepareFounderAvatarPortraitMutation();
+  const [generateFounderAvatarTest, generateFounderAvatarTestState] = useGenerateFounderAvatarTestMutation();
+  const [chatScreenplayVideoScene] = useChatScreenplayVideoSceneMutation();
+  const [generateScreenplaySceneDialogueVoice] = useGenerateScreenplaySceneDialogueVoiceMutation();
+  const [decideScreenplaySceneDialogueVoice] = useDecideScreenplaySceneDialogueVoiceMutation();
+  const [combineScreenplaySceneDialogueAudio] = useCombineScreenplaySceneDialogueAudioMutation();
+  const [uploadScreenplaySceneAvatarImage] = useUploadScreenplaySceneAvatarImageMutation();
+  const [uploadScreenplaySceneProductionImage] = useUploadScreenplaySceneProductionImageMutation();
+  const [generateScreenplayVideoSceneAsync, generateScreenplayVideoSceneState] = useGenerateScreenplayVideoSceneAsyncMutation();
+  const [regenerateScreenplayVideoSceneAsync, regenerateScreenplayVideoSceneState] = useRegenerateScreenplayVideoSceneAsyncMutation();
+  const [renderScreenplayVideoFinalAsync, renderScreenplayVideoFinalState] = useRenderScreenplayVideoFinalAsyncMutation();
+  const [generateScreenplayVideoAudioPackAsync, generateScreenplayVideoAudioPackState] = useGenerateScreenplayVideoAudioPackAsyncMutation();
+  const [submitHumanWorkOrder, submitHumanWorkOrderState] = useSubmitHumanWorkOrderMutation();
+  const [requestHumanWorkOrderChanges, requestHumanWorkOrderChangesState] = useRequestHumanWorkOrderChangesMutation();
+  const [approveHumanWorkOrder, approveHumanWorkOrderState] = useApproveHumanWorkOrderMutation();
   const [lockIdeaSelection, lockSelectionState] = useLockIdeaSelectionMutation();
   const [generateStoryboardFromScript, generateStoryboardState] = useGenerateStoryboardFromScriptMutation();
   const [generateStoryboardFromScriptAsync, generateStoryboardAsyncState] = useGenerateStoryboardFromScriptAsyncMutation();
   const [generateProductionPlansAsync, generateProductionPlansState] = useGenerateProductionPlansAsyncMutation();
+  const [saveStoryboardClientReview, saveClientReviewState] = useSaveStoryboardClientReviewMutation();
+  const [chatStoryboardClientReview, chatClientReviewState] = useChatStoryboardClientReviewMutation();
+  const [applyStoryboardClientReview, applyClientReviewState] = useApplyStoryboardClientReviewMutation();
+  const [revertStoryboardClientReview, revertClientReviewState] = useRevertStoryboardClientReviewMutation();
+  const [uploadStoryboardFontReferenceImage, uploadFontReferenceState] = useUploadStoryboardFontReferenceImageMutation();
+  const [uploadStoryboardVisualReferenceImage, uploadVisualReferenceState] = useUploadStoryboardVisualReferenceImageMutation();
+  const [fetchAnimatedStoryboardPreview] = useLazyGetAnimatedStoryboardPreviewQuery();
   const [generateShotImage, generateShotImageState] = useGenerateShotImageMutation();
   const [editStoryboardShotWithAi, editStoryboardShotWithAiState] = useEditStoryboardShotWithAiMutation();
   const [insertStoryboardTimelineShot, insertStoryboardTimelineShotState] = useInsertStoryboardTimelineShotMutation();
@@ -545,10 +1239,11 @@ export default function PlannerPage() {
   const [saveStoryboard] = useSaveStoryboardMutation();
   const [unsaveStoryboard] = useUnsaveStoryboardMutation();
   const [createWalletRecharge, rechargeState] = useAddWalletBalanceMutation();
+  const [verifyWalletPayment, verifyWalletPaymentState] = useVerifyWalletPaymentMutation();
   const [setupOrganization, setupOrganizationState] = useSetupOrganizationMutation();
-  const [startSubscriptionUpgrade, upgradeState] = useStartSubscriptionUpgradeMutation();
   const { data: predictionJob } = useGetJobQuery(predictionJobId, { skip: !predictionJobId, pollingInterval: predictionJobId ? 1600 : 0 });
   const { data: ideaGenerationJob } = useGetJobQuery(ideaGenerationJobId, { skip: !ideaGenerationJobId, pollingInterval: ideaGenerationJobId ? 1600 : 0 });
+  const { data: productAdPipelineJob } = useGetJobQuery(productAdPipelineJobId, { skip: !productAdPipelineJobId, pollingInterval: productAdPipelineJobId ? 2200 : 0 });
   const { data: screenplayJob } = useGetJobQuery(screenplayJobId, { skip: !screenplayJobId, pollingInterval: screenplayJobId ? 1600 : 0 });
   const { data: productionPlanJob } = useGetJobQuery(productionPlanJobId, { skip: !productionPlanJobId, pollingInterval: productionPlanJobId ? 1600 : 0 });
   const {
@@ -556,6 +1251,134 @@ export default function PlannerPage() {
     error: shotTakeJobError,
     isError: shotTakeJobIsError,
   } = useGetJobQuery(shotTakeJobId, { skip: !shotTakeJobId, pollingInterval: shotTakeJobId ? 1600 : 0 });
+  const { data: screenplayVideoJob, isError: screenplayVideoJobIsError } = useGetJobQuery(screenplayVideoJobId, {
+    skip: !screenplayVideoJobId,
+    pollingInterval: screenplayVideoJobId ? 2000 : 0,
+  });
+  const { data: screenplayVideoSceneJob, isError: screenplayVideoSceneJobIsError } = useGetJobQuery(screenplayVideoSceneJobId, {
+    skip: !screenplayVideoSceneJobId,
+    pollingInterval: screenplayVideoSceneJobId ? 2000 : 0,
+  });
+  const { data: screenplayVideoFinalJob, isError: screenplayVideoFinalJobIsError } = useGetJobQuery(screenplayVideoFinalJobId, {
+    skip: !screenplayVideoFinalJobId,
+    pollingInterval: screenplayVideoFinalJobId ? 2000 : 0,
+  });
+  const { data: screenplayVideoAudioJob, isError: screenplayVideoAudioJobIsError } = useGetJobQuery(screenplayVideoAudioJobId, {
+    skip: !screenplayVideoAudioJobId,
+    pollingInterval: screenplayVideoAudioJobId ? 2000 : 0,
+  });
+  const screenplayVideoJobActive = isJobActuallyRunning(
+    screenplayVideoJob,
+    screenplayVideoJobId,
+    generateScreenplayVideoState.isLoading,
+    screenplayVideoJobIsError
+  );
+  const screenplayVideoSceneJobActive = isJobActuallyRunning(
+    screenplayVideoSceneJob,
+    screenplayVideoSceneJobId,
+    generateScreenplayVideoSceneState.isLoading || regenerateScreenplayVideoSceneState.isLoading,
+    screenplayVideoSceneJobIsError
+  );
+  const screenplayVideoFinalJobActive = isJobActuallyRunning(
+    screenplayVideoFinalJob,
+    screenplayVideoFinalJobId,
+    renderScreenplayVideoFinalState.isLoading,
+    screenplayVideoFinalJobIsError
+  );
+  const screenplayVideoAudioJobActive = isJobActuallyRunning(
+    screenplayVideoAudioJob,
+    screenplayVideoAudioJobId,
+    generateScreenplayVideoAudioPackState.isLoading,
+    screenplayVideoAudioJobIsError
+  );
+  const screenplayVideoRunIdFromJobs = runIdFromVideoPayload(screenplayVideoJob?.result)
+    || runIdFromVideoPayload(screenplayVideoJob?.outputPayload)
+    || runIdFromVideoPayload(screenplayVideoSceneJob?.result)
+    || runIdFromVideoPayload(screenplayVideoSceneJob?.outputPayload)
+    || runIdFromVideoPayload(screenplayVideoFinalJob?.result)
+    || runIdFromVideoPayload(screenplayVideoFinalJob?.outputPayload)
+    || runIdFromVideoPayload(screenplayVideoAudioJob?.result)
+    || runIdFromVideoPayload(screenplayVideoAudioJob?.outputPayload);
+  const {
+    data: latestPersistedScreenplayVideoRun,
+    isFetching: latestPersistedScreenplayVideoRunLoading,
+    refetch: refetchLatestPersistedScreenplayVideoRun,
+  } = useGetLatestScreenplayVideoRunQuery(
+    { scriptId: scriptDetailIdea?.scriptId },
+    {
+      skip: !isUuid(scriptDetailIdea?.scriptId),
+      pollingInterval: MEDIA_URL_RENEWAL_INTERVAL_MS,
+      refetchOnMountOrArgChange: true,
+      refetchOnFocus: true,
+    }
+  );
+  const {
+    data: reusableFounderAvatarLibrary,
+    isFetching: reusableFounderAvatarLibraryLoading,
+  } = useListReusableFounderAvatarsQuery(
+    { scriptId: scriptDetailIdea?.scriptId },
+    {
+      skip: !isUuid(scriptDetailIdea?.scriptId),
+      refetchOnMountOrArgChange: true,
+      refetchOnFocus: true,
+    }
+  );
+  const availableFounderAvatars = Array.isArray(reusableFounderAvatarLibrary?.avatars)
+    ? reusableFounderAvatarLibrary.avatars
+    : [];
+  const latestPersistedScreenplayVideoRunId = runIdFromVideoPayload(latestPersistedScreenplayVideoRun);
+  const activeScreenplayVideoRunId = screenplayVideoRunId || screenplayVideoRunIdFromJobs || latestPersistedScreenplayVideoRunId;
+  const screenplayVideoPollingActive = Boolean(
+    activeScreenplayVideoRunId
+    && (
+      screenplayVideoJobActive
+      || screenplayVideoSceneJobActive
+      || screenplayVideoFinalJobActive
+      || screenplayVideoAudioJobActive
+    )
+  );
+  const {
+    data: screenplayVideoRun,
+    isFetching: screenplayVideoRunLoading,
+    refetch: refetchScreenplayVideoRun,
+  } = useGetScreenplayVideoRunQuery(
+    { scriptId: scriptDetailIdea?.scriptId, runId: activeScreenplayVideoRunId },
+    {
+      skip: !scriptDetailIdea?.scriptId || !activeScreenplayVideoRunId,
+      pollingInterval: screenplayVideoPollingActive ? 2200 : MEDIA_URL_RENEWAL_INTERVAL_MS,
+      refetchOnMountOrArgChange: true,
+      refetchOnFocus: true,
+    }
+  );
+  const refreshScreenplayMedia = () => {
+    if (activeScreenplayVideoRunId) {
+      return refetchScreenplayVideoRun();
+    }
+    return refetchLatestPersistedScreenplayVideoRun();
+  };
+  const baseScreenplayVideoRun = screenplayVideoRun
+    || latestPersistedScreenplayVideoRun
+    || videoRunFromPayload(screenplayVideoJob?.result)
+    || videoRunFromPayload(screenplayVideoJob?.outputPayload)
+    || videoRunFromPayload(screenplayVideoSceneJob?.result)
+    || videoRunFromPayload(screenplayVideoSceneJob?.outputPayload)
+    || videoRunFromPayload(screenplayVideoFinalJob?.result)
+    || videoRunFromPayload(screenplayVideoFinalJob?.outputPayload)
+    || videoRunFromPayload(screenplayVideoAudioJob?.result)
+    || videoRunFromPayload(screenplayVideoAudioJob?.outputPayload);
+  const latestAudioVideoRun = videoRunFromPayload(screenplayVideoAudioJob?.result)
+    || videoRunFromPayload(screenplayVideoAudioJob?.outputPayload);
+  const currentScreenplayVideoRun = mergeVideoRunAudioState(baseScreenplayVideoRun, latestAudioVideoRun);
+  const {
+    data: humanWorkOrdersData = [],
+    refetch: refetchHumanWorkOrders,
+  } = useGetHumanWorkOrdersQuery(
+    { scriptId: scriptDetailIdea?.scriptId, limit: 20 },
+    {
+      skip: !scriptDetailIdea?.scriptId,
+      refetchOnMountOrArgChange: true,
+    }
+  );
   const { data: creatorProjects = [], isFetching: creatorProjectsLoading, refetch: refetchCreatorProjects } = useGetCreatorProjectsQuery(
     { limit: 12 },
     { refetchOnMountOrArgChange: true }
@@ -577,6 +1400,13 @@ export default function PlannerPage() {
   const { data: backendProductionPlans = [], isFetching: productionPlansLoading, refetch: refetchProductionPlans } = useGetProductionPlansQuery(
     { scriptId: scriptDetailIdea?.scriptId },
     { skip: !scriptDetailIdea?.scriptId || productionPlanJobId }
+  );
+  const {
+    data: backendClientReview,
+    isFetching: clientReviewLoading,
+  } = useGetStoryboardClientReviewQuery(
+    { scriptId: scriptDetailIdea?.scriptId },
+    { skip: !isUuid(scriptDetailIdea?.scriptId), refetchOnMountOrArgChange: true }
   );
   const { data: backendShotImageUrls = [], isFetching: shotImageUrlsLoading } = useGetShotImageUrlsQuery(
     { scriptId: scriptDetailIdea?.scriptId },
@@ -706,6 +1536,130 @@ export default function PlannerPage() {
       || availableAiProviders[0];
   }, [availableAiProviders, selectedProviderCode]);
   const aiProviderContext = useMemo(() => buildAiProviderContext(selectedAiProvider), [selectedAiProvider]);
+  const activeProductionStyleGuidance = useMemo(
+    () => productionStyleGuidanceFor(productionStyle, { hybridSceneMode, brollStyle, captionStyle }),
+    [brollStyle, captionStyle, hybridSceneMode, productionStyle]
+  );
+  const screenplayVideoGenerationPackage = useMemo(
+    () => {
+      const provider = normalizeScreenplayVideoProvider(screenplayVideoProvider);
+      const model = compatibleScreenplayVideoModelForProvider(provider, screenplayVideoModel);
+      const maxClipSeconds = maxClipSecondsForVideoProvider(provider, model);
+      return buildScreenplayVideoGenerationPackage(scriptDetailIdea?.scriptJson, {
+        durationSeconds: selectedDuration,
+        screenType,
+        topicType,
+        storytellingType,
+        productionStyle,
+        hybridSceneMode,
+        brollStyle,
+        captionStyle,
+        dialogueLanguage,
+        provider,
+        model,
+        maxClipSeconds,
+        videoModelCapability: videoModelCapabilityForScreenplay(provider, model),
+      });
+    },
+    [brollStyle, captionStyle, dialogueLanguage, hybridSceneMode, productionStyle, screenType, screenplayVideoModel, screenplayVideoProvider, scriptDetailIdea?.scriptJson, selectedDuration, storytellingType, topicType]
+  );
+  const activeVideoStylePayload = useMemo(() => ({
+    productionStyle,
+    hybridSceneMode,
+    brollStyle,
+    captionStyle,
+    productionStyleGuidance: activeProductionStyleGuidance,
+    ...screenplayVideoGenerationPackage,
+    ...(Object.keys(screenplayVideoGenerationPackage).length ? { screenplayVideoGenerationPackage } : {}),
+  }), [activeProductionStyleGuidance, brollStyle, captionStyle, hybridSceneMode, productionStyle, screenplayVideoGenerationPackage]);
+  const activeProductAdBrief = useMemo(() => normalizeProductAdBrief(productAdBrief), [productAdBrief]);
+  const hasActiveProductAdInput = useMemo(() => hasProductAdInput(activeProductAdBrief), [activeProductAdBrief]);
+  const activeProductIntelligenceBrief = useMemo(
+    () => buildProductIntelligenceBrief(activeProductAdBrief, manualIdeaDraft, {
+      countryCode: country.code,
+      durationSeconds: selectedDuration,
+      topicType,
+      productionStyle,
+      dialogueLanguage,
+      screenType,
+      storytellingType,
+      hookLens,
+      brollStyle,
+      captionStyle,
+      campaignAngle: selectedCampaignAngle,
+    }),
+    [activeProductAdBrief, brollStyle, captionStyle, country.code, dialogueLanguage, hookLens, manualIdeaDraft, productionStyle, screenType, selectedCampaignAngle, selectedDuration, storytellingType, topicType]
+  );
+  const storyboardProductBrief = useMemo(
+    () => productIntelligenceBriefForWorkflow(
+      scriptDetailIdea,
+      storyScriptIdea,
+      lockedBrief,
+      activeProductIntelligenceBrief
+    ),
+    [activeProductIntelligenceBrief, lockedBrief, scriptDetailIdea, storyScriptIdea]
+  );
+  const productStoryboardMode = Boolean(storyboardProductBrief);
+  const activeCampaignAngle = selectedCampaignAngle || campaignAngleFromEntity(lockedBrief, activeProductAdBrief);
+  const activeProductInputKey = useMemo(
+    () => productAdInputKey(activeProductIntelligenceBrief),
+    [activeProductIntelligenceBrief]
+  );
+  const activeVideoFinishingPlan = useMemo(
+    () => normalizeVideoFinishingPlan(videoFinishingPlan),
+    [videoFinishingPlan]
+  );
+  const activeFounderAvatarProfile = useMemo(
+    () => normalizeFounderAvatarProfileForPlanning(scriptDetailIdea, currentScreenplayVideoRun, founderAvatarProfile),
+    [currentScreenplayVideoRun, founderAvatarProfile, scriptDetailIdea]
+  );
+  const selectedFounderAvatarKey = useMemo(() => {
+    const explicitSelection = firstString(
+      activeFounderAvatarProfile.selectedFromScriptId,
+      activeFounderAvatarProfile.selected_from_script_id
+    );
+    if (explicitSelection) return explicitSelection;
+    const activeProviderVoiceId = firstString(
+      activeFounderAvatarProfile.providerVoiceId,
+      activeFounderAvatarProfile.minimaxVoiceId,
+      activeFounderAvatarProfile.elevenLabsVoiceId,
+      activeFounderAvatarProfile.sarvamVoiceId,
+      activeFounderAvatarProfile.synthesiaVoiceId
+    );
+    return firstString(
+      availableFounderAvatars.find((avatar) => firstString(avatar?.providerVoiceId) === activeProviderVoiceId)?.sourceScriptId
+    );
+  }, [activeFounderAvatarProfile, availableFounderAvatars]);
+  const activeFounderAvatarPayload = useMemo(
+    () => founderAvatarPayloadForPlanning(activeFounderAvatarProfile),
+    [activeFounderAvatarProfile]
+  );
+  const activeScreenplayVideoPayload = useMemo(() => {
+    const provider = normalizeScreenplayVideoProvider(screenplayVideoProvider);
+    const model = compatibleScreenplayVideoModelForProvider(provider, screenplayVideoModel);
+    const maxClipSeconds = maxClipSecondsForVideoProvider(provider, model);
+    const videoModelCapability = videoModelCapabilityForScreenplay(provider, model);
+    return {
+      ...activeVideoStylePayload,
+      provider,
+      model,
+      maxClipSeconds,
+      videoModelCapability,
+      modelCapabilities: videoModelCapability,
+      dialogueTimingPolicy: dialogueTimingPolicyForModelCapability(maxClipSeconds),
+      videoFinishingPlan: activeVideoFinishingPlan,
+      soundDesignPlan: soundDesignPlanFromVideoFinishingPlan(activeVideoFinishingPlan),
+      imageLedAdPlan: imageLedAdPlanFromVideoFinishingPlan(activeVideoFinishingPlan),
+      audioProductionPlan: audioProductionPlanFromVideoFinishingPlan(activeVideoFinishingPlan),
+      editingPlan: editingPlanFromVideoFinishingPlan(activeVideoFinishingPlan),
+      ...activeFounderAvatarPayload,
+      storyboardReferenceMode: activeVideoFinishingPlan.useStoryboardReferences ? activeVideoFinishingPlan.referenceImageMode : "ignore",
+      referenceImageMode: activeVideoFinishingPlan.referenceImageMode,
+      requireImageAnchors: activeVideoFinishingPlan.requireImageAnchors,
+      burnCaptions: activeVideoFinishingPlan.burnCaptions,
+      useMixedAudio: activeVideoFinishingPlan.useMixedAudio,
+    };
+  }, [activeFounderAvatarPayload, activeVideoFinishingPlan, activeVideoStylePayload, screenplayVideoModel, screenplayVideoProvider]);
   const baseIdeas = ideasState.data?.ideas || currentStoryboard?.ideas || fallbackIdeas;
   const ideas = useMemo(() => {
     const merged = [...baseIdeas, ...lockedIdeaOptions, ...extraIdeas, ...savedIdeaSnapshots];
@@ -802,15 +1756,21 @@ export default function PlannerPage() {
     scriptDetailIdea?.scriptScenes?.length,
   ]);
   const shotExportSummary = useMemo(
-    () => summarizeShotExportAssets(scenes, expectedExportShotCount),
-    [expectedExportShotCount, scenes]
+    () => summarizeShotExportAssets(scenes, expectedExportShotCount, productStoryboardMode),
+    [expectedExportShotCount, productStoryboardMode, scenes]
+  );
+  const productFrameGenerationLoading = Boolean(
+    productShotImagesGenerating
+    || visibleShotImageLoadingKeys.some((key) => String(key).endsWith(":production"))
   );
   const canExportShotsPdf = Boolean(
     !shotGenerationLoading
+    && !productFrameGenerationLoading
     && shotExportSummary.expected > 0
     && shotExportSummary.storyboardReady >= shotExportSummary.expected
     && shotExportSummary.lightingReady >= shotExportSummary.expected
     && shotExportSummary.dpReady >= shotExportSummary.expected
+    && (!productStoryboardMode || shotExportSummary.productionReady >= shotExportSummary.expected)
   );
   const generatedShotCardsReadyForPolish = Boolean(
     shotExportSummary.expected > 0
@@ -818,10 +1778,14 @@ export default function PlannerPage() {
   );
   const exportBlockedReason = shotGenerationLoading
     ? "Shot generation is still running. Please export after all shots are generated."
+    : productFrameGenerationLoading
+      ? "Product frames are still generating. Please wait before exporting."
     : shotExportSummary.expected <= 0
       ? "Generate shot plans and shots before exporting."
       : !canExportShotsPdf
-        ? `Please export after generating all the shots (${shotExportSummary.completeReady}/${shotExportSummary.expected} complete).`
+        ? productStoryboardMode
+          ? `Generate all storyboard, lighting, DP, and product frames before export (${shotExportSummary.completeReady}/${shotExportSummary.expected} complete).`
+          : `Please export after generating all the shots (${shotExportSummary.completeReady}/${shotExportSummary.expected} complete).`
         : "";
   const shotTakeBusy = Boolean(
     shotTakeJobId
@@ -943,14 +1907,15 @@ export default function PlannerPage() {
     [displayedGeneratedTopics, selectedGeneratedTopicId]
   );
   const activeStoryIdeaForCast = scriptDetailIdea || storyScriptIdea || selectedIdea;
-  const activeStoryIdeaIdForCast = activeStoryIdeaForCast?.id;
+  const activeStoryIdeaIdForCast = resolveWorkflowStoryIdeaId(activeStoryIdeaForCast, storyScriptIdea, selectedIdea, { id: savedStoryIdeaId });
+  const activeLockedIdeaIdForCast = resolveWorkflowLockedIdeaId(activeStoryIdeaForCast, storyScriptIdea, selectedIdea, lockedBrief);
   const activeStoryCharactersForCast = useMemo(
     () => resolveStoryCharactersForCast(activeStoryIdeaForCast, storyScriptIdea, selectedIdea),
     [activeStoryIdeaForCast, storyScriptIdea, selectedIdea]
   );
-  const shouldFetchCharacterCastMappings = Boolean(isUuid(lockedBrief?.lockedIdeaId) && isUuid(activeStoryIdeaIdForCast));
+  const shouldFetchCharacterCastMappings = Boolean(isUuid(activeLockedIdeaIdForCast) && isUuid(activeStoryIdeaIdForCast));
   const { data: characterCastMappingData = { mappings: [] } } = useGetCharacterCastMappingsQuery(
-    { lockedIdeaId: lockedBrief?.lockedIdeaId, storyIdeaId: activeStoryIdeaIdForCast },
+    { lockedIdeaId: activeLockedIdeaIdForCast, storyIdeaId: activeStoryIdeaIdForCast },
     { skip: !shouldFetchCharacterCastMappings }
   );
   useEffect(() => {
@@ -978,6 +1943,41 @@ export default function PlannerPage() {
     dispatch(restorePlannerState(storedWorkflowSnapshot.planner));
     setWorkflowRestored(true);
   }, [dispatch, storedWorkflowSnapshot]);
+
+  useEffect(() => {
+    const savedAssets = storyboardReferenceAssetsFromScriptIdea(scriptDetailIdea);
+    if (savedAssets.length) {
+      setStoryboardReferenceAssets((current) => mergeStoryboardReferenceAssets(current, savedAssets));
+    }
+    const savedDetails = storyboardReferenceDetailsFromScriptIdea(scriptDetailIdea);
+    if (savedDetails && !storyboardReferenceDetails) {
+      setStoryboardReferenceDetails(savedDetails);
+    }
+    if (storyboardReferenceEnhancementEnabledFromScriptIdea(scriptDetailIdea)) {
+      setStoryboardEnhanceWithReference(true);
+    }
+  }, [scriptDetailIdea?.scriptId]);
+
+  useEffect(() => {
+    const planningLanguage = firstString(
+      scriptDetailIdea?.dialogueLanguage,
+      scriptDetailIdea?.scriptJson?.dialogueLanguage,
+      dialogueLanguage
+    );
+    const embeddedReview = normalizeClientReview(
+      scriptDetailIdea?.clientReview || scriptDetailIdea?.scriptJson?.clientReview,
+      planningLanguage
+    );
+    setClientReview(embeddedReview);
+    setClientReviewDirty(false);
+    if (planningLanguage) setDialogueLanguage(planningLanguage);
+  }, [scriptDetailIdea?.scriptId]);
+
+  useEffect(() => {
+    if (!backendClientReview || clientReviewDirty) return;
+    const normalized = normalizeClientReview(backendClientReview, dialogueLanguage);
+    setClientReview(normalized);
+  }, [backendClientReview, clientReviewDirty]);
 
   useEffect(() => {
     const visibleSavedIdeas = ideas.filter((idea) => idea?.id && savedIdeaIds.has(idea.id));
@@ -1020,12 +2020,34 @@ export default function PlannerPage() {
       selectedAudienceDecision,
       generatedStoryboard,
       storyboardSaved,
+      screenplayApprovedForVideo,
+      productAdPipelineJobId,
+      screenplayVideoRunId: activeScreenplayVideoRunId,
+      screenplayVideoJobId,
+      screenplayVideoFinalJobId,
+      screenplayVideoAudioJobId,
       selectedDuration,
       dialogueLanguage,
+      clientReview,
       screenType,
       storytellingType,
       hookLens,
+      topicType,
+      productionStyle,
+      hybridSceneMode,
+      brollStyle,
+      captionStyle,
+      videoFinishingPlan: activeVideoFinishingPlan,
+      screenplayVideoProvider,
+      screenplayVideoModel,
+      founderAvatarProfile: activeFounderAvatarProfile,
+      founderKit: activeFounderAvatarProfile,
+      storyboardReferenceDetails,
+      storyboardReferenceAssets,
+      storyboardEnhanceWithReference,
+      creativeFlow,
       manualIdeaDraft,
+      productAdBrief: activeProductAdBrief,
       savedIdeaIds: Array.from(savedIdeaIds),
       savedIdeaSnapshots,
       extraIdeas,
@@ -1033,16 +2055,23 @@ export default function PlannerPage() {
     });
   }, [
     activeProjectId,
+    activeFounderAvatarProfile,
     castPlan,
+    clientReview,
     dialogueLanguage,
     extraIdeas,
     generatedStoryboard,
     ideaCandidatePageInfo,
     ideaCandidatePageItems,
     hookLens,
+    hybridSceneMode,
     lockedBrief,
     lockedIdeaOptions,
     manualIdeaDraft,
+    activeProductAdBrief,
+    brollStyle,
+    captionStyle,
+    creativeFlow,
     planner.activeStep,
     planner.completedSteps,
     planner.projectId,
@@ -1050,16 +2079,30 @@ export default function PlannerPage() {
     planner.selectedCreatorId,
     planner.selectedIdeaId,
     planner.selectedTrendId,
+    productAdPipelineJobId,
     savedIdeaIds,
     savedIdeaSnapshots,
     savedStoryIdeaId,
     screenType,
+    screenplayApprovedForVideo,
+    screenplayVideoAudioJobId,
+    screenplayVideoFinalJobId,
+    screenplayVideoJobId,
+    screenplayVideoModel,
+    screenplayVideoProvider,
+    storyboardEnhanceWithReference,
+    storyboardReferenceAssets,
+    storyboardReferenceDetails,
+    activeScreenplayVideoRunId,
     scriptDetailIdea,
     selectedAudienceDecision,
     selectedDuration,
     storyboardSaved,
     storyScriptIdea,
     storytellingType,
+    topicType,
+    productionStyle,
+    activeVideoFinishingPlan,
     workflowRestored,
     workspacePage,
   ]);
@@ -1068,9 +2111,16 @@ export default function PlannerPage() {
     [country, selectedIdea, selectedTrend]
   );
   const selectedAudienceSummary = selectedAudienceDecision || fallbackAudienceSummary;
+  const savedBriefMatchesProductInput = Boolean(
+    hasActiveProductAdInput
+    && lockedBrief?.source === "original"
+    && productAdInputKey(productIntelligenceBriefFromEntity(lockedBrief)) === activeProductInputKey
+  );
   const savedBriefMatchesCurrentMode = TREND_DISCOVERY_ENABLED && trendChoiceMode === "trend"
     ? Boolean(lockedBrief?.source === "trend" && lockedBrief?.trendId === selectedTrend?.id)
-    : Boolean(lockedBrief?.source === "original" && lockedBrief?.description === manualIdeaDraft.trim());
+    : hasActiveProductAdInput
+      ? savedBriefMatchesProductInput
+      : Boolean(lockedBrief?.source === "original" && lockedBrief?.description === manualIdeaDraft.trim());
   const canGenerateStoryIdeas = projectWorkspaceMode ? Boolean(lockedBrief) : savedBriefMatchesCurrentMode;
   const activeStoryboardId = currentStoryboard?.id || currentStoryboard?.storyboardId || planner.projectId;
   const projectNeedsIdeaWorkflow = projectWorkspaceMode && !storyScriptIdea && !scriptDetailIdea;
@@ -1092,6 +2142,10 @@ export default function PlannerPage() {
   const selectedCreatorMappings = Array.isArray(selectedCreator?.characterMappings) ? selectedCreator.characterMappings : [];
   const backendCharacterMappings = Array.isArray(characterCastMappingData?.mappings) ? characterCastMappingData.mappings : [];
   const activeCharacterMappings = selectedCreatorMappings.length ? selectedCreatorMappings : backendCharacterMappings;
+  const activeDialogueVoiceProfile = useMemo(
+    () => dialogueVoiceProfileForPlanning(activeCharacterMappings, selectedCreator, scriptDetailIdea?.scriptJson, activeFounderAvatarProfile),
+    [activeCharacterMappings, activeFounderAvatarProfile, selectedCreator, scriptDetailIdea?.scriptJson]
+  );
   const mappedCharacterCount = activeCharacterMappings
     .filter((mapping) => mapping?.actorId || mapping?.actorName || mapping?.actorIds?.length || mapping?.castProfileId || mapping?.castDisplayName)
     .length;
@@ -1111,12 +2165,60 @@ export default function PlannerPage() {
     && castStepComplete;
   const effectiveAudienceStepComplete = !freshNewIdeaMode && Boolean(selectedAudienceDecision || planner.completedSteps.audience);
   const effectiveScreenplayReady = !freshNewIdeaMode && Boolean(scriptDetailIdea);
+  const effectiveScreenplayApprovedForVideo = Boolean(
+    screenplayApprovedForVideo
+    || scriptDetailIdea?.approval
+    || activeScreenplayVideoRunId
+    || currentScreenplayVideoRun?.runId
+    || currentScreenplayVideoRun?.id
+    || ["SCREENPLAY_APPROVED", "APPROVED", "VIDEO_APPROVED"].includes(String(scriptDetailIdea?.status || "").toUpperCase())
+  );
   const effectiveShotPlansReady = !freshNewIdeaMode && Boolean(productionPlanTags.length || storyboardSaved || generatedStoryboard);
   const expectedShotTakeCount = scenes.length || productionPlanTags.length || screenplayShotCount || 0;
   const acceptedShotTakeCount = (Array.isArray(shotTakes) ? shotTakes : []).filter((take) => take?.accepted).length;
   const effectiveShootPolishReady = Boolean(expectedShotTakeCount && acceptedShotTakeCount >= expectedShotTakeCount);
+  const screenplayVideoSceneCount = screenplayVideoSceneCountFor(screenplayVideoRun, scenes);
+  const screenplayVideoGeneratedCount = screenplayVideoGeneratedCountFor(screenplayVideoRun);
+  const activeFinalVideoUrl = finalVideoUrlFromPayload(currentScreenplayVideoRun)
+    || finalVideoUrlFromPayload(screenplayVideoFinalJob?.result)
+    || finalVideoUrlFromPayload(screenplayVideoFinalJob?.outputPayload);
+  useEffect(() => {
+    if (
+      workspacePage !== "video"
+      || !productStoryboardMode
+      || canExportShotsPdf
+      || activeFinalVideoUrl
+      || !scriptDetailIdea?.scriptId
+    ) return;
+    setWorkspacePage("storyboard");
+    dispatch(setActiveStep("storyboard"));
+    window.history.replaceState(null, "", "/#storyboard");
+  }, [activeFinalVideoUrl, canExportShotsPdf, dispatch, productStoryboardMode, scriptDetailIdea?.scriptId, workspacePage]);
+  const effectiveScreenplayVideoReady = Boolean(
+    activeFinalVideoUrl
+  );
+  const humanWorkOrders = useMemo(() => normalizeHumanWorkOrderList(humanWorkOrdersData), [humanWorkOrdersData]);
+  const screenplayReviewOrder = useMemo(
+    () => latestHumanWorkOrderOfType(humanWorkOrders, "SCREENPLAY_REVIEW"),
+    [humanWorkOrders]
+  );
+  const editingWorkOrder = useMemo(
+    () => latestHumanWorkOrderOfType(humanWorkOrders, "EDITING_JOB"),
+    [humanWorkOrders]
+  );
+  const videoBlockedReason = !effectiveScreenplayReady
+    ? "Generate and review the screenplay before video generation"
+    : !planner.completedSteps.screenplay && !effectiveScreenplayApprovedForVideo
+      ? "Review the screenplay before video generation"
+      : !effectiveShotPlansReady
+        ? "Generate storyboard shot plans before video generation"
+        : !storyboardSaved
+          ? "Save Production on the Storyboard page before video generation"
+          : !canExportShotsPdf
+            ? exportBlockedReason || "Generate every required storyboard image before video generation"
+      : "";
   const polishBlockedReason = !effectiveShotPlansReady
-    ? "Generate shot design before opening Polish."
+    ? "Generate storyboard before opening Polish."
     : shotGenerationLoading
       ? "Shot images are still generating. Polish unlocks when generated shots are ready."
       : !generatedShotCardsReadyForPolish
@@ -1124,8 +2226,14 @@ export default function PlannerPage() {
         : "";
   const polishUnlocked = !polishBlockedReason;
   const usedGeneratedIdeaIds = useMemo(
-    () => new Set([savedStoryIdeaId, storyScriptIdea?.id, scriptDetailIdea?.id].filter(Boolean).map((id) => String(id))),
-    [savedStoryIdeaId, scriptDetailIdea?.id, storyScriptIdea?.id]
+    () => new Set([
+      savedStoryIdeaId,
+      storyScriptIdea?.storyIdeaId,
+      storyScriptIdea?.id,
+      scriptDetailIdea?.storyIdeaId,
+      scriptDetailIdea?.id,
+    ].filter(Boolean).map((id) => String(id))),
+    [savedStoryIdeaId, scriptDetailIdea?.id, scriptDetailIdea?.storyIdeaId, storyScriptIdea?.id, storyScriptIdea?.storyIdeaId]
   );
   const selectedStoryIdeaMarkerIds = useMemo(
     () => new Set([savedStoryIdeaId, planner.completedSteps.ideas ? planner.selectedIdeaId : null].filter(Boolean).map((id) => String(id))),
@@ -1161,16 +2269,16 @@ export default function PlannerPage() {
     },
     {
       id: "cast",
-      label: "Actor",
+      label: "Cast",
       value: effectiveCastStepComplete
         ? `${mappedCharacterCount || selectedCreator?.actors?.length || 0} mappings saved`
-        : "Map characters to actors",
+        : "Map characters to cast",
       done: effectiveCastStepComplete,
       active: activeWorkflowSlide.id === "cast",
     },
     {
       id: "screenplay",
-      label: "Script",
+      label: "Screenplay",
       value: scriptDetailIdea ? `${screenplayShotCount || "Shot-wise"} pages ready` : "Generate screenplay",
       done: effectiveScreenplayReady,
       active: activeWorkflowSlide.id === "screenplay",
@@ -1208,15 +2316,15 @@ export default function PlannerPage() {
     },
     {
       id: "cast",
-      label: "Actor",
+      label: "Cast",
       kicker: "Cast mapping",
-      description: effectiveCastStepComplete ? `${mappedCharacterCount || selectedCreator?.actors?.length || 0} mappings saved` : "Add actors and map characters",
+      description: effectiveCastStepComplete ? `${mappedCharacterCount || selectedCreator?.actors?.length || 0} mappings saved` : "Add cast and map characters",
       done: effectiveCastStepComplete,
       locked: false,
     },
     {
       id: "screenplay",
-      label: "Script",
+      label: "Screenplay",
       kicker: "Shots",
       description: scriptDetailIdea
         ? `${screenplayShotCount || "Shot-wise"} pages ready - ${productionPlanTags.length || 0} plan tags`
@@ -1225,24 +2333,37 @@ export default function PlannerPage() {
       locked: Boolean(getWorkflowGateMessage("screenplay")),
     },
     {
+      id: "video",
+      label: "Video",
+      kicker: "Video Render",
+      description: videoBlockedReason
+        || (effectiveScreenplayVideoReady
+          ? "Final video ready"
+          : screenplayVideoGeneratedCount
+            ? `${screenplayVideoGeneratedCount}/${screenplayVideoSceneCount || screenplayShotCount || scenes.length || 0} shot clips ready`
+            : effectiveScreenplayApprovedForVideo
+              ? "Ready to prepare shot render"
+              : "Approve screenplay for video"),
+      done: effectiveScreenplayVideoReady,
+      locked: Boolean(videoBlockedReason),
+    },
+    {
       id: "storyboard",
-      label: "Shot Design",
-      kicker: "Production",
-      description: productionPlanTags.length ? `${productionPlanTags.length} shot plans ready` : getWorkflowGateMessage("storyboard") || "Generate readable shot plans",
+      label: "Storyboard",
+      kicker: "Optional review",
+      description: productionPlanTags.length ? `${productionPlanTags.length} shot plans ready` : getWorkflowGateMessage("storyboard") || "Preview and adjust shots before video",
       done: effectiveShotPlansReady,
       locked: Boolean(getWorkflowGateMessage("storyboard")),
     },
     {
-      id: "shoot-polish",
-      label: "Polish",
-      kicker: "Takes",
-      description: polishBlockedReason
-        ? polishBlockedReason
-        : effectiveShotPlansReady
-        ? `${acceptedShotTakeCount}/${expectedShotTakeCount || scenes.length || 0} takes accepted`
-        : "Upload takes after shot design is ready",
-      done: effectiveShootPolishReady,
-      locked: Boolean(polishBlockedReason),
+      id: "client-review",
+      label: "Client Review",
+      kicker: "Feedback",
+      description: clientReview?.propagation?.status === "APPLIED"
+        ? `${clientReview.propagation.updatedShotCount || scenes.length || 0} shots synced`
+        : "Review frames, language, fonts, and overlays",
+      done: clientReview?.propagation?.status === "APPLIED",
+      locked: false,
     },
   ];
   const visibleWorkspacePages = projectWorkspaceMode
@@ -1287,10 +2408,6 @@ export default function PlannerPage() {
         setProjectsOpen(true);
         return;
       }
-      if (window.location.hash === "#post-production") {
-        setPostProductionOpen(true);
-        return;
-      }
       if (window.location.hash === "#past-storyline" || window.location.hash === "#past-script") {
         setPastHistoryModal(window.location.hash === "#past-storyline" ? "storyline" : "script");
         return;
@@ -1309,18 +2426,6 @@ export default function PlannerPage() {
       setProjectsOpen(true);
     }
     return () => window.removeEventListener("creator:open-projects", openProjects);
-  }, []);
-
-  useEffect(() => {
-    const openPostProduction = () => {
-      setSelectedPostProductionProject(null);
-      setPostProductionOpen(true);
-    };
-    window.addEventListener("creator:open-post-production", openPostProduction);
-    if (window.location.hash === "#post-production") {
-      openPostProduction();
-    }
-    return () => window.removeEventListener("creator:open-post-production", openPostProduction);
   }, []);
 
   useEffect(() => {
@@ -1427,10 +2532,30 @@ export default function PlannerPage() {
   }, [refetchWallet, tenantId]);
 
   useEffect(() => {
-    if (!tenantId || walletHasPaidGenerationBalance) {
+    if (!tenantId) {
+      setLowBalanceNotice(null);
+      return;
+    }
+    if (!lowBalanceNotice) return;
+    const minimumBalance = Number(lowBalanceNotice.minimumBalance) > 0 ? Number(lowBalanceNotice.minimumBalance) : paidGenerationMinimumBalance;
+    if (walletBalanceAmount >= minimumBalance) {
       setLowBalanceNotice(null);
     }
-  }, [tenantId, walletHasPaidGenerationBalance]);
+  }, [lowBalanceNotice, paidGenerationMinimumBalance, tenantId, walletBalanceAmount]);
+
+  useEffect(() => {
+    const openRecharge = () => {
+      if (!tenantId) {
+        flash("Set up organization before wallet recharge", "error");
+        scrollToSection("dashboard");
+        return;
+      }
+      setLowBalanceNotice(null);
+      setRechargeOpen(true);
+    };
+    window.addEventListener("creator:open-recharge", openRecharge);
+    return () => window.removeEventListener("creator:open-recharge", openRecharge);
+  }, [tenantId]);
 
   useEffect(() => {
     if (TREND_DISCOVERY_ENABLED
@@ -1552,6 +2677,154 @@ export default function PlannerPage() {
   }, [productionPlanJob?.status, productionPlanJob?.progress, refetchWallet]);
 
   useEffect(() => {
+    if (!screenplayVideoRunIdFromJobs || screenplayVideoRunIdFromJobs === screenplayVideoRunId) return;
+    setScreenplayVideoRunId(screenplayVideoRunIdFromJobs);
+  }, [screenplayVideoRunId, screenplayVideoRunIdFromJobs]);
+
+  useEffect(() => {
+    if (screenplayVideoJobId && screenplayVideoJobIsError) {
+      setScreenplayVideoJobId(null);
+      return;
+    }
+    const status = String(screenplayVideoJob?.status || "").toUpperCase();
+    if (!status) return;
+    if (isFailedJobStatus(status)) {
+      setScreenplayVideoJobId(null);
+      addActivity("Shot queue preparation failed", scriptDetailIdea?.title || "Screenplay video");
+      flash(screenplayVideoJob?.errorMessage || screenplayVideoJob?.message || "Shot queue preparation failed. Try again.", "error");
+      void refetchWallet?.();
+      return;
+    }
+    if (!isCompletedJobStatus(status)) return;
+    setScreenplayVideoJobId(null);
+    setScreenplayVideoRunId(runIdFromVideoPayload(screenplayVideoJob?.result) || runIdFromVideoPayload(screenplayVideoJob?.outputPayload) || screenplayVideoRunId);
+    addActivity("Shot queue prepared", scriptDetailIdea?.title || "Screenplay video");
+    flash("Shot queue ready. Generate one shot at a time.", "success");
+    void refetchScreenplayVideoRun?.();
+    void refetchWallet?.();
+  }, [screenplayVideoJob?.status, screenplayVideoJob?.progress, screenplayVideoJobId, screenplayVideoJobIsError, refetchWallet]);
+
+  useEffect(() => {
+    if (screenplayVideoSceneJobId && screenplayVideoSceneJobIsError) {
+      setScreenplayVideoSceneJobId(null);
+      setScreenplayVideoActiveSceneId(null);
+      return;
+    }
+    const status = String(screenplayVideoSceneJob?.status || "").toUpperCase();
+    if (!status) return;
+    if (isFailedJobStatus(status)) {
+      setScreenplayVideoSceneJobId(null);
+      setScreenplayVideoActiveSceneId(null);
+      addActivity("Shot generation failed", scriptDetailIdea?.title || "Screenplay video");
+      flash(screenplayVideoSceneJob?.errorMessage || screenplayVideoSceneJob?.message || "Shot generation failed. Try again.", "error");
+      void refetchWallet?.();
+      return;
+    }
+    if (!isCompletedJobStatus(status)) return;
+    setScreenplayVideoSceneJobId(null);
+    setScreenplayVideoActiveSceneId(null);
+    addActivity("Shot generated", scriptDetailIdea?.title || "Screenplay video");
+    flash("Shot clip is ready for review.", "success");
+    void refetchScreenplayVideoRun?.();
+    void refetchWallet?.();
+  }, [screenplayVideoSceneJob?.status, screenplayVideoSceneJob?.progress, screenplayVideoSceneJobId, screenplayVideoSceneJobIsError, refetchWallet]);
+
+  useEffect(() => {
+    if (screenplayVideoFinalJobId && screenplayVideoFinalJobIsError) {
+      setScreenplayVideoFinalJobId(null);
+      return;
+    }
+    const status = String(screenplayVideoFinalJob?.status || "").toUpperCase();
+    if (!status) return;
+    if (isFailedJobStatus(status)) {
+      setScreenplayVideoFinalJobId(null);
+      addActivity("Final video merge failed", scriptDetailIdea?.title || "Screenplay video");
+      flash(screenplayVideoFinalJob?.errorMessage || screenplayVideoFinalJob?.message || "Final video merge failed. Try again.", "error");
+      void refetchWallet?.();
+      return;
+    }
+    if (!isCompletedJobStatus(status)) return;
+    setScreenplayVideoFinalJobId(null);
+    addActivity("Final video ready", scriptDetailIdea?.title || "Screenplay video");
+    flash("Final video is ready.", "success");
+    void refetchScreenplayVideoRun?.();
+    void refetchWallet?.();
+  }, [screenplayVideoFinalJob?.status, screenplayVideoFinalJob?.progress, screenplayVideoFinalJobId, screenplayVideoFinalJobIsError, refetchWallet]);
+
+  useEffect(() => {
+    if (screenplayVideoAudioJobId && screenplayVideoAudioJobIsError) {
+      setScreenplayVideoAudioJobId(null);
+      return;
+    }
+    const status = String(screenplayVideoAudioJob?.status || "").toUpperCase();
+    if (!status) return;
+    if (isFailedJobStatus(status)) {
+      setScreenplayVideoAudioJobId(null);
+      addActivity("Dialogue and music preparation failed", scriptDetailIdea?.title || "Screenplay video");
+      flash(screenplayVideoAudioJob?.errorMessage || screenplayVideoAudioJob?.message || "Dialogue or music preparation failed. Try again.", "error");
+      void refetchWallet?.();
+      return;
+    }
+    if (!isCompletedJobStatus(status)) return;
+    setScreenplayVideoAudioJobId(null);
+    addActivity("Dialogue and music ready", scriptDetailIdea?.title || "Screenplay video");
+    flash("Dialogue and background music details are attached to the video run.", "success");
+    void refetchScreenplayVideoRun?.();
+    void refetchWallet?.();
+  }, [screenplayVideoAudioJob?.status, screenplayVideoAudioJob?.progress, screenplayVideoAudioJobId, screenplayVideoAudioJobIsError, refetchWallet]);
+
+  useEffect(() => {
+    const status = String(productAdPipelineJob?.status || "").toUpperCase();
+    if (!status) return;
+    if (isFailedJobStatus(status)) {
+      setProductAdPipelineJobId(null);
+      addActivity("Product ad agent failed", activeProductIntelligenceBrief?.displayName || "Product campaign");
+      flash(productAdPipelineJob?.errorMessage || productAdPipelineJob?.message || "Product ad agent failed. Try again.", "error");
+      void refetchWallet?.();
+      return;
+    }
+    if (!isCompletedJobStatus(status)) return;
+
+    const result = productAdPipelineJob?.result || productAdPipelineJob?.outputPayload || {};
+    const enrichedBrief = productAdBriefFromPipelineResult(result, activeProductAdBrief);
+    if (enrichedBrief) {
+      setProductAdBrief(enrichedBrief);
+    }
+    const productWorkflowState = workflowStateFromProductAdPipelineResult(result, activeProductAdBrief);
+    if (productWorkflowState?.lockedBrief) {
+      setLockedBrief(productWorkflowState.lockedBrief);
+    }
+    if (productWorkflowState?.storyScriptIdea) {
+      setStoryScriptIdea(productWorkflowState.storyScriptIdea);
+      setSavedStoryIdeaId(productWorkflowState.storyScriptIdea.id || productWorkflowState.storyScriptIdea.storyIdeaId || null);
+    }
+    if (productWorkflowState?.scriptDetailIdea) {
+      setScriptDetailIdea(productWorkflowState.scriptDetailIdea);
+      setScreenplayApprovedForVideo(true);
+      dispatch(completeStep("ideas"));
+      dispatch(completeStep("script"));
+      dispatch(completeStep("screenplay"));
+    }
+    const preparedRunId = runIdFromVideoPayload(result?.screenplayVideoRunJob?.result)
+      || runIdFromVideoPayload(result?.screenplayVideoRunJob?.outputPayload)
+      || runIdFromVideoPayload(result?.screenplayVideoRunJob)
+      || runIdFromVideoPayload(result);
+    if (preparedRunId) {
+      setScreenplayVideoRunId(preparedRunId);
+    }
+    setProductAdPipelineJobId(null);
+    if (productWorkflowState?.scriptDetailIdea) {
+      setWorkspacePage("screenplay");
+      dispatch(setActiveStep("screenplay"));
+      window.history.replaceState(null, "", "/#screenplay");
+    }
+    addActivity("Product ad agent completed", enrichedBrief?.displayName || activeProductIntelligenceBrief?.displayName || "Product campaign");
+    flash("Product strategy, image anchors, dialogue, captions, and music plan are ready.", "success");
+    void refetchScreenplayVideoRun?.();
+    void refetchWallet?.();
+  }, [productAdPipelineJob?.status, productAdPipelineJob?.progress, refetchWallet]);
+
+  useEffect(() => {
     if (!shotPlanRetry?.availableAt) {
       setShotPlanRetrySeconds(0);
       return undefined;
@@ -1598,14 +2871,22 @@ export default function PlannerPage() {
       sceneCount: storyboardResult?.scenes?.length || 0,
     });
     if (storyboardResult) setGeneratedStoryboard(storyboardResult);
-    setStoryboardSaved(false);
+    setStoryboardSaved(true);
     setStoryboardJobId(null);
     dispatch(completeStep("storyboard"));
     if (isUuid(storyboardResult?.projectId || activeProjectId)) {
       dispatch(setProjectId(storyboardResult?.projectId || activeProjectId));
     }
     addActivity("Storyboard generated", selectedIdea?.title || "Locked idea");
-    flash("Storyboard, lighting build sheets, and DP camera sheets generated", "success");
+    if (productStoryboardMode && storyboardResult?.scenes?.length) {
+      void handleGenerateAllScreenplaySceneImages(storyboardResult.scenes);
+    }
+    flash(
+      productStoryboardMode
+        ? "Storyboard, lighting, and DP sheets generated. Product frames are now rendering."
+        : "Storyboard, lighting build sheets, and DP camera sheets generated",
+      "success"
+    );
     void refetchWallet?.();
     void refetchCreatorProjects?.();
     scrollToSection("storyboard");
@@ -1692,10 +2973,11 @@ export default function PlannerPage() {
     });
   };
 
-  const canRunPaidModelAction = (actionLabel = "paid AI generation") => {
+  const canRunPaidModelAction = (actionLabel = "paid AI generation", details = {}) => {
     if (walletLoading) return true;
-    if (walletHasPaidGenerationBalance) return true;
-    openRechargeForPaidAction(actionLabel);
+    const minimumBalance = Number(details.minimumBalance) > 0 ? Number(details.minimumBalance) : paidGenerationMinimumBalance;
+    if (walletBalanceAmount >= minimumBalance) return true;
+    openRechargeForPaidAction(actionLabel, { minimumBalance });
     return false;
   };
 
@@ -1707,8 +2989,194 @@ export default function PlannerPage() {
     flash(apiErrorMessage(error, fallback), "error");
   };
 
+  const clearCampaignAngleSelection = () => {
+    setCampaignAngleSuggestions([]);
+    setSelectedCampaignAngle(null);
+  };
+
+  const handleOriginalIdeaChange = (value) => {
+    setManualIdeaDraft(value);
+    clearCampaignAngleSelection();
+  };
+
+  const handleProductAdBriefChange = (value) => {
+    setProductAdBrief(normalizeProductAdBrief(value));
+    clearCampaignAngleSelection();
+  };
+
+  const handleUploadProductReferenceImages = async (selectedFiles = []) => {
+    const existingAssets = firstArray(activeProductAdBrief.imageAssets);
+    const remainingSlots = Math.max(0, 8 - productReferenceUrlsFromBrief(activeProductAdBrief).length);
+    const files = (Array.isArray(selectedFiles) ? selectedFiles : Array.from(selectedFiles || []))
+      .filter(Boolean)
+      .slice(0, remainingSlots);
+    if (!remainingSlots) {
+      flash("Remove a product image before adding another. You can attach up to 8.", "warning");
+      return;
+    }
+    if (!files.length) return;
+    const invalidFile = files.find((file) => !["image/jpeg", "image/png", "image/webp"].includes(String(file?.type || "").toLowerCase()));
+    if (invalidFile) {
+      flash("Product references must be JPG, PNG, or WebP images.", "error");
+      return;
+    }
+    try {
+      const optimizedFiles = await Promise.all(files.map(optimizeProductReferenceFile));
+      const result = await uploadProductReferenceImages(optimizedFiles).unwrap();
+      const uploadedAssets = firstArray(result?.images, result?.assets)
+        .filter((asset) => asset && typeof asset === "object");
+      const uploadedUrls = uniqueStrings([
+        ...splitProductImageUrls(result?.imageUrls),
+        ...uploadedAssets.map(productReferenceAssetUrl).filter(Boolean),
+      ]);
+      if (!uploadedAssets.length || !uploadedUrls.length) {
+        throw new Error("The upload completed without reusable product image details.");
+      }
+      setProductAdBrief((currentValue) => {
+        const current = normalizeProductAdBrief(currentValue);
+        const imageAssets = uniqueProductReferenceAssets([
+          ...firstArray(current.imageAssets),
+          ...uploadedAssets,
+        ]).slice(0, 8);
+        const sourceProductImageUrls = uniqueStrings([
+          ...splitProductImageUrls(current.sourceProductImageUrls || current.imageUrls),
+          ...uploadedUrls,
+        ]).slice(0, 8);
+        return normalizeProductAdBrief({
+          ...current,
+          imageAssets,
+          uploadedImageUrls: sourceProductImageUrls,
+          sourceProductImageUrls,
+          imageUrls: sourceProductImageUrls,
+        });
+      });
+      clearCampaignAngleSelection();
+      flash(`${uploadedAssets.length} product image${uploadedAssets.length === 1 ? "" : "s"} attached and ready for AI analysis.`, "success");
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not upload the product images."), "error");
+    }
+  };
+
+  const handleTopicTypeChange = (value) => {
+    setTopicType(value);
+    clearCampaignAngleSelection();
+  };
+
+  const handleGenerateCampaignAngles = async () => {
+    if (creativeFlow !== "guided") {
+      flash("Switch to Guided angle to video to generate campaign angles.", "error");
+      return;
+    }
+    const ideaText = String(manualIdeaDraft || "").trim();
+    if (!lockedBrief?.backendLocked || !isUuid(lockedBrief?.lockedIdeaId)) {
+      flash("Save the brief before generating campaign angles.", "error");
+      return;
+    }
+    if (!canRunPaidModelAction("AI campaign angle generation")) return;
+
+    try {
+      const result = await suggestCampaignAngles({
+        projectId: isUuid(lockedBrief?.projectId || activeProjectId) ? (lockedBrief?.projectId || activeProjectId) : undefined,
+        ideaText: ideaText || lockedBrief.description || lockedBrief.title,
+        topicType,
+        adFormat: activeProductAdBrief.adFormat,
+        campaignObjective: activeProductIntelligenceBrief?.campaignObjective,
+        targetAudience: firstString(
+          activeProductIntelligenceBrief?.productUnderstanding?.targetAudience,
+          activeProductIntelligenceBrief?.targetAudience
+        ),
+        productionStyle,
+        dialogueLanguage,
+        screenType,
+        storytellingType,
+        hookLens,
+        durationSeconds: selectedDuration,
+        selectedShotTypes: activeProductIntelligenceBrief?.selectedShotTypes || activeProductAdBrief.selectedShotTypes || [],
+        brandContext: brandContextFromProductIntelligence(activeProductIntelligenceBrief),
+        productIntelligenceBrief: hasActiveProductAdInput ? activeProductIntelligenceBrief : undefined,
+      }).unwrap();
+      const suggestions = (Array.isArray(result?.angles) ? result.angles : [])
+        .map((angle, index) => ({
+          ...angle,
+          id: angle?.id || `angle-${index + 1}`,
+          provider: result?.provider,
+          model: result?.model,
+          promptRunId: result?.promptRunId,
+        }))
+        .filter((angle) => angle.title && angle.description);
+      if (!suggestions.length) {
+        throw new Error("The AI response did not contain campaign angles.");
+      }
+      setCampaignAngleSuggestions(suggestions);
+      setSelectedCampaignAngle(null);
+      addActivity("AI campaign angles ready", `${suggestions.length} directions for ${lockedBrief.title || ideaText || activeProductIntelligenceBrief?.displayName || "your brief"}`);
+      flash("Choose one campaign angle to guide the full workflow.", "success");
+    } catch (error) {
+      handlePaidModelError(error, "Could not generate AI campaign angles.", "AI campaign angle generation");
+    }
+  };
+
+  const handleCampaignAngleSelect = async (angle) => {
+    if (!angle?.title || !angle?.description) return;
+    if (!lockedBrief?.backendLocked || !isUuid(lockedBrief?.lockedIdeaId)) {
+      flash("Save the brief before selecting a campaign angle.", "error");
+      return;
+    }
+    const selected = {
+      ...angle,
+      generatedBy: "ai",
+      selectedAt: new Date().toISOString(),
+    };
+    try {
+      const saved = await selectLockedCampaignAngle({
+        lockedIdeaId: lockedBrief.lockedIdeaId,
+        campaignAngle: selected,
+      }).unwrap();
+      setSelectedCampaignAngle(selected);
+      setLockedBrief((current) => ({
+        ...current,
+        campaignAngle: selected,
+        selectionPayload: saved?.selectionContext?.selectionPayload || current?.selectionPayload,
+      }));
+      if (hasActiveProductAdInput) {
+        setProductAdBrief((current) => normalizeProductAdBrief({ ...current, campaignAngle: selected }));
+      }
+    } catch (error) {
+      handlePaidModelError(error, "Could not save the selected campaign angle.", "campaign angle selection");
+      return;
+    }
+    addActivity("Campaign angle selected", selected.title);
+    flash(`Selected "${selected.title}". It will guide the generated story and scenes.`, "success");
+  };
+
   const buildIdeaSelectionPayload = ({ sourceType, idea, trend }) => {
     const isTrendSource = sourceType === "TREND";
+    const productIntelligenceBrief = !isTrendSource && hasActiveProductAdInput
+      ? buildProductIntelligenceBrief(activeProductAdBrief, manualIdeaDraft, {
+        countryCode: country.code,
+        durationSeconds: selectedDuration,
+        topicType,
+        productionStyle,
+        dialogueLanguage,
+        screenType,
+        storytellingType,
+        hookLens,
+        brollStyle,
+        captionStyle,
+        campaignAngle: activeCampaignAngle,
+      })
+      : null;
+    const productSelectionPayload = productIntelligenceBrief ? {
+      briefMode: PRODUCT_AD_BRIEF_MODE,
+      marketingAgentMode: true,
+      productInputKey: productAdInputKey(productIntelligenceBrief),
+      productIntelligenceBrief,
+      productUnderstanding: productIntelligenceBrief.productUnderstanding,
+      adConceptLanes: PRODUCT_AD_CONCEPT_LANES,
+      brandContext: brandContextFromProductIntelligence(productIntelligenceBrief),
+      campaignObjective: productIntelligenceBrief.campaignObjective,
+      campaignAngle: activeCampaignAngle,
+    } : {};
     const basePayload = {
       sourceType,
       projectId: activeProjectId,
@@ -1720,12 +3188,23 @@ export default function PlannerPage() {
       screenType,
       storytellingType,
       hookLens,
+      topicType,
+      ...activeVideoStylePayload,
       selectionPayload: {
         selectedFrom: isTrendSource ? "trend_cloud" : "own_idea",
         aiProvider: aiProviderContext,
         storytellingType,
         hookLens,
-        idea,
+        topicType,
+        campaignAngle: activeCampaignAngle,
+        ...activeVideoStylePayload,
+        ...productSelectionPayload,
+        idea: productIntelligenceBrief ? {
+          ...idea,
+          briefMode: PRODUCT_AD_BRIEF_MODE,
+          productInputKey: productAdInputKey(productIntelligenceBrief),
+          productIntelligenceBrief,
+        } : idea,
       },
     };
 
@@ -1778,6 +3257,10 @@ export default function PlannerPage() {
       durationSeconds: selectedDuration,
       storytellingType,
       hookLens,
+      topicType,
+      productIntelligenceBrief: productIntelligenceBriefFromEntity(brief) || activeProductIntelligenceBrief,
+      adConceptLanes: PRODUCT_AD_CONCEPT_LANES,
+      ...activeVideoStylePayload,
     });
     let usedFallback = false;
     let usedBalanceFallback = false;
@@ -1789,6 +3272,11 @@ export default function PlannerPage() {
           lockedIdeaId: brief.lockedIdeaId,
           page,
           size: ideaCandidatePageSize,
+          briefDescription: brief.description || brief.title,
+          topicType,
+          productIntelligenceBrief: productIntelligenceBriefFromEntity(brief) || activeProductIntelligenceBrief,
+          adConceptLanes: PRODUCT_AD_CONCEPT_LANES,
+          ...activeVideoStylePayload,
         }).unwrap();
         const jobId = acceptedJob?.jobId || acceptedJob?.id;
         if (!jobId) {
@@ -1834,6 +3322,11 @@ export default function PlannerPage() {
             lockedIdeaId: brief.lockedIdeaId,
             page,
             size: ideaCandidatePageSize,
+            briefDescription: brief.description || brief.title,
+            topicType,
+            productIntelligenceBrief: productIntelligenceBriefFromEntity(brief) || activeProductIntelligenceBrief,
+            adConceptLanes: PRODUCT_AD_CONCEPT_LANES,
+            ...activeVideoStylePayload,
           }).unwrap();
           return applyIdeaCandidatePage(result, page);
         } catch (error) {
@@ -1995,6 +3488,7 @@ export default function PlannerPage() {
 
   const handleStartNewIdea = () => {
     setManualIdeaDraft("");
+    setProductAdBrief(normalizeProductAdBrief());
     setLockedBrief(null);
     setLockedIdeaOptions([]);
     setIdeaCandidatePageItems([]);
@@ -2012,6 +3506,7 @@ export default function PlannerPage() {
     setShotPlanRetry(null);
     setShotPlanRetrySeconds(0);
     setIdeaGenerationJobId(null);
+    setVideoFinishingPlan(normalizeVideoFinishingPlan());
     setActorModalSignal(0);
     clearStoredIdeaGenerationJob();
     setWorkspacePage("ideas");
@@ -2152,12 +3647,19 @@ export default function PlannerPage() {
     }
     if (!canRunPaidModelAction("AI shot plan generation")) return;
     const focusedShotNumber = Number(options.focusedShotNumber || 0) || null;
+    const videoProvider = normalizeScreenplayVideoProvider(activeScreenplayVideoPayload.provider);
+    const videoModel = activeScreenplayVideoPayload.model;
+    const maxClipSeconds = maxClipSecondsForVideoProvider(videoProvider, videoModel);
 
     productionPlanStartInFlightRef.current = true;
     try {
       const job = await generateProductionPlansAsync({
         scriptId: scriptDetailIdea.scriptId,
         styleKey: "indian_creator_pencil",
+        videoProvider,
+        videoModel,
+        maxClipSeconds,
+        ...activeFounderAvatarPayload,
         ...(focusedShotNumber ? { focusedShotNumber } : {}),
       }).unwrap();
       const jobId = job?.jobId || job?.id;
@@ -2220,6 +3722,10 @@ export default function PlannerPage() {
         scriptId: scriptDetailIdea.scriptId,
         screenType: scriptDetailIdea.screenType || scriptDetailIdea.scriptJson?.screenType || screenType,
         signedUrlTtlSeconds: 604800,
+        videoProvider: activeScreenplayVideoPayload.provider,
+        videoModel: activeScreenplayVideoPayload.model,
+        maxClipSeconds: activeScreenplayVideoPayload.maxClipSeconds,
+        ...activeFounderAvatarPayload,
       }).unwrap();
       const jobId = job?.jobId || job?.id;
       if (!jobId) {
@@ -2229,7 +3735,12 @@ export default function PlannerPage() {
       setWorkspacePage("storyboard");
       dispatch(setActiveStep("storyboard"));
       addActivity("Shot generation started", `${productionPlanTags.length || "All"} shots queued`);
-      flash("Shot generation started. Storyboard, lighting, and DP cards will appear as the job progresses.", "success");
+      flash(
+        productStoryboardMode
+          ? "Shot generation started. Storyboard, lighting, DP, and product frames will appear as they complete."
+          : "Shot generation started. Storyboard, lighting, and DP cards will appear as the job progresses.",
+        "success"
+      );
       scrollToSection("storyboard");
     } catch (error) {
       const message = apiErrorMessage(error, "Shot generation failed. Check backend logs and try again.");
@@ -2241,6 +3752,59 @@ export default function PlannerPage() {
       });
       handlePaidModelError(error, message, "AI shot image generation");
     }
+  };
+
+  const handleUploadStoryboardReferenceImage = async (event) => {
+    const file = event?.target?.files?.[0];
+    if (event?.target) event.target.value = "";
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate and save the screenplay before attaching a storyboard reference image.", "error");
+      setWorkspacePage("screenplay");
+      dispatch(setActiveStep("screenplay"));
+      return null;
+    }
+    if (!file) return null;
+    setStoryboardReferenceUploadError("");
+    try {
+      const asset = await uploadScreenplayVideoReferenceImage({
+        scriptId: scriptDetailIdea.scriptId,
+        file,
+        details: storyboardReferenceDetails,
+        enhanceScreenplay: storyboardEnhanceWithReference,
+      }).unwrap();
+      const normalizedAsset = normalizeStoryboardReferenceAsset(asset);
+      setStoryboardReferenceAssets((current) => mergeStoryboardReferenceAssets(current, [normalizedAsset]));
+      setScriptDetailIdea((current) => applyStoryboardReferenceToScriptIdea(
+        current,
+        [normalizedAsset],
+        storyboardReferenceDetails,
+        storyboardEnhanceWithReference
+      ));
+      setStoryboardSaved(false);
+      addActivity("Storyboard reference attached", asset?.details || asset?.originalFilename || "Image anchor");
+      flash(
+        storyboardEnhanceWithReference
+          ? "Reference image attached and screenplay context enhanced for storyboard generation."
+          : "Reference image attached for storyboard generation.",
+        "success"
+      );
+      return asset;
+    } catch (error) {
+      const message = apiErrorMessage(error, "Could not upload the storyboard reference image.");
+      setStoryboardReferenceUploadError(message);
+      flash(message, "error");
+      return null;
+    }
+  };
+
+  const handleToggleStoryboardReferenceEnhancement = (enabled) => {
+    setStoryboardEnhanceWithReference(Boolean(enabled));
+    setScriptDetailIdea((current) => applyStoryboardReferenceToScriptIdea(
+      current,
+      storyboardReferenceAssets,
+      storyboardReferenceDetails,
+      Boolean(enabled)
+    ));
   };
 
   const handleShotPlansAction = () => {
@@ -2260,14 +3824,14 @@ export default function PlannerPage() {
     void handleGenerateStoryboard({ focusedShotNumber: shotPlanRetry?.shotNumber || fallbackShotNumber });
   };
 
-  const handleGenerateShotImage = async (scene, imageKind = "storyboard") => {
+  const handleGenerateShotImage = async (scene, imageKind = "storyboard", imageOptions = {}) => {
     if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
       flash("Generate screenplay before rendering images.", "error");
-      return;
+      return null;
     }
     if (shotPlanLoading) {
       flash("Shot plans are still generating. Please wait before rendering images.", "warning");
-      return;
+      return null;
     }
     const normalizedImageKind = normalizeImageAssetKind(imageKind);
     const shotNumber = Number(scene?.shotNumber || 1);
@@ -2276,24 +3840,137 @@ export default function PlannerPage() {
     if (!hasProductionPlanImageKindData(matchingPlan || scene, normalizedImageKind)) {
       const planLabel = normalizedImageKind === "dp" ? "camera/DP" : normalizedImageKind;
       flash(`Generate ${planLabel} shot plan JSON for shot ${shotNumber} before rendering this image.`, "error");
-      return;
+      return null;
     }
-    if (!canRunPaidModelAction(`${normalizedImageKind === "dp" ? "DP" : normalizedImageKind} image generation`)) return;
+    if (!canRunPaidModelAction(`${normalizedImageKind === "dp" ? "DP" : normalizedImageKind} image generation`)) return null;
     const loadingKey = shotImageLoadingKey(shotNumber, normalizedImageKind);
     setShotImageLoadingKeys((current) => current.includes(loadingKey) ? current : [...current, loadingKey]);
     try {
+      const requestedImagePrompt = firstText(
+        imageOptions.imagePrompt,
+        imageOptions.productImagePrompt,
+        scene?.productImagePrompt,
+        scene?.productionImagePrompt,
+        scene?.imagePrompt,
+        scene?.storyboardImagePrompt,
+        scene?.visualPrompt
+      );
+      const requestedReferenceImageUrls = uniqueStrings([
+        ...(Array.isArray(imageOptions.referenceImageUrls) ? imageOptions.referenceImageUrls : []),
+        ...(Array.isArray(imageOptions.productReferenceImageUrls) ? imageOptions.productReferenceImageUrls : []),
+        ...(Array.isArray(imageOptions.canonicalProductImageUrls) ? imageOptions.canonicalProductImageUrls : []),
+        ...(Array.isArray(scene?.visualReferenceImageUrls) ? scene.visualReferenceImageUrls : []),
+        ...(Array.isArray(scene?.visualReferenceImages)
+          ? scene.visualReferenceImages.map((asset) => firstText(asset?.signedUrl, asset?.publicUrl, asset?.assetUrl, asset?.url))
+          : []),
+        ...(normalizedImageKind === "production" && (imageOptions.productLed || productStoryboardMode || activeVideoFinishingPlan?.imageLedAdMode)
+          ? productReferenceUrlsFromBrief(storyboardProductBrief || activeProductIntelligenceBrief)
+          : []),
+      ]).slice(0, 9);
       const result = await generateShotImage({
         scriptId: scriptDetailIdea.scriptId,
         shotNumber,
         imageKind: normalizedImageKind,
         screenType: scriptDetailIdea.screenType || scriptDetailIdea.scriptJson?.screenType || screenType,
         signedUrlTtlSeconds: 604800,
+        imagePrompt: requestedImagePrompt,
+        productReferenceDetails: firstText(
+          imageOptions.referenceImageDetails,
+          imageOptions.productReferenceDetails,
+          storyboardReferenceDetails
+        ),
+        productReferenceImageUrls: requestedReferenceImageUrls,
+        ...(normalizedImageKind === "production" ? {
+          productLed: Boolean(imageOptions.productLed ?? (productStoryboardMode || activeVideoFinishingPlan?.imageLedAdMode)),
+        } : {}),
       }).unwrap();
       const resultScene = normalizeShotImageResult(result, scene, shotNumber, normalizedImageKind);
-      const normalizedScene = normalizeStoryboardResponse(
+      let normalizedScene = normalizeStoryboardResponse(
         { scenes: [resultScene], screenType: resultScene.screenType || result.screenType || screenType, renderWidth: resultScene.renderWidth || result.renderWidth, renderHeight: resultScene.renderHeight || result.renderHeight },
         scriptDetailIdea
       ).scenes[0];
+      if (normalizedImageKind === "storyboard") {
+        const storyboardImageUrl = firstText(
+          result?.storyboardImageUrl,
+          result?.storyboard_image_url,
+          result?.signedUrl,
+          result?.signed_url,
+          resultScene?.storyboardImageUrl,
+          resultScene?.storyboard_image_url,
+          resultScene?.signedUrl,
+          resultScene?.imageUrl,
+          resultScene?.assetUrl
+        );
+        const storyboardImageAsset = {
+          assetId: firstText(result?.imageAssetId, result?.image_asset_id, result?.storyboardImageAssetId, result?.storyboard_image_asset_id, resultScene?.imageAssetId, resultScene?.image_asset_id),
+          bucket: firstText(result?.bucket, resultScene?.bucket),
+          objectKey: firstText(result?.objectKey, result?.object_key, result?.storyboardObjectKey, result?.storyboard_object_key, resultScene?.objectKey, resultScene?.object_key),
+          contentType: firstText(result?.contentType, result?.content_type, resultScene?.contentType, resultScene?.content_type, "image/jpeg"),
+          assetUrl: storyboardImageUrl,
+          signedUrl: storyboardImageUrl,
+          publicUrl: storyboardImageUrl,
+          assetType: "STORYBOARD_IMAGE",
+          assetKind: "storyboard",
+          imageKind: "storyboard",
+        };
+        normalizedScene = {
+          ...normalizedScene,
+          imageKind: "storyboard",
+          storyboardImage: storyboardImageAsset,
+          storyboardImageUrl,
+          signedUrl: storyboardImageUrl,
+          imageUrl: storyboardImageUrl,
+          publicUrl: storyboardImageUrl,
+          assetUrl: storyboardImageUrl,
+          imageAssetId: storyboardImageAsset.assetId,
+          storyboardRevisionAt: new Date().toISOString(),
+        };
+      } else if (normalizedImageKind === "production") {
+        const productionImageUrl = firstText(
+          result?.productionImageUrl,
+          result?.production_image_url,
+          resultScene?.productionImageUrl,
+          resultScene?.production_image_url,
+          result?.signedUrl,
+          result?.signed_url,
+          resultScene?.signedUrl,
+          resultScene?.imageUrl,
+          resultScene?.assetUrl
+        );
+        const productionImagePrompt = firstText(
+          result?.productionImagePrompt,
+          result?.production_image_prompt,
+          resultScene?.productionImagePrompt,
+          resultScene?.production_image_prompt,
+          imageOptions.imagePrompt,
+          imageOptions.productImagePrompt,
+          scene?.productImagePrompt,
+          scene?.productionImagePrompt
+        );
+        const productionImageAsset = {
+          assetId: firstText(result?.productionImageAssetId, result?.production_image_asset_id, result?.imageAssetId, result?.image_asset_id, resultScene?.imageAssetId, resultScene?.image_asset_id),
+          bucket: firstText(result?.bucket, resultScene?.bucket),
+          objectKey: firstText(result?.productionObjectKey, result?.production_object_key, result?.objectKey, result?.object_key, resultScene?.objectKey, resultScene?.object_key),
+          contentType: firstText(result?.contentType, result?.content_type, resultScene?.contentType, resultScene?.content_type, "image/jpeg"),
+          assetUrl: productionImageUrl,
+          signedUrl: productionImageUrl,
+          publicUrl: productionImageUrl,
+          assetType: "PRODUCT_SCENE_FRAME",
+          assetKind: "generated_product_scene_frame",
+          referenceRole: "generated_product_scene_frame",
+        };
+        normalizedScene = {
+          ...normalizedScene,
+          imageKind: "production",
+          productionImage: productionImageAsset,
+          productionImageUrl,
+          generatedProductImageUrl: productionImageUrl,
+          generatedProductImageAssets: [productionImageAsset],
+          imageAnchorUrl: productionImageUrl,
+          productImagePrompt: productionImagePrompt,
+          productionImagePrompt,
+        };
+      }
       setGeneratedStoryboard((current) => {
         const baseScenes = current?.scenes?.length ? current.scenes : scenes;
         const updatedScenes = replaceSceneByShotNumber(baseScenes, normalizedScene);
@@ -2318,10 +3995,47 @@ export default function PlannerPage() {
       } : current);
       addActivity(`${normalizedImageKind.toUpperCase()} image rendered`, `Shot ${shotNumber}`);
       flash(`${normalizedImageKind === "dp" ? "DP" : normalizedImageKind} image generated for shot ${shotNumber}.`, "success");
+      return normalizedScene;
     } catch (error) {
-      handlePaidModelError(error, `Could not render ${normalizedImageKind} image for shot ${shotNumber}.`, `${normalizedImageKind === "dp" ? "DP" : normalizedImageKind} image generation`);
+      if (!imageOptions.suppressErrorFlash) {
+        handlePaidModelError(error, `Could not render ${normalizedImageKind} image for shot ${shotNumber}.`, `${normalizedImageKind === "dp" ? "DP" : normalizedImageKind} image generation`);
+      }
+      if (imageOptions.throwOnError) {
+        throw error;
+      }
+      return null;
     } finally {
       setShotImageLoadingKeys((current) => current.filter((key) => key !== loadingKey));
+    }
+  };
+
+  const handleGenerateAllScreenplaySceneImages = async (candidateScenes = [], options = {}) => {
+    if (productShotImagesGenerating) return;
+    const sourceScenes = Array.isArray(candidateScenes) && candidateScenes.length
+      ? candidateScenes
+      : scriptDetailIdea?.scriptScenes?.length
+        ? scriptDetailIdea.scriptScenes
+        : scriptDetailIdea?.scriptJson?.shots || scenes;
+    if (!sourceScenes.length) return;
+    setProductShotImagesGenerating(true);
+    let generatedCount = 0;
+    try {
+      for (const scene of sourceScenes) {
+        const existingImage = normalizeShotImageFields(scene).productionImageUrl;
+        if (options.force || !existingImage) {
+          const generated = await handleGenerateShotImage(scene, "production", {
+            productLed: true,
+            imagePrompt: defaultProductImagePrompt(scene),
+            productReferenceImageUrls: productReferenceUrlsFromBrief(storyboardProductBrief || activeProductIntelligenceBrief),
+          });
+          if (generated) generatedCount += 1;
+        }
+      }
+      if (generatedCount > 0) {
+        addActivity("Product frames generated", `${generatedCount} shot${generatedCount === 1 ? "" : "s"} ready`);
+      }
+    } finally {
+      setProductShotImagesGenerating(false);
     }
   };
 
@@ -3001,8 +4715,955 @@ export default function PlannerPage() {
     }
   };
 
+  const handleApproveScreenplayForVideo = async () => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate and save the screenplay before approval.", "error");
+      setWorkspacePage("screenplay");
+      dispatch(setActiveStep("screenplay"));
+      return false;
+    }
+    const lockedIdeaId = resolveWorkflowLockedIdeaId(scriptDetailIdea, storyScriptIdea, selectedIdea, lockedBrief);
+    const storyIdeaId = resolveWorkflowStoryIdeaId(scriptDetailIdea, storyScriptIdea, selectedIdea, { id: savedStoryIdeaId });
+    if (!isUuid(lockedIdeaId) || !isUuid(storyIdeaId)) {
+      flash("Backend screenplay approval needs the saved locked idea and story idea ids.", "error");
+      return false;
+    }
+    try {
+      const targetProvider = normalizeScreenplayVideoProvider(activeScreenplayVideoPayload.provider);
+      const targetModel = activeScreenplayVideoPayload.model;
+      const maxClipSeconds = maxClipSecondsForVideoProvider(targetProvider, targetModel);
+      const result = await approveScreenplay({
+        lockedIdeaId,
+        storyIdeaId,
+        scriptId: scriptDetailIdea.scriptId,
+        approvalSource: "creator_ui_video_generation",
+        targetProvider,
+        targetModel,
+        maxClipSeconds,
+        videoModelCapability: videoModelCapabilityForScreenplay(targetProvider, targetModel),
+        durationSeconds: selectedDuration,
+        screenType,
+        topicType,
+        ...activeScreenplayVideoPayload,
+      }).unwrap();
+      setScreenplayApprovedForVideo(true);
+      dispatch(completeStep("screenplay"));
+      setScriptDetailIdea((current) => current ? {
+        ...current,
+        lockedIdeaId,
+        storyIdeaId,
+        status: result?.status || result?.scriptStatus || "SCREENPLAY_APPROVED",
+        approval: result?.approval || result?.screenplayApproval || current.approval || null,
+      } : current);
+      addActivity("Screenplay approved", scriptDetailIdea?.title || "Video render");
+      flash("Screenplay approved for video generation.", "success");
+      return true;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Screenplay approval failed. The backend approval endpoint may not be available yet."), "error");
+      return false;
+    }
+  };
+
+  const handleGenerateScreenplayVideo = async (generationOptions = {}) => {
+    const preparingSceneWorkspace = generationOptions.prepareOnly === true
+      || generationOptions.generationWorkflow === "scene_by_scene";
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate and approve the screenplay before video generation.", "error");
+      setWorkspacePage("screenplay");
+      dispatch(setActiveStep("screenplay"));
+      return;
+    }
+    if (!effectiveScreenplayApprovedForVideo) {
+      flash("Approve the screenplay before preparing shot video generation.", "error");
+      return;
+    }
+    const activeRunScenes = Array.isArray(currentScreenplayVideoRun?.scenes)
+      ? currentScreenplayVideoRun.scenes
+      : Array.isArray(currentScreenplayVideoRun?.sceneClips)
+        ? currentScreenplayVideoRun.sceneClips
+        : [];
+    const resumingStoredRun = !generationOptions.forceNewRun
+      && activeRunScenes.some(screenplaySceneHasGeneratedClip)
+      && activeRunScenes.some((scene) => !screenplaySceneHasGeneratedClip(scene));
+    if (!preparingSceneWorkspace
+        && !resumingStoredRun
+        && !canRunPaidModelAction("60-second AI video production", { minimumBalance: creatorFlowMinimumBalance })) return;
+    const screenplayScenes = scriptDetailIdea?.scriptScenes?.length
+      ? scriptDetailIdea.scriptScenes
+      : scriptDetailIdea?.scriptJson?.shots?.length
+        ? scriptDetailIdea.scriptJson.shots
+        : scenes;
+    const sceneModeOverrides = normalizeVideoSceneModeOverrides(
+      generationOptions.sceneModeOverrides || {},
+      screenplayScenes,
+      productionStyle,
+      generationOptions.hybridSceneMode || hybridSceneMode
+    );
+    const requestedVideoFinishingPlan = normalizeVideoFinishingPlan(generationOptions.videoFinishingPlan || activeVideoFinishingPlan);
+    try {
+      const provider = normalizeScreenplayVideoProvider(generationOptions.provider || activeScreenplayVideoPayload.provider);
+      const model = generationOptions.model || activeScreenplayVideoPayload.model;
+      const maxClipSeconds = maxClipSecondsForVideoProvider(provider, model);
+      const job = await generateScreenplayVideoAsync({
+        scriptId: scriptDetailIdea.scriptId,
+        targetDurationSeconds: selectedDuration,
+        durationSeconds: selectedDuration,
+        screenType,
+        storytellingType,
+        hookLens,
+        topicType,
+        ...activeScreenplayVideoPayload,
+        ...generationOptions,
+        dialogueLanguage: generationOptions.dialogueLanguage || dialogueLanguage,
+        clientReview,
+        typographySystem: scriptDetailIdea?.scriptJson?.typographySystem || {},
+        overlayPlan: scriptDetailIdea?.scriptJson?.overlayPlan || [],
+        videoDirectorPlan: scriptDetailIdea?.scriptJson?.videoDirectorPlan || {},
+        planningPropagation: clientReview?.propagation || scriptDetailIdea?.scriptJson?.planningPropagation || {},
+        provider,
+        model,
+        maxClipSeconds,
+        videoModelCapability: videoModelCapabilityForScreenplay(provider, model),
+        modelCapabilities: videoModelCapabilityForScreenplay(provider, model),
+        dialogueTimingPolicy: dialogueTimingPolicyForModelCapability(maxClipSeconds),
+        forceNewRun: Boolean(generationOptions.forceNewRun),
+        billingConsent: Boolean(generationOptions.billingConsent),
+        videoFinishingPlan: requestedVideoFinishingPlan,
+        soundDesignPlan: soundDesignPlanFromVideoFinishingPlan(requestedVideoFinishingPlan),
+        imageLedAdPlan: imageLedAdPlanFromVideoFinishingPlan(requestedVideoFinishingPlan),
+        audioProductionPlan: audioProductionPlanFromVideoFinishingPlan(requestedVideoFinishingPlan),
+        editingPlan: editingPlanFromVideoFinishingPlan(requestedVideoFinishingPlan),
+        storyboardReferenceMode: generationOptions.storyboardReferenceMode || (requestedVideoFinishingPlan.useStoryboardReferences ? requestedVideoFinishingPlan.referenceImageMode : "ignore"),
+        referenceImageMode: generationOptions.referenceImageMode || requestedVideoFinishingPlan.referenceImageMode,
+        requireImageAnchors: Boolean(generationOptions.requireImageAnchors || requestedVideoFinishingPlan.requireImageAnchors),
+        sceneModeOverrides,
+        screenplayJson: scriptDetailIdea.scriptJson,
+        scenes: screenplayScenes,
+      }).unwrap();
+      const jobId = jobIdFromPayload(job);
+      const runId = runIdFromVideoPayload(job);
+      const returnedRun = videoRunFromPayload(job);
+      const resumedExistingRun = Boolean(returnedRun?.resumedAt || returnedRun?.resumeCount);
+      const jobStatus = String(job?.status || job?.jobStatus || "").toUpperCase();
+      if (jobId && jobStatus && !isCompletedJobStatus(jobStatus)) {
+        setScreenplayVideoJobId(jobId);
+      } else {
+        setScreenplayVideoJobId(null);
+      }
+      if (runId) setScreenplayVideoRunId(runId);
+      setWorkspacePage("video");
+      addActivity(
+        preparingSceneWorkspace
+          ? "Scene workspace prepared"
+          : resumedExistingRun
+            ? "Video queue resumed"
+            : generationOptions.billingConsent
+              ? "Paid full video rerun started"
+              : "Full video queue started",
+        preparingSceneWorkspace
+          ? `${screenplayScenes.length || "All"} scenes are ready for individual generation`
+          : resumedExistingRun
+            ? "Only missing shots will be generated"
+            : generationOptions.billingConsent
+              ? "A separate confirmed package run is generating"
+              : `${screenplayScenes.length || "All"} shots generating in sequence`
+      );
+      flash(
+        preparingSceneWorkspace
+          ? "Scene workspace ready. No video provider was called; generate and review one scene at a time."
+          : resumedExistingRun
+            ? "Resuming missing shots. Existing generated clips will not be submitted again."
+            : generationOptions.billingConsent
+              ? "Confirmed full-video rerun started. Its wallet charges will appear in the video ledger."
+              : "Full video generation started. Each completed shot will appear here automatically.",
+        "success"
+      );
+      scrollToSection("video");
+    } catch (error) {
+      handlePaidModelError(error, "Could not prepare the shot queue.", "Shot queue preparation");
+    }
+  };
+
+  const handleUploadScreenplayVideoReferenceImage = async ({ file, details } = {}) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate the screenplay before uploading reference images.", "error");
+      return null;
+    }
+    if (!file) {
+      flash("Choose a reference image to upload.", "error");
+      return null;
+    }
+    try {
+      const asset = await uploadScreenplayVideoReferenceImage({
+        scriptId: scriptDetailIdea.scriptId,
+        file,
+        details,
+      }).unwrap();
+      addActivity("Reference image uploaded", asset?.details || asset?.originalFilename || "Product visual anchor");
+      flash("Reference image attached for storyboard-level consistency.", "success");
+      return asset;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not upload the reference image."), "error");
+      return null;
+    }
+  };
+
+  const handleUploadFounderAvatarSource = async ({ file, details, providerMode, synthesiaAvatarId, synthesiaVoiceId, localVoiceModel, voiceProfileId, localTalkingAvatarModel, localLipSyncModel, localImageModel, localVideoModel, referenceTranscript, previewText, spokenText, pronunciationGuide, elevenLabsVoiceId, sarvamVoiceId, productionEnhancementEnabled, productionEnhancementPrompt, consentConfirmed, language, languageCode } = {}) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate the screenplay before uploading the founder source video.", "error");
+      return null;
+    }
+    if (!file) {
+      flash("Choose a founder source video to upload.", "error");
+      return null;
+    }
+    try {
+      const asset = await uploadScreenplayFounderAvatarSource({
+        scriptId: scriptDetailIdea.scriptId,
+        file,
+        details,
+        providerMode,
+        synthesiaAvatarId,
+        synthesiaVoiceId,
+        localVoiceModel,
+        voiceProfileId,
+        localTalkingAvatarModel,
+        localLipSyncModel,
+        localImageModel,
+        localVideoModel,
+        referenceTranscript,
+        previewText,
+        spokenText,
+        pronunciationGuide,
+        elevenLabsVoiceId,
+        sarvamVoiceId,
+        productionEnhancementEnabled,
+        productionEnhancementPrompt,
+        consentConfirmed,
+        language,
+        languageCode,
+      }).unwrap();
+      const normalizedProfile = normalizeFounderAvatarProfileForPlanning(asset?.founderAvatarProfile || asset?.profile || asset);
+      setFounderAvatarProfile(normalizedProfile);
+      setScriptDetailIdea((current) => applyFounderAvatarProfileToScriptIdea(current, normalizedProfile, asset));
+      addActivity("Founder avatar source uploaded", avatarProviderModeLabel(normalizedProfile.avatarProviderMode));
+      flash("Founder avatar kit saved for the hybrid video flow.", "success");
+      return asset;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not upload the founder source video."), "error");
+      return null;
+    }
+  };
+
+  const applyFounderProfileResult = (result) => {
+    const normalizedProfile = normalizeFounderAvatarProfileForPlanning(result?.founderAvatarProfile || result?.profile || result);
+    setFounderAvatarProfile(normalizedProfile);
+    setScriptDetailIdea((current) => applyFounderAvatarProfileToScriptIdea(current, normalizedProfile, normalizedProfile.sourceAsset || {}));
+    return normalizedProfile;
+  };
+
+  const applyFounderVoiceResult = (result, activityLabel) => {
+    const normalizedProfile = applyFounderProfileResult(result);
+    addActivity(activityLabel, voiceApprovalLabelForPlanning(normalizedProfile.voiceApprovalStatus));
+    return normalizedProfile;
+  };
+
+  const handleSelectFounderAvatar = async (avatar = {}) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate or open a saved screenplay before selecting an avatar.", "error");
+      return null;
+    }
+    const sourceScriptId = firstString(avatar.sourceScriptId, avatar.selectionKey, avatar.id);
+    if (!sourceScriptId) {
+      flash("Select a ready avatar. Create and approve one first.", "warning");
+      return null;
+    }
+    try {
+      const result = await selectReusableFounderAvatar({
+        scriptId: scriptDetailIdea.scriptId,
+        sourceScriptId,
+        avatarId: firstString(avatar.avatarId),
+      }).unwrap();
+      const normalizedProfile = normalizeFounderAvatarProfileForPlanning(result?.founderAvatarProfile || result?.profile || result);
+      setFounderAvatarProfile(normalizedProfile);
+      setScriptDetailIdea((current) => applyFounderAvatarProfileToScriptIdea(
+        current,
+        normalizedProfile,
+        normalizedProfile.sourceAsset || {}
+      ));
+      addActivity("Saved avatar selected", firstString(avatar.name, normalizedProfile.avatarId, "Founder avatar"));
+      flash("Avatar selected. Create avatar video will use the current screenplay dialogue.", "success");
+      return result;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not select the saved avatar."), "error");
+      return null;
+    }
+  };
+
+  const handlePrepareFounderEnglishDialogue = async (request = {}) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate the screenplay before preparing English dialogue.", "error");
+      return null;
+    }
+    if (!canRunPaidModelAction("English dialogue translation")) return null;
+    try {
+      const result = await prepareFounderEnglishDialogue({
+        scriptId: scriptDetailIdea.scriptId,
+        sourceDialogueLanguage: firstString(
+          request.sourceDialogueLanguage,
+          scriptDetailIdea?.dialogueLanguage,
+          scriptDetailIdea?.scriptJson?.dialogueLanguage,
+          dialogueLanguage,
+          "Hinglish"
+        ),
+        dialogueText: request.dialogueText,
+        avatarScript: request.dialogueText,
+        voiceModel: "client_rvc_english",
+        voiceProfileId: firstString(request.voiceProfileId, "founder_female_v1"),
+        founderAvatarProfile: activeFounderAvatarProfile,
+      }).unwrap();
+      const normalized = applyFounderVoiceResult(result, "English avatar dialogue prepared");
+      setDialogueLanguage("English");
+      flash("English dialogue is ready. Review it, then generate the client voice preview.", "success");
+      return normalized;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not prepare the current dialogue in English."), "error");
+      return null;
+    }
+  };
+
+  const handleGenerateFounderVoicePreview = async (voiceRequest = {}) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate the screenplay before preparing a founder voice.", "error");
+      return null;
+    }
+    if (!canRunPaidModelAction("Founder voice preview")) return null;
+    try {
+      const result = await generateFounderVoicePreview({
+        scriptId: scriptDetailIdea.scriptId,
+        ...voiceRequest,
+      }).unwrap();
+      applyFounderVoiceResult(result, "Founder voice preview ready");
+      flash("Mastered voice preview is ready. Approve it to create the lip-sync avatar preview.", "success");
+      return result;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not generate the founder voice preview."), "error");
+      return null;
+    }
+  };
+
+  const handleFounderVoiceDecision = async (decision, voiceRequest = {}) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) return null;
+    try {
+      const result = await approveFounderVoicePreview({
+        scriptId: scriptDetailIdea.scriptId,
+        decision,
+        ...voiceRequest,
+      }).unwrap();
+      const normalized = applyFounderVoiceResult(result, decision === "APPROVE" ? "Founder voice approved" : "Founder voice needs changes");
+      flash(decision === "APPROVE" ? "Founder voice approved. Create the fal.ai lip-sync preview next." : "Voice approval reset. Generate another preview.", decision === "APPROVE" ? "success" : "info");
+      return normalized;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not update founder voice approval."), "error");
+      return null;
+    }
+  };
+
+  const handlePrepareFounderAvatarPortrait = async ({
+    file,
+    sourceMode = "extract",
+    timestampSeconds = 0.5,
+    consentConfirmed = false,
+  } = {}) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate the screenplay before preparing an avatar portrait.", "error");
+      return null;
+    }
+    try {
+      const result = await prepareFounderAvatarPortrait({
+        scriptId: scriptDetailIdea.scriptId,
+        file,
+        sourceMode,
+        timestampSeconds,
+        consentConfirmed,
+      }).unwrap();
+      const normalized = applyFounderProfileResult(result);
+      addActivity(
+        sourceMode === "upload" ? "Founder portrait uploaded" : "Founder portrait extracted",
+        "Avatar test portrait ready"
+      );
+      flash("Founder portrait is ready. Review it before running the avatar quality test.", "success");
+      return normalized;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not prepare the founder portrait."), "error");
+      return null;
+    }
+  };
+
+  const handleGenerateFounderAvatarTest = async (testRequest = {}) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate the screenplay before creating an avatar test.", "error");
+      return null;
+    }
+    if (!canRunPaidModelAction("5-second avatar quality test")) return null;
+    try {
+      const result = await generateFounderAvatarTest({
+        scriptId: scriptDetailIdea.scriptId,
+        durationSeconds: 5,
+        aspectRatio: firstString(
+          testRequest.aspectRatio,
+          scriptDetailIdea?.aspectRatio,
+          scriptDetailIdea?.scriptJson?.aspectRatio,
+          "9:16"
+        ),
+        portraitMode: testRequest.portraitMode,
+        motionPrompt: testRequest.motionPrompt,
+        previewText: testRequest.previewText,
+        talkingAvatarModel: testRequest.talkingAvatarModel,
+        lipSyncModel: testRequest.lipSyncModel,
+        avatarResolution: testRequest.avatarResolution,
+        talkingStyle: testRequest.talkingStyle,
+      }).unwrap();
+      const normalized = applyFounderProfileResult(result);
+      addActivity(
+        "Founder avatar quality test ready",
+        testRequest.talkingAvatarModel === "fal_heygen_avatar4"
+          ? "HeyGen Avatar IV"
+          : testRequest.lipSyncModel === "fal_musetalk"
+            ? "HappyHorse 1.1 + MuseTalk"
+            : "HappyHorse 1.1 + LatentSync"
+      );
+      flash("Avatar test is ready in the Avatar panel. Review or download the result.", "success");
+      return normalized;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not create the founder avatar quality test."), "error");
+      return null;
+    }
+  };
+
+  const handleGenerateFounderAvatarPreview = async (previewRequest = {}) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate the screenplay before creating an avatar preview.", "error");
+      return null;
+    }
+    if (!canRunPaidModelAction("Avatar lip-sync preview")) return null;
+    try {
+      const result = await generateFounderAvatarPreview({
+        scriptId: scriptDetailIdea.scriptId,
+        durationSeconds: 8,
+        aspectRatio: firstString(
+          previewRequest.aspectRatio,
+          scriptDetailIdea?.aspectRatio,
+          scriptDetailIdea?.scriptJson?.aspectRatio,
+          "9:16"
+        ),
+        previewText: previewRequest.previewText,
+      }).unwrap();
+      const normalized = applyFounderProfileResult(result);
+      addActivity("Founder lip-sync preview ready", avatarApprovalLabelForPlanning(normalized.avatarPreviewStatus));
+      flash("fal.ai lip-sync preview is ready in the Avatar panel. Review and approve it before the full run.", "success");
+      return result;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not create the founder lip-sync preview."), "error");
+      return null;
+    }
+  };
+
+  const handleFounderAvatarDecision = async (decision) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) return null;
+    try {
+      const result = await approveFounderAvatarPreview({
+        scriptId: scriptDetailIdea.scriptId,
+        decision,
+      }).unwrap();
+      const normalized = applyFounderProfileResult(result);
+      addActivity(
+        decision === "APPROVE" ? "Founder avatar approved" : "Founder avatar needs changes",
+        avatarApprovalLabelForPlanning(normalized.avatarPreviewStatus)
+      );
+      flash(
+        decision === "APPROVE"
+          ? "Avatar approved. You can edit the final dialogue and run the founder video pipeline."
+          : "Avatar preview rejected. Create another lip-sync preview when ready.",
+        decision === "APPROVE" ? "success" : "info"
+      );
+      return normalized;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not update avatar preview approval."), "error");
+      return null;
+    }
+  };
+
+  const handleUploadFounderFinalAudio = async ({ file, captionText, consentConfirmed } = {}) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate the screenplay before uploading founder audio.", "error");
+      return null;
+    }
+    if (!file) return null;
+    try {
+      const result = await uploadFounderFinalAudio({
+        scriptId: scriptDetailIdea.scriptId,
+        file,
+        captionText,
+        consentConfirmed,
+      }).unwrap();
+      applyFounderVoiceResult(result, "Exact founder audio uploaded");
+      flash("Exact founder audio saved and approved for lip-sync.", "success");
+      return result;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not upload the founder audio."), "error");
+      return null;
+    }
+  };
+
+  const handleChatScreenplayVideoScene = async (scene, message, sceneOptions = {}) => {
+    const runId = activeScreenplayVideoRunId;
+    const sceneId = scene?.id || scene?.sceneId || scene?.scene_id;
+    if (!runId || !sceneId) {
+      flash("Prepare the video run before editing an individual shot.", "error");
+      return;
+    }
+    if (!canRunPaidModelAction("Scene chat improvement")) return;
+    try {
+      const provider = normalizeScreenplayVideoProvider(sceneOptions.provider || activeScreenplayVideoPayload.provider);
+      const model = sceneOptions.model || activeScreenplayVideoPayload.model;
+      const maxClipSeconds = maxClipSecondsForVideoProvider(provider, model);
+      const result = await chatScreenplayVideoScene({
+        runId,
+        sceneId,
+        message,
+        editRequest: message,
+        sceneNumber: scene?.sceneNumber,
+        ...activeScreenplayVideoPayload,
+        ...sceneOptions,
+        provider,
+        model,
+        maxClipSeconds,
+        videoModelCapability: videoModelCapabilityForScreenplay(provider, model),
+        dialogueTimingPolicy: dialogueTimingPolicyForModelCapability(maxClipSeconds),
+        generationMode: videoGenerationModeForStyle(productionStyle, sceneOptions.generationMode),
+      }).unwrap();
+      const nextRunId = runIdFromVideoPayload(result);
+      if (nextRunId) setScreenplayVideoRunId(nextRunId);
+      addActivity("Scene edit saved", scene?.title || `Scene ${scene?.sceneNumber || ""}`.trim());
+      flash("Scene edit request saved.", "success");
+      void refetchScreenplayVideoRun?.();
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not save the scene edit request."), "error");
+    }
+  };
+
+  const handleRegenerateScreenplayVideoScene = async (scene, sceneOptions = {}) => {
+    const runId = activeScreenplayVideoRunId;
+    const sceneId = scene?.id || scene?.sceneId || scene?.scene_id;
+    if (!runId || !sceneId) {
+      flash("Prepare the video run before generating a shot.", "error");
+      return;
+    }
+    if (!effectiveScreenplayApprovedForVideo) {
+      flash("Approve the screenplay before generating shot video.", "error");
+      return;
+    }
+    const sceneHasClip = screenplaySceneHasGeneratedClip(scene);
+    if (!canRunPaidModelAction(sceneHasClip ? "Paid shot regeneration" : "Shot generation")) return;
+    setScreenplayVideoActiveSceneId(sceneId);
+    try {
+      const provider = normalizeScreenplayVideoProvider(sceneOptions.provider || activeScreenplayVideoPayload.provider);
+      const model = sceneOptions.model || activeScreenplayVideoPayload.model;
+      const maxClipSeconds = maxClipSecondsForVideoProvider(provider, model);
+      const job = await (sceneHasClip ? regenerateScreenplayVideoSceneAsync : generateScreenplayVideoSceneAsync)({
+        runId,
+        sceneId,
+        sceneNumber: scene?.sceneNumber,
+        ...activeScreenplayVideoPayload,
+        ...sceneOptions,
+        provider,
+        model,
+        maxClipSeconds,
+        videoModelCapability: videoModelCapabilityForScreenplay(provider, model),
+        dialogueTimingPolicy: dialogueTimingPolicyForModelCapability(maxClipSeconds),
+        generationMode: videoGenerationModeForStyle(productionStyle, sceneOptions.generationMode),
+        billingConsent: Boolean(sceneOptions.billingConsent),
+      }).unwrap();
+      const jobId = jobIdFromPayload(job);
+      const nextRunId = runIdFromVideoPayload(job);
+      if (jobId) setScreenplayVideoSceneJobId(jobId);
+      if (nextRunId) setScreenplayVideoRunId(nextRunId);
+      addActivity(sceneHasClip ? "Shot regeneration started" : "Shot generation started", scene?.title || `Shot ${scene?.sceneNumber || ""}`.trim());
+      flash(sceneHasClip ? "Shot regeneration started." : "Shot generation started.", "success");
+    } catch (error) {
+      setScreenplayVideoActiveSceneId(null);
+      handlePaidModelError(error, "Could not generate this shot.", "Shot generation");
+    }
+  };
+
+  const handleGenerateScreenplaySceneDialogueVoice = async (scene, voiceOptions = {}) => {
+    const runId = activeScreenplayVideoRunId;
+    const sceneId = scene?.id || scene?.sceneId || scene?.scene_id;
+    if (!runId || !sceneId) {
+      flash("Prepare the video run before cloning scene dialogue.", "error");
+      return null;
+    }
+    if (!canRunPaidModelAction("Scene dialogue voice clone")) return null;
+    try {
+      const result = await generateScreenplaySceneDialogueVoice({
+        runId,
+        sceneId,
+        ...voiceOptions,
+      }).unwrap();
+      addActivity("Scene dialogue cloned", scene?.title || `Scene ${scene?.sceneNumber || ""}`.trim());
+      flash("Cloned dialogue is ready. Play it and accept it before creating the avatar.", "success");
+      void refetchScreenplayVideoRun?.();
+      return result;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not clone this scene dialogue."), "error");
+      return null;
+    }
+  };
+
+  const handleDecideScreenplaySceneDialogueVoice = async (scene, decision) => {
+    const runId = activeScreenplayVideoRunId;
+    const sceneId = scene?.id || scene?.sceneId || scene?.scene_id;
+    if (!runId || !sceneId) return null;
+    try {
+      const result = await decideScreenplaySceneDialogueVoice({
+        runId,
+        sceneId,
+        decision,
+      }).unwrap();
+      addActivity(
+        decision === "APPROVE" ? "Scene dialogue accepted" : "Scene dialogue rejected",
+        scene?.title || `Scene ${scene?.sceneNumber || ""}`.trim()
+      );
+      flash(
+        decision === "APPROVE"
+          ? "Scene dialogue accepted. Create avatar is now enabled."
+          : "Scene dialogue rejected. Generate another clone.",
+        decision === "APPROVE" ? "success" : "warning"
+      );
+      void refetchScreenplayVideoRun?.();
+      return result;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not update the scene dialogue decision."), "error");
+      return null;
+    }
+  };
+
+  const handleCombineScreenplaySceneDialogueAudio = async () => {
+    const runId = activeScreenplayVideoRunId;
+    if (!runId) {
+      flash("Prepare the video run before combining scene dialogue.", "error");
+      return null;
+    }
+    try {
+      const result = await combineScreenplaySceneDialogueAudio({ runId }).unwrap();
+      const included = Number(result?.includedSceneCount || 0);
+      const total = Number(result?.totalSceneCount || 0);
+      addActivity("Scene dialogue combined", `${included || 0} of ${total || included || 0} tracks`);
+      flash(
+        included < total
+          ? `Combined ${included} of ${total} scene dialogue tracks. Missing scenes were skipped.`
+          : "All scene dialogue audio is combined and ready to download.",
+        "success"
+      );
+      void refetchScreenplayVideoRun?.();
+      return result;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not combine the available scene dialogue audio."), "error");
+      return null;
+    }
+  };
+
+  const handleUploadScreenplaySceneAvatarImage = async (scene, file) => {
+    const runId = activeScreenplayVideoRunId;
+    const sceneId = scene?.id || scene?.sceneId || scene?.scene_id;
+    if (!runId || !sceneId || !file) return null;
+    try {
+      const result = await uploadScreenplaySceneAvatarImage({ runId, sceneId, file }).unwrap();
+      addActivity("Scene avatar image uploaded", scene?.title || `Scene ${scene?.sceneNumber || ""}`.trim());
+      flash("Avatar image attached to this scene.", "success");
+      void refetchScreenplayVideoRun?.();
+      return result;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not upload the scene avatar image."), "error");
+      return null;
+    }
+  };
+
+  const handleUploadScreenplaySceneProductionImage = async (scene, file, details) => {
+    const runId = activeScreenplayVideoRunId;
+    const sceneId = scene?.id || scene?.sceneId || scene?.scene_id;
+    if (!runId || !sceneId || !file) return null;
+    try {
+      const result = await uploadScreenplaySceneProductionImage({ runId, sceneId, file, details }).unwrap();
+      addActivity("Scene image uploaded", scene?.title || `Scene ${scene?.sceneNumber || ""}`.trim());
+      flash("Image attached to this AI scene.", "success");
+      void refetchScreenplayVideoRun?.();
+      return result;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not upload the scene image."), "error");
+      return null;
+    }
+  };
+
+  const handleRenderScreenplayFinalVideo = async (renderOptions = {}) => {
+    const runId = activeScreenplayVideoRunId;
+    if (!runId) {
+      flash("Generate all shot clips before merging the final video.", "error");
+      return;
+    }
+    if (!canRunPaidModelAction("Final video merge")) return;
+    const requestedVideoFinishingPlan = normalizeVideoFinishingPlan(renderOptions.videoFinishingPlan || activeVideoFinishingPlan);
+    const {
+      targetDurationSeconds: _ignoredTargetDurationSeconds,
+      durationSeconds: _ignoredDurationSeconds,
+      ...finalMergePayload
+    } = activeScreenplayVideoPayload;
+    try {
+      const job = await renderScreenplayVideoFinalAsync({
+        runId,
+        renderMode: "MERGE_SCENE_CLIPS",
+        ...finalMergePayload,
+        provider: normalizeScreenplayVideoProvider(renderOptions.provider || activeScreenplayVideoPayload.provider),
+        model: renderOptions.model || activeScreenplayVideoPayload.model,
+        videoFinishingPlan: requestedVideoFinishingPlan,
+        soundDesignPlan: soundDesignPlanFromVideoFinishingPlan(requestedVideoFinishingPlan),
+        imageLedAdPlan: imageLedAdPlanFromVideoFinishingPlan(requestedVideoFinishingPlan),
+        audioProductionPlan: audioProductionPlanFromVideoFinishingPlan(requestedVideoFinishingPlan),
+        editingPlan: editingPlanFromVideoFinishingPlan(requestedVideoFinishingPlan),
+        storyboardReferenceMode: requestedVideoFinishingPlan.useStoryboardReferences ? requestedVideoFinishingPlan.referenceImageMode : "ignore",
+        referenceImageMode: requestedVideoFinishingPlan.referenceImageMode,
+        requireImageAnchors: requestedVideoFinishingPlan.requireImageAnchors,
+        acceptedSceneIds: Array.isArray(renderOptions.acceptedSceneIds) ? renderOptions.acceptedSceneIds : [],
+        acceptedClipKeys: Array.isArray(renderOptions.acceptedClipKeys) ? renderOptions.acceptedClipKeys : [],
+        requireAcceptedScenes: Boolean(renderOptions.requireAcceptedScenes),
+      }).unwrap();
+      const jobId = jobIdFromPayload(job);
+      const nextRunId = runIdFromVideoPayload(job);
+      if (jobId) setScreenplayVideoFinalJobId(jobId);
+      if (nextRunId) setScreenplayVideoRunId(nextRunId);
+      addActivity("Final video merge started", scriptDetailIdea?.title || "Screenplay video");
+      flash("Final video merge started.", "success");
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not start final video merge."), "error");
+    }
+  };
+
+  const handleGenerateScreenplayAudioPack = async (audioOptions = {}) => {
+    const runId = activeScreenplayVideoRunId;
+    if (!runId) {
+      flash("Prepare the video run before generating audio.", "error");
+      return;
+    }
+    const audioRequestType = audioOptions.audioRequestType || (
+      audioOptions.generateDialogue === false || audioOptions.generateVoice === false ? "background_music" : "dialogue"
+    );
+    const requestedMusicSource = normalizeAudioMusicSource(audioOptions.musicSource || audioOptions.backgroundMusicSource || "free_licensed");
+    const shouldGenerateDialogue = audioOptions.generateDialogue !== false && audioOptions.generateVoice !== false;
+    const shouldGenerateAiMusic = requestedMusicSource === "ai_generated" && audioOptions.generateMusic !== false;
+    if (shouldGenerateDialogue || shouldGenerateAiMusic) {
+      const label = shouldGenerateDialogue && shouldGenerateAiMusic
+        ? "Dialogue and AI music generation"
+        : shouldGenerateDialogue
+          ? "Dialogue generation"
+          : "AI music generation";
+      if (!canRunPaidModelAction(label)) return;
+    }
+    const requestedVideoFinishingPlan = normalizeVideoFinishingPlan(activeVideoFinishingPlan);
+    try {
+      const job = await generateScreenplayVideoAudioPackAsync({
+        runId,
+        audioRequestType,
+        voiceProvider: activeDialogueVoiceProfile.voiceProvider || "google_chirp",
+        musicProvider: "google_lyria",
+        ...activeDialogueVoiceProfile,
+        ...(audioRequestType === "dialogue" ? { preserveExistingMusic: true } : {
+          musicSource: requestedMusicSource,
+          backgroundMusicSource: requestedMusicSource,
+        }),
+        musicLayerType: audioOptions.musicLayerType || "background_music",
+        backgroundMusicPrompt: audioOptions.backgroundMusicPrompt || requestedVideoFinishingPlan.backgroundMusicPrompt,
+        musicPrompt: audioOptions.musicPrompt || requestedVideoFinishingPlan.backgroundMusicPrompt,
+        generateDialogue: shouldGenerateDialogue,
+        generateVoice: shouldGenerateDialogue,
+        forceRegenerateDialogue: Boolean(audioOptions.forceRegenerateDialogue),
+        generateMusic: shouldGenerateAiMusic,
+        generateAiMusic: shouldGenerateAiMusic,
+        durationSeconds: selectedDuration,
+        targetDurationSeconds: selectedDuration,
+        dialogueLanguage,
+        screenType,
+        provider: normalizeScreenplayVideoProvider(activeScreenplayVideoPayload.provider),
+        model: activeScreenplayVideoPayload.model,
+        videoFinishingPlan: requestedVideoFinishingPlan,
+        soundDesignPlan: soundDesignPlanFromVideoFinishingPlan(requestedVideoFinishingPlan),
+        audioProductionPlan: audioProductionPlanFromVideoFinishingPlan(requestedVideoFinishingPlan),
+        editingPlan: editingPlanFromVideoFinishingPlan(requestedVideoFinishingPlan),
+        srt: scriptDetailIdea?.scriptJson?.srt,
+        srtFile: scriptDetailIdea?.scriptJson?.srtFile,
+        srtCues: scriptDetailIdea?.scriptJson?.srtCues,
+        screenplayJson: scriptDetailIdea?.scriptJson,
+      }).unwrap();
+      const jobId = jobIdFromPayload(job);
+      const nextRunId = runIdFromVideoPayload(job);
+      if (jobId) setScreenplayVideoAudioJobId(jobId);
+      if (nextRunId) setScreenplayVideoRunId(nextRunId);
+      addActivity(audioRequestType === "background_music" ? "Background music preparation started" : "Dialogue voice generation started", scriptDetailIdea?.title || "Screenplay video");
+      if (shouldGenerateAiMusic) {
+        flash("Generating background music with Google Lyria.", "success");
+      } else if (shouldGenerateDialogue) {
+        flash(
+          activeDialogueVoiceProfile.voiceProvider === "dalai_llama"
+            ? "Generating the founder voice clone with DalaiLlama Voice."
+            : "Generating or syncing dialogue voiceover with Google Chirp.",
+          "success"
+        );
+      } else {
+        flash(requestedMusicSource === "none" ? "Background music will be skipped for this run." : "Preparing background music selection plan.", "success");
+      }
+    } catch (error) {
+      handlePaidModelError(error, "Could not start audio preparation.", audioRequestType === "background_music" ? "Background music preparation" : "Dialogue generation");
+    }
+  };
+
+  const handleSubmitScreenplayReview = async ({ requesterNotes } = {}) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate and save the screenplay before sending it for human review.", "error");
+      setWorkspacePage("screenplay");
+      dispatch(setActiveStep("screenplay"));
+      return;
+    }
+    if (!canRunPaidModelAction("Human screenplay review", { minimumBalance: screenplayReviewMinimumBalance })) return;
+    const lockedIdeaId = resolveWorkflowLockedIdeaId(scriptDetailIdea, storyScriptIdea, selectedIdea, lockedBrief);
+    const storyIdeaId = resolveWorkflowStoryIdeaId(scriptDetailIdea, storyScriptIdea, selectedIdea, { id: savedStoryIdeaId });
+    try {
+      await submitHumanWorkOrder({
+        workType: "SCREENPLAY_REVIEW",
+        scriptId: scriptDetailIdea.scriptId,
+        lockedIdeaId,
+        storyIdeaId,
+        projectId: scriptDetailIdea?.projectId || activeProjectId || lockedBrief?.projectId,
+        title: `Screenplay review: ${scriptDetailIdea?.title || scriptDetailIdea?.scriptJson?.projectTitle || "Untitled video"}`,
+        description: "Human expert review for hook, structure, dialogue, pacing, and production clarity.",
+        requesterNotes: requesterNotes || "Please improve this screenplay for stronger retention, clearer visuals, and production-ready scene detail.",
+        sourcePayload: {
+          brief: lockedBrief,
+          screenplay: scriptDetailIdea,
+          scenes: scriptDetailIdea?.scriptScenes?.length ? scriptDetailIdea.scriptScenes : scriptDetailIdea?.scriptJson?.shots || scenes,
+          style: activeVideoStylePayload,
+          durationSeconds: selectedDuration,
+          screenType,
+          topicType,
+        },
+      }).unwrap();
+      addActivity("Human screenplay review submitted", scriptDetailIdea?.title || "Screenplay");
+      flash("Screenplay sent for human review.", "success");
+      void refetchHumanWorkOrders?.();
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not submit screenplay for human review."), "error");
+    }
+  };
+
+  const handleSubmitEditingJob = async ({ requesterNotes } = {}) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate the screenplay before creating an editing job.", "error");
+      return;
+    }
+    const runId = currentScreenplayVideoRun?.runId || currentScreenplayVideoRun?.id || activeScreenplayVideoRunId;
+    const finalClipUrl = finalVideoUrlFromPayload(currentScreenplayVideoRun)
+      || finalVideoUrlFromPayload(screenplayVideoFinalJob?.result)
+      || finalVideoUrlFromPayload(screenplayVideoFinalJob?.outputPayload);
+    if (!runId || !finalClipUrl) {
+      flash("Combine accepted clips before sending the video to an editor.", "error");
+      return;
+    }
+    const lockedIdeaId = resolveWorkflowLockedIdeaId(scriptDetailIdea, storyScriptIdea, selectedIdea, lockedBrief);
+    const storyIdeaId = resolveWorkflowStoryIdeaId(scriptDetailIdea, storyScriptIdea, selectedIdea, { id: savedStoryIdeaId });
+    try {
+      await submitHumanWorkOrder({
+        workType: "EDITING_JOB",
+        scriptId: scriptDetailIdea.scriptId,
+        videoRunId: runId,
+        lockedIdeaId,
+        storyIdeaId,
+        projectId: scriptDetailIdea?.projectId || activeProjectId || lockedBrief?.projectId,
+        title: `Editor job: ${scriptDetailIdea?.title || scriptDetailIdea?.scriptJson?.projectTitle || "Final video"}`,
+        description: "Freelancer editing handoff with final clip, shot clips, voice/music/caption plan, and revision notes.",
+        requesterNotes: requesterNotes || "Please polish the final video, tighten pacing, balance music/voice, verify captions, and return an edited master.",
+        priceAmount: 0,
+        priceCurrency: "INR",
+        sourcePayload: {
+          brief: lockedBrief,
+          screenplay: scriptDetailIdea,
+          videoRun: currentScreenplayVideoRun,
+          finalClipUrl,
+          scenes: scriptDetailIdea?.scriptScenes?.length ? scriptDetailIdea.scriptScenes : scriptDetailIdea?.scriptJson?.shots || scenes,
+          acceptedShotSequence,
+          videoFinishingPlan: activeVideoFinishingPlan,
+          soundDesignPlan: soundDesignPlanFromVideoFinishingPlan(activeVideoFinishingPlan),
+          imageLedAdPlan: imageLedAdPlanFromVideoFinishingPlan(activeVideoFinishingPlan),
+          audioProductionPlan: audioProductionPlanFromVideoFinishingPlan(activeVideoFinishingPlan),
+          editingPlan: editingPlanFromVideoFinishingPlan(activeVideoFinishingPlan),
+          style: activeVideoStylePayload,
+          provider: activeScreenplayVideoPayload.provider,
+          model: activeScreenplayVideoPayload.model,
+          durationSeconds: selectedDuration,
+          screenType,
+          topicType,
+        },
+      }).unwrap();
+      addActivity("Editing job submitted", scriptDetailIdea?.title || "Final video");
+      flash("Editing job sent to the freelancer queue. Basic editing is included in this AI video package.", "success");
+      void refetchHumanWorkOrders?.();
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not submit the editing job."), "error");
+    }
+  };
+
+  const handleRequestEditingChanges = async (workOrder, message) => {
+    const workOrderId = workOrder?.workOrderId || workOrder?.id;
+    const cleanMessage = String(message || "").trim();
+    if (!workOrderId || !cleanMessage) {
+      flash("Write the edit change you want before sending it.", "error");
+      return;
+    }
+    try {
+      await requestHumanWorkOrderChanges({
+        workOrderId,
+        scriptId: scriptDetailIdea?.scriptId,
+        message: cleanMessage,
+        authorRole: "CREATOR",
+      }).unwrap();
+      addActivity("Editor changes requested", workOrder?.title || "Editing job");
+      flash("Change request sent to the editor.", "success");
+      void refetchHumanWorkOrders?.();
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not send the edit change request."), "error");
+    }
+  };
+
+  const handleApproveEditingJob = async (workOrder) => {
+    const workOrderId = workOrder?.workOrderId || workOrder?.id;
+    if (!workOrderId) {
+      flash("No editing job is selected for approval.", "error");
+      return;
+    }
+    try {
+      await approveHumanWorkOrder({
+        workOrderId,
+        scriptId: scriptDetailIdea?.scriptId,
+        message: "Creator approved the edited video.",
+      }).unwrap();
+      addActivity("Edited video approved", workOrder?.title || "Editing job");
+      flash("Edited video approved. Basic editing was included in the AI video package.", "success");
+      void refetchHumanWorkOrders?.();
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not approve the edited video or debit the wallet."), "error");
+    }
+  };
+
   function getWorkflowGateMessage(step) {
-    if (!workflowStepIds.has(step) && step !== "storyboard" && step !== "shoot-polish") return "";
+    if (!workflowStepIds.has(step) && step !== "video" && step !== "storyboard") return "";
     if (step === "ideas") return "";
     if (step === "script" && !storyScriptIdea) {
       return savedStoryIdeaId === planner.selectedIdeaId
@@ -3018,8 +5679,8 @@ export default function PlannerPage() {
     if (step === "storyboard" && !effectiveScreenplayReady) {
       return "Generate and review the screenplay before storyboard generation";
     }
-    if (step === "shoot-polish" && polishBlockedReason) {
-      return polishBlockedReason;
+    if (step === "video" && videoBlockedReason) {
+      return videoBlockedReason;
     }
     return "";
   }
@@ -3035,8 +5696,18 @@ export default function PlannerPage() {
     const currentSection = workspacePage === "ideas" && projectWorkspaceMode ? "workflow" : sectionForWorkspacePage(workspacePage);
     const nextSection = nextPage === "ideas" && projectWorkspaceMode ? "workflow" : sectionForWorkspacePage(nextPage);
     const gateStep = nextPage === "generated-ideas" ? "" : nextPage;
-    const gateMessage = gateStep ? getWorkflowGateMessage(gateStep) : "";
+    const storyboardVideoGate = workspacePage === "storyboard" && nextPage === "video"
+      ? !effectiveShotPlansReady
+        ? "Generate shot plans before continuing to Video."
+        : !storyboardSaved
+          ? "Save Production before continuing to Video."
+          : !canExportShotsPdf
+            ? exportBlockedReason || "Generate every required shot image before continuing to Video."
+          : ""
+      : "";
+    const gateMessage = storyboardVideoGate || (gateStep ? getWorkflowGateMessage(gateStep) : "");
     if (gateMessage) {
+      flash(gateMessage, "warning");
       scrollToSection(currentSection);
       return;
     }
@@ -3085,6 +5756,7 @@ export default function PlannerPage() {
     };
     const gateMessage = getWorkflowGateMessage(step);
     if (gateMessage) {
+      flash(gateMessage, "warning");
       scrollToSection(sectionByStep[step] || "workflow");
       return;
     }
@@ -3127,15 +5799,29 @@ export default function PlannerPage() {
 
   const handleContinueFromScreenplay = () => {
     dispatch(completeStep("screenplay"));
+    dispatch(setActiveStep("storyboard"));
     setWorkspacePage("storyboard");
     addActivity("Screenplay reviewed", scriptDetailIdea?.title || selectedIdea?.title || "Generated screenplay");
-    flash("Screenplay reviewed. Ready for storyboard generation.");
-    scrollToSection("workflow");
+    flash(
+      effectiveShotPlansReady
+        ? "Screenplay reviewed. Review and generate the storyboard before Video."
+        : "Screenplay reviewed. Generating storyboard shot plans next.",
+      "success"
+    );
+    window.history.replaceState(null, "", "/#storyboard");
+    scrollToSection("storyboard");
+    if (!effectiveShotPlansReady && !shotPlanLoading) {
+      void handleGenerateStoryboard();
+    }
   };
 
   const handleContinueFromStoryline = async (draftStoryScript = null) => {
     if (draftStoryScript) {
-      await handleSaveStoryScript(draftStoryScript);
+      try {
+        await handleSaveStoryScript(draftStoryScript);
+      } catch {
+        return;
+      }
     }
     dispatch(completeStep("script"));
     dispatch(setActiveStep("cast"));
@@ -3147,8 +5833,9 @@ export default function PlannerPage() {
 
   const handleSaveStoryScript = async (draftScript, revisionContext = {}) => {
     if (!storyScriptIdea) {
-      flash("Generate a story script before saving edits", "error");
-      return null;
+      const message = "Generate a story script before saving edits";
+      flash(message, "error");
+      throw new Error(message);
     }
 
     const revisionPayload = buildStoryRevisionPayload(draftScript, storyScriptIdea, revisionContext);
@@ -3159,35 +5846,37 @@ export default function PlannerPage() {
       screenType: draftScript.screenType || screenType,
       storytellingType: draftScript.storytellingType || storytellingType,
       hookLens: draftScript.hookLens || hookLens,
+      topicType: draftScript.topicType || topicType,
+      ...activeVideoStylePayload,
       scriptText: buildStoryScriptTextFromDraft(draftScript),
       scriptJson: revisionPayload,
     };
 
-    let result = {
-      ...storyScriptIdea,
-      title: payload.title,
-      scriptText: payload.scriptText,
-      scriptJson: payload.scriptJson,
-      durationSeconds: payload.durationSeconds,
-      status: "SCRIPT_GENERATED",
-    };
+    const storyScriptLockedIdeaId = resolveWorkflowLockedIdeaId(storyScriptIdea, selectedIdea, lockedBrief);
+    const storyScriptStoryIdeaId = resolveWorkflowStoryIdeaId(storyScriptIdea, selectedIdea, { id: savedStoryIdeaId });
+    if (!isUuid(storyScriptLockedIdeaId) || !isUuid(storyScriptStoryIdeaId)) {
+      const message = "Storyline edits need a backend-saved topic and story idea. Save the idea again, then retry the edit.";
+      flash(message, "error");
+      throw new Error(message);
+    }
 
-    let usedLocalSave = false;
-    if (isUuid(lockedBrief?.lockedIdeaId) && isUuid(storyScriptIdea.id)) {
-      try {
-        result = await saveStoryIdeaScript({
-          lockedIdeaId: lockedBrief.lockedIdeaId,
-          storyIdeaId: storyScriptIdea.id,
-          ...payload,
-        }).unwrap();
-      } catch {
-        usedLocalSave = true;
-        // Local story script editing stays usable while backend save is unavailable.
-      }
+    let result;
+    try {
+      result = await saveStoryIdeaScript({
+        lockedIdeaId: storyScriptLockedIdeaId,
+        storyIdeaId: storyScriptStoryIdeaId,
+        ...payload,
+      }).unwrap();
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not save storyline edits to the backend. Your text remains in the editor; edit it again to retry."), "error");
+      throw error;
     }
 
     const updatedIdea = updateStoryIdeaInState({
       ...storyScriptIdea,
+      id: storyScriptStoryIdeaId || storyScriptIdea.id,
+      storyIdeaId: storyScriptStoryIdeaId || storyScriptIdea.storyIdeaId,
+      lockedIdeaId: storyScriptLockedIdeaId || storyScriptIdea.lockedIdeaId,
       title: result.title || payload.title,
       storyScriptText: result.scriptText || payload.scriptText,
       storyScriptJson: result.scriptJson || payload.scriptJson,
@@ -3195,15 +5884,18 @@ export default function PlannerPage() {
       durationSeconds: result.durationSeconds || payload.durationSeconds,
       storytellingType: result.scriptJson?.storytellingType || payload.storytellingType,
       hookLens: result.scriptJson?.hookLens || payload.hookLens,
+      topicType: result.scriptJson?.topicType || result.topicType || payload.topicType,
+      productionStyle: result.scriptJson?.productionStyle || result.productionStyle || payload.productionStyle,
+      hybridSceneMode: result.scriptJson?.hybridSceneMode || result.hybridSceneMode || payload.hybridSceneMode,
+      brollStyle: result.scriptJson?.brollStyle || result.brollStyle || payload.brollStyle,
+      captionStyle: result.scriptJson?.captionStyle || result.captionStyle || payload.captionStyle,
+      productionStyleGuidance: result.scriptJson?.productionStyleGuidance || result.productionStyleGuidance || payload.productionStyleGuidance,
       status: result.status || "SCRIPT_GENERATED",
     });
     setStoryScriptIdea(updatedIdea);
     addActivity("Story script saved", updatedIdea.title);
-    logStoryRevisionEvent(updatedIdea, payload.scriptJson.revisionAudit, usedLocalSave);
-    flash(
-      usedLocalSave ? "Story script save API failed; saved locally for this session." : "Story script saved",
-      usedLocalSave ? "warning" : "success"
-    );
+    logStoryRevisionEvent(updatedIdea, payload.scriptJson.revisionAudit, false);
+    flash("Story script saved to backend", "success");
     return updatedIdea;
   };
 
@@ -3221,6 +5913,8 @@ export default function PlannerPage() {
       screenType: draftScript.screenType || screenType,
       storytellingType: draftScript.storytellingType || storytellingType,
       hookLens: draftScript.hookLens || hookLens,
+      topicType: draftScript.topicType || topicType,
+      ...activeVideoStylePayload,
       scriptJson: draftScript,
       scenes: draftScript.shots || [],
     };
@@ -3236,11 +5930,13 @@ export default function PlannerPage() {
     };
 
     let usedLocalSave = false;
-    if (isUuid(lockedBrief?.lockedIdeaId) && isUuid(scriptDetailIdea.id) && isUuid(scriptDetailIdea.scriptId)) {
+    const screenplayLockedIdeaId = resolveWorkflowLockedIdeaId(scriptDetailIdea, storyScriptIdea, selectedIdea, lockedBrief);
+    const screenplayStoryIdeaId = resolveWorkflowStoryIdeaId(scriptDetailIdea, storyScriptIdea, selectedIdea, { id: savedStoryIdeaId });
+    if (isUuid(screenplayLockedIdeaId) && isUuid(screenplayStoryIdeaId) && isUuid(scriptDetailIdea.scriptId)) {
       try {
         result = await saveGeneratedScript({
-          lockedIdeaId: lockedBrief.lockedIdeaId,
-          storyIdeaId: scriptDetailIdea.id,
+          lockedIdeaId: screenplayLockedIdeaId,
+          storyIdeaId: screenplayStoryIdeaId,
           scriptId: scriptDetailIdea.scriptId,
           ...payload,
         }).unwrap();
@@ -3252,6 +5948,9 @@ export default function PlannerPage() {
 
     const updatedIdea = updateStoryIdeaInState({
       ...scriptDetailIdea,
+      id: screenplayStoryIdeaId || scriptDetailIdea.id,
+      storyIdeaId: screenplayStoryIdeaId || scriptDetailIdea.storyIdeaId,
+      lockedIdeaId: screenplayLockedIdeaId || scriptDetailIdea.lockedIdeaId,
       title: result.title || payload.title,
       scriptId: result.scriptId || scriptDetailIdea.scriptId,
       projectId: result.projectId || scriptDetailIdea.projectId || activeProjectId,
@@ -3260,6 +5959,12 @@ export default function PlannerPage() {
       scriptScenes: normalizeGeneratedScriptScenes(result.scenes || result.scriptJson?.shots || payload.scenes),
       productionPlanTags: result.productionPlanTags || scriptDetailIdea.productionPlanTags || [],
       productionPlanStatus: result.productionPlanStatus || result.scriptJson?.productionPlanStatus || scriptDetailIdea.productionPlanStatus || "",
+      topicType: result.scriptJson?.topicType || result.topicType || payload.topicType,
+      productionStyle: result.scriptJson?.productionStyle || result.productionStyle || payload.productionStyle,
+      hybridSceneMode: result.scriptJson?.hybridSceneMode || result.hybridSceneMode || payload.hybridSceneMode,
+      brollStyle: result.scriptJson?.brollStyle || result.brollStyle || payload.brollStyle,
+      captionStyle: result.scriptJson?.captionStyle || result.captionStyle || payload.captionStyle,
+      productionStyleGuidance: result.scriptJson?.productionStyleGuidance || result.productionStyleGuidance || payload.productionStyleGuidance,
       productionPlanError: result.productionPlanError || result.scriptJson?.productionPlanError || scriptDetailIdea.productionPlanError || "",
       productionPlanDebug: result.productionPlanDebug || result.scriptJson?.productionPlanDebug || scriptDetailIdea.productionPlanDebug || null,
       durationSeconds: result.durationSeconds || payload.durationSeconds,
@@ -3268,6 +5973,13 @@ export default function PlannerPage() {
       status: result.status || "SCRIPT_EDITED",
     });
     setScriptDetailIdea(updatedIdea);
+    setScreenplayApprovedForVideo(false);
+    setScreenplayVideoRunId(null);
+    setScreenplayVideoJobId(null);
+    setScreenplayVideoSceneJobId(null);
+    setScreenplayVideoActiveSceneId(null);
+    setScreenplayVideoFinalJobId(null);
+    setScreenplayVideoAudioJobId(null);
     addActivity("Screenplay saved", updatedIdea.title);
     flash(
       usedLocalSave ? "Screenplay save API failed; saved locally for this session." : "Edited screenplay saved",
@@ -3309,6 +6021,7 @@ export default function PlannerPage() {
     if (!text) return;
     setTrendChoiceMode("original");
     setManualIdeaDraft(text);
+    setTopicType(inferTopicTypeFromText(text, topicType));
     addActivity("Weekly idea selected", tag?.title || tag?.label || "Idea tag");
     flash("Idea copied into the topic box.", "success");
   };
@@ -3320,28 +6033,26 @@ export default function PlannerPage() {
       const result = await refetchWeeklyIdeaTags?.();
       latestTags = result?.data || result?.currentData || latestTags;
     } catch {
-      // If cached lookup fails, fall through to paid refresh so wallet/API errors surface normally.
+      // If cached lookup fails, fall through to refresh so API errors surface normally.
     }
     if (hasWeeklyIdeaTagsPayload(latestTags)) return;
-    if (!canRunPaidModelAction("weekly idea cloud refresh")) return;
     try {
       await refreshWeeklyIdeaTags().unwrap();
       await refetchWeeklyIdeaTags?.();
-      addActivity("Weekly idea cloud loaded", "Next 7 days");
+      addActivity("Trend moments loaded", "Next 7 days");
     } catch (error) {
-      handlePaidModelError(error, "Could not load weekly idea tags.", "weekly idea cloud refresh");
+      handlePaidModelError(error, "Could not load trend moments.", "trend moment refresh");
     }
   };
 
   const handleRefreshWeeklyIdeaTags = async () => {
-    if (!canRunPaidModelAction("weekly idea cloud refresh")) return;
     try {
       await refreshWeeklyIdeaTags().unwrap();
       await refetchWeeklyIdeaTags?.();
-      addActivity("Weekly idea cloud refreshed", "Next 7 days");
-      flash("Weekly idea cloud refreshed.", "success");
+      addActivity("Trend moments refreshed", "Next 7 days");
+      flash("Trend moments refreshed.", "success");
     } catch (error) {
-      handlePaidModelError(error, "Could not refresh weekly idea tags.", "weekly idea cloud refresh");
+      handlePaidModelError(error, "Could not refresh trend moments.", "trend moment refresh");
     }
   };
 
@@ -3387,6 +6098,9 @@ export default function PlannerPage() {
       hashtags: selectedTrend.hashtags || selectedTrend.tags || ["#TrendIdea", "#CreatorScript"],
       source: "trend",
       trendId: selectedTrend.id,
+      topicType,
+      topicTypeLabel: topicTypeLabelFor(topicType),
+      ...activeVideoStylePayload,
     };
     const lockedSelection = await persistIdeaSelection({ sourceType: "TREND", idea: draftIdea, trend: selectedTrend });
     const nextIdea = {
@@ -3411,18 +6125,46 @@ export default function PlannerPage() {
   };
 
   const handleSaveOriginalIdea = async (text) => {
-    if (!text?.trim()) {
-      flash("Write the topic you want to generate content about first", "error");
+    if (creativeFlow !== "guided") {
+      flash("Switch to Guided angle to video to save a brief and generate ideas.", "error");
       return;
     }
-    const trimmed = text.trim();
+    const trimmed = String(text || "").trim();
+    const productIntelligenceBrief = hasActiveProductAdInput
+      ? buildProductIntelligenceBrief(activeProductAdBrief, trimmed, {
+        countryCode: country.code,
+        durationSeconds: selectedDuration,
+        topicType,
+        productionStyle,
+        dialogueLanguage,
+        screenType,
+        storytellingType,
+        hookLens,
+        brollStyle,
+        captionStyle,
+      })
+      : null;
+    if (!trimmed && !productIntelligenceBrief) {
+      flash("Add a product URL, product name, image URL, or short topic first", "error");
+      return;
+    }
+    const briefDescription = productIntelligenceBrief?.briefSummary || trimmed;
+    const briefTitle = productIntelligenceBrief?.displayName || trimmed;
     const draftIdea = {
       id: `idea-original-${Date.now()}`,
-      title: trimmed.length > 42 ? `${trimmed.slice(0, 39)}...` : trimmed,
-      description: trimmed,
-      hashtags: ["#OriginalIdea", "#CreatorScript"],
+      title: briefTitle.length > 42 ? `${briefTitle.slice(0, 39)}...` : briefTitle,
+      description: briefDescription,
+      hashtags: productIntelligenceBrief ? ["#ProductAd", "#Commercial", "#CreatorScript"] : ["#OriginalIdea", "#CreatorScript"],
       manual: true,
       source: "original",
+      briefMode: productIntelligenceBrief ? PRODUCT_AD_BRIEF_MODE : "creator_topic",
+      productInputKey: productIntelligenceBrief ? productAdInputKey(productIntelligenceBrief) : "",
+      productIntelligenceBrief,
+      adConceptLanes: productIntelligenceBrief ? PRODUCT_AD_CONCEPT_LANES : [],
+      topicType,
+      topicTypeLabel: topicTypeLabelFor(topicType),
+      campaignAngle: activeCampaignAngle,
+      ...activeVideoStylePayload,
     };
     const lockedSelection = await persistIdeaSelection({ sourceType: "ORIGINAL", idea: draftIdea, trend: null });
     const nextIdea = {
@@ -3441,12 +6183,81 @@ export default function PlannerPage() {
     dispatch(completeStep("trend"));
     setWorkspacePage("ideas");
     flash(
-      lockedSelection?.ideaId ? "Topic saved. Generate story ideas when ready." : "Topic saved locally; generate local story ideas when ready.",
+      lockedSelection?.ideaId
+        ? productIntelligenceBrief ? "Product brief saved. Generate campaign concepts when ready." : "Topic saved. Generate story ideas when ready."
+        : productIntelligenceBrief ? "Product brief saved locally; generate local campaign concepts when ready." : "Topic saved locally; generate local story ideas when ready.",
       lockedSelection?.ideaId ? "success" : "warning"
     );
   };
 
+  const handleGenerateProductAdPipeline = async () => {
+    if (creativeFlow !== "autonomous_product_ad") {
+      flash("Switch to Autonomous product ad to run the product-ad agent.", "error");
+      return;
+    }
+    if (!hasActiveProductAdInput || !activeProductIntelligenceBrief) {
+      flash("Add a product URL, product name, or product image URL first.", "error");
+      return;
+    }
+    if (!canRunPaidModelAction("product ad research and image generation")) return;
+
+    const productInput = firstString(activeProductIntelligenceBrief.productInput, activeProductAdBrief.productInput);
+    const imageUrls = splitProductImageUrls(
+      activeProductIntelligenceBrief.imageUrls
+      || activeProductAdBrief.imageUrlsText
+      || activeProductAdBrief.imageUrls
+      || activeProductAdBrief.productImageUrls
+    );
+    const payload = {
+      productUrl: firstString(activeProductIntelligenceBrief.sourceUrl, isHttpUrl(productInput) ? productInput : ""),
+      productName: firstString(activeProductIntelligenceBrief.displayName, activeProductIntelligenceBrief.productName, isHttpUrl(productInput) ? "" : productInput),
+      productImageUrls: imageUrls,
+      campaignObjective: activeProductIntelligenceBrief.campaignObjective || "",
+      targetAudience: firstString(activeProductIntelligenceBrief.productUnderstanding?.targetAudience, activeProductIntelligenceBrief.targetAudience),
+      ingredientDetails: firstString(
+        activeProductIntelligenceBrief.ingredientDetails,
+        activeProductIntelligenceBrief.productUnderstanding?.ingredients
+      ),
+      tone: firstString(
+        activeProductIntelligenceBrief.adTone,
+        activeProductIntelligenceBrief.productUnderstanding?.adTone,
+        activeProductIntelligenceBrief.productUnderstanding?.tone
+      ),
+      categoryCode: filters.category,
+      platformCode: filters.platform,
+      durationSeconds: selectedDuration || 60,
+      conceptCount: 3,
+      imageCount: 10,
+      screenType,
+      pacingStyle: selectedDuration <= 30 ? "FAST" : "BALANCED",
+      noHumans: Boolean(activeProductAdBrief.noHumans),
+      autoPlanShotTypes: activeProductAdBrief.shotRecipeSource !== "custom",
+      generateImages: true,
+      useWebSearch: true,
+      autoPrepareVideoRun: Boolean(scriptDetailIdea?.scriptId && screenplayApprovedForVideo),
+      projectId: isUuid(activeProjectId) ? activeProjectId : undefined,
+      lockedIdeaId: isUuid(lockedBrief?.lockedIdeaId) ? lockedBrief.lockedIdeaId : undefined,
+      storyIdeaId: isUuid(savedStoryIdeaId) ? savedStoryIdeaId : undefined,
+      scriptId: isUuid(scriptDetailIdea?.scriptId) ? scriptDetailIdea.scriptId : undefined,
+      existingBrief: activeProductIntelligenceBrief,
+      brandContext: brandContextFromProductIntelligence(activeProductIntelligenceBrief),
+    };
+
+    try {
+      const job = await generateProductAdPipeline(payload).unwrap();
+      setProductAdPipelineJobId(job.jobId || job.id);
+      addActivity("Product ad agent started", activeProductIntelligenceBrief.displayName || "Product campaign");
+      flash("Product ad agent started. It will research the product, create campaign concepts, and generate image anchors.", "success");
+    } catch (error) {
+      handlePaidModelError(error, "Could not start the product ad agent.", "product ad research and image generation");
+    }
+  };
+
   const handleGenerateStoryIdeas = async () => {
+    if (creativeFlow !== "guided") {
+      flash("The autonomous product-ad route creates its own campaign concepts. Switch to Guided angle to video for manual idea generation.", "error");
+      return;
+    }
     if (!lockedBrief) {
       flash(TREND_DISCOVERY_ENABLED ? "Save a trend or original idea first" : "Write and save a topic first", "error");
       return;
@@ -3492,24 +6303,92 @@ export default function PlannerPage() {
     }
   };
 
-  const saveSelectedStoryIdeaForWorkflow = async (storyIdea, { silent = false } = {}) => {
-    if (!lockedBrief || !storyIdea) {
+  const ensureSavedLockedBriefForWorkflow = async () => {
+    if (!lockedBrief) return null;
+    if (isUuid(lockedBrief.lockedIdeaId)) return lockedBrief;
+
+    const sourceType = lockedBrief.source === "trend" ? "TREND" : "ORIGINAL";
+    const lockedSelection = await persistIdeaSelection({
+      sourceType,
+      idea: lockedBrief,
+      trend: sourceType === "TREND" ? selectedTrend : null,
+    });
+
+    if (!isUuid(lockedSelection?.ideaId)) return lockedBrief;
+
+    const nextBrief = {
+      ...lockedBrief,
+      id: lockedSelection.ideaId,
+      backendLocked: true,
+      lockedIdeaId: lockedSelection.ideaId,
+      projectId: lockedSelection.projectId || lockedBrief.projectId || activeProjectId,
+    };
+    setLockedBrief(nextBrief);
+    setExtraIdeas((current) => mergeUniqueIdeas(current, [nextBrief]));
+    return nextBrief;
+  };
+
+  const ensureBackendStoryIdeaForWorkflow = async (storyIdea, workflowLockedBrief, { silent = false } = {}) => {
+    if (!storyIdea || !workflowLockedBrief) return storyIdea;
+    if (isUuid(storyIdea.id)) return storyIdea;
+    if (!isUuid(workflowLockedBrief.lockedIdeaId)) return storyIdea;
+
+    const knownMatch = findBestPersistedStoryIdea(storyIdea, [
+      ...ideaCandidatePageItems,
+      ...lockedIdeaOptions,
+      ...savedIdeaSnapshots,
+    ]);
+    if (knownMatch) return knownMatch;
+
+    if (!silent) {
+      flash("Saving this story idea to the backend before generation.", "info");
+    }
+
+    try {
+      const page = Math.max(0, Number(ideaCandidatePageInfo?.number || 0));
+      const generated = await loadIdeaCandidatesForBrief(workflowLockedBrief, page);
+      const backendMatch = findBestPersistedStoryIdea(storyIdea, generated.items);
+      if (backendMatch) {
+        setLockedIdeaOptions((current) => mergeUniqueIdeas(current, [backendMatch]));
+        setIdeaCandidatePageItems((current) => mergeUniqueIdeas(current, [backendMatch]));
+        dispatch(selectIdea(backendMatch.id));
+        return backendMatch;
+      }
+    } catch (error) {
+      logCreatorWorkflowError("Could not hydrate local story idea with backend UUID.", error, {
+        lockedIdeaId: workflowLockedBrief.lockedIdeaId,
+        localStoryIdeaId: storyIdea.id,
+      });
+    }
+
+    return storyIdea;
+  };
+
+  const saveSelectedStoryIdeaForWorkflow = async (storyIdea, { silent = false, lockedBriefOverride = null } = {}) => {
+    const workflowLockedBrief = lockedBriefOverride || lockedBrief;
+    if (!workflowLockedBrief || !storyIdea) {
       if (!silent) flash("Select a story idea first", "error");
       return null;
     }
 
     let savedIdea = { ...storyIdea, saved: true, status: "SELECTED" };
     let usedLocalSave = false;
-    if (isUuid(lockedBrief.lockedIdeaId) && isUuid(storyIdea.id)) {
+    if (isUuid(workflowLockedBrief.lockedIdeaId) && isUuid(storyIdea.id)) {
       try {
-        savedIdea = await saveStoryIdea({ lockedIdeaId: lockedBrief.lockedIdeaId, storyIdeaId: storyIdea.id }).unwrap();
+        savedIdea = await saveStoryIdea({ lockedIdeaId: workflowLockedBrief.lockedIdeaId, storyIdeaId: storyIdea.id }).unwrap();
       } catch {
         usedLocalSave = true;
         // Local save keeps the workflow usable while the backend is unavailable.
       }
     }
 
-    const normalized = updateStoryIdeaInState({ ...savedIdea, saved: true, status: "SELECTED" });
+    const normalized = updateStoryIdeaInState({
+      ...savedIdea,
+      lockedIdeaId: savedIdea.lockedIdeaId || workflowLockedBrief.lockedIdeaId,
+      projectId: savedIdea.projectId || workflowLockedBrief.projectId || activeProjectId,
+      saved: true,
+      status: "SELECTED",
+    });
     setSavedStoryIdeaId(normalized.id);
     setSavedIdeaIds((current) => {
       const next = new Set(current);
@@ -3540,10 +6419,22 @@ export default function PlannerPage() {
       return;
     }
 
+    const workflowLockedBrief = await ensureSavedLockedBriefForWorkflow();
+    if (!isUuid(workflowLockedBrief?.lockedIdeaId)) {
+      flash("Could not save the topic to the backend. Save the topic again after the backend is reachable.", "error");
+      return;
+    }
+
     let sourceStoryIdea = storyIdea;
     let usedLocalSave = false;
-    if (savedStoryIdeaId !== storyIdea.id) {
-      const saved = await saveSelectedStoryIdeaForWorkflow(storyIdea, { silent: true });
+    sourceStoryIdea = await ensureBackendStoryIdeaForWorkflow(storyIdea, workflowLockedBrief, { silent: true });
+    if (!isUuid(sourceStoryIdea?.id)) {
+      flash("Story ideas are still local only. Regenerate story ideas once the backend can return saved UUIDs.", "error");
+      return;
+    }
+
+    if (savedStoryIdeaId !== sourceStoryIdea.id) {
+      const saved = await saveSelectedStoryIdeaForWorkflow(sourceStoryIdea, { silent: true, lockedBriefOverride: workflowLockedBrief });
       if (!saved?.idea) {
         flash("Could not save selected story idea before generation", "error");
         return;
@@ -3553,17 +6444,21 @@ export default function PlannerPage() {
     }
 
     const providerMemory = aiProviderContext;
-    const storyCategoryCode = resolveWorkflowCategoryCode(lockedBrief, sourceStoryIdea, filters.category);
-    if (!isUuid(lockedBrief.lockedIdeaId) || !isUuid(sourceStoryIdea.id)) {
-      flash("Story generation needs saved UUIDs. Save the topic again so the workflow can continue.", "error");
+    const storyCategoryCode = resolveWorkflowCategoryCode(workflowLockedBrief, sourceStoryIdea, filters.category);
+    if (!isUuid(workflowLockedBrief.lockedIdeaId) || !isUuid(sourceStoryIdea.id)) {
+      flash("Story generation needs backend-saved topic and story idea IDs. Regenerate story ideas and try again.", "error");
       return;
     }
     if (!canRunPaidModelAction("AI story script generation")) return;
 
+    const productWorkflowBrief = productIntelligenceBriefForWorkflow(workflowLockedBrief, sourceStoryIdea, activeProductIntelligenceBrief);
+    const productBrandContext = brandContextFromProductIntelligence(productWorkflowBrief);
+    const adConceptStrategy = adConceptStrategyFromIdea(sourceStoryIdea);
+    const campaignAngle = campaignAngleFromEntity(sourceStoryIdea, workflowLockedBrief, productWorkflowBrief, activeCampaignAngle);
     let scriptResult;
     try {
       scriptResult = attachAiProviderMetadata(await generateStoryIdeaScript({
-        lockedIdeaId: lockedBrief.lockedIdeaId,
+        lockedIdeaId: workflowLockedBrief.lockedIdeaId,
         storyIdeaId: sourceStoryIdea.id,
         durationSeconds: selectedDuration,
         categoryCode: storyCategoryCode,
@@ -3572,7 +6467,22 @@ export default function PlannerPage() {
         screenType,
         storytellingType,
         hookLens,
-        context: { aiProvider: providerMemory, storytellingType, hookLens },
+        topicType,
+        ...activeVideoStylePayload,
+        brandContext: productBrandContext,
+        context: {
+          aiProvider: providerMemory,
+          storytellingType,
+          hookLens,
+          topicType,
+          campaignAngle,
+          ...activeVideoStylePayload,
+          briefMode: productWorkflowBrief ? PRODUCT_AD_BRIEF_MODE : "creator_topic",
+          productIntelligenceBrief: productWorkflowBrief,
+          adConceptStrategy,
+          campaignObjective: productWorkflowBrief?.campaignObjective || adConceptStrategy?.marketingObjective || "",
+          brandContext: productBrandContext,
+        },
       }).unwrap(), providerMemory);
     } catch (error) {
       handlePaidModelError(error, "Story generation failed. Please regenerate with complete storyline, character, and beat JSON.", "AI story script generation");
@@ -3592,6 +6502,12 @@ export default function PlannerPage() {
       screenType: scriptResult.scriptJson?.screenType || scriptResult.screenType || screenType,
       storytellingType: scriptResult.scriptJson?.storytellingType || scriptResult.storytellingType || storytellingType,
       hookLens: scriptResult.scriptJson?.hookLens || scriptResult.hookLens || hookLens,
+      topicType: scriptResult.scriptJson?.topicType || scriptResult.topicType || topicType,
+      productionStyle: scriptResult.scriptJson?.productionStyle || scriptResult.productionStyle || productionStyle,
+      hybridSceneMode: scriptResult.scriptJson?.hybridSceneMode || scriptResult.hybridSceneMode || hybridSceneMode,
+      brollStyle: scriptResult.scriptJson?.brollStyle || scriptResult.brollStyle || brollStyle,
+      captionStyle: scriptResult.scriptJson?.captionStyle || scriptResult.captionStyle || captionStyle,
+      productionStyleGuidance: scriptResult.scriptJson?.productionStyleGuidance || scriptResult.productionStyleGuidance || activeProductionStyleGuidance,
       provider: scriptResult.provider,
       model: scriptResult.model,
     });
@@ -3612,11 +6528,18 @@ export default function PlannerPage() {
 
   const applyScreenplayResult = (screenplayResult, sourceIdea, draftStoryScript = null) => {
     if (!screenplayResult || !sourceIdea) return null;
+    const storyIdeaId = resolveWorkflowStoryIdeaId(screenplayResult, sourceIdea);
+    const lockedIdeaId = resolveWorkflowLockedIdeaId(screenplayResult, sourceIdea, lockedBrief);
+    const screenplayResultId = firstString(screenplayResult.id);
+    const scriptId = resolveWorkflowScriptId(screenplayResult) || (screenplayResultId && screenplayResultId !== storyIdeaId ? screenplayResultId : "");
     const screenplayIdea = updateStoryIdeaInState({
       ...sourceIdea,
+      id: storyIdeaId || sourceIdea.id,
+      storyIdeaId: storyIdeaId || sourceIdea.storyIdeaId,
       title: screenplayResult.title || sourceIdea.title,
       description: sourceIdea.description,
-      scriptId: screenplayResult.scriptId,
+      lockedIdeaId: lockedIdeaId || sourceIdea.lockedIdeaId,
+      scriptId,
       projectId: screenplayResult.projectId || sourceIdea.projectId || activeProjectId,
       scriptText: screenplayResult.script,
       scriptJson: screenplayResult.scriptJson,
@@ -3631,12 +6554,25 @@ export default function PlannerPage() {
       screenType: screenplayResult.scriptJson?.screenType || screenplayResult.screenType || screenType,
       storytellingType: screenplayResult.scriptJson?.storytellingType || screenplayResult.storytellingType || storytellingType,
       hookLens: screenplayResult.scriptJson?.hookLens || screenplayResult.hookLens || hookLens,
+      topicType: screenplayResult.scriptJson?.topicType || screenplayResult.topicType || sourceIdea.topicType || topicType,
+      productionStyle: screenplayResult.scriptJson?.productionStyle || screenplayResult.productionStyle || sourceIdea.productionStyle || productionStyle,
+      hybridSceneMode: screenplayResult.scriptJson?.hybridSceneMode || screenplayResult.hybridSceneMode || sourceIdea.hybridSceneMode || hybridSceneMode,
+      brollStyle: screenplayResult.scriptJson?.brollStyle || screenplayResult.brollStyle || sourceIdea.brollStyle || brollStyle,
+      captionStyle: screenplayResult.scriptJson?.captionStyle || screenplayResult.captionStyle || sourceIdea.captionStyle || captionStyle,
+      productionStyleGuidance: screenplayResult.scriptJson?.productionStyleGuidance || screenplayResult.productionStyleGuidance || sourceIdea.productionStyleGuidance || activeProductionStyleGuidance,
       provider: screenplayResult.provider,
       model: screenplayResult.model,
       storyScriptJson: sourceIdea.storyScriptJson || buildInitialStoryRevisionPayload(draftStoryScript),
       storyScriptText: sourceIdea.storyScriptText,
     });
     setScriptDetailIdea(screenplayIdea);
+    setScreenplayApprovedForVideo(false);
+    setScreenplayVideoRunId(null);
+    setScreenplayVideoJobId(null);
+    setScreenplayVideoSceneJobId(null);
+    setScreenplayVideoActiveSceneId(null);
+    setScreenplayVideoFinalJobId(null);
+    setScreenplayVideoAudioJobId(null);
     dispatch(completeStep("script"));
     dispatch(setActiveStep("screenplay"));
     setWorkspacePage("screenplay");
@@ -3669,11 +6605,38 @@ export default function PlannerPage() {
         sourceIdea = await handleSaveStoryScript(draftStoryScript) || storyIdea;
       }
 
-      const providerMemory = aiProviderContext;
-      const screenplayCategoryCode = resolveWorkflowCategoryCode(lockedBrief, sourceIdea, filters.category);
-      if (!isUuid(lockedBrief.lockedIdeaId) || !isUuid(sourceIdea.id)) {
+      const workflowLockedBrief = await ensureSavedLockedBriefForWorkflow();
+      if (!isUuid(workflowLockedBrief?.lockedIdeaId)) {
         screenplayStartInFlightRef.current = false;
-        flash("Screenplay generation needs saved UUIDs. Save the topic again so the workflow can continue.", "error");
+        flash("Could not save the topic to the backend. Save the topic again after the backend is reachable.", "error");
+        return;
+      }
+
+      const hydratedStoryIdea = await ensureBackendStoryIdeaForWorkflow(sourceIdea, workflowLockedBrief, { silent: true });
+      if (!isUuid(hydratedStoryIdea?.id)) {
+        screenplayStartInFlightRef.current = false;
+        flash("Screenplay generation needs a backend-saved story idea. Regenerate story ideas once the backend can return saved UUIDs.", "error");
+        return;
+      }
+      if (hydratedStoryIdea.id !== sourceIdea.id) {
+        sourceIdea = updateStoryIdeaInState({
+          ...hydratedStoryIdea,
+          storyScriptText: sourceIdea.storyScriptText || hydratedStoryIdea.storyScriptText,
+          storyScriptJson: sourceIdea.storyScriptJson || hydratedStoryIdea.storyScriptJson,
+          status: sourceIdea.status || hydratedStoryIdea.status,
+        });
+        setStoryScriptIdea(sourceIdea);
+        dispatch(selectIdea(sourceIdea.id));
+      } else {
+        sourceIdea = hydratedStoryIdea;
+      }
+
+      const providerMemory = aiProviderContext;
+      const screenplayLockedIdeaId = resolveWorkflowLockedIdeaId(sourceIdea, storyScriptIdea, selectedIdea, workflowLockedBrief);
+      const screenplayCategoryCode = resolveWorkflowCategoryCode(sourceIdea, workflowLockedBrief, filters.category);
+      if (!isUuid(screenplayLockedIdeaId) || !isUuid(sourceIdea.id)) {
+        screenplayStartInFlightRef.current = false;
+        flash("Screenplay generation needs backend-saved topic and story idea IDs. Regenerate story ideas and try again.", "error");
         return;
       }
       if (!canRunPaidModelAction("AI screenplay generation")) {
@@ -3689,7 +6652,7 @@ export default function PlannerPage() {
       setStoryboardJobId(null);
       setGeneratedStoryboard(null);
       const job = await generateStoryIdeaScreenplayAsync({
-        lockedIdeaId: lockedBrief.lockedIdeaId,
+        lockedIdeaId: screenplayLockedIdeaId,
         storyIdeaId: sourceIdea.id,
         durationSeconds: selectedDuration,
         categoryCode: screenplayCategoryCode,
@@ -3698,6 +6661,8 @@ export default function PlannerPage() {
         screenType,
         storytellingType,
         hookLens,
+        topicType,
+        ...activeVideoStylePayload,
         budgetTier: productionContext.budgetTier,
         characterCastMappings: productionContext.characterCastMappings,
         availableActors: productionContext.availableActors,
@@ -3709,6 +6674,8 @@ export default function PlannerPage() {
           workflowLockedAt: new Date().toISOString(),
           storytellingType,
           hookLens,
+          topicType,
+          ...activeVideoStylePayload,
           lockedPackage: productionContext,
         },
       }).unwrap();
@@ -3729,7 +6696,7 @@ export default function PlannerPage() {
     ...audienceData,
     id: audienceData.id || selectedAudienceDecision?.id,
     projectId: activeProjectId,
-    lockedIdeaId: lockedBrief?.lockedIdeaId,
+    lockedIdeaId: activeLockedIdeaIdForCast,
     storyIdeaId: activeStoryIdeaIdForCast,
     scriptId: scriptDetailIdea?.scriptId,
     trendId: selectedTrend?.id,
@@ -3744,12 +6711,19 @@ export default function PlannerPage() {
     scriptJson: scriptDetailIdea?.scriptJson,
     castPlan: selectedCreator,
     characterCastMappings: activeCharacterMappings,
+    brandContext: brandContextFromProductIntelligence(productIntelligenceBriefForWorkflow(lockedBrief, selectedIdea, activeProductIntelligenceBrief)),
     context: {
       durationSeconds: selectedDuration,
       dialogueLanguage,
       screenType,
       storytellingType,
       hookLens,
+      topicType,
+      campaignAngle: campaignAngleFromEntity(selectedIdea, lockedBrief, activeCampaignAngle),
+      ...activeVideoStylePayload,
+      briefMode: hasActiveProductAdInput ? PRODUCT_AD_BRIEF_MODE : "creator_topic",
+      productIntelligenceBrief: productIntelligenceBriefForWorkflow(lockedBrief, selectedIdea, activeProductIntelligenceBrief),
+      adConceptStrategy: adConceptStrategyFromIdea(selectedIdea),
       source: "creator-ui",
     },
   });
@@ -3757,26 +6731,49 @@ export default function PlannerPage() {
   const buildScreenplayProductionContext = () => {
     const characterCastMappings = activeCharacterMappings;
     const availableActors = selectedCreator?.actors || creators || [];
-    const brandContext = selectedAudienceDecision?.brandContext || {
+    const productWorkflowBrief = productIntelligenceBriefForWorkflow(lockedBrief, storyScriptIdea || selectedIdea, activeProductIntelligenceBrief);
+    const campaignAngle = campaignAngleFromEntity(storyScriptIdea, selectedIdea, lockedBrief, productWorkflowBrief, activeCampaignAngle);
+    const productBrandContext = brandContextFromProductIntelligence(productWorkflowBrief);
+    const referenceImageUrls = splitProductImageUrls(
+      productWorkflowBrief?.imageUrls
+      || productWorkflowBrief?.referenceImageUrls
+      || productWorkflowBrief?.productUnderstanding?.imageUrls
+      || activeProductAdBrief?.imageUrlsText
+    );
+    const brandContext = normalizeBrandContextForApi(selectedAudienceDecision?.brandContext || productBrandContext || {
       productContext: selectedAudienceDecision?.productContext || "",
       brandTone: selectedAudienceDecision?.brandTone || "",
       restrictions: selectedAudienceDecision?.restrictions || [],
-    };
+    });
     const creatorContext = {
       selectedCreator,
       castPlan: selectedCreator,
       selectedIdea,
       lockedBrief,
+      briefMode: productWorkflowBrief ? PRODUCT_AD_BRIEF_MODE : "creator_topic",
+      productIntelligenceBrief: productWorkflowBrief,
+      adConceptStrategy: adConceptStrategyFromIdea(storyScriptIdea || selectedIdea),
+      metadata: {
+        campaignAngle,
+        referenceImageUrls,
+        storyboardReferencePolicy: referenceImageUrls.length
+          ? "Use the supplied product and brand reference images to keep packaging, logo placement, colors, and materials consistent in storyboard sketches. Do not paste a source image into a storyboard panel; storyboard sketches remain planning assets only."
+          : "No product reference images were supplied.",
+      },
       dialogueLanguage,
       screenType,
       storytellingType,
       hookLens,
+      topicType,
+      ...activeVideoStylePayload,
       durationSeconds: selectedDuration,
     };
     return {
       budgetTier: selectedDuration <= 60 ? "zero_budget" : selectedDuration <= 180 ? "micro_budget" : "indie",
       storytellingType,
       hookLens,
+      topicType,
+      ...activeVideoStylePayload,
       characterCastMappings,
       availableActors,
       audienceDecision: selectedAudienceDecision || selectedAudienceSummary,
@@ -3906,10 +6903,10 @@ export default function PlannerPage() {
       flash("No story characters are available to map. Generate the storyline first, then confirm cast.", "error");
       return;
     }
-    if (savedMappings.length && isUuid(lockedBrief?.lockedIdeaId) && isUuid(activeStoryIdeaIdForCast)) {
+    if (savedMappings.length && isUuid(activeLockedIdeaIdForCast) && isUuid(activeStoryIdeaIdForCast)) {
       try {
         const mappingResult = await saveCharacterCastMappings({
-          lockedIdeaId: lockedBrief.lockedIdeaId,
+          lockedIdeaId: activeLockedIdeaIdForCast,
           storyIdeaId: activeStoryIdeaIdForCast,
           projectId: activeProjectId,
           scriptId: isUuid(scriptDetailIdea?.scriptId) ? scriptDetailIdea.scriptId : null,
@@ -3920,7 +6917,7 @@ export default function PlannerPage() {
         usedLocalMappings = true;
         castSaveWarning = apiErrorMessage(error, "Cast mapping save failed; cast plan saved locally.");
         logCreatorWorkflowError("Character cast mapping save failed.", error, {
-          lockedIdeaId: lockedBrief?.lockedIdeaId,
+          lockedIdeaId: activeLockedIdeaIdForCast,
           storyIdeaId: activeStoryIdeaIdForCast,
           projectId: activeProjectId,
         });
@@ -3958,6 +6955,15 @@ export default function PlannerPage() {
       hashtags: baseIdea?.hashtags || ["#CastFit", "#CreatorScript"],
       castEnhanced: true,
       castActors: nextCastPlan?.actors || [],
+      topicType: baseIdea?.topicType || topicType,
+      topicTypeLabel: baseIdea?.topicTypeLabel || topicTypeLabelFor(topicType),
+      ...(baseIdea?.productionStyleGuidance ? {
+        productionStyle: baseIdea.productionStyle || productionStyle,
+        hybridSceneMode: baseIdea.hybridSceneMode || hybridSceneMode,
+        brollStyle: baseIdea.brollStyle || brollStyle,
+        captionStyle: baseIdea.captionStyle || captionStyle,
+        productionStyleGuidance: baseIdea.productionStyleGuidance,
+      } : activeVideoStylePayload),
     };
     setCastPlan(nextCastPlan);
     setExtraIdeas((current) => [nextIdea, ...current]);
@@ -3983,6 +6989,9 @@ export default function PlannerPage() {
       hashtags: ["#OriginalIdea", "#CreatorScript"],
       manual: true,
       source: options.source || "manual",
+      topicType,
+      topicTypeLabel: topicTypeLabelFor(topicType),
+      ...activeVideoStylePayload,
     };
     setExtraIdeas((current) => [nextIdea, ...current]);
     dispatch(selectIdea(nextIdea.id));
@@ -4018,6 +7027,9 @@ export default function PlannerPage() {
       ...idea,
       id: `${idea.id}-${extraIdeas.length + index}`,
       source: "trend",
+      topicType,
+      topicTypeLabel: topicTypeLabelFor(topicType),
+      ...activeVideoStylePayload,
     }));
     setExtraIdeas((current) => [...current, ...batch]);
     if (batch[0]) {
@@ -4036,13 +7048,18 @@ export default function PlannerPage() {
   const handleGenerateGeneralIdea = () => {
     setIsGeneratingMore(true);
     window.setTimeout(() => {
-      const categoryLabel = filterLabels.category[filters.category] || filters.category || "creator";
+      const selectedTopicType = topicTypeOptionFor(topicType);
+      const categoryLabel = selectedTopicType.label || filterLabels.category[filters.category] || filters.category || "creator";
+      const [suggestedAngle] = ideaAngleSuggestionsFor(topicType, manualIdeaDraft);
       const nextIdea = {
         id: `idea-general-${Date.now()}`,
-        title: `${categoryLabel} relatable hook`,
-        description: `A simple ${categoryLabel.toLowerCase()} short where the creator opens with a relatable problem, shows one practical shift, and ends with a clear payoff viewers can save.`,
+        title: `${categoryLabel}: ${suggestedAngle?.title || "relatable hook"}`,
+        description: suggestedAngle?.description || `A simple ${categoryLabel.toLowerCase()} short where the creator opens with a relatable problem, shows one practical shift, and ends with a clear payoff viewers can save.`,
         hashtags: ["#CreatorIdea", "#Shorts", `#${String(categoryLabel).replace(/[^a-z0-9]/gi, "")}`],
         source: "general_ai",
+        topicType,
+        topicTypeLabel: selectedTopicType.label,
+        ...activeVideoStylePayload,
       };
       setExtraIdeas((current) => [nextIdea, ...current]);
       dispatch(selectIdea(nextIdea.id));
@@ -4073,6 +7090,9 @@ export default function PlannerPage() {
       generatedScript: true,
       source: script.source,
       scriptScenes: script.scenes || [],
+      topicType,
+      topicTypeLabel: topicTypeLabelFor(topicType),
+      ...activeVideoStylePayload,
     };
     setExtraIdeas((current) => [nextIdea, ...current]);
     dispatch(selectIdea(nextIdea.id));
@@ -4143,6 +7163,915 @@ export default function PlannerPage() {
     );
   };
 
+  const handleContinueStoryboardToVideo = () => {
+    if (!effectiveShotPlansReady) {
+      flash("Generate shot plans before continuing to Video.", "warning");
+      return;
+    }
+    if (!storyboardSaved) {
+      flash("Save Production before continuing to Video.", "warning");
+      return;
+    }
+    if (!canExportShotsPdf) {
+      flash(exportBlockedReason || "Generate every required shot image before continuing to Video.", "warning");
+      return;
+    }
+    handleWorkspacePageClick("video");
+  };
+
+  const handleClientReviewChange = (field, value) => {
+    setClientReview((current) => normalizeClientReview(
+      { ...current, [field]: value },
+      current?.dialogueLanguage || dialogueLanguage
+    ));
+    setClientReviewDirty(true);
+  };
+
+  const handleClientDialogueLanguageChange = (value) => {
+    const nextLanguage = String(value || "English").trim() || "English";
+    const appliedLanguage = firstString(
+      scriptDetailIdea?.scriptJson?.contentRules?.dialogueLanguage,
+      scriptDetailIdea?.dialogueLanguage,
+      dialogueLanguage,
+      "English"
+    );
+    const languageChanged = nextLanguage.toLowerCase() !== appliedLanguage.toLowerCase();
+    setClientReview((current) => {
+      const reviewChat = (Array.isArray(current?.reviewChat) ? current.reviewChat : [])
+        .filter((message) => !message?.languageChangePrompt);
+      if (languageChanged) {
+        reviewChat.push({
+          id: `language-change-${Date.now()}`,
+          role: "assistant",
+          text: `You selected ${nextLanguage}, while the currently applied dialogue language is ${appliedLanguage}. Do you want to translate the dialogue, voice-over, captions, subtitles, and overlays to ${nextLanguage} when you Apply to all planning?`,
+          targetType: "PLANNING",
+          shotNumber: "",
+          affectedShotNumbers: [],
+          status: "AWAITING_CONFIRMATION",
+          languageChangePrompt: true,
+          sourceDialogueLanguage: appliedLanguage,
+          targetDialogueLanguage: nextLanguage,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      return normalizeClientReview({
+        ...current,
+        dialogueLanguage: nextLanguage,
+        reviewChat,
+      }, nextLanguage);
+    });
+    setClientReviewDirty(true);
+  };
+
+  const handleSendReviewMessage = async ({
+    text,
+    targetType,
+    shotNumber,
+    visualReferenceAssetIds = [],
+    visualReferenceUsageMode = "INSPIRATION_ONLY",
+  } = {}) => {
+    const instruction = compactReviewInstruction(text);
+    if (!instruction) return null;
+    if (!isUuid(scriptDetailIdea?.scriptId)) {
+      flash("Open a saved project with a screenplay before starting review chat.", "warning");
+      return null;
+    }
+    const normalizedTarget = String(targetType || "STORYBOARD_AND_PRODUCT").toUpperCase();
+    const normalizedShotNumber = Number(shotNumber) > 0 ? Number(shotNumber) : "";
+    const normalizedVisualReferenceAssetIds = [...new Set(
+      (Array.isArray(visualReferenceAssetIds) ? visualReferenceAssetIds : [])
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+    )].slice(0, 8);
+    const normalizedVisualReferenceUsageMode = String(visualReferenceUsageMode || "").toUpperCase() === "EXACT_SOURCE"
+      ? "EXACT_SOURCE"
+      : "INSPIRATION_ONLY";
+    const message = {
+      id: `review-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      role: "user",
+      text: instruction,
+      targetType: normalizedTarget,
+      shotNumber: normalizedShotNumber,
+      visualReferenceAssetIds: normalizedVisualReferenceAssetIds,
+      visualReferenceUsageMode: normalizedVisualReferenceUsageMode,
+      status: "AWAITING_ANALYSIS",
+      createdAt: new Date().toISOString(),
+    };
+    const reviewChat = [...(Array.isArray(clientReview?.reviewChat) ? clientReview.reviewChat : []), message];
+    const frameFeedback = normalizedTarget === "PLANNING"
+      ? clientReview?.frameFeedback || []
+      : [
+          ...(Array.isArray(clientReview?.frameFeedback) ? clientReview.frameFeedback : []),
+          {
+            id: message.id,
+            targetType: normalizedTarget,
+            shotNumber: normalizedShotNumber,
+            instruction,
+            visualReferenceAssetIds: normalizedVisualReferenceAssetIds,
+            visualReferenceUsageMode: normalizedVisualReferenceUsageMode,
+          },
+        ];
+    const nextReview = normalizeClientReview(
+      { ...clientReview, reviewChat, frameFeedback },
+      clientReview?.dialogueLanguage || dialogueLanguage
+    );
+    setClientReview(nextReview);
+    setClientReviewDirty(true);
+    addActivity("Client review message added", normalizedShotNumber ? `Shot ${normalizedShotNumber}` : "Complete planning");
+    try {
+      const ragResult = await chatStoryboardClientReview({
+        scriptId: scriptDetailIdea.scriptId,
+        messageId: message.id,
+        message: instruction,
+        targetType: normalizedTarget,
+        shotNumber: normalizedShotNumber || null,
+        dialogueLanguage: nextReview.dialogueLanguage || dialogueLanguage,
+        currentReview: compactClientReviewForInspection(nextReview),
+        visualReferenceAssetIds: normalizedVisualReferenceAssetIds,
+        visualReferenceUsageMode: normalizedVisualReferenceUsageMode,
+      }).unwrap();
+      const analyzedReview = normalizeClientReview(
+        ragResult?.review || {
+          ...nextReview,
+          reviewChat: [
+            ...reviewChat,
+            ...(ragResult?.assistantMessage ? [ragResult.assistantMessage] : []),
+          ],
+        },
+        nextReview.dialogueLanguage || dialogueLanguage
+      );
+      setClientReview(analyzedReview);
+      setClientReviewDirty(false);
+      addActivity(
+        "Current project context retrieved",
+        `${ragResult?.retrievedKeys?.length || 0} planning sources · ${ragResult?.attachedImageCount || 0} current images`
+      );
+      flash("Change analyzed. Confirm Apply in the assistant message to update the storyboard and planning.", "success");
+      return {
+        message: ragResult?.userMessage || message,
+        review: analyzedReview,
+        rag: ragResult,
+      };
+    } catch (error) {
+      setClientReview((current) => normalizeClientReview({
+        ...current,
+        reviewChat: (current?.reviewChat || []).map((item) => (
+          item.id === message.id ? { ...item, status: "FAILED" } : item
+        )),
+      }, dialogueLanguage));
+      if (isRateLimitedError(error)) {
+        const retrySeconds = Math.max(1, Math.ceil(reviewRetryDelayMs(error) / 1000));
+        flash(
+          `Gemini reached its per-minute capacity. This is separate from your Google billing balance. Retry in about ${retrySeconds} seconds.`,
+          "warning"
+        );
+      } else {
+        flash(apiErrorMessage(error, "Could not inspect the current project for this revision."), "error");
+      }
+      return null;
+    }
+  };
+
+  const handleUploadFontReferenceImage = async (file) => {
+    if (!isUuid(scriptDetailIdea?.scriptId)) {
+      flash("Generate and save the screenplay before uploading a font reference.", "warning");
+      return [];
+    }
+    if (!file || !String(file.type || "").toLowerCase().startsWith("image/")) {
+      flash("Choose a JPG, PNG, WebP, AVIF, or GIF image containing the font style.", "warning");
+      return [];
+    }
+    if (Number(file.size || 0) > 10 * 1024 * 1024) {
+      flash("Font reference images must be 10 MB or smaller.", "warning");
+      return [];
+    }
+    try {
+      const uploaded = await uploadStoryboardFontReferenceImage({
+        scriptId: scriptDetailIdea.scriptId,
+        file,
+      }).unwrap();
+      const normalizedAsset = {
+        ...normalizeStoryboardReferenceAsset(uploaded),
+        referenceRole: "typography_style_reference",
+        assetRole: "typography_style_reference",
+      };
+      setClientReview((current) => normalizeClientReview({
+        ...current,
+        fontReferenceImages: mergeStoryboardReferenceAssets(
+          current?.fontReferenceImages || [],
+          [normalizedAsset]
+        ),
+      }, dialogueLanguage));
+      addActivity("Font style reference uploaded", normalizedAsset.originalFilename || "Image sample");
+      flash("Font image uploaded. Apply the review when you want AI to choose the closest renderable font.", "success");
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not upload the font reference image."), "error");
+    }
+  };
+
+  const handleUploadVisualReferenceImages = async (selectedFiles = []) => {
+    if (!isUuid(scriptDetailIdea?.scriptId)) {
+      flash("Generate and save the screenplay before uploading visual references.", "warning");
+      return [];
+    }
+    const currentCount = Array.isArray(clientReview?.visualReferenceImages)
+      ? clientReview.visualReferenceImages.length
+      : 0;
+    const remainingSlots = Math.max(0, 40 - currentCount);
+    const files = (Array.isArray(selectedFiles) ? selectedFiles : Array.from(selectedFiles || []))
+      .filter(Boolean)
+      .slice(0, remainingSlots);
+    if (!remainingSlots) {
+      flash("Reference history can hold up to 40 images. Remove an older item before adding another.", "warning");
+      return [];
+    }
+    if (!files.length) return [];
+    const invalidFile = files.find((file) => !["image/jpeg", "image/png", "image/webp"].includes(String(file?.type || "").toLowerCase()));
+    if (invalidFile) {
+      flash("Visual references must be JPG, PNG, or WebP images.", "error");
+      return [];
+    }
+    try {
+      const uploadedAssets = [];
+      for (const file of files) {
+        const optimizedFile = await optimizeProductReferenceFile(file);
+        const uploaded = await uploadStoryboardVisualReferenceImage({
+          scriptId: scriptDetailIdea.scriptId,
+          file: optimizedFile,
+        }).unwrap();
+        uploadedAssets.push({
+          ...normalizeStoryboardReferenceAsset(uploaded),
+          referenceRole: "visual_inspiration_only",
+          assetRole: "visual_inspiration_only",
+          usageMode: "INSPIRATION_ONLY",
+        });
+      }
+      setClientReview((current) => normalizeClientReview({
+        ...current,
+        visualReferenceImages: mergeStoryboardReferenceAssets(
+          current?.visualReferenceImages || [],
+          uploadedAssets
+        ).slice(0, 8),
+      }, dialogueLanguage));
+      setClientReviewDirty(true);
+      addActivity("Visual inspiration uploaded", `${uploadedAssets.length} image${uploadedAssets.length === 1 ? "" : "s"} marked inspiration-only`);
+      flash("Visual references uploaded. They will influence both storyboard and product-frame regeneration without copying brand or packaging details.", "success");
+      return uploadedAssets;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not upload the visual inspiration image."), "error");
+      return [];
+    }
+  };
+
+  const persistClientReview = async ({ silent = false, reviewOverride = null } = {}) => {
+    if (!isUuid(scriptDetailIdea?.scriptId)) {
+      if (!silent) flash("Generate and save the screenplay before saving client feedback.", "warning");
+      return null;
+    }
+    const payload = normalizeClientReview({
+      ...(reviewOverride || clientReview),
+      dialogueLanguage: reviewOverride?.dialogueLanguage || clientReview?.dialogueLanguage || dialogueLanguage,
+    }, reviewOverride?.dialogueLanguage || clientReview?.dialogueLanguage || dialogueLanguage);
+    try {
+      const saved = await saveStoryboardClientReview({
+        scriptId: scriptDetailIdea.scriptId,
+        storyboardFeedback: payload.storyboardFeedback,
+        productionFramesFeedback: payload.productionFramesFeedback,
+        dialogueFeedback: payload.dialogueFeedback,
+        dialogueLanguage: payload.dialogueLanguage,
+        reviewStatus: payload.reviewStatus,
+        frameFeedback: payload.frameFeedback,
+        referenceUrls: payload.referenceUrls,
+        visualReferenceImages: payload.visualReferenceImages,
+        fontReferenceImages: payload.fontReferenceImages,
+        reviewChat: compactReviewChatForMutation(payload.reviewChat),
+        typographySystem: payload.typographySystem,
+        overlayPlan: payload.overlayPlan,
+        videoDirectorPlan: payload.videoDirectorPlan,
+      }).unwrap();
+      const normalized = normalizeClientReview(saved, payload.dialogueLanguage);
+      setClientReview(normalized);
+      setClientReviewDirty(false);
+      setScriptDetailIdea((current) => current ? {
+        ...current,
+        clientReview: normalized,
+        scriptJson: {
+          ...(current.scriptJson || {}),
+          clientReview: normalized,
+        },
+      } : current);
+      if (!silent) {
+        addActivity("Review working copy saved", `${reviewStatusLabel(normalized.reviewStatus)} · ${normalized.dialogueLanguage}`);
+        flash("Review draft saved. The current screenplay and planning remain unchanged until Apply to all planning.", "success");
+      }
+      return normalized;
+    } catch (error) {
+      if (!silent) {
+        flash(apiErrorMessage(error, "Could not save client feedback."), "error");
+      }
+      return null;
+    }
+  };
+
+  const handleApplyClientReview = async ({
+    reviewOverride = null,
+    silent = false,
+    selectedReviewMessageId = "",
+  } = {}) => {
+    if (!isUuid(scriptDetailIdea?.scriptId)) {
+      flash("Generate and save the screenplay before applying client feedback.", "warning");
+      return;
+    }
+    const payload = normalizeClientReview({
+      ...(reviewOverride || clientReview),
+      dialogueLanguage: reviewOverride?.dialogueLanguage || clientReview?.dialogueLanguage || dialogueLanguage,
+    }, reviewOverride?.dialogueLanguage || clientReview?.dialogueLanguage || dialogueLanguage);
+    try {
+      const applied = await applyStoryboardClientReview({
+        scriptId: scriptDetailIdea.scriptId,
+        storyboardFeedback: payload.storyboardFeedback,
+        productionFramesFeedback: payload.productionFramesFeedback,
+        dialogueFeedback: payload.dialogueFeedback,
+        dialogueLanguage: payload.dialogueLanguage,
+        reviewStatus: payload.reviewStatus,
+        frameFeedback: payload.frameFeedback,
+        referenceUrls: payload.referenceUrls,
+        visualReferenceImages: payload.visualReferenceImages,
+        fontReferenceImages: payload.fontReferenceImages,
+        reviewChat: compactReviewChatForMutation(payload.reviewChat),
+        typographySystem: payload.typographySystem,
+        overlayPlan: payload.overlayPlan,
+        videoDirectorPlan: payload.videoDirectorPlan,
+        selectedReviewMessageId: String(selectedReviewMessageId || "").trim() || null,
+      }).unwrap();
+      const normalized = normalizeClientReview(applied, payload.dialogueLanguage);
+      const updatedShots = Array.isArray(applied?.updatedShots) ? applied.updatedShots : [];
+      setClientReview(normalized);
+      setClientReviewDirty(false);
+      setDialogueLanguage(normalized.dialogueLanguage);
+      setScriptDetailIdea((current) => current ? {
+        ...current,
+        dialogueLanguage: normalized.dialogueLanguage,
+        clientReview: normalized,
+        scriptScenes: updatedShots.length ? updatedShots : current.scriptScenes,
+        scriptJson: {
+          ...(current.scriptJson || {}),
+          dialogueLanguage: normalized.dialogueLanguage,
+          clientReview: normalized,
+          typographySystem: normalized.typographySystem,
+          overlayPlan: normalized.overlayPlan,
+          videoDirectorPlan: normalized.videoDirectorPlan,
+          planningPropagation: normalized.propagation,
+          shots: updatedShots.length ? updatedShots : current.scriptJson?.shots,
+        },
+      } : current);
+      if (updatedShots.length) {
+        setGeneratedStoryboard((current) => {
+          const base = current || currentStoryboard || {};
+          const existingScenes = Array.isArray(base.shots) && base.shots.length
+            ? base.shots
+            : Array.isArray(base.scenes)
+              ? base.scenes
+              : [];
+          const synchronizedScenes = mergeAppliedReviewScenes(existingScenes, updatedShots);
+          return {
+            ...base,
+            dialogueLanguage: normalized.dialogueLanguage,
+            shots: synchronizedScenes,
+            scenes: synchronizedScenes,
+          };
+        });
+      }
+      await refetchProductionPlans?.();
+      if (!silent) {
+        const approvedRuleCount = Number(normalized.creativeLearning?.approvedRuleCount || 0);
+        addActivity(
+          "Client feedback applied",
+          `${normalized.propagation?.updatedShotCount || updatedShots.length || scenes.length} shots synced across planning`
+        );
+        flash(
+          `Client feedback was applied to the storyline, screenplay, shot plans, overlays, dialogue language, and video handoff.${approvedRuleCount > 0 ? ` ${approvedRuleCount} approved creative principle${approvedRuleCount === 1 ? "" : "s"} will guide matching future ads.` : ""}`,
+          "success"
+        );
+      }
+      return { ...normalized, updatedShots };
+    } catch (error) {
+      creatorDebugLog("client review propagation failed", { scriptId: scriptDetailIdea?.scriptId, error });
+      if (!silent) flash(apiErrorMessage(error, "Could not apply client feedback across planning."), "error");
+      return null;
+    }
+  };
+
+  const handleRevertClientReview = async () => {
+    if (!isUuid(scriptDetailIdea?.scriptId)) {
+      flash("Generate and save the screenplay before restoring an earlier plan.", "warning");
+      return;
+    }
+    try {
+      const reverted = await revertStoryboardClientReview({
+        scriptId: scriptDetailIdea.scriptId,
+      }).unwrap();
+      const normalized = normalizeClientReview(reverted, dialogueLanguage);
+      const restoredShots = Array.isArray(reverted?.updatedShots) ? reverted.updatedShots : [];
+      const restoredPlanningLanguage = firstString(
+        normalized.propagation?.restoredDialogueLanguage,
+        dialogueLanguage
+      );
+      const restoredTypography = restoredShots.find((shot) => (
+        shot?.typographySystem && typeof shot.typographySystem === "object"
+      ))?.typographySystem || {};
+      const restoredOverlayPlan = restoredShots
+        .map((shot) => shot?.overlayPlan)
+        .filter((item) => item && typeof item === "object");
+      const restoredVideoDirectorPlan = normalized.propagation?.restoredVideoDirectorPlan
+        && typeof normalized.propagation.restoredVideoDirectorPlan === "object"
+        ? normalized.propagation.restoredVideoDirectorPlan
+        : {};
+      setClientReview(normalized);
+      setClientReviewDirty(false);
+      setDialogueLanguage(restoredPlanningLanguage);
+      setScriptDetailIdea((current) => current ? {
+        ...current,
+        dialogueLanguage: restoredPlanningLanguage,
+        clientReview: normalized,
+        scriptScenes: restoredShots.length ? restoredShots : current.scriptScenes,
+        scriptJson: {
+          ...(current.scriptJson || {}),
+          dialogueLanguage: restoredPlanningLanguage,
+          clientReview: normalized,
+          typographySystem: restoredTypography,
+          overlayPlan: restoredOverlayPlan,
+          videoDirectorPlan: restoredVideoDirectorPlan,
+          planningPropagation: normalized.propagation,
+          shots: restoredShots.length ? restoredShots : current.scriptJson?.shots,
+        },
+      } : current);
+      await refetchProductionPlans?.();
+      addActivity(
+        "Planning revision restored",
+        `${restoredShots.length || scenes.length} shots returned to the pre-apply version`
+      );
+      flash(
+        `The last applied revision was reverted. Your saved review draft and earlier planning state are restored.${normalized.propagation?.creativeLearningReverted ? " Its future-ad learning was also disabled." : ""}`,
+        "success"
+      );
+    } catch (error) {
+      creatorDebugLog("client review revert failed", { scriptId: scriptDetailIdea?.scriptId, error });
+      flash(apiErrorMessage(error, "Could not restore the previous planning version."), "error");
+    }
+  };
+
+  const handleApplyReviewMessage = async (message = {}, reviewOverride = null) => {
+    const messageId = String(message.id || "");
+    if (!messageId || reviewFrameUpdateKey) return;
+    setReviewFrameUpdateKey(messageId);
+    try {
+      const effectiveReviewSource = reviewOverride || clientReview;
+      const preliminaryAnalysisMessage = [...(effectiveReviewSource?.reviewChat || [])].reverse().find((item) => (
+        String(item?.confirmationForMessageId || "") === messageId
+        || String(item?.id || "") === `${messageId}-analysis`
+      ));
+      const preliminaryProposal = preliminaryAnalysisMessage?.proposal
+        && typeof preliminaryAnalysisMessage.proposal === "object"
+        ? preliminaryAnalysisMessage.proposal
+        : {};
+      if (!proposalHasMeaningfulPlanningDelta(preliminaryProposal)) {
+        flash("This draft has no usable current-versus-proposed frame changes. Analyze the prompt again before Apply.", "warning");
+        return;
+      }
+      const explicitEditScope = explicitReviewShotScope(message.text || message.message);
+      const proposedShotNumbers = reviewAffectedShotNumbers(
+        message,
+        preliminaryAnalysisMessage,
+        preliminaryProposal
+      );
+      const requestedShotNumbers = explicitEditScope.length
+        ? proposedShotNumbers.filter((shotNumber) => explicitEditScope.includes(shotNumber))
+        : proposedShotNumbers;
+      const pairedFrameRevision = requestedShotNumbers.length > 0
+        && preliminaryProposal.requiresFrameRegeneration !== false;
+      const effectiveTargetType = pairedFrameRevision ? "STORYBOARD_AND_PRODUCT" : "PLANNING";
+      const propagationReview = pairedFrameRevision ? {
+        ...effectiveReviewSource,
+        reviewChat: (effectiveReviewSource?.reviewChat || []).map((item) => (
+          String(item?.id || "") === messageId
+          || String(item?.confirmationForMessageId || "") === messageId
+            ? {
+                ...item,
+                targetType: "STORYBOARD_AND_PRODUCT",
+                affectedShotNumbers: requestedShotNumbers,
+                status: "AWAITING_CONFIRMATION",
+              }
+            : item
+        )),
+      } : effectiveReviewSource;
+      const appliedReview = await handleApplyClientReview({
+        silent: true,
+        reviewOverride: propagationReview,
+        selectedReviewMessageId: messageId,
+      });
+      if (!appliedReview) {
+        flash("Could not propagate this review instruction. Please retry from the chat message.", "error");
+        return;
+      }
+      const appliedShots = Array.isArray(appliedReview.updatedShots) ? appliedReview.updatedShots : [];
+      const appliedDialogueLanguage = firstText(
+        appliedReview.dialogueLanguage,
+        effectiveReviewSource?.dialogueLanguage,
+        dialogueLanguage,
+        "English"
+      );
+      const analysisMessage = [...(appliedReview.reviewChat || [])].reverse().find((item) => (
+        String(item?.confirmationForMessageId || "") === messageId
+        || String(item?.id || "") === `${messageId}-analysis`
+      ));
+      const proposal = analysisMessage?.proposal && typeof analysisMessage.proposal === "object"
+        ? analysisMessage.proposal
+        : preliminaryProposal;
+      const appliedProposalShotNumbers = reviewAffectedShotNumbers(
+        message,
+        analysisMessage,
+        proposal
+      );
+      const affectedShotNumbers = explicitEditScope.length
+        ? appliedProposalShotNumbers.filter((shotNumber) => explicitEditScope.includes(shotNumber))
+        : appliedProposalShotNumbers;
+      const targetType = affectedShotNumbers.length > 0 && proposal.requiresFrameRegeneration !== false
+        ? "STORYBOARD_AND_PRODUCT"
+        : effectiveTargetType;
+      const referenceAssetIds = new Set(
+        (Array.isArray(message.visualReferenceAssetIds) ? message.visualReferenceAssetIds : [])
+          .map((value) => String(value || "").trim())
+          .filter(Boolean)
+      );
+      const referenceUsageMode = String(
+        message.visualReferenceUsageMode || analysisMessage?.visualReferenceUsageMode || "INSPIRATION_ONLY"
+      ).toUpperCase();
+      const selectedReferenceAssets = (appliedReview.visualReferenceImages || [])
+        .filter((asset) => referenceAssetIds.has(String(asset?.assetId || asset?.id || "").trim()))
+        .map((asset) => ({
+          ...asset,
+          usageMode: referenceUsageMode,
+          visualReferenceUsageMode: referenceUsageMode,
+          referenceRole: referenceUsageMode === "EXACT_SOURCE" ? "exact_visual_source" : "visual_inspiration_only",
+          assetRole: referenceUsageMode === "EXACT_SOURCE" ? "exact_visual_source" : "visual_inspiration_only",
+        }));
+      const selectedReferenceUrls = uniqueStrings(selectedReferenceAssets.map((asset) => (
+        firstText(asset?.signedUrl, asset?.publicUrl, asset?.assetUrl, asset?.url)
+      )));
+      const referenceUsageGuidance = referenceUsageMode === "EXACT_SOURCE"
+        ? "Use the attached client image as the exact visual source for this confirmed shot. Preserve its visible source details and composition unless the confirmed instruction explicitly changes them."
+        : "Use the attached client image only as inspiration for mood, composition, lighting, texture, palette, and pacing. Preserve this project's approved product name, logo, packaging, claims, and identity; do not copy reference branding or artwork.";
+      const persistFrameRevisionRetry = async (failureMessage, completedFrames = []) => {
+        const retryAt = new Date().toISOString();
+        const retryChat = (appliedReview.reviewChat || []).map((item) => (
+          item.id === messageId
+            ? {
+                ...item,
+                status: "AWAITING_CONFIRMATION",
+                lastAttemptAt: retryAt,
+                generatedFrames: completedFrames,
+                affectedShotNumbers,
+              }
+            : item
+        ));
+        retryChat.push({
+          id: `${messageId}-retry-${Date.now()}`,
+          role: "assistant",
+          confirmationForMessageId: messageId,
+          targetType,
+          shotNumber: affectedShotNumbers.length === 1 ? affectedShotNumbers[0] : "",
+          affectedShotNumbers,
+          status: "AWAITING_CONFIRMATION",
+          createdAt: retryAt,
+          text: failureMessage,
+        });
+        const retryReview = normalizeClientReview(
+          { ...appliedReview, reviewChat: retryChat },
+          appliedReview.dialogueLanguage
+        );
+        await persistClientReview({ silent: true, reviewOverride: retryReview });
+        return retryReview;
+      };
+      const generated = [];
+      const regenerationQueue = [];
+      for (const shotNumber of affectedShotNumbers) {
+        const targetScene = appliedShots.find((shot) => Number(shot?.shotNumber) === shotNumber)
+          || scenes.find((shot) => Number(shot?.shotNumber) === shotNumber);
+        if (!targetScene) {
+          await persistFrameRevisionRetry(
+            `Planning was updated, but Shot ${shotNumber} could not be found for frame regeneration. The revision remains pending so the storyboard, product frames, and planning sheet cannot drift apart.`,
+            generated
+          );
+          flash(`Shot ${shotNumber} could not be loaded for regeneration. The revision remains pending.`, "warning");
+          return;
+        }
+        const shotRevision = (Array.isArray(proposal.shotRevisions) ? proposal.shotRevisions : []).find((item) => (
+          Number(item?.shotNumber || item?.shot_number) === shotNumber
+        )) || {};
+        const planningPreview = (Array.isArray(proposal.planningChangePreview) ? proposal.planningChangePreview : []).find((item) => (
+          Number(item?.shotNumber || item?.shot_number) === shotNumber
+        )) || {};
+        const previewOverlay = planningPreview.overlayPlan && typeof planningPreview.overlayPlan === "object"
+          ? planningPreview.overlayPlan
+          : {};
+        const previewPerSecondFrames = Array.isArray(planningPreview.perSecondFrames)
+          ? planningPreview.perSecondFrames
+          : [];
+        const premiumPlanningPrompt = [
+          "[APPROVED PRE-APPLY PREMIUM FRAME PLAN]",
+          planningPreview.proposedFrameDescription
+            ? `Proposed frame: ${planningPreview.proposedFrameDescription}`
+            : "",
+          planningPreview.cameraPlan ? `Camera: ${planningPreview.cameraPlan}` : "",
+          planningPreview.lensFocusPlan ? `Lens and focus: ${planningPreview.lensFocusPlan}` : "",
+          planningPreview.lightingPlan ? `Lighting: ${planningPreview.lightingPlan}` : "",
+          planningPreview.directionPlan ? `Direction: ${planningPreview.directionPlan}` : "",
+          planningPreview.transitionPlan ? `Transition: ${planningPreview.transitionPlan}` : "",
+          planningPreview.soundPlan ? `Sound: ${planningPreview.soundPlan}` : "",
+          `Dialogue language: ${appliedDialogueLanguage}. All spoken dialogue, voice-over, captions, subtitles, and text callouts must use ${appliedDialogueLanguage} only. Do not retain wording from the previously applied language.`,
+          Object.keys(previewOverlay).length
+            ? `Overlay: ${previewOverlay.enabled === false
+              ? "No on-screen text."
+              : [
+                  previewOverlay.text ? `render only "${previewOverlay.text}"` : "use only approved copy",
+                  previewOverlay.fontFamily,
+                  previewOverlay.position,
+                  previewOverlay.entrance,
+                  previewOverlay.exit,
+                ].filter(Boolean).join("; ")}`
+            : "",
+          previewPerSecondFrames.length
+            ? `Second-by-second execution:\n${previewPerSecondFrames.map((frame) => (
+                `[${frame.startTimeSeconds}-${frame.endTimeSeconds}s] ${frame.frameDescription}`
+                + ` | Camera: ${frame.cameraAction}`
+                + ` | Lighting: ${frame.lightingAction}`
+                + ` | Focus: ${frame.focusAction}`
+                + ` | Direction: ${frame.directorAction}`
+                + ` | Transition: ${frame.transitionAction}`
+              )).join("\n")}`
+            : "",
+          "Execute as a premium commercial film only: ARRI Alexa 35 or Sony Venice 2 class cinema capture, premium glass chosen for the intended scale, calibrated movement, measured focus marks, focus-puller control, 10/12-bit log or RAW intent, protected highlights, and 4K delivery oversampled from 6K/8K when supported.",
+          "Use a DP and gaffer-ready lighting design with motivated key, shaped fill or negative fill, precise rim and separation, declared color-temperature and contrast intent, modifiers, flagging, reflection control, and recorded continuity. Preserve deliberate commercial-director intent and exact product choreography. No phone, casual, rookie, generic, or automatic camera, exposure, focus, lighting, or direction.",
+        ].filter(Boolean).join("\n");
+        const revisionPrompt = [
+          firstText(
+            shotRevision.imageRevisionPrompt,
+            shotRevision.changeSummary,
+            proposal.imageRevisionPrompt,
+            proposal.changeSummary,
+            message.text,
+            message.message
+          ),
+          `Apply this instruction specifically to Shot ${shotNumber}. Preserve continuity with every preceding and following shot in the approved plan.`,
+          premiumPlanningPrompt,
+          selectedReferenceUrls.length ? referenceUsageGuidance : "",
+        ].filter(Boolean).join("\n\n");
+        const proposedShot = shotRevision.proposedShot && typeof shotRevision.proposedShot === "object"
+          ? shotRevision.proposedShot
+          : {};
+        const sceneForRegeneration = mergeAppliedDialogueFields({
+          ...targetScene,
+          ...proposedShot,
+          visualReferenceImages: selectedReferenceAssets.length
+            ? selectedReferenceAssets
+            : targetScene.visualReferenceImages,
+          visualReferenceImageUrls: selectedReferenceUrls.length
+            ? selectedReferenceUrls
+            : targetScene.visualReferenceImageUrls,
+          visualReferenceUsageMode: referenceUsageMode,
+          planningChangePreview: planningPreview,
+          storyboardTag: mergeAppliedDialogueFields(
+            {
+              ...(targetScene.storyboardTag || {}),
+              ...(proposedShot.storyboardTag || {}),
+            },
+            targetScene.storyboardTag || {},
+            appliedDialogueLanguage
+          ),
+        }, targetScene, appliedDialogueLanguage);
+        const productFrameChangeRequired = shotRevision.productFrameChangeRequired !== false
+          && planningPreview.productFrameChangeRequired !== false;
+        const storyboardChangeRequired = productFrameChangeRequired
+          || (shotRevision.storyboardChangeRequired !== false
+            && planningPreview.storyboardChangeRequired !== false);
+        regenerationQueue.push({
+          shotNumber,
+          sceneForRegeneration,
+          revisionPrompt,
+          storyboardChangeRequired,
+          productFrameChangeRequired,
+        });
+      }
+      const generateReviewFrameWithRetry = async (scene, imageKind, imageOptions) => {
+        const retryableOptions = {
+          ...imageOptions,
+          throwOnError: true,
+          suppressErrorFlash: true,
+        };
+        try {
+          return await handleGenerateShotImage(scene, imageKind, retryableOptions);
+        } catch (error) {
+          if (!isRateLimitedError(error) && !isTransientServiceError(error)) {
+            throw error;
+          }
+          const retryDelayMs = reviewRetryDelayMs(error);
+          const retrySeconds = Math.max(1, Math.ceil(retryDelayMs / 1000));
+          const shotNumber = Number(scene?.shotNumber || 1);
+          const frameLabel = imageKind === "production" ? "product frame" : "storyboard";
+          flash(
+            isRateLimitedError(error)
+              ? `Gemini is cooling down. Retrying Shot ${shotNumber} ${frameLabel} automatically in ${retrySeconds} seconds.`
+              : `The service is recovering. Retrying Shot ${shotNumber} ${frameLabel} automatically in ${retrySeconds} seconds.`,
+            "warning"
+          );
+          await waitForReviewRetry(retryDelayMs);
+          return handleGenerateShotImage(scene, imageKind, retryableOptions);
+        }
+      };
+      for (const {
+        shotNumber,
+        sceneForRegeneration,
+        revisionPrompt,
+        storyboardChangeRequired,
+        productFrameChangeRequired,
+      } of regenerationQueue) {
+        if (storyboardChangeRequired) {
+          try {
+            const frame = await generateReviewFrameWithRetry(sceneForRegeneration, "storyboard", {
+              imagePrompt: revisionPrompt,
+              referenceImageUrls: selectedReferenceUrls,
+              referenceImageDetails: referenceUsageGuidance,
+            });
+            if (!frame) {
+              await persistFrameRevisionRetry(
+                `The planning sheet was updated, but Shot ${shotNumber}'s storyboard image could not be regenerated. Its product frame was not changed, so that visual pair stays consistent. Select retry below to regenerate all affected shots.`,
+                generated
+              );
+              flash(`Shot ${shotNumber} storyboard generation did not finish. Product regeneration was paused.`, "warning");
+              return;
+            }
+            generated.push(`Shot ${shotNumber} storyboard`);
+          } catch (error) {
+            const reason = apiErrorMessage(error, "The image provider is temporarily unavailable.");
+            await persistFrameRevisionRetry(
+              `The planning sheet was updated, but the continuous storyboard sequence paused at Shot ${shotNumber}: ${reason} Its product-frame regeneration and all later shots have not started. Select retry to resume the complete affected sequence.`,
+              generated
+            );
+            flash(`Shot ${shotNumber} storyboard paused: ${reason}`, "warning");
+            return;
+          }
+        }
+        if (productFrameChangeRequired) {
+          try {
+            const frame = await generateReviewFrameWithRetry(sceneForRegeneration, "production", {
+              productLed: true,
+              imagePrompt: [revisionPrompt, defaultProductImagePrompt(sceneForRegeneration)].filter(Boolean).join("\n\n"),
+              referenceImageDetails: referenceUsageGuidance,
+              productReferenceImageUrls: uniqueStrings([
+                ...selectedReferenceUrls,
+                ...productReferenceUrlsFromBrief(storyboardProductBrief || activeProductIntelligenceBrief),
+              ]),
+            });
+            if (!frame) {
+              await persistFrameRevisionRetry(
+                `Shot ${shotNumber}'s storyboard step completed, but its matching product frame did not finish. The complete revision remains pending. Select retry below to synchronize this shot before later shots continue.`,
+                generated
+              );
+              flash(`Shot ${shotNumber} product-frame generation did not finish. The revision remains pending.`, "warning");
+              return;
+            }
+            generated.push(`Shot ${shotNumber} product frame`);
+          } catch (error) {
+            const reason = apiErrorMessage(error, "The image provider is temporarily unavailable.");
+            await persistFrameRevisionRetry(
+              `Shot ${shotNumber}'s storyboard step completed, but its product frame is temporarily unavailable: ${reason} Later shots have not started. Select retry below to synchronize every affected shot and the planning sheet.`,
+              generated
+            );
+            flash(`Shot ${shotNumber} product frame paused: ${reason}`, "warning");
+            return;
+          }
+        }
+      }
+      await refetchProductionPlans?.();
+      const completedAt = new Date().toISOString();
+      const updatedChat = (appliedReview.reviewChat || []).map((item) => (
+        item.id === messageId
+          ? {
+              ...item,
+              status: "COMPLETED",
+              completedAt,
+              generatedFrames: generated,
+              affectedShotNumbers,
+            }
+          : item
+      ));
+      updatedChat.push({
+        id: `${messageId}-result-${Date.now()}`,
+        role: "assistant",
+        targetType,
+        shotNumber: affectedShotNumbers.length === 1 ? affectedShotNumbers[0] : "",
+        affectedShotNumbers,
+        status: "COMPLETED",
+        createdAt: completedAt,
+        text: affectedShotNumbers.length
+          ? `${generated.length ? generated.join(", ") : "The requested planning changes"} ${generated.length === 1 ? "was" : "were"} completed. The planning sheet, screenplay, overlays, DP/lighting context, and complete per-second video prompt were rebuilt and are ready for review.`
+          : "The feedback was propagated across the complete planning sheet and the per-second video-generation prompt was rebuilt.",
+      });
+      const finalReview = normalizeClientReview({ ...appliedReview, reviewChat: updatedChat }, appliedReview.dialogueLanguage);
+      await persistClientReview({ silent: true, reviewOverride: finalReview });
+      addActivity(
+        "Review change completed",
+        affectedShotNumbers.length ? `Shots ${affectedShotNumbers.join(", ")}` : "Complete planning"
+      );
+      const approvedRuleCount = Number(finalReview.creativeLearning?.approvedRuleCount || 0);
+      flash(
+        affectedShotNumbers.length
+          ? `Review applied to Shots ${affectedShotNumbers.join(", ")}; frames, planning sheet, and video prompt synchronized.${approvedRuleCount > 0 ? ` ${approvedRuleCount} approved creative principle${approvedRuleCount === 1 ? "" : "s"} saved for matching future ads.` : ""}`
+          : `Review applied across the complete plan and per-second video prompt.${approvedRuleCount > 0 ? ` ${approvedRuleCount} approved creative principle${approvedRuleCount === 1 ? "" : "s"} saved for matching future ads.` : ""}`,
+        "success"
+      );
+    } catch (error) {
+      creatorDebugLog("review message apply failed", { messageId, error });
+      flash(apiErrorMessage(error, "Could not apply this review change."), "error");
+    } finally {
+      setReviewFrameUpdateKey("");
+    }
+  };
+
+  const localAnimatedStoryboardReport = (reviewOverride) => buildAnimatedStoryboardHtml({
+    title: buildExportTitle({ activeProjectId, storyScriptIdea, scriptDetailIdea, selectedIdea, currentStoryboard }),
+    storyline: buildExportStoryline({ activeProjectId, storyScriptIdea, scriptDetailIdea, selectedIdea, currentStoryboard }),
+    scenes,
+    durationSeconds: currentStoryboard?.durationSeconds || currentStoryboard?.duration || selectedDuration,
+    screenType: currentStoryboard?.screenType || screenType,
+    dialogueLanguage,
+    clientReview: reviewOverride || clientReview,
+    productMode: productStoryboardMode,
+  });
+
+  const resolveAnimatedStoryboardReport = async (reviewOverride) => {
+    const effectiveReview = reviewOverride || clientReview;
+    // Build from the live planner scenes so newly regenerated storyboard and product
+    // frames, manual overlay locks, and the latest motion settings are always present.
+    return { ...localAnimatedStoryboardReport(effectiveReview), source: "local" };
+  };
+
+  const handleAnimatedPreview = async () => {
+    if (!scenes.length) {
+      flash("Generate storyboard shots before opening the animated preview.", "warning");
+      return;
+    }
+    const previewWindow = window.open("", "_blank");
+    if (!previewWindow) {
+      flash("Allow pop-ups for Creator UI, then open Client Preview again.", "error");
+      return;
+    }
+    previewWindow.document.open();
+    previewWindow.document.write(animatedStoryboardLoadingHtml());
+    previewWindow.document.close();
+    setAnimatedPreviewLoading(true);
+    try {
+      const reviewNeededSaving = clientReviewDirty;
+      const savedReview = reviewNeededSaving ? await persistClientReview({ silent: true }) : null;
+      const report = await resolveAnimatedStoryboardReport(savedReview || clientReview, !reviewNeededSaving || Boolean(savedReview));
+      previewWindow.document.open();
+      previewWindow.document.write(report.html);
+      previewWindow.document.close();
+      previewWindow.focus();
+      addActivity("Animated storyboard opened", `${report.shotCount} shots · ${dialogueLanguage}`);
+      flash("Animated client storyboard opened in a new window.", "success");
+    } catch (error) {
+      previewWindow.close();
+      creatorDebugLog("animated storyboard preview failed", { scriptId: scriptDetailIdea?.scriptId, error });
+      flash("Could not open the animated storyboard preview.", "error");
+    } finally {
+      setAnimatedPreviewLoading(false);
+    }
+  };
+
+  const handleAnimatedHtmlExport = async () => {
+    if (!scenes.length) {
+      flash("Generate storyboard shots before exporting animated HTML.", "warning");
+      return;
+    }
+    setAnimatedHtmlExporting(true);
+    try {
+      const reviewNeededSaving = clientReviewDirty;
+      const savedReview = reviewNeededSaving ? await persistClientReview({ silent: true }) : null;
+      const report = await resolveAnimatedStoryboardReport(savedReview || clientReview, !reviewNeededSaving || Boolean(savedReview));
+      const title = buildExportTitle({ activeProjectId, storyScriptIdea, scriptDetailIdea, selectedIdea, currentStoryboard });
+      downloadHtmlDocument(report.html, animatedStoryboardFileName(title));
+      addActivity("Animated HTML exported", `${report.shotCount} client-ready shots`);
+      flash("Animated storyboard HTML downloaded.", "success");
+    } catch (error) {
+      creatorDebugLog("animated storyboard HTML export failed", { scriptId: scriptDetailIdea?.scriptId, error });
+      flash("Could not export the animated storyboard HTML.", "error");
+    } finally {
+      setAnimatedHtmlExporting(false);
+    }
+  };
+
   const handleExport = () => {
     if (!activeProjectId) {
       flash("Save a topic first so this workflow has a project id to export.", "error");
@@ -4173,6 +8102,9 @@ export default function PlannerPage() {
         scenes: scenes.slice(0, shotExportSummary.expected),
         durationSeconds: currentStoryboard?.durationSeconds || currentStoryboard?.duration || selectedDuration,
         screenType: currentStoryboard?.screenType || screenType,
+        productMode: productStoryboardMode,
+        dialogueLanguage,
+        clientReview,
         callbackUrl: buildPdfCallbackUrl(activeProjectId, scriptDetailIdea?.scriptId),
       });
       emitCreatorAnalyticsEvent("creator_pdf_export_opened", {
@@ -4285,28 +8217,9 @@ export default function PlannerPage() {
     dispatch(setTenantIdentity(identity));
     persistTenantId(identity.tenantId);
 
-    let walletRechargeFailed = false;
-    if (Number(draft?.initialWalletAmount) >= 100) {
-      try {
-        await createWalletRecharge({
-          tenantId: identity.tenantId,
-          amount: Number(draft.initialWalletAmount),
-          currency: draft.currency || "INR",
-          source: "organization_setup",
-        }).unwrap();
-      } catch {
-        walletRechargeFailed = true;
-      }
-    }
-
     void refetchOrganization?.();
     addActivity("Organization configured", identity.companyName || identity.name || identity.tenantId);
-    flash(
-      walletRechargeFailed
-        ? "Organization created; wallet recharge API failed."
-        : "Organization created and wallet service connected.",
-      walletRechargeFailed ? "warning" : "success"
-    );
+    flash("Organization created and wallet service connected.");
   };
 
   const handleRecharge = async (body) => {
@@ -4315,25 +8228,84 @@ export default function PlannerPage() {
       return;
     }
     try {
-      await createWalletRecharge({ tenantId, ...body }).unwrap();
-      await refetchWallet?.();
-      flash("Recharge flow started");
-    } catch {
-      flash("Mock recharge flow started because recharge API failed", "warning");
-    }
-    setRechargeOpen(false);
-  };
+      const requestedCurrency = normalizeCurrencyCode(body?.currency || walletCurrencyCode || detectedBillingCurrencyCode);
+      const order = await createWalletRecharge({ tenantId, ...body, currency: requestedCurrency }).unwrap();
+      const checkoutDetails = orderCheckoutDetails(order);
+      const gatewayOrderId = paymentOrderId(order);
+      const paymentId = firstText(order.paymentId, order.payment_id);
+      const keyId = paymentKeyId(order);
+      const amountPaise = paymentAmountPaise(order, body?.amount);
+      const currency = normalizeCurrencyCode(firstText(checkoutDetails.currency, order.currency, body?.currency, requestedCurrency));
 
-  const handleUpgrade = async () => {
-    if (!tenantId) {
-      flash("Tenant is required before subscription activation", "error");
-      return;
-    }
-    try {
-      const result = await startSubscriptionUpgrade({ tenantId, productCode: "CREATOR", planCode: "CREATOR_PRO", agentCount: 0 }).unwrap();
-      flash(result?.subscriptionId ? "Creator subscription activation started" : "Subscription flow started");
-    } catch {
-      flash("Mock subscription flow started because subscription API failed", "warning");
+      if (!gatewayOrderId) {
+        throw new Error("Razorpay order response is missing checkout details.");
+      }
+      if (!paymentId) {
+        throw new Error("Billing did not return a payment tracking id for this recharge.");
+      }
+      if (!keyId) {
+        throw new Error("Razorpay public key is not configured for checkout.");
+      }
+      if (amountPaise < 100) {
+        throw new Error("Recharge amount is below Razorpay minimum amount.");
+      }
+
+      await loadRazorpayCheckoutScript();
+      await new Promise((resolve, reject) => {
+        let settled = false;
+        const rejectOnce = (error) => {
+          if (settled) return;
+          settled = true;
+          reject(error);
+        };
+
+        const checkout = new window.Razorpay({
+          key: keyId,
+          amount: amountPaise,
+          currency,
+          name: firstText(checkoutDetails.name, "Dalai Llama Platform"),
+          description: firstText(checkoutDetails.description, "Wallet recharge"),
+          order_id: gatewayOrderId,
+          handler: async (response) => {
+            if (settled) return;
+            settled = true;
+            try {
+              await verifyWalletPayment({
+                tenantId,
+                paymentId,
+                gatewayOrderId: response.razorpay_order_id,
+                gatewayPaymentId: response.razorpay_payment_id,
+                gatewaySignature: response.razorpay_signature,
+              }).unwrap();
+              resolve(response);
+            } catch (error) {
+              reject(new Error(apiErrorMessage(error, "Payment verification failed. Wallet was not credited.")));
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              const error = new Error("Payment cancelled. Wallet was not recharged.");
+              error.paymentCancelled = true;
+              rejectOnce(error);
+            },
+          },
+          theme: { color: "#8b5cf6" },
+        });
+
+        checkout.on("payment.failed", (response) => {
+          const error = new Error(response?.error?.description || "Payment failed. Wallet was not recharged.");
+          error.paymentFailed = true;
+          rejectOnce(error);
+        });
+
+        checkout.open();
+      });
+
+      await refetchWallet?.();
+      flash("Wallet recharge verified and credited.");
+      setRechargeOpen(false);
+    } catch (error) {
+      flash(error?.message || apiErrorMessage(error, "Could not start Razorpay checkout."), error?.paymentCancelled ? "warning" : "error");
     }
   };
 
@@ -4424,7 +8396,12 @@ export default function PlannerPage() {
     const nextProjectId = restored?.projectId || requestedProjectId;
 
     if (restored?.projectId) {
-      const targetWorkspacePage = options.workspacePage || restored.workspacePage;
+      const requestedWorkspacePage = options.workspacePage || restored.workspacePage;
+      const targetWorkspacePage = workspacePageIds.has(requestedWorkspacePage)
+        ? requestedWorkspacePage
+        : requestedWorkspacePage === "shoot-polish"
+          ? "video"
+          : "ideas";
       if (restored.lockedBrief) {
         setLockedBrief(restored.lockedBrief);
         setExtraIdeas((current) => mergeUniqueIdeas(current, [restored.lockedBrief]));
@@ -4459,6 +8436,11 @@ export default function PlannerPage() {
       setScriptDetailIdea(restored.scriptDetailIdea || null);
       setStorytellingType(restored.storytellingType || DEFAULT_STORYTELLING_TYPE);
       setHookLens(restored.hookLens || DEFAULT_HOOK_LENS);
+      setTopicType(restored.topicType || inferTopicTypeFromText(restored.lockedBrief?.description || restored.lockedBrief?.title));
+      setProductionStyle(restored.productionStyle || DEFAULT_PRODUCTION_STYLE);
+      setHybridSceneMode(restored.hybridSceneMode || DEFAULT_HYBRID_SCENE_MODE);
+      setBrollStyle(restored.brollStyle || DEFAULT_BROLL_STYLE);
+      setCaptionStyle(restored.captionStyle || DEFAULT_CAPTION_STYLE);
       setCastPlan(restored.castPlan || null);
       setSelectedAudienceDecision(restored.audienceDecision || null);
       setGeneratedStoryboard(restored.storyboard || null);
@@ -4475,7 +8457,12 @@ export default function PlannerPage() {
       dispatch(setProjectId(nextProjectId));
       flash("Project restored as the active workflow", "success");
     }
-    const targetPage = options.workspacePage || restored?.workspacePage;
+    const requestedTargetPage = options.workspacePage || restored?.workspacePage;
+    const targetPage = workspacePageIds.has(requestedTargetPage)
+      ? requestedTargetPage
+      : requestedTargetPage === "shoot-polish"
+        ? "video"
+        : "ideas";
     const restoredSection = targetPage === "ideas" ? "workflow" : sectionForWorkspacePage(targetPage);
     scrollToSection(restored?.workspacePage ? restoredSection : isUuid(nextProjectId) ? "storyboard" : "dashboard");
   };
@@ -4517,7 +8504,7 @@ export default function PlannerPage() {
   const handleOpenPostProductionShot = async (project, shot, index = 0) => {
     if (!project) return;
     await handleOpenHistoryItem(project, {
-      workspacePage: "shoot-polish",
+      workspacePage: "video",
       sceneIndex: Number.isFinite(index) ? index : Math.max(0, Number(shot?.shotNumber || 1) - 1),
       skipProjectFetch: Boolean(project.postProductionApi),
     });
@@ -4536,6 +8523,11 @@ export default function PlannerPage() {
         const storyIdea = normalizeBackendStorylineDetail(detail);
         setStorytellingType(storyIdea.storytellingType || DEFAULT_STORYTELLING_TYPE);
         setHookLens(storyIdea.hookLens || DEFAULT_HOOK_LENS);
+        setTopicType(storyIdea.topicType || inferTopicTypeFromText(storyIdea.description || storyIdea.title));
+        setProductionStyle(storyIdea.productionStyle || DEFAULT_PRODUCTION_STYLE);
+        setHybridSceneMode(storyIdea.hybridSceneMode || DEFAULT_HYBRID_SCENE_MODE);
+        setBrollStyle(storyIdea.brollStyle || DEFAULT_BROLL_STYLE);
+        setCaptionStyle(storyIdea.captionStyle || DEFAULT_CAPTION_STYLE);
         setStoryScriptIdea(storyIdea);
         if (storyIdea?.id) {
           setSavedStoryIdeaId(storyIdea.id);
@@ -4553,6 +8545,11 @@ export default function PlannerPage() {
         const scriptIdea = normalizeBackendScriptDetail(detail);
         setStorytellingType(scriptIdea.storytellingType || DEFAULT_STORYTELLING_TYPE);
         setHookLens(scriptIdea.hookLens || DEFAULT_HOOK_LENS);
+        setTopicType(scriptIdea.topicType || inferTopicTypeFromText(scriptIdea.description || scriptIdea.title));
+        setProductionStyle(scriptIdea.productionStyle || DEFAULT_PRODUCTION_STYLE);
+        setHybridSceneMode(scriptIdea.hybridSceneMode || DEFAULT_HYBRID_SCENE_MODE);
+        setBrollStyle(scriptIdea.brollStyle || DEFAULT_BROLL_STYLE);
+        setCaptionStyle(scriptIdea.captionStyle || DEFAULT_CAPTION_STYLE);
         setScriptDetailIdea(scriptIdea);
         if (scriptIdea?.id) {
           setStoryScriptIdea((current) => current || normalizeGeneratedIdea(scriptIdea));
@@ -4584,6 +8581,18 @@ export default function PlannerPage() {
           onStorytellingTypeChange={setStorytellingType}
           hookLens={hookLens}
           onHookLensChange={setHookLens}
+          productionStyle={productionStyle}
+          onProductionStyleChange={setProductionStyle}
+          productionStyleOptions={PRODUCTION_STYLE_OPTIONS}
+          hybridSceneMode={hybridSceneMode}
+          onHybridSceneModeChange={setHybridSceneMode}
+          hybridSceneModeOptions={HYBRID_SCENE_MODE_OPTIONS}
+          brollStyle={brollStyle}
+          onBrollStyleChange={setBrollStyle}
+          brollStyleOptions={BROLL_STYLE_OPTIONS}
+          captionStyle={captionStyle}
+          onCaptionStyleChange={setCaptionStyle}
+          captionStyleOptions={CAPTION_STYLE_OPTIONS}
           aiProviders={availableAiProviders}
           selectedProviderCode={selectedAiProvider?.code || selectedProviderCode}
           selectedProvider={selectedAiProvider}
@@ -4593,6 +8602,12 @@ export default function PlannerPage() {
           pageInfo={ideaCandidatePageInfo}
           onPageChange={handleIdeaCandidatePageChange}
           onGenerateIdeas={handleGenerateStoryIdeas}
+          campaignAngleSuggestions={campaignAngleSuggestions}
+          selectedCampaignAngle={activeCampaignAngle}
+          onGenerateCampaignAngles={handleGenerateCampaignAngles}
+          onSelectCampaignAngle={handleCampaignAngleSelect}
+          isGeneratingCampaignAngles={campaignAngleSuggestionState.isLoading}
+          isSelectingCampaignAngle={selectLockedCampaignAngleState.isLoading}
           showGenerateIdeasAction={!showCreativeBriefPanel}
           onSelectIdea={handleIdeaSelect}
           onSaveStoryIdea={handleSaveStoryIdea}
@@ -4659,6 +8674,26 @@ export default function PlannerPage() {
             onSave={handleSaveGeneratedScript}
             isSaving={saveGeneratedScriptState.isLoading}
             onContinue={handleContinueFromScreenplay}
+            humanReviewOrder={screenplayReviewOrder}
+            onSubmitHumanReview={handleSubmitScreenplayReview}
+            isSubmittingHumanReview={submitHumanWorkOrderState.isLoading}
+          />
+          <StoryboardReferenceImagePanel
+            assets={storyboardReferenceAssets}
+            details={storyboardReferenceDetails}
+            enhanceScreenplay={storyboardEnhanceWithReference}
+            uploading={uploadScreenplayVideoReferenceImageState.isLoading}
+            error={storyboardReferenceUploadError}
+            disabled={!scriptDetailIdea?.scriptId}
+            onDetailsChange={(value) => {
+              setStoryboardReferenceDetails(value);
+              if (storyboardReferenceAssets.length) {
+                setScriptDetailIdea((current) => applyStoryboardReferenceToScriptIdea(current, storyboardReferenceAssets, value, storyboardEnhanceWithReference));
+              }
+            }}
+            onEnhanceChange={handleToggleStoryboardReferenceEnhancement}
+            onUpload={handleUploadStoryboardReferenceImage}
+            onBlockedAction={(message) => flash(message, "warning")}
           />
           <ProductionPlanPanel plans={productionPlanTags} scenes={scenes} />
         </div>
@@ -4687,6 +8722,16 @@ export default function PlannerPage() {
     return null;
   };
 
+  const lowBalanceMinimum = Number(lowBalanceNotice?.minimumBalance) > 0
+    ? Number(lowBalanceNotice.minimumBalance)
+    : paidGenerationMinimumBalance;
+  const lowBalanceShortfall = Math.max(0, lowBalanceMinimum - walletBalanceAmount);
+  const lowBalanceIsEmpty = walletBalanceAmount <= 0;
+  const lowBalanceTitle = lowBalanceIsEmpty ? "Wallet balance is zero" : "Wallet balance is too low";
+  const lowBalanceBody = lowBalanceIsEmpty
+    ? `Add at least ${formatWalletAmount(lowBalanceMinimum, walletCurrencyCode)} to start ${lowBalanceNotice?.actionLabel || "this paid flow"}.`
+    : `Keep at least ${formatWalletAmount(lowBalanceMinimum, walletCurrencyCode)} to run ${lowBalanceNotice?.actionLabel || "this paid flow"}.`;
+
   return (
     <div id="dashboard" className="creator-section mx-auto max-w-[1680px] space-y-5 px-4 py-6 sm:px-6 xl:px-8">
       <header className="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
@@ -4699,7 +8744,13 @@ export default function PlannerPage() {
         <div className="flex max-w-full items-center gap-2">
           <div className="custom-scrollbar -mx-1 flex min-w-0 items-center gap-2 overflow-x-auto px-1 pb-1">
             <div className="shrink-0">
-              <SubscriptionBadge subscription={subscription} isLoading={subscriptionLoading || upgradeState.isLoading} onUpgrade={handleUpgrade} />
+              <WalletBalanceButton
+                wallet={wallet}
+                isLoading={walletLoading}
+                onRecharge={handleOpenRecharge}
+                minimumBalance={creatorFlowMinimumBalance}
+                minimumLabel="60-sec video flow"
+              />
             </div>
             <button type="button" onClick={() => setProjectsOpen(true)} className="creator-control flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-300">
               <FolderOpen size={16} /> Projects
@@ -4747,6 +8798,8 @@ export default function PlannerPage() {
         wallet={wallet}
         isLoading={organizationLoading}
         walletLoading={walletLoading}
+        minimumBalance={creatorFlowMinimumBalance}
+        minimumLabel="60-sec video flow"
         isSaving={setupOrganizationState.isLoading}
         onSubmit={handleOrganizationSetup}
         onRecharge={handleOpenRecharge}
@@ -4777,16 +8830,50 @@ export default function PlannerPage() {
           onPageChange={setTrendPage}
           mode={TREND_DISCOVERY_ENABLED ? trendChoiceMode : "original"}
           onModeChange={TREND_DISCOVERY_ENABLED ? setTrendChoiceMode : () => setTrendChoiceMode("original")}
+          creativeFlow={creativeFlow}
+          onCreativeFlowChange={setCreativeFlow}
           originalIdea={manualIdeaDraft}
-          onOriginalIdeaChange={setManualIdeaDraft}
+          onOriginalIdeaChange={handleOriginalIdeaChange}
+          productAdBrief={activeProductAdBrief}
+          onProductAdBriefChange={handleProductAdBriefChange}
+          onUploadProductReferenceImages={handleUploadProductReferenceImages}
+          isUploadingProductReferenceImages={uploadProductReferenceImagesState.isLoading}
+          productAdFormatOptions={PRODUCT_AD_FORMAT_OPTIONS}
+          productAdFormatPlaybooks={PRODUCT_AD_FORMAT_PLAYBOOKS}
+          productAdShotTypeOptions={PRODUCT_AD_SHOT_TYPE_OPTIONS}
+          onGenerateProductAdPipeline={handleGenerateProductAdPipeline}
+          isGeneratingProductAdPipeline={productAdPipelineState.isLoading || Boolean(productAdPipelineJobId)}
+          productAdPipelineJob={productAdPipelineJob}
+          canGenerateProductAdPipeline={hasActiveProductAdInput}
           onSaveOriginalIdea={handleSaveOriginalIdea}
           onSaveTrend={handleSaveTrendBrief}
           onGenerateStoryIdeas={handleGenerateStoryIdeas}
+          topicType={topicType}
+          onTopicTypeChange={handleTopicTypeChange}
+          topicTypeOptions={TOPIC_TYPE_OPTIONS}
+          topicIdeaSuggestions={campaignAngleSuggestions}
+          selectedCampaignAngle={activeCampaignAngle}
+          onSelectCampaignAngle={handleCampaignAngleSelect}
+          onGenerateCampaignAngles={handleGenerateCampaignAngles}
+          isGeneratingCampaignAngles={campaignAngleSuggestionState.isLoading}
+          canGenerateCampaignAngles={creativeFlow === "guided" && Boolean(lockedBrief?.backendLocked && isUuid(lockedBrief?.lockedIdeaId))}
+          productionStyle={productionStyle}
+          onProductionStyleChange={setProductionStyle}
+          productionStyleOptions={PRODUCTION_STYLE_OPTIONS}
+          hybridSceneMode={hybridSceneMode}
+          onHybridSceneModeChange={setHybridSceneMode}
+          hybridSceneModeOptions={HYBRID_SCENE_MODE_OPTIONS}
+          brollStyle={brollStyle}
+          onBrollStyleChange={setBrollStyle}
+          brollStyleOptions={BROLL_STYLE_OPTIONS}
+          captionStyle={captionStyle}
+          onCaptionStyleChange={setCaptionStyle}
+          captionStyleOptions={CAPTION_STYLE_OPTIONS}
           isFetching={isFetching}
           isLockingSelection={lockSelectionState.isLoading}
           isGeneratingIdeas={generatedIdeaState.isLoading || generatedIdeaAsyncState.isLoading || Boolean(ideaGenerationJobId)}
-          canGenerateStoryIdeas={canGenerateStoryIdeas}
-          savedBriefTitle={canGenerateStoryIdeas ? lockedBrief?.title : ""}
+          canGenerateStoryIdeas={creativeFlow === "guided" && canGenerateStoryIdeas}
+          savedBriefTitle={creativeFlow === "guided" && canGenerateStoryIdeas ? lockedBrief?.title : ""}
           aiProviders={availableAiProviders}
           selectedProviderCode={selectedAiProvider?.code || selectedProviderCode}
           selectedProvider={selectedAiProvider}
@@ -4795,6 +8882,8 @@ export default function PlannerPage() {
           providersError={aiProvidersError}
           trendsDisabled={!TREND_DISCOVERY_ENABLED}
           autoFocusOriginalIdea={workspacePage === "ideas" && !projectWorkspaceMode}
+          onRefreshTrendMoments={handleRefreshWeeklyIdeaTags}
+          isRefreshingTrendMoments={weeklyIdeaTagsLoading || refreshWeeklyIdeaTagsState.isLoading}
         />
         {TREND_DISCOVERY_ENABLED && (
           <WhyTrendingStrip
@@ -4935,8 +9024,200 @@ export default function PlannerPage() {
       </section>
       )}
 
+      {workspacePage === "video" && (
+      <section id="video" className="creator-section space-y-5">
+        <div className="grid gap-5 2xl:grid-cols-[minmax(0,3fr)_minmax(19rem,1fr)]">
+          <ScreenplayVideoGenerationPanel
+            screenplay={scriptDetailIdea}
+            scenes={scriptDetailIdea?.scriptScenes?.length ? scriptDetailIdea.scriptScenes : scriptDetailIdea?.scriptJson?.shots || scenes}
+            screenplayApproved={effectiveScreenplayApprovedForVideo}
+            videoRun={currentScreenplayVideoRun}
+            videoRunLoading={screenplayVideoRunLoading || latestPersistedScreenplayVideoRunLoading}
+            videoJob={screenplayVideoJob || (screenplayVideoJobActive ? { status: "RUNNING", progress: 12, message: "Preparing video run" } : null)}
+            finalRenderJob={screenplayVideoFinalJob || (screenplayVideoFinalJobActive ? { status: "RUNNING", progress: 18, message: "Merging accepted shot clips" } : null)}
+            audioJob={screenplayVideoAudioJob || (screenplayVideoAudioJobActive ? { status: "RUNNING", progress: 18, message: "Preparing dialogue and background music" } : null)}
+            productionStyle={productionStyle}
+            productionStyleLabel={productionStyleLabelFor(productionStyle)}
+            hybridSceneMode={hybridSceneMode}
+            onHybridSceneModeChange={setHybridSceneMode}
+            brollStyleLabel={brollStyleOptionFor(brollStyle).label}
+            captionStyleLabel={captionStyleOptionFor(captionStyle).label}
+            videoFinishingPlan={activeVideoFinishingPlan}
+            onVideoFinishingPlanChange={setVideoFinishingPlan}
+            videoProvider={screenplayVideoProvider}
+            videoModel={screenplayVideoModel}
+            onVideoProviderChange={setScreenplayVideoProvider}
+            onVideoModelChange={setScreenplayVideoModel}
+            storyboardReady={effectiveShotPlansReady}
+            storyboardGenerated={shotsGenerated}
+            storyboardLoading={shotGenerationLoading || shotPlanLoading}
+            onOpenStoryboard={() => handleWorkspacePageClick("storyboard")}
+            onGenerateStoryboard={handleShotPlansAction}
+            onGenerateSceneImage={(scene, imageOptions) => handleGenerateShotImage(scene, "production", imageOptions)}
+            onGenerateAllSceneImages={handleGenerateAllScreenplaySceneImages}
+            onUploadSceneImage={handleUploadScreenplaySceneProductionImage}
+            onApprove={handleApproveScreenplayForVideo}
+            onGenerate={handleGenerateScreenplayVideo}
+            onUploadReferenceImage={handleUploadScreenplayVideoReferenceImage}
+            founderAvatarProfile={activeFounderAvatarProfile}
+            availableFounderAvatars={availableFounderAvatars}
+            selectedFounderAvatarKey={selectedFounderAvatarKey}
+            founderAvatarLibraryLoading={reusableFounderAvatarLibraryLoading}
+            onSelectFounderAvatar={handleSelectFounderAvatar}
+            onFounderAvatarProfileChange={setFounderAvatarProfile}
+            dialogueLanguage={dialogueLanguage}
+            onDialogueLanguageChange={setDialogueLanguage}
+            onUploadFounderAvatarSource={handleUploadFounderAvatarSource}
+            onPrepareFounderEnglishDialogue={handlePrepareFounderEnglishDialogue}
+            onGenerateFounderVoicePreview={handleGenerateFounderVoicePreview}
+            onFounderVoiceDecision={handleFounderVoiceDecision}
+            onPrepareFounderAvatarPortrait={handlePrepareFounderAvatarPortrait}
+            onGenerateFounderAvatarTest={handleGenerateFounderAvatarTest}
+            onGenerateFounderAvatarPreview={handleGenerateFounderAvatarPreview}
+            onFounderAvatarDecision={handleFounderAvatarDecision}
+            onUploadFounderFinalAudio={handleUploadFounderFinalAudio}
+            onBlockedAction={(message) => flash(message, "warning")}
+            onChatScene={handleChatScreenplayVideoScene}
+            onGenerateSceneDialogueVoice={handleGenerateScreenplaySceneDialogueVoice}
+            onDecideSceneDialogueVoice={handleDecideScreenplaySceneDialogueVoice}
+            onCombineSceneDialogueAudio={handleCombineScreenplaySceneDialogueAudio}
+            onUploadSceneAvatarImage={handleUploadScreenplaySceneAvatarImage}
+            onRegenerateScene={handleRegenerateScreenplayVideoScene}
+            onFinalRender={handleRenderScreenplayFinalVideo}
+            onGenerateAudioPack={handleGenerateScreenplayAudioPack}
+            onRefreshMedia={refreshScreenplayMedia}
+            onOpenScreenplay={() => handleWorkspacePageClick("screenplay")}
+            editingWorkOrder={editingWorkOrder}
+            onSubmitEditingJob={handleSubmitEditingJob}
+            onApproveEditingJob={handleApproveEditingJob}
+            onRequestEditingChanges={handleRequestEditingChanges}
+            isApproving={approveScreenplayState.isLoading}
+            isGenerating={screenplayVideoJobActive}
+            isUploadingReferenceImage={uploadScreenplayVideoReferenceImageState.isLoading}
+            isUploadingFounderAvatarSource={uploadScreenplayFounderAvatarSourceState.isLoading}
+            isPreparingFounderEnglishDialogue={prepareFounderEnglishDialogueState.isLoading}
+            isSelectingFounderAvatar={selectReusableFounderAvatarState.isLoading}
+            isGeneratingFounderVoicePreview={generateFounderVoicePreviewState.isLoading}
+            isUpdatingFounderVoiceApproval={approveFounderVoicePreviewState.isLoading}
+            isPreparingFounderAvatarPortrait={prepareFounderAvatarPortraitState.isLoading}
+            isGeneratingFounderAvatarTest={generateFounderAvatarTestState.isLoading}
+            isGeneratingFounderAvatarPreview={generateFounderAvatarPreviewState.isLoading}
+            isUpdatingFounderAvatarApproval={approveFounderAvatarPreviewState.isLoading}
+            isUploadingFounderFinalAudio={uploadFounderFinalAudioState.isLoading}
+            isFinalRendering={screenplayVideoFinalJobActive}
+            isGeneratingAudio={screenplayVideoAudioJobActive}
+            isSubmittingEditingJob={submitHumanWorkOrderState.isLoading}
+            isApprovingEditingJob={approveHumanWorkOrderState.isLoading}
+            isRequestingEditingChanges={requestHumanWorkOrderChangesState.isLoading}
+            isGeneratingSceneImage={(scene) => visibleShotImageLoadingKeys.includes(shotImageLoadingKey(scene?.shotNumber || scene?.sceneNumber || 1, "production"))}
+            isSceneWorking={(scene) => {
+              const sceneId = String(scene?.id || scene?.sceneId || scene?.scene_id || "");
+              const sceneGenerationLoading = generateScreenplayVideoSceneState.isLoading || regenerateScreenplayVideoSceneState.isLoading;
+              const activeSceneMatches = !screenplayVideoActiveSceneId || String(screenplayVideoActiveSceneId || "") === sceneId;
+              return (sceneGenerationLoading && String(screenplayVideoActiveSceneId || "") === sceneId)
+                || (screenplayVideoSceneJobActive && activeSceneMatches)
+                || (screenplayVideoSceneJobActive && isActiveSceneVideoStatus(scene?.status));
+            }}
+          />
+          <MobileFrame
+            scene={selectedScene}
+            scenes={scriptDetailIdea?.scriptScenes?.length ? scriptDetailIdea.scriptScenes : scriptDetailIdea?.scriptJson?.shots || scenes}
+            videoRun={currentScreenplayVideoRun}
+            finalVideoUrl={activeFinalVideoUrl}
+            screenplay={scriptDetailIdea}
+            productionStyle={productionStyle}
+            cursorMs={preview.cursorMs}
+            durationMs={preview.durationMs}
+            isPlaying={preview.isPlaying}
+            onToggle={() => dispatch(togglePlayback())}
+            onSeek={(ms) => {
+              const previewScenes = scriptDetailIdea?.scriptScenes?.length ? scriptDetailIdea.scriptScenes : scriptDetailIdea?.scriptJson?.shots || scenes;
+              const sceneMs = preview.durationMs / Math.max(1, previewScenes.length);
+              dispatch(setCursorMs(ms));
+              dispatch(setCurrentSceneIndex(Math.min(Math.max(0, previewScenes.length - 1), Math.floor(ms / sceneMs))));
+            }}
+            onRefreshMedia={refreshScreenplayMedia}
+          />
+        </div>
+      </section>
+      )}
+
+      {workspacePage === "client-review" && (
+        <section id="client-review" className="creator-section space-y-4">
+          <div className="creator-panel border-cyan-300/20 bg-gradient-to-r from-cyan-400/[0.08] via-purple-400/[0.06] to-transparent p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-normal text-cyan-200">
+                  <MessageSquareText size={15} />
+                  Client Review
+                </div>
+                <h2 className="mt-1 text-lg font-extrabold text-white">Review frames and update the complete production plan</h2>
+                <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-slate-400">
+                  Select a storyboard or product frame and describe the change. The director automatically plans premium typography, placement, motion, and pacing before the approved revision moves to Video.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleWorkspacePageClick("storyboard")}
+                className="creator-control flex min-h-11 shrink-0 items-center justify-center gap-2 px-5 text-sm font-black text-white"
+              >
+                <Clapperboard size={16} />
+                Back to Storyboard
+              </button>
+            </div>
+          </div>
+          <ClientReviewPanel
+            review={clientReview}
+            shots={scenes}
+            dialogueLanguage={clientReview?.dialogueLanguage || dialogueLanguage}
+            shotCount={scenes.length}
+            onChange={handleClientReviewChange}
+            onDialogueLanguageChange={handleClientDialogueLanguageChange}
+            onSave={() => persistClientReview()}
+            onApply={handleApplyClientReview}
+            onRevert={handleRevertClientReview}
+            onUploadVisualReference={handleUploadVisualReferenceImages}
+            onUploadFontReference={handleUploadFontReferenceImage}
+            onSendReviewMessage={handleSendReviewMessage}
+            onApplyReviewMessage={handleApplyReviewMessage}
+            isLoading={clientReviewLoading}
+            isSaving={saveClientReviewState.isLoading}
+            isChatting={chatClientReviewState.isLoading}
+            isApplying={applyClientReviewState.isLoading}
+            isReverting={revertClientReviewState.isLoading}
+            isUploadingVisualReference={uploadVisualReferenceState.isLoading}
+            isUploadingFontReference={uploadFontReferenceState.isLoading}
+            updatingReviewMessageId={reviewFrameUpdateKey}
+            isDirty={clientReviewDirty}
+            disabled={!isUuid(scriptDetailIdea?.scriptId)}
+          />
+        </section>
+      )}
+
       {workspacePage === "storyboard" && (
       <>
+      <section className="creator-panel border-cyan-300/20 bg-gradient-to-r from-cyan-400/[0.08] via-purple-400/[0.06] to-transparent p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-normal text-cyan-200">
+              <ListChecks size={15} />
+              Client review
+            </div>
+            <h2 className="mt-1 text-lg font-extrabold text-white">Give feedback and propagate it to final planning</h2>
+            <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-slate-400">
+              Review storyboard images, product frames, dialogue, and references. Approved changes propagate through storyline, screenplay, shot planning, production frames, and animation; typography and overlay motion are directed automatically.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleWorkspacePageClick("client-review")}
+            className="creator-primary flex min-h-11 shrink-0 items-center justify-center gap-2 px-5 text-sm font-black text-white"
+          >
+            <Sparkles size={16} />
+            Open Client Review
+          </button>
+        </div>
+      </section>
       {shotPlanRetry && (
         <section className="creator-panel border-amber-300/20 bg-amber-400/[0.045] p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -4970,6 +9251,48 @@ export default function PlannerPage() {
           </div>
         </section>
       )}
+      <StoryboardReferenceImagePanel
+        assets={storyboardReferenceAssets}
+        details={storyboardReferenceDetails}
+        enhanceScreenplay={storyboardEnhanceWithReference}
+        uploading={uploadScreenplayVideoReferenceImageState.isLoading}
+        error={storyboardReferenceUploadError}
+        disabled={!scriptDetailIdea?.scriptId}
+        onDetailsChange={(value) => {
+          setStoryboardReferenceDetails(value);
+          if (storyboardReferenceAssets.length) {
+            setScriptDetailIdea((current) => applyStoryboardReferenceToScriptIdea(current, storyboardReferenceAssets, value, storyboardEnhanceWithReference));
+          }
+        }}
+        onEnhanceChange={handleToggleStoryboardReferenceEnhancement}
+        onUpload={handleUploadStoryboardReferenceImage}
+        onBlockedAction={(message) => flash(message, "warning")}
+      />
+      <ClientReviewPanel
+        review={clientReview}
+        shots={scenes}
+        dialogueLanguage={clientReview?.dialogueLanguage || dialogueLanguage}
+        shotCount={scenes.length}
+        onChange={handleClientReviewChange}
+        onDialogueLanguageChange={handleClientDialogueLanguageChange}
+        onSave={() => persistClientReview()}
+        onApply={handleApplyClientReview}
+        onRevert={handleRevertClientReview}
+        onUploadVisualReference={handleUploadVisualReferenceImages}
+        onUploadFontReference={handleUploadFontReferenceImage}
+        onSendReviewMessage={handleSendReviewMessage}
+        onApplyReviewMessage={handleApplyReviewMessage}
+        isLoading={clientReviewLoading}
+        isSaving={saveClientReviewState.isLoading}
+        isChatting={chatClientReviewState.isLoading}
+        isApplying={applyClientReviewState.isLoading}
+        isReverting={revertClientReviewState.isLoading}
+        isUploadingVisualReference={uploadVisualReferenceState.isLoading}
+        isUploadingFontReference={uploadFontReferenceState.isLoading}
+        updatingReviewMessageId={reviewFrameUpdateKey}
+        isDirty={clientReviewDirty}
+        disabled={!isUuid(scriptDetailIdea?.scriptId)}
+      />
       <ProductionPlanPanel plans={productionPlanTags} scenes={scenes} isLoading={shotPlanLoading} />
       <div id="storyboard" className="creator-section grid gap-5 2xl:grid-cols-[minmax(0,3fr)_minmax(19rem,1fr)]">
         <StoryboardGrid
@@ -4985,26 +9308,40 @@ export default function PlannerPage() {
           activeSceneIndex={preview.currentSceneIndex}
           onSelectScene={handleSceneSelect}
           onGenerateImage={handleGenerateShotImage}
+          onGenerateProductImages={() => handleGenerateAllScreenplaySceneImages(scenes)}
           onEditShot={handleEditStoryboardShotWithAi}
           onInsertShot={handleInsertStoryboardTimelineShot}
           onExport={handleExport}
+          onPreviewAnimated={handleAnimatedPreview}
+          onDownloadAnimated={handleAnimatedHtmlExport}
           onSave={handleSaveStoryboard}
           isSaved={storyboardSaved}
           onGenerateAgain={handleGenerateStoryboard}
           onGenerateShots={handleGenerateShots}
+          onBlockedAction={(message) => flash(message, "warning")}
           canGenerateShots={canGenerateShots}
           generateShotsBlockedReason={generateShotsBlockedReason}
           canExport={canExportShotsPdf}
           exportBlockedReason={exportBlockedReason}
           isExporting={pdfExporting}
+          isPreviewingAnimated={animatedPreviewLoading}
+          isExportingAnimated={animatedHtmlExporting}
           shotsGenerated={shotsGenerated}
           isGeneratingShots={shotGenerationLoading}
+          productMode={productStoryboardMode}
+          productImageSummary={shotExportSummary}
+          isGeneratingProductImages={productFrameGenerationLoading}
           isEditingShot={editStoryboardShotWithAiState.isLoading}
           isInsertingShot={insertStoryboardTimelineShotState.isLoading}
           isGenerating={shotPlanLoading || shotImageUrlsLoading || generateShotImageState.isLoading || editStoryboardShotWithAiState.isLoading || insertStoryboardTimelineShotState.isLoading || pdfExporting || shotGenerationLoading}
         />
         <MobileFrame
           scene={selectedScene}
+          scenes={scenes}
+          videoRun={currentScreenplayVideoRun}
+          finalVideoUrl={activeFinalVideoUrl}
+          screenplay={scriptDetailIdea}
+          productionStyle={productionStyle}
           cursorMs={preview.cursorMs}
           durationMs={preview.durationMs}
           isPlaying={preview.isPlaying}
@@ -5014,33 +9351,44 @@ export default function PlannerPage() {
             dispatch(setCursorMs(ms));
             dispatch(setCurrentSceneIndex(Math.min(Math.max(0, scenes.length - 1), Math.floor(ms / sceneMs))));
           }}
+          onRefreshMedia={refreshScreenplayMedia}
         />
       </div>
       <GenerationStatusBar job={productionPlanJob || storyboardJob || (generateProductionPlansState.isLoading ? { status: "RUNNING", progress: 18, message: "Starting shot plan job" } : productionPlanJobId ? { status: "RUNNING", progress: 38, message: "Generating storyboard, lighting, sound, and DP plans" } : generateStoryboardAsyncState.isLoading ? { status: "RUNNING", progress: 10, message: "Starting shot generation job" } : storyboardJobId ? { status: "RUNNING", progress: 35, message: "Generating shot cards one by one" } : null)} label="Shot design" />
 
-      {effectiveShotPlansReady && (
-        <div className="creator-panel-muted flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+      <div className="creator-panel-muted flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className={`text-xs font-black uppercase tracking-normal ${polishUnlocked ? "text-emerald-200" : "text-amber-200"}`}>
-              {polishUnlocked ? "Ready for real footage" : "Generate shots first"}
+            <p className={`text-xs font-black uppercase tracking-normal ${storyboardSaved && canExportShotsPdf ? "text-emerald-200" : "text-amber-200"}`}>
+              {storyboardSaved && canExportShotsPdf ? "Ready for video" : storyboardSaved ? "Generate all shot images to continue" : "Save production to continue"}
             </p>
             <p className="mt-1 text-sm font-semibold text-slate-300">
-              {polishUnlocked
-                ? "Upload each recorded take in Polish, review camera/dialogue fit, then generate a preview pass for lighting, background, production design, and sound direction."
-                : polishBlockedReason}
+              {storyboardSaved && canExportShotsPdf
+                ? productStoryboardMode
+                  ? "Storyboard and product frames are ready for PDF export and the Video stage."
+                  : "Shot plans and generated images are ready. Continue to Video to assemble the final render."
+                : storyboardSaved
+                  ? exportBlockedReason
+                : "Review the shot plans, select Save Production, then continue to Video."}
             </p>
           </div>
           <button
             type="button"
-            disabled={!polishUnlocked}
-            onClick={() => handleWorkspacePageClick("shoot-polish")}
-            className="creator-primary flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
-            title={polishBlockedReason || "Open Polish"}
+            onClick={handleContinueStoryboardToVideo}
+            aria-disabled={!effectiveShotPlansReady || !storyboardSaved || !canExportShotsPdf}
+            className={`creator-primary flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white ${
+              !effectiveShotPlansReady || !storyboardSaved || !canExportShotsPdf ? "opacity-60" : ""
+            }`}
+            title={!effectiveShotPlansReady
+              ? "Generate shot plans before continuing"
+              : !storyboardSaved
+                ? "Save Production before continuing"
+                : !canExportShotsPdf
+                  ? exportBlockedReason
+                : "Continue to Video"}
           >
-            {shotGenerationLoading ? "Generating Shots" : "Open Polish"} <ChevronRight size={16} />
+            Continue to Video <ChevronRight size={16} />
           </button>
         </div>
-      )}
 
       <StoryboardHistoryPanel
         saved={displayedSavedStoryboards}
@@ -5055,7 +9403,7 @@ export default function PlannerPage() {
         {polishBlockedReason && (
           <div className="creator-panel border-amber-300/20 bg-amber-400/[0.045] p-4">
             <p className="text-xs font-black uppercase tracking-normal text-amber-200">
-              {effectiveShotPlansReady ? "Generated shots needed" : "Shot design needed"}
+              {effectiveShotPlansReady ? "Generated shots needed" : "Storyboard needed"}
             </p>
             <p className="mt-1 text-sm font-semibold leading-6 text-slate-300">
               {polishBlockedReason}
@@ -5066,7 +9414,7 @@ export default function PlannerPage() {
               disabled={shotGenerationLoading}
               className="creator-primary mt-3 inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {shotGenerationLoading ? "Generating Shots" : effectiveShotPlansReady ? "Open Shot Design" : "Open Shot Design"} <ChevronRight size={16} />
+              {shotGenerationLoading ? "Generating Shots" : "Open Storyboard"} <ChevronRight size={16} />
             </button>
           </div>
         )}
@@ -5116,7 +9464,7 @@ export default function PlannerPage() {
             onEnhanceAll={handleEnhanceAllShotTakes}
           />
         </div>
-        <GenerationStatusBar job={shotTakeJob || (shotTakeJobId && !shotTakeJobIsError ? { status: "RUNNING", progress: 35, message: "Processing shoot and polish job" } : null)} label="Shoot & Polish" />
+        <GenerationStatusBar job={shotTakeJob || (shotTakeJobId && !shotTakeJobIsError ? { status: "RUNNING", progress: 35, message: "Processing editor handoff job" } : null)} label="Editor Handoff" />
       </section>
       )}
 
@@ -5125,30 +9473,38 @@ export default function PlannerPage() {
           className="fixed inset-0 z-[75] bg-slate-950/45 p-4 backdrop-blur-[2px]"
           role="dialog"
           aria-modal="true"
-          aria-label="Recharge wallet"
+          aria-label={lowBalanceTitle}
           onClick={() => setLowBalanceNotice(null)}
         >
           <div
-            className="absolute bottom-4 right-4 w-[min(24rem,calc(100vw-2rem))] rounded-lg border border-amber-300/35 bg-[#16110a]/90 p-3 text-amber-50 shadow-2xl shadow-black/55 backdrop-blur-md"
+            className={`absolute bottom-4 right-4 w-[min(25rem,calc(100vw-2rem))] rounded-lg border p-3 shadow-2xl shadow-black/55 backdrop-blur-md ${
+              lowBalanceIsEmpty
+                ? "border-rose-300/35 bg-[#190c11]/92 text-rose-50"
+                : "border-amber-300/35 bg-[#16110a]/90 text-amber-50"
+            }`}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-amber-300/15 text-amber-200">
+              <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${
+                lowBalanceIsEmpty ? "bg-rose-300/15 text-rose-200" : "bg-amber-300/15 text-amber-200"
+              }`}>
                 <WalletCards size={17} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-amber-100">Recharge wallet</p>
-                <p className="mt-1 text-xs leading-5 text-amber-100/80">
-                  Recharge to run {lowBalanceNotice.actionLabel || "paid AI generation"}. Your generated ideas and scripts stay visible after closing this.
+                <p className={`text-sm font-bold ${lowBalanceIsEmpty ? "text-rose-100" : "text-amber-100"}`}>{lowBalanceTitle}</p>
+                <p className={`mt-1 text-xs leading-5 ${lowBalanceIsEmpty ? "text-rose-100/80" : "text-amber-100/80"}`}>
+                  {lowBalanceBody} Your generated ideas and scripts stay visible after closing this.
                 </p>
-                <p className="mt-1 text-[11px] font-semibold uppercase tracking-normal text-amber-200/80">
-                  Balance {formatWalletAmount(walletBalanceAmount, walletCurrencyCode)} · Minimum {formatWalletAmount(lowBalanceNotice.minimumBalance || paidGenerationMinimumBalance, walletCurrencyCode)}
+                <p className={`mt-1 text-[11px] font-semibold uppercase tracking-normal ${lowBalanceIsEmpty ? "text-rose-200/80" : "text-amber-200/80"}`}>
+                  Balance {formatWalletAmount(walletBalanceAmount, walletCurrencyCode)} - Required {formatWalletAmount(lowBalanceMinimum, walletCurrencyCode)} - Short by {formatWalletAmount(lowBalanceShortfall, walletCurrencyCode)}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setLowBalanceNotice(null)}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/10 text-amber-100/80 hover:border-amber-200/40 hover:text-amber-50"
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/10 ${
+                  lowBalanceIsEmpty ? "text-rose-100/80 hover:border-rose-200/40 hover:text-rose-50" : "text-amber-100/80 hover:border-amber-200/40 hover:text-amber-50"
+                }`}
                 aria-label="Close low balance notice"
               >
                 <X size={15} />
@@ -5178,7 +9534,9 @@ export default function PlannerPage() {
         open={rechargeOpen}
         onClose={() => setRechargeOpen(false)}
         onRecharge={handleRecharge}
-        isLoading={rechargeState.isLoading}
+        isLoading={rechargeState.isLoading || verifyWalletPaymentState.isLoading}
+        currencyCode={walletCurrencyCode}
+        regionLabel={detectedBillingRegionLabel}
       />
 
       <ScriptGenerationModal
@@ -5379,13 +9737,13 @@ export default function PlannerPage() {
       )}
 
       {postProductionOpen && (
-        <CreatorModal title="Post Production" onClose={handleClosePostProduction}>
+        <CreatorModal title="Editor Handoff" onClose={handleClosePostProduction}>
           <div className="grid max-h-[72vh] gap-4 overflow-hidden lg:grid-cols-[minmax(17rem,0.8fr)_minmax(0,1.2fr)]">
             <div className="min-h-0 space-y-3">
               <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
-                <p className="text-sm font-bold text-white">Projects ready for polish</p>
+                <p className="text-sm font-bold text-white">Projects ready for editor handoff</p>
                 <p className="mt-1 text-sm font-medium leading-6 text-slate-400">
-                  Only projects with shot design or storyboard plans appear here.
+                  Only projects with storyboard or shot plans appear here.
                 </p>
                 <button
                   type="button"
@@ -5429,7 +9787,7 @@ export default function PlannerPage() {
                   </div>
                 ) : (
                   <div className="px-3 py-6 text-sm font-semibold text-slate-500">
-                    No projects have shot design ready yet. Generate shot plans from a project first.
+                    No projects have storyboard ready yet. Generate shot plans from a project first.
                   </div>
                 )}
               </div>
@@ -5444,7 +9802,7 @@ export default function PlannerPage() {
                     <div className="min-w-0">
                       <p className="text-xs font-black uppercase tracking-normal text-emerald-200">Shot thumbnails</p>
                       <h3 className="mt-1 truncate text-lg font-extrabold text-white">{selectedPostProductionProject.title}</h3>
-                      <p className="mt-1 text-xs font-semibold text-slate-500">Select a shot to open its storyboard and upload the actual take.</p>
+                      <p className="mt-1 text-xs font-semibold text-slate-500">Select a shot to resume the project in Video and send assets to an editor.</p>
                     </div>
                     <button
                       type="button"
@@ -5470,7 +9828,7 @@ export default function PlannerPage() {
                               <span className="block text-[10px] font-black uppercase tracking-normal text-slate-500">Shot {String(shot.shotNumber || index + 1).padStart(2, "0")}</span>
                               <span className="mt-1 line-clamp-2 min-h-[2.25rem] text-xs font-extrabold leading-5 text-white">{shot.title || `Shot ${index + 1}`}</span>
                               <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-200">
-                                Open Polish <ChevronRight size={12} />
+                                Open Video <ChevronRight size={12} />
                               </span>
                             </span>
                           </button>
@@ -5492,7 +9850,7 @@ export default function PlannerPage() {
                     <Clapperboard size={28} className="mx-auto text-emerald-200" />
                     <p className="mt-3 text-sm font-bold text-white">Choose a project</p>
                     <p className="mt-1 max-w-sm text-sm font-medium leading-6 text-slate-500">
-                      Its shot thumbnails will appear here. Opening one resumes the project in the polish workspace.
+                      Its shot thumbnails will appear here. Opening one resumes the project in the Video workspace.
                     </p>
                   </div>
                 </div>
@@ -5732,6 +10090,93 @@ function buildDefaultCastPlan(creators = []) {
   };
 }
 
+function dialogueVoiceProfileForPlanning(characterMappings = [], castPlan = {}, scriptJson = {}, founderAvatarProfile = {}) {
+  const founderProfile = normalizeFounderAvatarProfileForPlanning(founderAvatarProfile);
+  if (hasFounderAvatarIdentityForPlanning(founderProfile) && founderProfile.avatarProviderMode === "dalai_llama") {
+    const profile = {
+      selectionSource: "founder_avatar_kit",
+      speakerName: "Founder",
+      voiceProvider: "dalai_llama",
+      voiceModel: founderProfile.localModels.voiceModel,
+      voiceId: founderProfile.voiceId,
+      voiceEmbeddingId: founderProfile.voiceEmbeddingId,
+      avatarId: founderProfile.avatarId,
+      language: founderProfile.language,
+      languageCode: founderProfile.languageCode,
+    };
+    return {
+      dialogueVoiceProfile: profile,
+      speakerName: "Founder",
+      voiceProvider: "dalai_llama",
+      voiceModel: founderProfile.localModels.voiceModel,
+      voiceId: founderProfile.voiceId,
+      voiceEmbeddingId: founderProfile.voiceEmbeddingId,
+      avatarId: founderProfile.avatarId,
+      founderAvatarProfile: founderProfile,
+      language: founderProfile.language,
+      languageCode: founderProfile.languageCode,
+      stylePrompt: "Natural Hinglish founder voiceover with clear pronunciation and confident ad energy.",
+    };
+  }
+  const mappings = Array.isArray(characterMappings) ? characterMappings : [];
+  const castActors = Array.isArray(castPlan?.actors) ? castPlan.actors : [];
+  const storyCharacters = resolveStoryCharactersForCast({ scriptJson });
+  const candidates = [
+    ...mappings.map((mapping) => ({
+      ...mapping,
+      ...(mapping?.characterPayload || {}),
+      ...(mapping?.castPayload || {}),
+      role: mapping?.characterRole || mapping?.role || mapping?.castPayload?.role || mapping?.castPayload?.roleInShort,
+      speakerName: mapping?.castDisplayName || mapping?.castPayload?.name || mapping?.characterName,
+    })),
+    ...castActors,
+    ...storyCharacters,
+  ].filter((candidate) => candidate && typeof candidate === "object");
+  const lead = [...candidates].sort((left, right) => dialogueVoiceCandidateScore(right) - dialogueVoiceCandidateScore(left))[0] || {};
+  const voiceGender = normalizeDialogueVoiceGender(lead.gender || lead.genderIdentity || lead.castPayload?.gender || lead.characterPayload?.gender);
+  const speakerName = firstString(
+    lead.speakerName,
+    lead.name,
+    lead.displayName,
+    lead.characterName,
+    lead.castDisplayName
+  );
+  const profile = {
+    selectionSource: candidates.length ? "planning_cast" : "configured_default",
+    ...(voiceGender ? { voiceGender } : {}),
+    ...(speakerName ? { speakerName } : {}),
+  };
+  return {
+    dialogueVoiceProfile: profile,
+    ...(voiceGender ? { voiceGender } : {}),
+    ...(speakerName ? { speakerName } : {}),
+  };
+}
+
+function dialogueVoiceCandidateScore(candidate = {}) {
+  const role = String(
+    candidate.characterRole
+    || candidate.roleInShort
+    || candidate.role
+    || candidate.castPayload?.roleInShort
+    || candidate.castPayload?.role
+    || ""
+  ).toLowerCase();
+  let score = 0;
+  if (role.includes("main")) score += 30;
+  if (role.includes("lead") || role.includes("primary") || role.includes("narrator")) score += 20;
+  if (normalizeDialogueVoiceGender(candidate.gender || candidate.genderIdentity || candidate.castPayload?.gender)) score += 10;
+  if (candidate.name || candidate.displayName || candidate.characterName || candidate.castDisplayName) score += 1;
+  return score;
+}
+
+function normalizeDialogueVoiceGender(value = "") {
+  const normalized = String(value || "").trim().toLowerCase().replace(/[^a-z]+/g, "");
+  if (normalized.startsWith("female") || normalized === "woman" || normalized === "girl") return "female";
+  if (normalized.startsWith("male") || normalized === "man" || normalized === "boy") return "male";
+  return "";
+}
+
 function castMemberToProfilePayload(member = {}, projectId) {
   return {
     projectId: isUuid(projectId) ? projectId : undefined,
@@ -5943,23 +10388,48 @@ function normalizeGeneratedIdeaResult(data, fallbackPage = 0, fallbackSize = 5) 
 }
 
 function normalizeGeneratedIdea(idea) {
-  const id = String(idea?.id || idea?.ideaId || `idea-generated-${Math.random().toString(36).slice(2)}`);
+  const explicitStoryIdeaId = firstString(idea?.storyIdeaId, idea?.story_idea_id, idea?.ideaId, idea?.idea_id);
+  const explicitScriptId = firstString(idea?.scriptId, idea?.script_id, idea?.screenplayId, idea?.screenplay_id);
+  const id = String(explicitStoryIdeaId || idea?.id || `idea-generated-${Math.random().toString(36).slice(2)}`);
+  const creativeNotes = idea?.creativeNotes || idea?.notes || {};
+  const productIntelligenceBrief = productIntelligenceBriefFromEntity({ ...idea, creativeNotes });
   return {
     ...idea,
     id,
+    storyIdeaId: explicitStoryIdeaId || idea?.storyIdeaId,
+    scriptId: explicitScriptId || idea?.scriptId,
     title: idea?.title || "Generated story idea",
     description: idea?.description || idea?.summary || "AI-generated story idea from the locked brief.",
     hashtags: idea?.hashtags || idea?.tags || ["#CreatorIdea", "#Shorts"],
     source: idea?.source || "AI_FROM_LOCKED_BRIEF",
-    lockedIdeaId: idea?.lockedIdeaId,
+    lockedIdeaId: idea?.lockedIdeaId || idea?.locked_idea_id,
     projectId: idea?.projectId,
     storytellingType: idea?.storytellingType || idea?.storyScriptJson?.storytellingType || idea?.scriptJson?.storytellingType || DEFAULT_STORYTELLING_TYPE,
     storytellingGuidance: idea?.storytellingGuidance || idea?.storyScriptJson?.storytellingGuidance || idea?.scriptJson?.storytellingGuidance || {},
     hookLens: idea?.hookLens || idea?.storyScriptJson?.hookLens || idea?.scriptJson?.hookLens || DEFAULT_HOOK_LENS,
     hookLensGuidance: idea?.hookLensGuidance || idea?.storyScriptJson?.hookLensGuidance || idea?.scriptJson?.hookLensGuidance || {},
+    topicType: normalizeTopicType(idea?.topicType || idea?.storyScriptJson?.topicType || idea?.scriptJson?.topicType || DEFAULT_TOPIC_TYPE),
+    topicTypeLabel: idea?.topicTypeLabel || topicTypeLabelFor(idea?.topicType || idea?.storyScriptJson?.topicType || idea?.scriptJson?.topicType || DEFAULT_TOPIC_TYPE),
+    productionStyle: normalizeProductionStyle(idea?.productionStyle || idea?.storyScriptJson?.productionStyle || idea?.scriptJson?.productionStyle || DEFAULT_PRODUCTION_STYLE),
+    hybridSceneMode: normalizeHybridSceneMode(idea?.hybridSceneMode || idea?.storyScriptJson?.hybridSceneMode || idea?.scriptJson?.hybridSceneMode || DEFAULT_HYBRID_SCENE_MODE),
+    brollStyle: normalizeBrollStyle(idea?.brollStyle || idea?.storyScriptJson?.brollStyle || idea?.scriptJson?.brollStyle || DEFAULT_BROLL_STYLE),
+    captionStyle: normalizeCaptionStyle(idea?.captionStyle || idea?.storyScriptJson?.captionStyle || idea?.scriptJson?.captionStyle || DEFAULT_CAPTION_STYLE),
+    productionStyleGuidance: idea?.productionStyleGuidance || idea?.storyScriptJson?.productionStyleGuidance || idea?.scriptJson?.productionStyleGuidance || productionStyleGuidanceFor(
+      idea?.productionStyle || idea?.storyScriptJson?.productionStyle || idea?.scriptJson?.productionStyle || DEFAULT_PRODUCTION_STYLE,
+      {
+        hybridSceneMode: idea?.hybridSceneMode || idea?.storyScriptJson?.hybridSceneMode || idea?.scriptJson?.hybridSceneMode,
+        brollStyle: idea?.brollStyle || idea?.storyScriptJson?.brollStyle || idea?.scriptJson?.brollStyle,
+        captionStyle: idea?.captionStyle || idea?.storyScriptJson?.captionStyle || idea?.scriptJson?.captionStyle,
+      }
+    ),
     hookBridge: idea?.hookBridge || idea?.storyScriptJson?.hookBridge || idea?.scriptJson?.hookBridge || {},
     factualityNotes: idea?.factualityNotes || idea?.storyScriptJson?.factualityNotes || idea?.scriptJson?.factualityNotes || {},
-    creativeNotes: idea?.creativeNotes || idea?.notes || {},
+    briefMode: idea?.briefMode || idea?.selectionContext?.briefMode || creativeNotes?.briefMode || (productIntelligenceBrief ? PRODUCT_AD_BRIEF_MODE : undefined),
+    productInputKey: idea?.productInputKey || idea?.selectionContext?.productInputKey || creativeNotes?.productInputKey || productAdInputKey(productIntelligenceBrief),
+    productIntelligenceBrief,
+    campaignAngle: campaignAngleFromEntity(idea, creativeNotes, idea?.selectionContext),
+    adConceptStrategy: idea?.adConceptStrategy || creativeNotes?.adConceptStrategy || creativeNotes?.campaignStrategy || {},
+    creativeNotes,
   };
 }
 
@@ -5983,6 +10453,10 @@ function hasWeeklyIdeaTagsPayload(payload = {}) {
 }
 
 function buildLocalGeneratedIdeasFromBrief(brief, context = {}) {
+  const productBrief = productIntelligenceBriefFromEntity(brief) || context.productIntelligenceBrief;
+  if (productBrief && hasProductIntelligenceBrief(productBrief)) {
+    return buildLocalProductAdIdeasFromBrief(brief, context, normalizeProductIntelligenceBrief(productBrief));
+  }
   const angles = [
     ["Contrarian opener", "Start with the opposite of what viewers expect, then reveal the real lesson in the last beat."],
     ["Beginner mistake", "Show the most relatable mistake first, then make the correction feel simple and repeatable."],
@@ -6008,8 +10482,24 @@ function buildLocalGeneratedIdeasFromBrief(brief, context = {}) {
   const baseTitle = truncateText(brief?.title || context.trend?.title || "Saved brief", 72);
   const categoryLabel = filterLabels.category?.[context.filters?.category] || context.filters?.category || "Creator";
   const seed = String(brief?.lockedIdeaId || brief?.id || "local").replace(/[^a-z0-9]/gi, "").slice(0, 10) || "local";
+  const normalizedTopicType = normalizeTopicType(context.topicType || brief?.topicType || context.filters?.category);
+  const topicOption = topicTypeOptionFor(normalizedTopicType);
+  const productionGuidance = productionStyleGuidanceFor(context.productionStyle || brief?.productionStyle, {
+    hybridSceneMode: context.hybridSceneMode || brief?.hybridSceneMode,
+    brollStyle: context.brollStyle || brief?.brollStyle,
+    captionStyle: context.captionStyle || brief?.captionStyle,
+  });
+  const topicAngles = ideaAngleSuggestionsFor(normalizedTopicType, brief?.description || baseTitle)
+    .map((item) => [item.title, item.description]);
+  const seenAngles = new Set();
+  const combinedAngles = [...topicAngles, ...angles].filter(([angle]) => {
+    const key = String(angle || "").toLowerCase();
+    if (seenAngles.has(key)) return false;
+    seenAngles.add(key);
+    return true;
+  });
 
-  return angles.map(([angle, description], index) => ({
+  return combinedAngles.map(([angle, description], index) => ({
     id: `idea-${seed}-${index + 1}`,
     lockedIdeaId: brief?.lockedIdeaId || brief?.id,
     projectId: brief?.projectId,
@@ -6019,13 +10509,187 @@ function buildLocalGeneratedIdeasFromBrief(brief, context = {}) {
     durationSeconds: context.durationSeconds || 30,
     storytellingType: context.storytellingType || DEFAULT_STORYTELLING_TYPE,
     hookLens: context.hookLens || DEFAULT_HOOK_LENS,
+    topicType: normalizedTopicType,
+    topicTypeLabel: topicOption.label,
+    productionStyle: productionGuidance.mode,
+    hybridSceneMode: productionGuidance.hybridSceneMode,
+    brollStyle: productionGuidance.brollStyle,
+    captionStyle: productionGuidance.captionStyle,
+    productionStyleGuidance: productionGuidance,
     hashtags: [`#${String(categoryLabel).replace(/[^a-z0-9]/gi, "")}`, `#${angle.replace(/[^a-z0-9]/gi, "")}`, "#ShortsIdea"],
     creativeNotes: {
       hook: angle,
       targetEmotion: index % 3 === 0 ? "Fast curiosity" : index % 3 === 1 ? "Relatable humor" : "Honest connection",
       storyShape: index % 2 === 0 ? "Hook, escalation, payoff" : "Setup, reaction, practical close",
+      topicType: topicOption.label,
+      productionStyle: productionGuidance.label,
     },
   }));
+}
+
+function buildLocalProductAdIdeasFromBrief(brief, context = {}, productBrief = {}) {
+  const normalizedProduct = normalizeProductIntelligenceBrief(productBrief);
+  const productName = normalizedProduct.displayName || normalizedProduct.productName || normalizedProduct.productInputLabel || "the product";
+  const seed = String(brief?.lockedIdeaId || brief?.id || normalizedProduct.productInputKey || "product").replace(/[^a-z0-9]/gi, "").slice(0, 10) || "product";
+  const category = normalizedProduct.productUnderstanding?.productCategory || normalizedProduct.productCategory || "product";
+  const audience = normalizedProduct.productUnderstanding?.targetAudience || normalizedProduct.targetAudience || "likely buyers";
+  const usp = normalizedProduct.productUnderstanding?.usp || normalizedProduct.usp || "clear value";
+  const durationSeconds = context.durationSeconds || normalizedProduct.durationSeconds || 60;
+  const productionGuidance = productionStyleGuidanceFor(context.productionStyle || brief?.productionStyle || normalizedProduct.productionStyle || DEFAULT_PRODUCTION_STYLE, {
+    hybridSceneMode: context.hybridSceneMode || brief?.hybridSceneMode,
+    brollStyle: context.brollStyle || brief?.brollStyle,
+    captionStyle: context.captionStyle || brief?.captionStyle,
+  });
+
+  return PRODUCT_AD_CONCEPT_LANES.map((lane, index) => {
+    const strategy = productAdStrategyForLane(lane.key, normalizedProduct);
+    const title = `${String(index + 1).padStart(2, "0")}. ${lane.title}: ${truncateText(productName, 52)}`;
+    return {
+      id: `idea-${seed}-${lane.key}`,
+      lockedIdeaId: brief?.lockedIdeaId || brief?.id,
+      projectId: brief?.projectId,
+      title,
+      description: strategy.summary,
+      source: "AI_FROM_LOCKED_BRIEF",
+      durationSeconds,
+      storytellingType: context.storytellingType || DEFAULT_STORYTELLING_TYPE,
+      hookLens: context.hookLens || DEFAULT_HOOK_LENS,
+      topicType: normalizeTopicType(context.topicType || brief?.topicType || "product"),
+      topicTypeLabel: topicTypeLabelFor(context.topicType || brief?.topicType || "product"),
+      productionStyle: productionGuidance.mode,
+      hybridSceneMode: productionGuidance.hybridSceneMode,
+      brollStyle: productionGuidance.brollStyle,
+      captionStyle: productionGuidance.captionStyle,
+      productionStyleGuidance: productionGuidance,
+      briefMode: PRODUCT_AD_BRIEF_MODE,
+      productInputKey: normalizedProduct.productInputKey,
+      productIntelligenceBrief: normalizedProduct,
+      adConceptStrategy: strategy,
+      hashtags: ["ProductAd", lane.key.replace(/_/g, ""), String(category).replace(/[^a-z0-9]/gi, "")].filter(Boolean),
+      creativeNotes: {
+        briefMode: PRODUCT_AD_BRIEF_MODE,
+        productInputKey: normalizedProduct.productInputKey,
+        productIntelligenceBrief: normalizedProduct,
+        adConceptLane: lane.key,
+        adConceptTitle: lane.title,
+        hook: strategy.hook,
+        cta: strategy.cta,
+        targetAudience: audience,
+        usp,
+        marketingObjective: strategy.marketingObjective,
+        productUnderstanding: normalizedProduct.productUnderstanding,
+        shotPlanner: strategy.shotPlanner,
+        imagePrompts: strategy.imagePrompts,
+        videoPromptPlan: strategy.videoPromptPlan,
+        voiceMusicCaptionPlan: strategy.voiceMusicCaptionPlan,
+        editorPlan: strategy.editorPlan,
+        selectionReason: strategy.selectionReason,
+      },
+    };
+  });
+}
+
+function productAdStrategyForLane(laneKey, productBrief = {}) {
+  const productName = productBrief.displayName || productBrief.productName || productBrief.productInputLabel || "the product";
+  const category = productBrief.productUnderstanding?.productCategory || "product";
+  const audience = productBrief.productUnderstanding?.targetAudience || "likely buyers";
+  const usp = productBrief.productUnderstanding?.usp || productBrief.usp || "clear product value";
+  const brandTone = productBrief.productUnderstanding?.tone || productBrief.brandTone || "credible";
+  const cta = productBrief.cta || "Order today";
+  const baseImagePrompts = [
+    `Hero packshot of ${productName}, clean product-first commercial image, brand colors respected, vertical 9:16 safe framing`,
+    `Macro sensory detail for ${productName}, premium lighting, shallow depth of field, high-retention social ad still`,
+    `Lifestyle use moment for ${audience}, product visible, believable environment, natural hands and practical composition`,
+    `Final end-card style image with ${productName}, clear CTA space, readable layout, no fake claims`,
+  ];
+
+  if (laneKey === "luxury_brand_story") {
+    return {
+      laneKey,
+      marketingObjective: "Increase premium perception and purchase confidence.",
+      hook: `${productName} should create desire and mystery before the audience sees the complete pack or hears ingredient detail.`,
+      cta,
+      summary: `Position ${productName} as a premium ${category} with sensory product shots, slow motion detail, and a clean purchase close.`,
+      shotPlanner: [
+        "0–2.5s brand-world hook: darkness, architectural scale, amber light, or abstract product silhouette; no ingredients and no full-pack reveal",
+        "Artifact discovery: reveal only 10–20% through logo foil, edge geometry, surface engraving, material texture, or reflection",
+        "Texture and craft transformation with a distinct action that avoids repeating a pour",
+        "Ingredient reveal only after desire and product-world context are established",
+        "Earned full product hero with approved pack identity, restrained motion, and clean CTA space",
+      ],
+      imagePrompts: baseImagePrompts,
+      videoPromptPlan: [
+        "Master in 4K minimum: 2160x3840 vertical or 3840x2160 horizontal; capture with a professional cinema-camera package, 10/12-bit log, 24fps and controlled 180-degree shutter unless a planned slow-motion beat requires higher frame rate",
+        "Begin from near-black with a faint amber highlight and controlled atmospheric particles; use a professional dolly, motion-control slider, or calibrated tiny orbit while keeping product visibility below 10%",
+        "Use cinema macro glass in the 85–100mm range, measured focus pulls, controlled depth of field, and a gaffer-designed moving light sweep to discover packaging or product detail without showing the whole object",
+        "Transition through texture or craft, then ingredients, with physically plausible movement and no repetitive chocolate-pouring beat",
+        "Reveal the full approved product only in the earned hero beat; preserve exact name, logo, pack geometry, colors, claims, and proportions",
+      ],
+      voiceMusicCaptionPlan: {
+        voice: "Calm premium voiceover with minimal words.",
+        music: "Warm modern luxury bed ducked under speech.",
+        captions: "Sparse premium captions with key benefit words only.",
+      },
+      editorPlan: "Plan every second at commercial-director, cinematographer, gaffer, and focus-puller standard. Hold shots longer, move light as deliberately as the camera, reveal only 10–20% before the hero, use clean motivated transitions, keep sound restrained, and end on an earned full packshot.",
+      selectionReason: "Best when brand perception and product desirability matter more than hard-selling.",
+    };
+  }
+
+  if (laneKey === "ugc_testimonial") {
+    return {
+      laneKey,
+      marketingObjective: "Make the product feel discovered, useful, and socially believable.",
+      hook: `I did not expect ${productName} to be this useful.`,
+      cta,
+      summary: `Make ${productName} feel like a creator recommendation with proof beats, quick reactions, and simple buyer language.`,
+      shotPlanner: [
+        "Creator discovery hook",
+        "Product in hand or real-use setup",
+        "Visible proof/detail moment",
+        "Direct recommendation and CTA",
+      ],
+      imagePrompts: baseImagePrompts,
+      videoPromptPlan: [
+        "Handheld creator-style movement, natural room light, honest framing",
+        "Quick product insert with practical proof detail",
+        "Fast social cut with testimonial caption emphasis",
+      ],
+      voiceMusicCaptionPlan: {
+        voice: "Conversational first-person delivery.",
+        music: "Light social rhythm ducked below voice.",
+        captions: "Bold keyword captions on proof and CTA beats.",
+      },
+      editorPlan: "Keep cuts fast, preserve natural pauses, add small whooshes sparingly, make proof beat impossible to miss.",
+      selectionReason: "Best when the buyer needs authenticity and social proof before purchase.",
+    };
+  }
+
+  return {
+    laneKey: "problem_solution",
+    marketingObjective: "Convert a clear buyer pain into purchase intent.",
+    hook: `Still choosing ordinary ${category}?`,
+    cta,
+    summary: `Open with a buyer problem, introduce ${productName} as the cleaner solution, then close on ${usp} and CTA.`,
+    shotPlanner: [
+      "Problem visual in first three seconds",
+      "Product enters as the solution",
+      "Benefit proof through close-ups",
+      "CTA packshot",
+    ],
+    imagePrompts: baseImagePrompts,
+    videoPromptPlan: [
+      "Fast contrast cut from problem state to product reveal",
+      "Cinematic product push-in with benefit text-safe framing",
+      "Clean final packshot with motion accent and CTA space",
+    ],
+    voiceMusicCaptionPlan: {
+      voice: "Direct response voiceover with clear benefit order.",
+      music: "Fast modern pulse ducked under dialogue.",
+      captions: "High-contrast captions for problem, solution, benefit, CTA.",
+    },
+    editorPlan: "Use fast opening cuts, tighten every pause, add crisp transition accents, keep CTA readable.",
+    selectionReason: "Best for immediate conversion and paid performance testing.",
+  };
 }
 
 function buildLocalStoryScriptFromIdea(idea, durationSeconds = 30, dialogueLanguage = "English", screenType = "vertical", category = "creator", storytellingType = DEFAULT_STORYTELLING_TYPE, hookLens = DEFAULT_HOOK_LENS) {
@@ -6033,6 +10697,12 @@ function buildLocalStoryScriptFromIdea(idea, durationSeconds = 30, dialogueLangu
   const { spokenLines } = localLanguageLines(dialogueLanguage, title);
   const normalizedStorytellingType = normalizeStorytellingType(storytellingType);
   const normalizedHookLens = normalizeHookLens(hookLens);
+  const normalizedTopicType = normalizeTopicType(idea?.topicType || category);
+  const productionGuidance = productionStyleGuidanceFor(idea?.productionStyle || DEFAULT_PRODUCTION_STYLE, {
+    hybridSceneMode: idea?.hybridSceneMode,
+    brollStyle: idea?.brollStyle,
+    captionStyle: idea?.captionStyle,
+  });
   const characters = [
     {
       name: dialogueLanguage?.toLowerCase?.().includes("hindi") || dialogueLanguage?.toLowerCase?.().includes("hinglish") ? "Priya" : "Asha",
@@ -6083,6 +10753,13 @@ function buildLocalStoryScriptFromIdea(idea, durationSeconds = 30, dialogueLangu
     storytellingGuidance: storytellingGuidanceFor(normalizedStorytellingType),
     hookLens: normalizedHookLens,
     hookLensGuidance: hookLensGuidanceFor(normalizedHookLens),
+    topicType: normalizedTopicType,
+    topicTypeLabel: topicTypeLabelFor(normalizedTopicType),
+    productionStyle: productionGuidance.mode,
+    hybridSceneMode: productionGuidance.hybridSceneMode,
+    brollStyle: productionGuidance.brollStyle,
+    captionStyle: productionGuidance.captionStyle,
+    productionStyleGuidance: productionGuidance,
     hookBridge: defaultHookBridgeFor(normalizedHookLens),
     factualityNotes: defaultFactualityNotesFor(normalizedHookLens),
     logline: `A beginner-friendly short where ${characters[0].name} turns "${title}" into one small believable decision.`,
@@ -6103,6 +10780,12 @@ function buildLocalStoryScriptFromIdea(idea, durationSeconds = 30, dialogueLangu
     scriptText: buildStoryScriptTextFromDraft(scriptJson),
     scriptJson,
     durationSeconds,
+    topicType: normalizedTopicType,
+    productionStyle: productionGuidance.mode,
+    hybridSceneMode: productionGuidance.hybridSceneMode,
+    brollStyle: productionGuidance.brollStyle,
+    captionStyle: productionGuidance.captionStyle,
+    productionStyleGuidance: productionGuidance,
     status: "SCRIPT_GENERATED",
   };
 }
@@ -6114,6 +10797,12 @@ function buildLocalGeneratedScriptFromIdea(idea, durationSeconds = 30, dialogueL
   const { spokenLines, screenCopy } = localLanguageLines(dialogueLanguage, hook);
   const normalizedStorytellingType = normalizeStorytellingType(storytellingType);
   const normalizedHookLens = normalizeHookLens(hookLens);
+  const normalizedTopicType = normalizeTopicType(idea?.topicType || category);
+  const productionGuidance = productionStyleGuidanceFor(idea?.productionStyle || DEFAULT_PRODUCTION_STYLE, {
+    hybridSceneMode: idea?.hybridSceneMode,
+    brollStyle: idea?.brollStyle,
+    captionStyle: idea?.captionStyle,
+  });
   const scenes = Array.from({ length: sceneCount }, (_, index) => {
     const start = index * segment;
     const end = index === sceneCount - 1 ? Number(durationSeconds) : Math.min(Number(durationSeconds), (index + 1) * segment);
@@ -6133,6 +10822,9 @@ function buildLocalGeneratedScriptFromIdea(idea, durationSeconds = 30, dialogueL
       screenText: screenCopy[Math.min(index, 5)],
       directorNote: `Keep it phone-friendly, natural, and framed for ${screenType === "horizontal" ? "horizontal 16:9 center-safe composition" : "vertical short-form safe zones"}.`,
       intent: ["Hook", "Ground the story", "Build relatability", "Show action", "Deliver payoff", "Create save intent"][Math.min(index, 5)],
+      generationMode: productionGuidance.mode === "full_ai" ? "ai_generated" : index % 3 === 0 ? "talking_head" : "ai_generated",
+      brollStyle: productionGuidance.brollStyle,
+      captionStyle: productionGuidance.captionStyle,
     };
   });
 
@@ -6151,6 +10843,13 @@ function buildLocalGeneratedScriptFromIdea(idea, durationSeconds = 30, dialogueL
       shotMixPlan: shotMixPlanFor(normalizedStorytellingType),
       hookLens: normalizedHookLens,
       hookLensGuidance: hookLensGuidanceFor(normalizedHookLens),
+      topicType: normalizedTopicType,
+      topicTypeLabel: topicTypeLabelFor(normalizedTopicType),
+      productionStyle: productionGuidance.mode,
+      hybridSceneMode: productionGuidance.hybridSceneMode,
+      brollStyle: productionGuidance.brollStyle,
+      captionStyle: productionGuidance.captionStyle,
+      productionStyleGuidance: productionGuidance,
       hookBridge: defaultHookBridgeFor(normalizedHookLens),
       factualityNotes: defaultFactualityNotesFor(normalizedHookLens),
       pacingStyle: "Local preview pacing with a clear hook, middle action, and saveable close",
@@ -6165,6 +10864,7 @@ function buildLocalGeneratedScriptFromIdea(idea, durationSeconds = 30, dialogueL
       shots: scenes.map((scene, index) => {
         const storytellingRole = localStorytellingRoleFor(index, normalizedStorytellingType);
         const relatedVisual = storytellingRole === "related_visual";
+        const fullAiScene = productionGuidance.mode === "full_ai";
         return {
           shotNumber: index + 1,
           title: scene.camera,
@@ -6174,7 +10874,11 @@ function buildLocalGeneratedScriptFromIdea(idea, durationSeconds = 30, dialogueL
           cameraMovement: index % 2 === 0 ? "Static" : "Handheld light",
           fps: 30,
           storytellingRole,
-          assetCaptureMode: relatedVisual ? "record_or_generate" : "record",
+          generationMode: scene.generationMode,
+          brollStyle: scene.brollStyle,
+          captionStyle: scene.captionStyle,
+          targetProvider: fullAiScene || scene.generationMode === "ai_generated" ? "seedance" : "record_or_upload",
+          assetCaptureMode: fullAiScene ? "generate" : relatedVisual ? "record_or_generate" : "record",
           assetGenerationPrompt: relatedVisual ? `Create a clean, phone-friendly visual metaphor or B-roll frame for: ${scene.visual}` : "",
           setDesign: screenType === "horizontal"
             ? "Simple everyday set arranged for a 16:9 frame, with subject center-safe and side clutter removed."
@@ -6194,6 +10898,12 @@ function buildLocalGeneratedScriptFromIdea(idea, durationSeconds = 30, dialogueL
       }),
     },
     durationSeconds,
+    topicType: normalizedTopicType,
+    productionStyle: productionGuidance.mode,
+    hybridSceneMode: productionGuidance.hybridSceneMode,
+    brollStyle: productionGuidance.brollStyle,
+    captionStyle: productionGuidance.captionStyle,
+    productionStyleGuidance: productionGuidance,
     status: "SCRIPT_GENERATED",
   };
 }
@@ -6234,6 +10944,956 @@ function shotMixPlanFor(storytellingType = DEFAULT_STORYTELLING_TYPE) {
     narratorFacePercent: guidance.narratorFacePercent || 0,
     relatedVisualPercent: guidance.relatedVisualPercent || 0,
     recordOrGenerateVisualsNote: guidance.recordOrGenerateVisuals ? "Related visual shots can be recorded by the user or generated from assetGenerationPrompt." : "",
+  };
+}
+
+function normalizeTopicType(value = DEFAULT_TOPIC_TYPE) {
+  const normalized = String(value || DEFAULT_TOPIC_TYPE)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (["ai", "software", "tools", "tech"].includes(normalized)) return "technology";
+  if (["startup", "sales", "marketing", "brand"].includes(normalized)) return "business";
+  if (["demo", "saas", "offer"].includes(normalized)) return "product";
+  if (["wellness", "medical", "habit"].includes(normalized)) return "health";
+  if (["gym", "workout", "sports"].includes(normalized)) return "fitness";
+  if (["recipe", "cooking", "meal"].includes(normalized)) return "food";
+  if (["skin", "makeup", "fashion"].includes(normalized)) return "beauty";
+  if (["money", "career", "investing"].includes(normalized)) return "finance";
+  if (["family", "couple", "friends", "friendship"].includes(normalized)) return "relationships";
+  if (["funny", "skit", "satire"].includes(normalized)) return "comedy";
+  if (TOPIC_TYPE_OPTIONS.some((option) => option.value === normalized)) return normalized;
+  return DEFAULT_TOPIC_TYPE;
+}
+
+function topicTypeOptionFor(value = DEFAULT_TOPIC_TYPE) {
+  const normalized = normalizeTopicType(value);
+  return TOPIC_TYPE_OPTIONS.find((option) => option.value === normalized) || TOPIC_TYPE_OPTIONS.find((option) => option.value === DEFAULT_TOPIC_TYPE) || TOPIC_TYPE_OPTIONS[0];
+}
+
+function topicTypeLabelFor(value = DEFAULT_TOPIC_TYPE) {
+  return topicTypeOptionFor(value)?.label || "Lifestyle";
+}
+
+function inferTopicTypeFromText(text = "", fallback = DEFAULT_TOPIC_TYPE) {
+  const value = String(text || "").toLowerCase();
+  if (/ai|automation|software|tool|app|code|tech|chatgpt|workflow/.test(value)) return "technology";
+  if (/startup|brand|business|founder|sales|marketing|customer|growth/.test(value)) return "business";
+  if (/product|demo|feature|offer|saas|launch/.test(value)) return "product";
+  if (/learn|teach|study|course|exam|explain|tutorial|student/.test(value)) return "education";
+  if (/health|wellness|sleep|stress|doctor|care|habit/.test(value)) return "health";
+  if (/gym|fitness|workout|weight|muscle|run|yoga/.test(value)) return "fitness";
+  if (/food|recipe|meal|kitchen|cook|protein|lunch|dinner/.test(value)) return "food";
+  if (/skin|beauty|makeup|glow|hair|style|fashion/.test(value)) return "beauty";
+  if (/travel|trip|place|city|hotel|flight|itinerary/.test(value)) return "travel";
+  if (/money|finance|salary|saving|invest|career|budget/.test(value)) return "finance";
+  if (/wife|husband|couple|family|friend|relationship|parent/.test(value)) return "relationships";
+  if (/comedy|funny|pov|skit|joke|satire/.test(value)) return "comedy";
+  if (/culture|india|local|society|history|festival|language/.test(value)) return "culture";
+  return normalizeTopicType(fallback);
+}
+
+function ideaAngleSuggestionsFor(topicType = DEFAULT_TOPIC_TYPE, briefText = "", productIntelligenceBrief = null) {
+  if (productIntelligenceBrief && hasProductIntelligenceBrief(productIntelligenceBrief)) {
+    return PRODUCT_AD_CONCEPT_LANES.map((lane) => ({
+      title: lane.title,
+      description: lane.description,
+    }));
+  }
+  const option = topicTypeOptionFor(topicType);
+  const baseAngles = option?.angles || topicTypeOptionFor(DEFAULT_TOPIC_TYPE).angles || [];
+  const brief = truncateText(String(briefText || "").trim(), 72);
+  const contextual = brief
+    ? [
+        ["Audience POV", `Show the topic through a viewer who wants "${brief}" to feel simpler or more useful.`],
+        ["Personal test", `Make the creator try "${brief}" in one small real moment with a visible payoff.`],
+        ["Fast contrast", `Contrast the confusing version of "${brief}" with the cleaner version viewers can remember.`],
+      ]
+    : [];
+  return [...baseAngles, ...contextual].map(([title, description]) => ({ title, description }));
+}
+
+function normalizeProductAdBrief(value = {}) {
+  const source = value && typeof value === "object" ? value : {};
+  const imageAssets = uniqueProductReferenceAssets([
+    ...(Array.isArray(source.imageAssets) ? source.imageAssets : []),
+    ...(Array.isArray(source.productImageAssets) ? source.productImageAssets : []),
+    ...(Array.isArray(source.referenceImageAssets) ? source.referenceImageAssets : []),
+  ]).slice(0, 8);
+  const assetUrls = imageAssets.map(productReferenceAssetUrl).filter(Boolean);
+  const manualImageUrls = splitProductImageUrls(source.imageUrlsText || source.imageUrlText);
+  const sourceProductImageUrls = uniqueStrings([
+    ...manualImageUrls,
+    ...splitProductImageUrls(source.sourceProductImageUrls),
+    ...splitProductImageUrls(source.uploadedImageUrls),
+    ...splitProductImageUrls(source.imageUrls),
+    ...splitProductImageUrls(source.productImageUrls),
+    ...splitProductImageUrls(source.referenceImageUrls),
+    ...assetUrls,
+  ]).slice(0, 8);
+  const linkedImageUrls = manualImageUrls.length
+    ? manualImageUrls
+    : sourceProductImageUrls.filter((url) => !assetUrls.includes(url));
+  const imageUrlsText = linkedImageUrls.join("\n");
+  const adFormat = PRODUCT_AD_FORMAT_OPTIONS.some((option) => option.value === source.adFormat)
+    ? source.adFormat
+    : DEFAULT_PRODUCT_AD_BRIEF.adFormat;
+  const selectedShotTypes = uniqueStrings(firstArray(source.selectedShotTypes, source.shotTypes, source.preferredShotTypes))
+    .filter((value) => PRODUCT_AD_SHOT_TYPE_OPTIONS.some((option) => option.value === value));
+  const customShotRecipe = source.shotRecipeSource === "custom" && selectedShotTypes.length > 0;
+  const productInput = firstString(
+    source.productInput,
+    source.input,
+    source.productUrl,
+    source.sourceUrl,
+    source.productName,
+    source.displayName,
+    source.productInputLabel
+  );
+  return {
+    ...DEFAULT_PRODUCT_AD_BRIEF,
+    ...source,
+    productInput,
+    imageUrlsText,
+    imageUrls: sourceProductImageUrls,
+    sourceProductImageUrls,
+    uploadedImageUrls: uniqueStrings([
+      ...splitProductImageUrls(source.uploadedImageUrls),
+      ...assetUrls,
+    ]),
+    imageAssets,
+    ingredientDetails: String(source.ingredientDetails || source.ingredients || source.productUnderstanding?.ingredients || "").slice(0, 150),
+    targetAudience: String(source.targetAudience || source.productUnderstanding?.targetAudience || ""),
+    campaignObjective: String(source.campaignObjective || DEFAULT_PRODUCT_AD_BRIEF.campaignObjective).slice(0, 240),
+    adFormat,
+    selectedShotTypes: customShotRecipe ? selectedShotTypes : [],
+    shotRecipeSource: customShotRecipe ? "custom" : "auto_product",
+    noHumans: Boolean(source.noHumans ?? source.no_humans),
+  };
+}
+
+function productAdFormatPlaybookFor(adFormat = DEFAULT_PRODUCT_AD_BRIEF.adFormat) {
+  return PRODUCT_AD_FORMAT_PLAYBOOKS[adFormat]
+    || PRODUCT_AD_FORMAT_PLAYBOOKS[DEFAULT_PRODUCT_AD_BRIEF.adFormat];
+}
+
+function productAdBriefFromPipelineResult(result = {}, currentBrief = {}) {
+  if (!result || typeof result !== "object") return null;
+  const product = firstObject(result.productIntelligence, result.product, result.productUnderstanding) || {};
+  const current = normalizeProductAdBrief(currentBrief);
+  const generatedAssets = firstArray(result.generatedAssets)
+    .map((asset) => firstString(asset?.assetUrl, asset?.signedUrl, asset?.publicUrl))
+    .filter(Boolean);
+  const imageUrls = uniqueStrings([
+    ...splitProductImageUrls(product.sourceImages || product.imageUrls || product.productImageUrls || product.referenceImageUrls),
+    ...splitProductImageUrls(current.sourceProductImageUrls || current.imageUrls || current.productImageUrls),
+  ]).slice(0, 8);
+  const displayName = firstString(
+    product.productName,
+    product.displayName,
+    product.name,
+    product.productUnderstanding?.productName,
+    current.productName,
+    current.displayName,
+    current.productInput
+  );
+  const sourceUrl = firstString(product.productUrl, product.sourceUrl, current.sourceUrl, current.productUrl);
+  const productUnderstanding = {
+    ...(current.productUnderstanding || {}),
+    productName: displayName,
+    sourceType: sourceUrl ? "product_url" : imageUrls.length ? "product_images" : "product_name",
+    sourceUrl,
+    imageUrls,
+    brandColors: firstArray(product.brandColors, product.visualIdentity?.colors, current.productUnderstanding?.brandColors),
+    logo: firstString(product.logoUrl, product.logo, current.productUnderstanding?.logo),
+    packaging: firstString(product.packaging, product.packagingDescription, current.productUnderstanding?.packaging),
+    productCategory: firstString(product.productCategory, product.category, current.productUnderstanding?.productCategory),
+    ingredients: firstString(product.ingredients, current.ingredientDetails, current.productUnderstanding?.ingredients),
+    usp: firstString(product.usp, product.description, current.productUnderstanding?.usp),
+    benefits: firstArray(product.benefits, current.productUnderstanding?.benefits),
+    targetAudience: firstString(product.targetAudience, result.marketResearch?.audience, current.targetAudience, current.productUnderstanding?.targetAudience),
+    price: firstString(product.price, current.productUnderstanding?.price),
+    customerReviews: firstArray(product.customerReviews, product.reviews, current.productUnderstanding?.customerReviews),
+    competitorPositioning: firstString(result.marketResearch?.positioning, product.competitorPositioning, current.productUnderstanding?.competitorPositioning),
+    tone: firstString(product.adTone, product.tone, result.adTone, current.productUnderstanding?.tone),
+    adTone: firstString(product.adTone, product.tone, result.adTone, current.productUnderstanding?.adTone),
+    toneRationale: firstString(product.toneRationale, result.toneRationale, current.productUnderstanding?.toneRationale),
+    evidencePolicy: "Backend product research enriched this brief. Unknown facts must stay marked as unknown or inferred.",
+  };
+  return normalizeProductAdBrief({
+    ...current,
+    mode: PRODUCT_AD_BRIEF_MODE,
+    briefMode: PRODUCT_AD_BRIEF_MODE,
+    productInput: firstString(sourceUrl, displayName, current.productInput),
+    productUrl: sourceUrl,
+    sourceUrl,
+    productName: displayName,
+    displayName,
+    imageUrls,
+    imageUrlsText: normalized.imageUrlsText || "",
+    sourceProductImageUrls: imageUrls,
+    imageAssets: current.imageAssets,
+    ingredientDetails: firstString(product.ingredients, current.ingredientDetails),
+    targetAudience: firstString(product.targetAudience, current.targetAudience),
+    campaignObjective: firstString(product.campaignObjective, current.campaignObjective),
+    adTone: firstString(product.adTone, product.tone, result.adTone),
+    toneRationale: firstString(product.toneRationale, result.toneRationale),
+    productUnderstanding,
+    productIntelligence: product,
+    marketResearch: result.marketResearch || {},
+    adConcepts: firstArray(result.adConcepts),
+    generatedAssets,
+    srtFile: result.srtFile,
+    videoFinishingPlan: result.videoFinishingPlan,
+  });
+}
+
+function workflowStateFromProductAdPipelineResult(result = {}, currentBrief = {}) {
+  if (!result || typeof result !== "object") return null;
+  const workflow = firstObject(result.savedWorkflow, result.workflowIds, result.persistedWorkflow, result.workflow);
+  const product = firstObject(result.productIntelligence, result.product, result.productUnderstanding) || {};
+  const videoRequest = firstObject(result.videoGenerationRequest);
+  const shotPlan = firstArray(result.shotPlan, videoRequest.scenes, result.scenes);
+  const scriptId = firstString(result.scriptId, workflow.scriptId, videoRequest.scriptId);
+  const storyIdeaId = firstString(result.storyIdeaId, workflow.storyIdeaId, videoRequest.storyIdeaId);
+  const lockedIdeaId = firstString(result.lockedIdeaId, workflow.lockedIdeaId, videoRequest.lockedIdeaId);
+  const projectId = firstString(result.projectId, workflow.projectId, videoRequest.projectId);
+  if (!scriptId || !storyIdeaId || !lockedIdeaId) return null;
+  const brief = normalizeProductAdBrief(currentBrief);
+  const title = firstString(
+    product.productName,
+    product.name,
+    result.title,
+    brief.displayName,
+    brief.productName,
+    "Product ad"
+  );
+  const scriptText = firstString(result.storyScript, result.script, videoRequest.script, brief.campaignObjective);
+  const durationSeconds = Number(result.durationSeconds || videoRequest.durationSeconds || videoRequest.targetDurationSeconds || brief.durationSeconds || 60) || 60;
+  const scriptJson = {
+    projectTitle: title,
+    title,
+    script: scriptText,
+    shots: shotPlan,
+    scenes: shotPlan,
+    duration: durationSeconds,
+    durationSeconds,
+    screenType: firstString(result.screenType, videoRequest.screenType, brief.screenType, "vertical"),
+    categoryCode: firstString(result.categoryCode, videoRequest.categoryCode, "advertisement"),
+    productionStyle: "full_ai",
+    hybridSceneMode: "ai_only",
+    noHumans: Boolean(result.noHumans ?? videoRequest.noHumans ?? brief.noHumans),
+    shotPlanningMode: firstString(result.shotPlanningMode, videoRequest.shotPlanningMode, brief.shotRecipeSource),
+    screenplayApprovedForVideo: true,
+    approvalStatus: "AUTO_APPROVED_PRODUCT_AD_PIPELINE",
+    productIntelligence: product,
+    productIntelligenceBrief: brief,
+    productImageUrls: productReferenceUrlsFromBrief(brief),
+    referenceImageUrls: productReferenceUrlsFromBrief(brief),
+    productImageAssets: firstArray(brief.imageAssets),
+    referenceImageAssets: firstArray(brief.imageAssets),
+    marketResearch: result.marketResearch || {},
+    adConcepts: firstArray(result.adConcepts),
+    videoFinishingPlan: firstObject(result.videoFinishingPlan, videoRequest.videoFinishingPlan),
+    soundDesignPlan: firstObject(result.soundDesignPlan, videoRequest.soundDesignPlan),
+    audioProductionPlan: firstObject(result.audioProductionPlan, videoRequest.audioProductionPlan),
+    editingPlan: firstObject(result.editingPlan, result.editorHandoffPlan, videoRequest.editingPlan, videoRequest.editorHandoffPlan),
+    editorHandoffPlan: firstObject(result.editorHandoffPlan, result.editingPlan, videoRequest.editorHandoffPlan, videoRequest.editingPlan),
+    videoPacingProfile: firstObject(result.videoPacingProfile, videoRequest.videoPacingProfile),
+    videoConsistencyBible: firstObject(result.videoConsistencyBible, videoRequest.videoConsistencyBible),
+    generatedAssets: firstArray(result.generatedAssets),
+    srt: result.srt || videoRequest.srt,
+    srtFile: result.srtFile || videoRequest.srtFile,
+    srtCues: firstArray(result.srtCues, videoRequest.srtCues),
+  };
+  const lockedBrief = {
+    id: lockedIdeaId,
+    lockedIdeaId,
+    projectId,
+    backendLocked: true,
+    title,
+    description: firstString(product.usp, product.summary, result.strategySummary, title),
+    durationSeconds,
+    topicType: "advertisement",
+    productionStyle: "full_ai",
+    hybridSceneMode: "ai_only",
+    productIntelligenceBrief: brief,
+    productIntelligence: product,
+    selectionPayload: {
+      productIntelligenceBrief: brief,
+      productAdPipelineResult: result,
+      productionStyle: "full_ai",
+      hybridSceneMode: "ai_only",
+    },
+  };
+  const storyScriptIdea = {
+    id: storyIdeaId,
+    ideaId: storyIdeaId,
+    storyIdeaId,
+    lockedIdeaId,
+    projectId,
+    title,
+    description: firstString(result.strategySummary, product.usp, title),
+    storyScriptText: scriptText,
+    storyScriptJson: buildInitialStoryRevisionPayload({ script: scriptText, shots: shotPlan }),
+    scenes: shotPlan,
+    durationSeconds,
+    status: "SCRIPT_GENERATED",
+    productionStyle: "full_ai",
+    hybridSceneMode: "ai_only",
+  };
+  const scriptDetailIdea = {
+    ...storyScriptIdea,
+    scriptId,
+    script: scriptText,
+    scriptText,
+    scriptJson,
+    scriptScenes: shotPlan,
+    scenes: shotPlan,
+    rawPromptResponse: result,
+    status: "GENERATED",
+    screenplayApprovedForVideo: true,
+    productionPlanTags: firstArray(result.productionPlanTags),
+    videoGenerationRequest: videoRequest,
+  };
+  return { lockedBrief, storyScriptIdea, scriptDetailIdea };
+}
+
+function hasProductAdInput(value = {}) {
+  const normalized = normalizeProductAdBrief(value);
+  return Boolean(
+    String(normalized.productInput || "").trim()
+    || String(normalized.productUrl || "").trim()
+    || String(normalized.productName || "").trim()
+    || splitProductImageUrls(normalized.imageUrlsText || normalized.imageUrls || normalized.productImageUrls).length
+  );
+}
+
+function buildProductIntelligenceBrief(productAdBrief = {}, campaignNotes = "", context = {}) {
+  const normalized = normalizeProductAdBrief(productAdBrief);
+  if (!hasProductAdInput(normalized)) return null;
+  const configuredImageUrls = splitProductImageUrls(
+    normalized.sourceProductImageUrls
+    || normalized.imageUrls
+    || normalized.productImageUrls
+    || normalized.imageUrlsText
+  );
+  const productInput = firstString(normalized.productInput, normalized.productUrl, normalized.productName);
+  const sourceUrl = isHttpUrl(productInput) ? productInput : firstString(normalized.productUrl, normalized.sourceUrl);
+  const imageUrls = uniqueStrings([
+    ...configuredImageUrls,
+    ...(isProductReferenceImageUrl(sourceUrl) ? [sourceUrl] : []),
+  ]);
+  const productName = firstString(normalized.productName, isHttpUrl(productInput) ? inferProductNameFromUrl(productInput) : productInput, "Product campaign");
+  const notes = String(campaignNotes || normalized.campaignNotes || normalized.notes || "").trim();
+  const category = inferProductCategory(`${productInput} ${notes}`);
+  const ingredientDetails = String(normalized.ingredientDetails || "").slice(0, 150);
+  const targetAudience = firstString(normalized.targetAudience, inferProductAudience(category, notes));
+  const resolvedAdTone = firstString(
+    normalized.adTone,
+    normalized.productUnderstanding?.adTone,
+    normalized.productUnderstanding?.tone
+  );
+  const displayName = productName || inferProductNameFromUrl(sourceUrl) || "Product campaign";
+  const adFormatOption = PRODUCT_AD_FORMAT_OPTIONS.find((option) => option.value === normalized.adFormat)
+    || PRODUCT_AD_FORMAT_OPTIONS[0];
+  const formatPlaybook = productAdFormatPlaybookFor(adFormatOption.value);
+  const selectedShotTypes = normalized.shotRecipeSource === "custom" ? normalized.selectedShotTypes : [];
+  const selectedShotTypeLabels = selectedShotTypes
+    .map((value) => PRODUCT_AD_SHOT_TYPE_OPTIONS.find((option) => option.value === value)?.label)
+    .filter(Boolean);
+  const productUnderstanding = {
+    productName: displayName,
+    sourceType: sourceUrl ? "product_url" : imageUrls.length ? "product_images" : "product_name",
+    sourceUrl,
+    imageUrls,
+    brandColors: [],
+    logo: "",
+    packaging: "",
+    productCategory: category,
+    ingredients: ingredientDetails,
+    usp: notes || "Value proposition to be inferred from product context.",
+    benefits: [],
+    targetAudience,
+    price: "",
+    customerReviews: [],
+    competitorPositioning: "",
+    tone: resolvedAdTone,
+    adTone: resolvedAdTone,
+    toneSelectionMode: "AUTO_FROM_PRODUCT_CONTEXT",
+    toneRationale: firstString(normalized.toneRationale, normalized.productUnderstanding?.toneRationale),
+    evidencePolicy: "Use provided URL/name/images as source. Mark unknown facts as inferred; do not invent ingredients, price, reviews, or claims.",
+  };
+  const briefSummary = limitTextWords(
+    `Create a ${context.durationSeconds || 60}s ${adFormatOption.label.toLowerCase()} commercial for ${displayName}.${notes ? ` Notes: ${notes}` : ""}`,
+    45
+  );
+  const brief = {
+    mode: PRODUCT_AD_BRIEF_MODE,
+    briefMode: PRODUCT_AD_BRIEF_MODE,
+    productInput,
+    productInputLabel: sourceUrl ? sourceUrl : displayName,
+    sourceUrl,
+    productName: displayName,
+    displayName,
+    imageUrls,
+    sourceProductImageUrls: imageUrls,
+    imageAssets: firstArray(normalized.imageAssets),
+    ingredientDetails,
+    targetAudience,
+    campaignNotes: notes,
+    campaignAngle: context.campaignAngle || normalized.campaignAngle || null,
+    campaignObjective: normalized.campaignObjective || "",
+    adTone: resolvedAdTone,
+    toneSelectionMode: "AUTO_FROM_PRODUCT_CONTEXT",
+    cta: normalized.cta || "Order today",
+    adFormat: adFormatOption.value,
+    adFormatLabel: adFormatOption.label,
+    adFormatDescription: adFormatOption.description,
+    formatPlaybook,
+    selectedShotTypes,
+    selectedShotTypeLabels,
+    shotRecipeSource: normalized.shotRecipeSource,
+    autoPlanShotTypes: normalized.shotRecipeSource !== "custom",
+    noHumans: Boolean(normalized.noHumans),
+    creativeDirection: {
+      adFormat: adFormatOption.label,
+      adFormatKey: adFormatOption.value,
+      adFormatDescription: adFormatOption.description,
+      formatPlaybook,
+      requestedShotTypes: selectedShotTypeLabels,
+      shotRecipeSource: normalized.shotRecipeSource,
+      autoPlanShotTypes: normalized.shotRecipeSource !== "custom",
+      noHumans: Boolean(normalized.noHumans),
+      campaignNotes: notes,
+      ingredientDetails,
+      targetAudience,
+      campaignObjective: normalized.campaignObjective || "",
+      toneSelectionMode: "AUTO_FROM_PRODUCT_CONTEXT",
+      adTone: resolvedAdTone,
+      storytellingType: context.storytellingType || DEFAULT_STORYTELLING_TYPE,
+      hookLens: context.hookLens || "",
+      hookBridge: defaultHookBridgeFor(context.hookLens),
+      retentionStrategy: "Open with an immediate product-relevant hook, add a fresh proof or visual payoff every few seconds, and reserve the clearest packshot plus CTA for the final beat.",
+      pacingStyle: context.pacingStyle || (Number(context.durationSeconds || 60) <= 30 ? "FAST" : "BALANCED"),
+      brollStyle: context.brollStyle || "",
+      captionStyle: context.captionStyle || "",
+      productReferencePolicy: "Use supplied product images only as product/package reference. Do not turn storyboard sketches into final product visuals.",
+    },
+    countryCode: context.countryCode || "",
+    durationSeconds: context.durationSeconds || 60,
+    topicType: context.topicType || "product",
+    productionStyle: context.productionStyle || DEFAULT_PRODUCTION_STYLE,
+    dialogueLanguage: context.dialogueLanguage || "Hinglish",
+    screenType: context.screenType || "vertical",
+    storytellingType: context.storytellingType || DEFAULT_STORYTELLING_TYPE,
+    hookLens: context.hookLens || "",
+    brollStyle: context.brollStyle || "",
+    captionStyle: context.captionStyle || "",
+    productUnderstanding,
+    adConceptLanes: PRODUCT_AD_CONCEPT_LANES,
+    briefSummary,
+  };
+  return {
+    ...brief,
+    productInputKey: productAdInputKey(brief),
+  };
+}
+
+function normalizeProductIntelligenceBrief(value = {}) {
+  if (!value || typeof value !== "object") return null;
+  const productUnderstanding = {
+    ...(value.productUnderstanding || {}),
+  };
+  const imageAssets = uniqueProductReferenceAssets([
+    ...(Array.isArray(value.imageAssets) ? value.imageAssets : []),
+    ...(Array.isArray(value.productImageAssets) ? value.productImageAssets : []),
+    ...(Array.isArray(value.referenceImageAssets) ? value.referenceImageAssets : []),
+  ]).slice(0, 8);
+  const configuredImageUrls = splitProductImageUrls(
+    value.sourceProductImageUrls
+    || value.imageUrls
+    || value.productImageUrls
+    || value.referenceImageUrls
+    || productUnderstanding.imageUrls
+    || value.imageUrlsText
+  );
+  const productInput = firstString(
+    value.productInput,
+    value.input,
+    value.productUrl,
+    value.sourceUrl,
+    value.productName,
+    value.displayName,
+    value.productInputLabel,
+    productUnderstanding.productName
+  );
+  const sourceUrl = firstString(value.sourceUrl, value.productUrl, isHttpUrl(productInput) ? productInput : "");
+  const imageUrls = uniqueStrings([
+    ...configuredImageUrls,
+    ...imageAssets.map(productReferenceAssetUrl).filter(Boolean),
+    ...(isProductReferenceImageUrl(sourceUrl) ? [sourceUrl] : []),
+  ]).slice(0, 8);
+  const displayName = firstString(
+    value.displayName,
+    value.productName,
+    productUnderstanding.productName,
+    isHttpUrl(productInput) ? inferProductNameFromUrl(productInput) : productInput,
+    imageUrls.length ? "Image-led product" : ""
+  );
+  if (!productInput && !displayName && !imageUrls.length) return null;
+  const normalized = {
+    ...value,
+    mode: value.mode || value.briefMode || PRODUCT_AD_BRIEF_MODE,
+    briefMode: value.briefMode || value.mode || PRODUCT_AD_BRIEF_MODE,
+    productInput,
+    productInputLabel: firstString(value.productInputLabel, sourceUrl, displayName),
+    sourceUrl,
+    productName: displayName,
+    displayName,
+    imageUrls,
+    sourceProductImageUrls: imageUrls,
+    imageAssets,
+    imageUrlsText: firstString(value.imageUrlsText, imageUrls.join("\n")),
+    ingredientDetails: String(value.ingredientDetails || productUnderstanding.ingredients || "").slice(0, 150),
+    targetAudience: firstString(value.targetAudience, productUnderstanding.targetAudience),
+    campaignObjective: value.campaignObjective || "",
+    adTone: firstString(value.adTone, productUnderstanding.adTone, productUnderstanding.tone),
+    toneRationale: firstString(value.toneRationale, productUnderstanding.toneRationale),
+    toneSelectionMode: value.toneSelectionMode || "AUTO_FROM_PRODUCT_CONTEXT",
+    cta: value.cta || "Order today",
+    productUnderstanding: {
+      ...productUnderstanding,
+      productName: displayName,
+      productCategory: value.productCategory || productUnderstanding.productCategory || inferProductCategory(productInput || displayName),
+      ingredients: String(value.ingredientDetails || productUnderstanding.ingredients || "").slice(0, 150),
+      targetAudience: value.targetAudience || productUnderstanding.targetAudience || inferProductAudience(productUnderstanding.productCategory, value.campaignNotes),
+      tone: firstString(value.adTone, value.brandTone, productUnderstanding.adTone, productUnderstanding.tone),
+      adTone: firstString(value.adTone, productUnderstanding.adTone, productUnderstanding.tone),
+      toneRationale: firstString(value.toneRationale, productUnderstanding.toneRationale),
+      toneSelectionMode: value.toneSelectionMode || productUnderstanding.toneSelectionMode || "AUTO_FROM_PRODUCT_CONTEXT",
+      imageUrls,
+    },
+    adConceptLanes: value.adConceptLanes || PRODUCT_AD_CONCEPT_LANES,
+  };
+  return {
+    ...normalized,
+    productInputKey: value.productInputKey || productAdInputKey(normalized),
+  };
+}
+
+function hasProductIntelligenceBrief(value = {}) {
+  const normalized = normalizeProductIntelligenceBrief(value);
+  return Boolean(normalized?.productInputKey || normalized?.displayName || normalized?.imageUrls?.length);
+}
+
+function campaignAngleFromEntity(...entities) {
+  for (const entity of entities) {
+    if (!entity || typeof entity !== "object") continue;
+    const selectionContext = firstObject(entity.selectionContext, entity.selection_context) || {};
+    const selectionPayload = firstObject(
+      entity.selectionPayload,
+      entity.selection_payload,
+      selectionContext.selectionPayload,
+      selectionContext.selection_payload
+    ) || {};
+    const sourceBrief = firstObject(entity.sourceBrief, selectionContext.sourceBrief, selectionPayload.sourceBrief) || {};
+    const productBrief = firstObject(entity.productIntelligenceBrief, selectionPayload.productIntelligenceBrief, sourceBrief.productIntelligenceBrief) || {};
+    const candidate = firstObject(
+      entity.campaignAngle,
+      selectionPayload.campaignAngle,
+      selectionContext.campaignAngle,
+      sourceBrief.campaignAngle,
+      productBrief.campaignAngle
+    );
+    if (candidate && firstString(candidate.title, candidate.description)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function productIntelligenceBriefFromEntity(entity = {}) {
+  if (!entity || typeof entity !== "object") return null;
+  if (
+    entity.briefMode === PRODUCT_AD_BRIEF_MODE
+    || entity.mode === PRODUCT_AD_BRIEF_MODE
+    || entity.productInput
+    || entity.productUrl
+    || entity.sourceUrl
+    || entity.productUnderstanding
+  ) {
+    const directSelf = normalizeProductIntelligenceBrief(entity);
+    if (directSelf && hasProductIntelligenceBrief(directSelf)) return directSelf;
+  }
+  const selectionContext = firstObject(entity.selectionContext, entity.selection_context) || {};
+  const selectionPayload = firstObject(entity.selectionPayload, entity.selection_payload, selectionContext.selectionPayload, selectionContext.selection_payload) || {};
+  const creativeNotes = firstObject(entity.creativeNotes, entity.notes) || {};
+  const sourceBrief = firstObject(entity.sourceBrief, selectionContext.sourceBrief) || {};
+  const direct = firstObject(
+    entity.productIntelligenceBrief,
+    entity.product_intelligence_brief,
+    entity.productBrief,
+    entity.product_brief,
+    selectionPayload.productIntelligenceBrief,
+    selectionPayload.product_intelligence_brief,
+    selectionContext.productIntelligenceBrief,
+    selectionContext.product_intelligence_brief,
+    sourceBrief.productIntelligenceBrief,
+    creativeNotes.productIntelligenceBrief,
+    creativeNotes.product_intelligence_brief
+  );
+  if (direct) return normalizeProductIntelligenceBrief(direct);
+  const productUnderstanding = firstObject(
+    entity.productUnderstanding,
+    entity.product_understanding,
+    selectionPayload.productUnderstanding,
+    selectionContext.productUnderstanding,
+    creativeNotes.productUnderstanding
+  );
+  return productUnderstanding ? normalizeProductIntelligenceBrief({ productUnderstanding }) : null;
+}
+
+function productIntelligenceBriefForWorkflow(...entities) {
+  for (const entity of entities) {
+    const direct = normalizeProductIntelligenceBrief(entity);
+    if (direct && hasProductIntelligenceBrief(direct)) return direct;
+    const productBrief = productIntelligenceBriefFromEntity(entity);
+    if (productBrief && hasProductIntelligenceBrief(productBrief)) return productBrief;
+  }
+  return null;
+}
+
+function productAdInputKey(value = {}) {
+  if (!value || typeof value !== "object") return "";
+  const productInput = firstString(
+    value.productInput,
+    value.input,
+    value.productUrl,
+    value.sourceUrl,
+    value.productName,
+    value.displayName,
+    value.productInputLabel,
+    value.productUnderstanding?.productName
+  );
+  const imageUrls = splitProductImageUrls(value.imageUrls || value.productImageUrls || value.referenceImageUrls || value.imageUrlsText);
+  const raw = [productInput, ...imageUrls].filter(Boolean).join("|");
+  return raw
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/[?#].*$/, "")
+    .replace(/\/+$/, "")
+    .replace(/[^a-z0-9|._/-]+/g, "-")
+    .slice(0, 240);
+}
+
+function brandContextFromProductIntelligence(productBrief = null) {
+  const normalized = normalizeProductIntelligenceBrief(productBrief);
+  if (!normalized) return null;
+  const understanding = normalized.productUnderstanding || {};
+  return normalizeBrandContextForApi({
+    brandName: normalized.brandName || "",
+    productName: normalized.displayName || normalized.productName || understanding.productName || "",
+    productCategory: understanding.productCategory || normalized.productCategory || "",
+    offer: normalized.campaignNotes || understanding.usp || "",
+    campaignObjective: normalized.campaignObjective || "",
+    ingredientDetails: normalized.ingredientDetails || understanding.ingredients || "",
+    targetAudience: normalized.targetAudience || understanding.targetAudience || "",
+    brandTone: normalized.adTone || understanding.adTone || understanding.tone || "",
+    toneSelectionMode: normalized.toneSelectionMode || "AUTO_FROM_PRODUCT_CONTEXT",
+    cta: normalized.cta || "Order today",
+    adFormat: normalized.adFormatLabel || normalized.adFormat || "Product Showcase",
+    adFormatKey: normalized.adFormat || "product_showcase",
+    formatPlaybook: normalized.formatPlaybook || normalized.creativeDirection?.formatPlaybook || productAdFormatPlaybookFor(normalized.adFormat),
+    requestedShotTypes: normalized.selectedShotTypeLabels || normalized.selectedShotTypes || [],
+    storytellingType: normalized.storytellingType || normalized.creativeDirection?.storytellingType || "",
+    hookLens: normalized.hookLens || normalized.creativeDirection?.hookLens || "",
+    retentionStrategy: normalized.creativeDirection?.retentionStrategy || "",
+    requiredMentions: [understanding.usp].filter(Boolean),
+    bannedClaims: normalized.bannedClaims || [],
+    restrictions: ["Do not invent price, reviews, ingredients, guarantees, or competitor claims."],
+    visualIdentity: {
+      colors: understanding.brandColors || [],
+      logoRequired: Boolean(understanding.logo),
+      styleNotes: understanding.packaging || "Keep the product and packaging visually consistent across shots.",
+    },
+    metadata: {
+      productInputKey: normalized.productInputKey,
+      sourceUrl: normalized.sourceUrl || "",
+      imageUrls: normalized.imageUrls || [],
+      imageAssets: normalized.imageAssets || [],
+      creativeDirection: normalized.creativeDirection || {},
+      productUnderstanding: understanding,
+    },
+  });
+}
+
+function normalizeBrandContextForApi(brandContext = null) {
+  if (!brandContext || typeof brandContext !== "object" || Array.isArray(brandContext)) return brandContext;
+  return {
+    ...brandContext,
+    campaignObjective: String(brandContext.campaignObjective || "").slice(0, 240),
+  };
+}
+
+function adConceptStrategyFromIdea(idea = {}) {
+  const notes = firstObject(idea?.creativeNotes, idea?.notes) || {};
+  const strategy = firstObject(idea?.adConceptStrategy, notes.adConceptStrategy, notes.campaignStrategy) || {};
+  if (Object.keys(strategy).length) return strategy;
+  if (!notes.adConceptLane && !notes.hook && !notes.shotPlanner) return {};
+  return {
+    laneKey: notes.adConceptLane || "",
+    title: notes.adConceptTitle || "",
+    hook: notes.hook || "",
+    cta: notes.cta || "",
+    marketingObjective: notes.marketingObjective || "",
+    shotPlanner: notes.shotPlanner || [],
+    imagePrompts: notes.imagePrompts || [],
+    videoPromptPlan: notes.videoPromptPlan || [],
+    voiceMusicCaptionPlan: notes.voiceMusicCaptionPlan || {},
+    editorPlan: notes.editorPlan || "",
+  };
+}
+
+function splitProductImageUrls(value) {
+  if (Array.isArray(value)) {
+    return value.flatMap(splitProductImageUrls);
+  }
+  return String(value || "")
+    .split(/[\n,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item, index, all) => all.indexOf(item) === index)
+    .slice(0, 12);
+}
+
+function productReferenceAssetUrl(asset = {}) {
+  return firstString(
+    asset?.assetUrl,
+    asset?.signedUrl,
+    asset?.publicUrl,
+    asset?.imageUrl,
+    asset?.url
+  );
+}
+
+function uniqueProductReferenceAssets(assets = []) {
+  const seen = new Set();
+  return (Array.isArray(assets) ? assets : [])
+    .filter((asset) => asset && typeof asset === "object")
+    .filter((asset) => {
+      const key = firstString(
+        asset?.bucket && asset?.objectKey ? `${asset.bucket}/${asset.objectKey}` : "",
+        asset?.bucket && asset?.object_key ? `${asset.bucket}/${asset.object_key}` : "",
+        productReferenceAssetUrl(asset)
+      );
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function productReferenceUrlsFromBrief(productBrief = {}) {
+  const understanding = firstObject(productBrief?.productUnderstanding) || {};
+  return uniqueStrings([
+    ...splitProductImageUrls(productBrief?.sourceProductImageUrls),
+    ...splitProductImageUrls(productBrief?.imageUrls),
+    ...splitProductImageUrls(productBrief?.productImageUrls),
+    ...splitProductImageUrls(productBrief?.referenceImageUrls),
+    ...splitProductImageUrls(understanding?.imageUrls),
+    ...firstArray(productBrief?.imageAssets).map(productReferenceAssetUrl).filter(Boolean),
+  ]).slice(0, 8);
+}
+
+async function optimizeProductReferenceFile(file) {
+  if (!file || typeof createImageBitmap !== "function" || file.size <= 3 * 1024 * 1024) {
+    return file;
+  }
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+    const maxDimension = 2048;
+    const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d", { alpha: true });
+    context.drawImage(bitmap, 0, 0, width, height);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.9));
+    if (!blob) return file;
+    const baseName = String(file.name || "product-reference").replace(/\.[^.]+$/, "");
+    return new File([blob], `${baseName}.webp`, {
+      type: "image/webp",
+      lastModified: file.lastModified || Date.now(),
+    });
+  } catch {
+    return file;
+  } finally {
+    bitmap?.close?.();
+  }
+}
+
+function isHttpUrl(value = "") {
+  return /^https?:\/\//i.test(String(value || "").trim());
+}
+
+function isProductReferenceImageUrl(value = "") {
+  if (!isHttpUrl(value)) return false;
+  try {
+    return /\.(avif|gif|jpe?g|png|webp)$/i.test(new URL(String(value).trim()).pathname);
+  } catch {
+    return false;
+  }
+}
+
+function inferProductNameFromUrl(value = "") {
+  try {
+    const url = new URL(String(value || "").trim());
+    const parts = url.pathname.split("/").filter(Boolean);
+    const last = parts[parts.length - 1] || url.hostname.replace(/^www\./, "");
+    return titleCase(last.replace(/\.(html?|php)$/i, "").replace(/[-_]+/g, " "));
+  } catch {
+    return "";
+  }
+}
+
+function titleCase(value = "") {
+  return String(value || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => `${word.slice(0, 1).toUpperCase()}${word.slice(1).toLowerCase()}`)
+    .join(" ");
+}
+
+function inferProductCategory(value = "") {
+  const text = String(value || "").toLowerCase();
+  if (/coffee|tea|latte|espresso|brew/.test(text)) return "coffee";
+  if (/skin|serum|cream|beauty|makeup|hair/.test(text)) return "beauty";
+  if (/shoe|shirt|fashion|wear|bag|watch/.test(text)) return "fashion";
+  if (/protein|snack|food|butter|milk|drink|beverage/.test(text)) return "food";
+  if (/app|saas|software|tool|platform/.test(text)) return "software";
+  if (/fitness|gym|workout|supplement/.test(text)) return "fitness";
+  return "product";
+}
+
+function inferProductAudience(category = "", notes = "") {
+  const text = `${category} ${notes}`.toLowerCase();
+  if (/coffee|software|saas|tool/.test(text)) return "working professionals";
+  if (/beauty|skin|hair/.test(text)) return "beauty-conscious buyers";
+  if (/fitness|protein|gym/.test(text)) return "fitness-focused buyers";
+  if (/food|snack|beverage/.test(text)) return "everyday shoppers";
+  return "likely buyers";
+}
+
+function inferProductBrandTone(value = "") {
+  const text = String(value || "").toLowerCase();
+  if (/luxury|premium|gold|rich|elegant/.test(text)) return "premium";
+  if (/fun|viral|ugc|creator|casual/.test(text)) return "social and conversational";
+  if (/trust|proof|clinical|safe/.test(text)) return "credible";
+  return "clear and persuasive";
+}
+
+function normalizeProductionStyle(value = DEFAULT_PRODUCTION_STYLE) {
+  const normalized = String(value || DEFAULT_PRODUCTION_STYLE)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (["ai", "fullai", "full_ai_video", "all_ai"].includes(normalized)) return "full_ai";
+  if (["mixed", "mix", "talking_head_ai", "talking_head_plus_ai"].includes(normalized)) return "hybrid";
+  return PRODUCTION_STYLE_OPTIONS.some((option) => option.value === normalized) ? normalized : DEFAULT_PRODUCTION_STYLE;
+}
+
+function productionStyleOptionFor(value = DEFAULT_PRODUCTION_STYLE) {
+  const normalized = normalizeProductionStyle(value);
+  return PRODUCTION_STYLE_OPTIONS.find((option) => option.value === normalized) || PRODUCTION_STYLE_OPTIONS[0];
+}
+
+function productionStyleLabelFor(value = DEFAULT_PRODUCTION_STYLE) {
+  return productionStyleOptionFor(value)?.label || "Hybrid";
+}
+
+function normalizeHybridSceneMode(value = DEFAULT_HYBRID_SCENE_MODE) {
+  const normalized = String(value || DEFAULT_HYBRID_SCENE_MODE)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (["ask", "ask_user", "ask_human_or_ai"].includes(normalized)) return "ask_speaking_scenes";
+  if (["human", "human_talking_head", "talking_head_first"].includes(normalized)) return "human_first";
+  if (["ai", "ai_generated", "ai_generated_first"].includes(normalized)) return "ai_first";
+  if (["founder_only", "avatar_only", "talking_head_only", "all_founder"].includes(normalized)) return "full_founder";
+  return HYBRID_SCENE_MODE_OPTIONS.some((option) => option.value === normalized) ? normalized : DEFAULT_HYBRID_SCENE_MODE;
+}
+
+function hybridSceneModeOptionFor(value = DEFAULT_HYBRID_SCENE_MODE) {
+  const normalized = normalizeHybridSceneMode(value);
+  return HYBRID_SCENE_MODE_OPTIONS.find((option) => option.value === normalized) || HYBRID_SCENE_MODE_OPTIONS[0];
+}
+
+function normalizeBrollStyle(value = DEFAULT_BROLL_STYLE) {
+  const normalized = String(value || DEFAULT_BROLL_STYLE)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (["cinematic", "stylized", "premium"].includes(normalized)) return "cinematic_social";
+  if (["ugc", "real", "phone"].includes(normalized)) return "ugc_real";
+  return BROLL_STYLE_OPTIONS.some((option) => option.value === normalized) ? normalized : DEFAULT_BROLL_STYLE;
+}
+
+function brollStyleOptionFor(value = DEFAULT_BROLL_STYLE) {
+  const normalized = normalizeBrollStyle(value);
+  return BROLL_STYLE_OPTIONS.find((option) => option.value === normalized) || BROLL_STYLE_OPTIONS[0];
+}
+
+function normalizeCaptionStyle(value = DEFAULT_CAPTION_STYLE) {
+  const normalized = String(value || DEFAULT_CAPTION_STYLE)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (["bold", "keyword", "styled", "full"].includes(normalized)) return "bold_keyword";
+  if (["karaoke", "animated"].includes(normalized)) return "karaoke_pop";
+  if (["subtitle", "clean"].includes(normalized)) return "clean_subtitle";
+  return CAPTION_STYLE_OPTIONS.some((option) => option.value === normalized) ? normalized : DEFAULT_CAPTION_STYLE;
+}
+
+function captionStyleOptionFor(value = DEFAULT_CAPTION_STYLE) {
+  const normalized = normalizeCaptionStyle(value);
+  return CAPTION_STYLE_OPTIONS.find((option) => option.value === normalized) || CAPTION_STYLE_OPTIONS[0];
+}
+
+function productionStyleGuidanceFor(value = DEFAULT_PRODUCTION_STYLE, styleOptions = {}) {
+  const option = productionStyleOptionFor(value);
+  const fullAi = option.value === "full_ai";
+  const hybridMode = hybridSceneModeOptionFor(styleOptions.hybridSceneMode);
+  const fullFounder = !fullAi && hybridMode.value === "full_founder";
+  const broll = brollStyleOptionFor(styleOptions.brollStyle);
+  const captions = captionStyleOptionFor(styleOptions.captionStyle);
+  return {
+    mode: option.value,
+    label: option.label,
+    aiScenePercent: fullFounder ? 0 : option.aiScenePercent,
+    talkingHeadPercent: fullFounder ? 100 : option.talkingHeadPercent,
+    hybridSceneMode: hybridMode.value,
+    hybridSceneModeLabel: hybridMode.label,
+    brollStyle: broll.value,
+    brollStyleLabel: broll.label,
+    captionStyle: captions.value,
+    captionStyleLabel: captions.label,
+    seedanceMaxClipSeconds: 15,
+    scenePlanningRule: fullAi
+      ? "Every timeline scene should be generated as AI video with Seedance-compatible prompts."
+      : fullFounder
+        ? "Every timeline scene must show the uploaded founder and use generationMode talking_head; split the complete spoken script into consecutive model-safe clips without dropping or paraphrasing dialogue."
+        : "Mix talking-head scenes with generated AI visual scenes; ask for Human or AI on speaking scenes when hybridSceneMode is ask_speaking_scenes, and mark each scene with generationMode as talking_head or ai_generated.",
+    brollRule: `Use ${broll.label} B-roll for non-speaking inserts, transitions, and visual support scenes.`,
+    captionRule: captions.value === "none" ? "Do not burn in captions unless required for accessibility." : `Use ${captions.label} captions across spoken and key text moments.`,
+    mergeRule: "Generate each timeline scene as <=15 second clips, then merge clips in timeline order to meet the target duration.",
   };
 }
 
@@ -6362,6 +12022,411 @@ function normalizeGeneratedScriptScenes(scenes = []) {
   }));
 }
 
+function videoGenerationModeForStyle(productionStyle = DEFAULT_PRODUCTION_STYLE, requestedMode = "") {
+  if (normalizeProductionStyle(productionStyle) === "full_ai") return "ai_generated";
+  return requestedMode || "";
+}
+
+function normalizeScreenplayVideoProvider(provider = "gemini_omni") {
+  const normalized = String(provider || "gemini_omni").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  if (normalized === "gemini_omni" || normalized === "google_omni" || normalized === "omni_flash" || normalized === "omini_flash" || normalized === "gemini_omni_flash" || normalized === "google_omni_flash") return "gemini_omni";
+  if (normalized === "omini" || normalized === "omni" || normalized === "openai_omni" || normalized === "openai_omini") return "omini";
+  if (normalized === "veo" || normalized === "google_veo" || normalized === "google_video" || normalized === "vertex_veo") return "gemini_omni";
+  if (normalized === "dalai_llama" || normalized === "dallai_llama" || normalized === "local" || normalized === "open_source" || normalized === "opensource") return "seedance";
+  if (normalized === "synthesia" || normalized === "synthesia_api") return "synthesia";
+  if (normalized === "seedance" || normalized === "seed_dance" || normalized === "fal_seedance" || normalized === "fal_ai_seedance") return "seedance";
+  return "seedance";
+}
+
+function defaultScreenplayVideoModelForProvider(provider = "gemini_omni") {
+  const normalized = normalizeScreenplayVideoProvider(provider);
+  if (normalized === "google_veo") return "veo-3.1-generate-preview";
+  if (normalized === "gemini_omni") return "gemini-omni-flash-preview";
+  if (normalized === "omini") return "omini-video";
+  if (normalized === "dalai_llama") return "ltx_video";
+  if (normalized === "synthesia") return "synthesia-avatar-video";
+  return "bytedance/seedance-2.0";
+}
+
+function compatibleScreenplayVideoModelForProvider(provider = "gemini_omni", model = "") {
+  const normalizedProvider = normalizeScreenplayVideoProvider(provider);
+  const normalizedModel = String(model || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  if (!normalizedModel) return defaultScreenplayVideoModelForProvider(normalizedProvider);
+  if (normalizedProvider === "gemini_omni" && !(normalizedModel.includes("gemini") || normalizedModel.includes("omni"))) {
+    return defaultScreenplayVideoModelForProvider(normalizedProvider);
+  }
+  if (normalizedProvider === "omini" && !(normalizedModel.includes("omini") || normalizedModel.includes("omni"))) {
+    return defaultScreenplayVideoModelForProvider(normalizedProvider);
+  }
+  if (normalizedProvider === "seedance" && !(normalizedModel.includes("seedance") || normalizedModel.includes("seed_dance"))) {
+    return defaultScreenplayVideoModelForProvider(normalizedProvider);
+  }
+  if (normalizedProvider === "dalai_llama" && !(normalizedModel.includes("ltx") || normalizedModel.includes("liveportrait") || normalizedModel.includes("echo") || normalizedModel.includes("face") || normalizedModel.includes("avatar") || normalizedModel.includes("local"))) {
+    return defaultScreenplayVideoModelForProvider(normalizedProvider);
+  }
+  if (normalizedProvider === "synthesia" && !(normalizedModel.includes("synthesia") || normalizedModel.includes("avatar") || normalizedModel.includes("digital"))) {
+    return defaultScreenplayVideoModelForProvider(normalizedProvider);
+  }
+  return model || defaultScreenplayVideoModelForProvider(normalizedProvider);
+}
+
+function maxClipSecondsForVideoProvider(provider = "gemini_omni", model = "") {
+  const normalized = normalizeScreenplayVideoProvider(provider);
+  const normalizedModel = String(model || "").trim().toLowerCase().replace(/[-\s]+/g, "_");
+  if (normalized === "google_veo") return 8;
+  if (/\b20\b|20s|twenty|long/.test(normalizedModel)) return 20;
+  if (normalized === "dalai_llama") return 8;
+  if (normalized === "synthesia") return 20;
+  if (normalized === "gemini_omni") return 10;
+  return 15;
+}
+
+function videoModelCapabilityForScreenplay(provider = "gemini_omni", model = "") {
+  const normalizedProvider = normalizeScreenplayVideoProvider(provider);
+  const compatibleModel = compatibleScreenplayVideoModelForProvider(normalizedProvider, model);
+  const maxClipSeconds = maxClipSecondsForVideoProvider(normalizedProvider, compatibleModel);
+  return {
+    videoProvider: normalizedProvider,
+    videoModel: compatibleModel,
+    maxClipSeconds,
+    maxDialogueSecondsPerShot: Math.max(1, maxClipSeconds - 1),
+    dialogueTimingPolicy: dialogueTimingPolicyForModelCapability(maxClipSeconds),
+  };
+}
+
+function normalizeFounderAvatarProfileForPlanning(...values) {
+  const merged = {};
+  const localModelSources = [];
+  values.forEach((value) => {
+    const source = firstObject(value) || {};
+    const embeddedProfile = firstObject(
+      source.founderAvatarProfile,
+      source.founderKit,
+      source.avatarProfile,
+      source.scriptJson?.founderAvatarProfile,
+      source.scriptJson?.founderKit,
+      source.scriptJson?.creatorContext?.founderAvatarProfile,
+      source.scriptJson?.creatorContext?.founderKit,
+      source.metadata?.founderAvatarProfile
+    ) || {};
+    const profile = Object.keys(embeddedProfile).length
+      ? embeddedProfile
+      : looksLikeFounderAvatarProfileSourceForPlanning(source)
+        ? source
+        : {};
+    mergeFounderProfileFieldsForPlanning(merged, profile);
+    localModelSources.push(
+      firstObject(profile.localModels, profile.localAvatarModels),
+      firstObject(source.localModels, source.localAvatarModels),
+      firstObject(source.scriptJson?.localModels, source.scriptJson?.localAvatarModels),
+      firstObject(source.scriptJson?.creatorContext?.localModels, source.scriptJson?.creatorContext?.localAvatarModels)
+    );
+  });
+  const localModels = normalizeFounderLocalModelsForPlanning(...localModelSources);
+  const avatarProviderMode = normalizeAvatarProviderModeForPlanning(firstString(
+    merged.avatarProviderMode,
+    merged.providerMode,
+    merged.avatarProvider,
+    merged.provider,
+    "dalai_llama"
+  ));
+  const synthesiaAvatarId = firstString(merged.synthesiaAvatarId, merged.synthesia_avatar_id, avatarProviderMode === "synthesia" ? merged.avatarId : "");
+  const synthesiaVoiceId = firstString(merged.synthesiaVoiceId, merged.synthesia_voice_id, avatarProviderMode === "synthesia" ? merged.voiceId : "");
+  return {
+    ...merged,
+    providerMode: avatarProviderMode,
+    avatarProviderMode,
+    avatarProvider: avatarProviderMode,
+    provider: avatarProviderMode,
+    avatarId: firstString(merged.avatarId, synthesiaAvatarId),
+    voiceId: firstString(merged.voiceId, synthesiaVoiceId),
+    providerVoiceId: firstString(merged.providerVoiceId, merged.customVoiceId, merged.minimaxVoiceId, merged.elevenLabsVoiceId, merged.sarvamVoiceId),
+    minimaxVoiceId: firstString(merged.minimaxVoiceId),
+    synthesiaAvatarId,
+    synthesiaVoiceId,
+    portraitEmbeddingId: firstString(merged.portraitEmbeddingId, merged.portrait_embedding_id),
+    facialFeatureEmbeddingId: firstString(merged.facialFeatureEmbeddingId, merged.facial_feature_embedding_id),
+    voiceEmbeddingId: firstString(merged.voiceEmbeddingId, merged.voice_embedding_id),
+    voiceProfileId: firstString(merged.voiceProfileId, merged.voice_profile_id, localModels.voiceProfileId),
+    sourceUrl: firstString(merged.sourceUrl, merged.source_url, merged.publicUrl, merged.signedUrl, merged.url),
+    sourceAsset: firstObject(merged.sourceAsset, merged.source_asset, merged.asset),
+    referenceTranscript: firstString(merged.referenceTranscript, merged.reference_transcript),
+    voicePreviewText: firstString(merged.voicePreviewText, merged.previewText, merged.voice_preview_text),
+    avatarScript: firstString(merged.avatarScript, merged.avatar_script, merged.fullSpokenText, merged.spokenText, merged.spoken_text),
+    spokenText: firstString(merged.spokenText, merged.spoken_text),
+    pronunciationGuide: firstString(merged.pronunciationGuide, merged.pronunciation_guide),
+    elevenLabsVoiceId: firstString(merged.elevenLabsVoiceId, merged.eleven_labs_voice_id, merged.proprietaryVoiceId),
+    sarvamVoiceId: firstString(merged.sarvamVoiceId, merged.sarvam_voice_id, merged.sarvamSpeakerId),
+    voiceApprovalStatus: firstString(merged.voiceApprovalStatus, merged.voice_approval_status, "NOT_REQUESTED").toUpperCase(),
+    voicePreviewAsset: firstObject(merged.voicePreviewAsset, merged.voice_preview_asset),
+    voiceEnhancement: firstObject(merged.voiceEnhancement, merged.voice_enhancement),
+    voiceEnhancementStatus: firstString(merged.voiceEnhancementStatus, merged.voice_enhancement_status),
+    voiceEnhancementApplied: booleanValue(merged.voiceEnhancementApplied ?? merged.voice_enhancement_applied, false),
+    voiceEnhancementProfile: firstString(merged.voiceEnhancementProfile, merged.voice_enhancement_profile),
+    avatarPortraitStatus: firstString(merged.avatarPortraitStatus, merged.avatar_portrait_status, "NOT_REQUESTED").toUpperCase(),
+    avatarPortraitAsset: firstObject(merged.avatarPortraitAsset, merged.avatar_portrait_asset),
+    avatarPortraitUrl: firstString(merged.avatarPortraitUrl, merged.avatar_portrait_url),
+    avatarPortraitSourceMode: firstString(merged.avatarPortraitSourceMode, merged.avatar_portrait_source_mode, "extract"),
+    avatarPortraitPreparedAt: firstString(merged.avatarPortraitPreparedAt, merged.avatar_portrait_prepared_at),
+    avatarMotionPrompt: firstString(merged.avatarMotionPrompt, merged.avatar_motion_prompt),
+    avatarTestStatus: firstString(merged.avatarTestStatus, merged.avatar_test_status, "NOT_REQUESTED").toUpperCase(),
+    avatarTestAsset: firstObject(merged.avatarTestAsset, merged.avatar_test_asset),
+    avatarTestUrl: firstString(merged.avatarTestUrl, merged.avatar_test_url),
+    avatarTestGeneratedAt: firstString(merged.avatarTestGeneratedAt, merged.avatar_test_generated_at),
+    avatarTestRequestId: firstString(merged.avatarTestRequestId, merged.avatar_test_request_id),
+    avatarTestModel: firstString(merged.avatarTestModel, merged.avatar_test_model),
+    avatarPreviewStatus: firstString(merged.avatarPreviewStatus, merged.avatar_preview_status, "NOT_REQUESTED").toUpperCase(),
+    avatarPreviewAsset: firstObject(merged.avatarPreviewAsset, merged.avatar_preview_asset),
+    avatarPreviewUrl: firstString(merged.avatarPreviewUrl, merged.avatar_preview_url),
+    avatarPreviewGeneratedAt: firstString(merged.avatarPreviewGeneratedAt, merged.avatar_preview_generated_at),
+    avatarPreviewApprovedAt: firstString(merged.avatarPreviewApprovedAt, merged.avatar_preview_approved_at),
+    avatarPreviewFingerprint: firstString(merged.avatarPreviewFingerprint, merged.avatar_preview_fingerprint),
+    lipSyncProvider: firstString(merged.lipSyncProvider, merged.lip_sync_provider),
+    lipSyncModel: firstString(merged.lipSyncModel, merged.lip_sync_model, localModels.lipSyncModel),
+    exactFounderAudioAsset: firstObject(merged.exactFounderAudioAsset, merged.finalFounderAudioAsset, merged.exact_founder_audio_asset),
+    finalFounderAudioUrl: firstString(merged.finalFounderAudioUrl, merged.final_founder_audio_url),
+    details: firstString(merged.details, merged.referenceDetails, merged.sourceDetails),
+    language: firstString(merged.language, "Hinglish"),
+    languageCode: firstString(merged.languageCode, merged.language_code, "hi-IN"),
+    voiceLanguageMode: firstString(merged.voiceLanguageMode, merged.voice_language_mode, "english_indian"),
+    voiceLanguage: firstString(merged.voiceLanguage, merged.voice_language, "English"),
+    voiceLanguageCode: firstString(merged.voiceLanguageCode, merged.voice_language_code, "en-IN"),
+    minimaxLanguageBoost: firstString(merged.minimaxLanguageBoost, merged.minimax_language_boost, "English"),
+    gpuProfile: firstString(merged.gpuProfile, merged.gpu_profile, "rtx_4060_8gb"),
+    localModels,
+    manualApprovalRequiredForFallback: booleanValue(merged.manualApprovalRequiredForFallback ?? merged.manual_approval_required_for_fallback, true),
+    productionEnhancementEnabled: booleanValue(merged.productionEnhancementEnabled ?? merged.production_enhancement_enabled, false),
+    consentConfirmed: booleanValue(merged.consentConfirmed ?? merged.consent_confirmed, false),
+  };
+}
+
+function looksLikeFounderAvatarProfileSourceForPlanning(source = {}) {
+  const localModels = firstObject(source.localModels, source.localAvatarModels) || {};
+  return Boolean(firstString(
+    source.avatarProviderMode,
+    source.providerMode,
+    source.avatarProvider,
+    source.synthesiaAvatarId,
+    source.synthesiaVoiceId,
+    source.avatarId,
+    source.voiceId,
+    source.portraitEmbeddingId,
+    source.facialFeatureEmbeddingId,
+    source.voiceEmbeddingId,
+    source.sourceUrl,
+    source.source_url,
+    source.avatarPortraitUrl,
+    source.avatarTestUrl,
+    localModels.voiceModel,
+    localModels.talkingAvatarModel,
+    localModels.lipSyncModel
+  ));
+}
+
+function mergeFounderProfileFieldsForPlanning(target, source = {}) {
+  Object.entries(firstObject(source) || {}).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    if (typeof value === "string" && !value.trim()) return;
+    if (Array.isArray(value) && !value.length) return;
+    if (value && typeof value === "object" && !Array.isArray(value) && !Object.keys(value).length) return;
+    target[key] = value;
+  });
+  return target;
+}
+
+function normalizeFounderLocalModelsForPlanning(...values) {
+  const merged = Object.assign({}, ...values.map(firstObject));
+  return {
+    voiceModel: normalizeLocalVoiceModelForPlanning(firstString(merged.voiceModel, merged.voice_model, "fal_minimax_voice_clone")),
+    voiceProfileId: firstString(merged.voiceProfileId, merged.voice_profile_id),
+    talkingAvatarModel: normalizeLocalTalkingAvatarModelForPlanning(firstString(merged.talkingAvatarModel, merged.talking_avatar_model, merged.avatarModel, "source_video")),
+    lipSyncModel: normalizeLocalLipSyncModelForPlanning(firstString(merged.lipSyncModel, merged.lipsyncModel, merged.lip_sync_model, "fal_latentsync")),
+    imageModel: normalizeLocalImageModelForPlanning(firstString(merged.imageModel, merged.image_model, "gemini_storyboard")),
+    lightingModel: normalizeLocalImageModelForPlanning(firstString(merged.lightingModel, merged.lighting_model, "ic_lightning")),
+    videoModel: normalizeLocalVideoModelForPlanning(firstString(merged.videoModel, merged.video_model, "ltx_video")),
+    gpuProfile: firstString(merged.gpuProfile, merged.gpu_profile, "rtx_4060_8gb"),
+  };
+}
+
+function normalizeAvatarProviderModeForPlanning(value = "dalai_llama") {
+  const normalized = String(value || "dalai_llama").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  if (normalized === "synthesia" || normalized === "synthesia_api") return "synthesia";
+  if (normalized === "dalai_llama" || normalized === "dallai_llama" || normalized === "local" || normalized === "open_source" || normalized === "opensource") return "dalai_llama";
+  return "dalai_llama";
+}
+
+function normalizeLocalVoiceModelForPlanning(value = "fal_minimax_voice_clone") {
+  const normalized = String(value || "fal_minimax_voice_clone").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  if (normalized.includes("client_rvc") || normalized.includes("trained_client_voice") || normalized.includes("founder_female_v1")) return "client_rvc_english";
+  if (normalized.includes("minimax") || normalized.includes("f5") || normalized === "fal" || normalized === "fal_tts") return "fal_minimax_voice_clone";
+  if (normalized.includes("chatterbox") || normalized.includes("multilingual_voice")) return "fal_chatterbox_multilingual";
+  if (normalized === "fal_elevenlabs_v3" || normalized === "fal_elevenlabs") return "fal_elevenlabs_v3";
+  if (["elevenlabs_v3_voice_clone", "elevenlabs_v3", "eleven_v3", "elevenlabs_direct", "elevenlabs_ivc"].includes(normalized)) return "elevenlabs_v3_voice_clone";
+  if (normalized.includes("sarvam")) return "sarvam_voice_clone";
+  if (normalized.includes("eleven") || normalized.includes("11labs")) return "elevenlabs_professional";
+  if (normalized.includes("upload") || normalized.includes("exact") || normalized.includes("founder_audio")) return "uploaded_founder_audio";
+  if (normalized.includes("synthesia")) return "synthesia_managed";
+  if (normalized.includes("api") || normalized.includes("fallback") || normalized.includes("proprietary")) return "api_fallback";
+  return "fal_minimax_voice_clone";
+}
+
+function normalizeLocalTalkingAvatarModelForPlanning() {
+  return "source_video";
+}
+
+function normalizeLocalLipSyncModelForPlanning(value = "fal_latentsync") {
+  const normalized = String(value || "fal_latentsync").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  if (normalized.includes("muse")) return "fal_musetalk";
+  if (normalized.includes("fal") && normalized.includes("latent")) return "fal_latentsync";
+  if (normalized.includes("latent")) return "fal_latentsync";
+  if (normalized.includes("sync_lab") || normalized === "synclabs" || normalized === "sync_labs") return "sync_labs";
+  if (normalized.includes("api") || normalized.includes("fallback") || normalized.includes("proprietary")) return "api_fallback";
+  return "fal_latentsync";
+}
+
+function normalizeLocalImageModelForPlanning(value = "gemini_storyboard") {
+  const normalized = String(value || "gemini_storyboard").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  if (normalized.includes("gemini") || normalized.includes("storyboard")) return "gemini_storyboard";
+  if (normalized.includes("ic_light")) return "ic_lightning";
+  return "flux_1_dev";
+}
+
+function normalizeLocalVideoModelForPlanning() {
+  return "fal_seedance";
+}
+
+function hasFounderAvatarIdentityForPlanning(profile = {}) {
+  const sourceAsset = firstObject(profile.sourceAsset, profile.source_asset, profile.asset) || {};
+  return Boolean(firstString(
+    profile.avatarId,
+    profile.voiceId,
+    profile.synthesiaAvatarId,
+    profile.synthesiaVoiceId,
+    profile.portraitEmbeddingId,
+    profile.facialFeatureEmbeddingId,
+    profile.voiceEmbeddingId,
+    profile.sourceUrl,
+    sourceAsset.objectKey,
+    sourceAsset.object_key,
+    sourceAsset.assetId,
+    sourceAsset.id
+  ));
+}
+
+function founderAvatarPayloadForPlanning(profile = {}) {
+  const normalized = normalizeFounderAvatarProfileForPlanning(profile);
+  if (!hasFounderAvatarIdentityForPlanning(normalized)) return {};
+  return {
+    founderLedHybridEnabled: true,
+    founderAvatarProfile: normalized,
+    founderKit: normalized,
+    avatarProviderMode: normalized.avatarProviderMode,
+    avatarProvider: normalized.avatarProviderMode,
+    avatarId: normalized.avatarId,
+    voiceId: normalized.voiceId,
+    providerVoiceId: normalized.providerVoiceId,
+    minimaxVoiceId: normalized.minimaxVoiceId,
+    elevenLabsVoiceId: normalized.elevenLabsVoiceId,
+    sarvamVoiceId: normalized.sarvamVoiceId,
+    avatarScript: normalized.avatarScript,
+    avatarScriptOverride: normalized.avatarScript,
+    spokenText: normalized.avatarScript,
+    synthesiaAvatarId: normalized.synthesiaAvatarId,
+    synthesiaVoiceId: normalized.synthesiaVoiceId,
+    portraitEmbeddingId: normalized.portraitEmbeddingId,
+    facialFeatureEmbeddingId: normalized.facialFeatureEmbeddingId,
+    voiceEmbeddingId: normalized.voiceEmbeddingId,
+    voiceProfileId: normalized.voiceProfileId,
+    localModels: normalized.localModels,
+    localAvatarModels: normalized.localModels,
+    manualApprovalRequiredForFallback: normalized.manualApprovalRequiredForFallback,
+    founderConsentConfirmed: normalized.consentConfirmed,
+    language: normalized.language,
+    languageCode: normalized.languageCode,
+  };
+}
+
+function avatarProviderModeLabel(value = "dalai_llama") {
+  return normalizeAvatarProviderModeForPlanning(value) === "synthesia" ? "Synthesia API" : "DalaiLlama managed";
+}
+
+function voiceApprovalLabelForPlanning(value = "NOT_REQUESTED") {
+  const normalized = String(value || "NOT_REQUESTED").trim().toUpperCase();
+  if (normalized === "APPROVED") return "Approved";
+  if (normalized === "PREVIEW_READY") return "Preview ready";
+  if (normalized === "REJECTED") return "Needs another preview";
+  return "Preview required";
+}
+
+function avatarApprovalLabelForPlanning(value = "NOT_REQUESTED") {
+  const normalized = String(value || "NOT_REQUESTED").trim().toUpperCase();
+  if (normalized === "APPROVED") return "Approved";
+  if (normalized === "PREVIEW_READY") return "Lip-sync preview ready";
+  if (normalized === "REJECTED") return "Needs another lip-sync preview";
+  return "Lip-sync preview required";
+}
+
+function applyFounderAvatarProfileToScriptIdea(idea, profile = {}, asset = {}) {
+  if (!idea) return idea;
+  const normalized = normalizeFounderAvatarProfileForPlanning(profile);
+  const scriptJson = firstObject(idea.scriptJson);
+  const creatorContext = firstObject(scriptJson.creatorContext);
+  const sourceAsset = firstObject(asset.sourceAsset, asset.asset, asset);
+  const nextProfile = {
+    ...normalized,
+    ...(Object.keys(sourceAsset).length ? { sourceAsset } : {}),
+  };
+  return {
+    ...idea,
+    scriptJson: {
+      ...scriptJson,
+      founderAvatarProfile: nextProfile,
+      founderKit: nextProfile,
+      founderLedHybridEnabled: hasFounderAvatarIdentityForPlanning(nextProfile),
+      avatarProviderMode: nextProfile.avatarProviderMode,
+      avatarProvider: nextProfile.avatarProviderMode,
+      avatarId: nextProfile.avatarId,
+      voiceId: nextProfile.voiceId,
+      portraitEmbeddingId: nextProfile.portraitEmbeddingId,
+      facialFeatureEmbeddingId: nextProfile.facialFeatureEmbeddingId,
+      voiceEmbeddingId: nextProfile.voiceEmbeddingId,
+      creatorContext: {
+        ...creatorContext,
+        founderAvatarProfile: nextProfile,
+        founderKit: nextProfile,
+        avatarProviderMode: nextProfile.avatarProviderMode,
+        avatarProvider: nextProfile.avatarProviderMode,
+      },
+    },
+  };
+}
+
+function dialogueTimingPolicyForModelCapability(maxClipSeconds = 15) {
+  const safeMax = Math.max(1, Number(maxClipSeconds) || 15);
+  const spokenBudget = Math.max(1, safeMax - 1);
+  return `Storyboard every beat so full spoken dialogue fits inside ${safeMax}s clips; keep each shot near ${spokenBudget}s of spoken line and split longer dialogue into consecutive parts without paraphrasing.`;
+}
+
+function screenplaySceneHasGeneratedClip(scene = {}) {
+  return Boolean(scene?.videoUrl || scene?.clipUrl || scene?.publicUrl || scene?.bucket || scene?.objectKey || scene?.object_key);
+}
+
+function isActiveSceneVideoStatus(status = "") {
+  return ["GENERATING_VIDEO", "SCENE_GENERATION_QUEUED", "VIDEO_GENERATION_QUEUED", "PROVIDER_QUEUED", "RUNNING", "PENDING"]
+    .includes(String(status || "").trim().toUpperCase());
+}
+
+function normalizeVideoSceneModeOverrides(overrides = {}, scenes = [], productionStyle = DEFAULT_PRODUCTION_STYLE, hybridSceneMode = DEFAULT_HYBRID_SCENE_MODE) {
+  const fullAi = normalizeProductionStyle(productionStyle) === "full_ai";
+  const fullFounder = normalizeHybridSceneMode(hybridSceneMode) === "full_founder";
+  if (!fullAi && !fullFounder) return overrides || {};
+  return (Array.isArray(scenes) ? scenes : []).reduce((next, scene, index) => {
+    const sceneId = String(scene?.id || scene?.sceneId || scene?.scene_id || scene?.shotId || scene?.shot_id || `shot-${scene?.shotNumber || scene?.sceneNumber || index + 1}`);
+    next[sceneId] = fullFounder ? "talking_head" : "ai_generated";
+    return next;
+  }, {});
+}
+
 function normalizeStoryboardResponse(response = {}, scriptIdea = {}) {
   const scenes = Array.isArray(response.scenes) ? response.scenes : [];
   const responseImageAssets = collectStoryboardImageAssets(response);
@@ -6389,6 +12454,15 @@ function normalizeStoryboardResponse(response = {}, scriptIdea = {}) {
       assetUrl: imageFields.storyboardImageUrl,
       lightingImageUrl: imageFields.lightingImageUrl,
       cameraPlanImageUrl: imageFields.cameraPlanImageUrl,
+      productionImageUrl: imageFields.productionImageUrl,
+      generatedProductImageUrl: imageFields.productionImageUrl,
+      imageAnchorUrl: imageFields.productionImageUrl,
+      productionImagePrompt: firstText(
+        sceneWithImages.productionImagePrompt,
+        sceneWithImages.production_image_prompt,
+        sceneWithImages.rawShot?.productionImagePrompt,
+        sceneWithImages.rawShot?.productImagePrompt
+      ),
       screenType: sceneWithImages.screenType || response.screenType || scriptIdea.screenType || scriptIdea.scriptJson?.screenType || "vertical",
       renderWidth: sceneWithImages.renderWidth || response.renderWidth || (response.screenType === "horizontal" ? 1920 : 1080),
       renderHeight: sceneWithImages.renderHeight || response.renderHeight || (response.screenType === "horizontal" ? 1080 : 1920),
@@ -6443,17 +12517,34 @@ function normalizeShotImageFields(scene = {}) {
   );
   const isLightingImage = imageKind === "lighting";
   const isCameraImage = imageKind === "dp";
+  const isProductionImage = imageKind === "production";
   const storyboardImageUrl = firstText(
     scene.storyboardImageUrl,
     scene.storyboard_image_url,
     imageUrlFromObject(scene.storyboardImage),
     imageUrlFromObject(scene.storyboardAsset),
     imageUrlByKind(imageAssets, "storyboard"),
-    !isLightingImage && !isCameraImage ? directImageUrl : ""
+    !isLightingImage && !isCameraImage && !isProductionImage ? directImageUrl : ""
   );
 
   return {
     storyboardImageUrl,
+    productionImageUrl: firstText(
+      scene.productionImageUrl,
+      scene.production_image_url,
+      scene.generatedProductImageUrl,
+      scene.generated_product_image_url,
+      scene.imageAnchorUrl,
+      scene.image_anchor_url,
+      imageUrlFromObject(scene.productionImage),
+      imageUrlFromObject(scene.production_image),
+      imageUrlFromObject(scene.productionAsset),
+      imageUrlFromObject(scene.production_asset),
+      imageUrlFromObject(scene.generatedProductImage),
+      imageUrlFromObject(scene.generated_product_image),
+      imageUrlByKind(imageAssets, "production"),
+      isProductionImage ? directImageUrl : ""
+    ),
     lightingImageUrl: firstText(
       scene.lightingImageUrl,
       scene.lighting_image_url,
@@ -6624,6 +12715,12 @@ function collectStoryboardImageAssets(source = {}) {
     source.camera_plan_images,
     source.dpImages,
     source.dp_images,
+    source.productionImages,
+    source.production_images,
+    source.productImages,
+    source.product_images,
+    source.generatedProductImageAssets,
+    source.generated_product_image_assets,
   ].flatMap((value) => Array.isArray(value) ? value : [])
     .filter((item) => item && typeof item === "object");
 }
@@ -6636,6 +12733,14 @@ function mergeSceneImageSources(scene = {}, responseImageAssets = [], index = 0)
     const kind = normalizeImageAssetKind(asset.imageKind || asset.image_kind || asset.kind || asset.assetKind || asset.asset_kind || asset.type || asset.role || asset.objectKey || asset.object_key || imageUrlFromObject(asset));
     const url = imageUrlFromObject(asset);
     if (!url) return merged;
+    if (kind === "production") {
+      return {
+        ...merged,
+        productionImageUrl: merged.productionImageUrl || url,
+        generatedProductImageUrl: merged.generatedProductImageUrl || url,
+        imageAnchorUrl: merged.imageAnchorUrl || url,
+      };
+    }
     if (kind === "lighting") return { ...merged, lightingImageUrl: merged.lightingImageUrl || url };
     if (kind === "dp") return { ...merged, cameraPlanImageUrl: merged.cameraPlanImageUrl || url };
     return {
@@ -6717,6 +12822,7 @@ function imageUrlFromObject(value = {}) {
 
 function normalizeImageAssetKind(value = "") {
   const text = String(value || "").toLowerCase();
+  if (text.includes("production") || text.includes("video_anchor") || text.includes("image_anchor")) return "production";
   if (text.includes("light")) return "lighting";
   if (text.includes("camera") || text.includes("dp") || text.includes("director_photography")) return "dp";
   return "storyboard";
@@ -6730,7 +12836,7 @@ function shotImageLoadingKeysForScenes(scenes = []) {
   return (Array.isArray(scenes) ? scenes : [])
     .flatMap((scene, index) => {
       const shotNumber = Number(scene?.shotNumber || scene?.shot_number || index + 1);
-      return ["storyboard", "lighting", "dp"].map((kind) => shotImageLoadingKey(shotNumber, kind));
+      return ["storyboard", "lighting", "dp", "production"].map((kind) => shotImageLoadingKey(shotNumber, kind));
     });
 }
 
@@ -6787,6 +12893,19 @@ function mergeShotImageUrlsIntoScenes(scenes = [], shotImages = []) {
       imageUrlFromObject(image.dp_asset),
       imageUrlByKind(imageAssets, "dp")
     );
+    const productionUrl = firstText(
+      image.productionImageUrl,
+      image.production_image_url,
+      image.generatedProductImageUrl,
+      image.generated_product_image_url,
+      image.imageAnchorUrl,
+      image.image_anchor_url,
+      imageUrlFromObject(image.productionImage),
+      imageUrlFromObject(image.production_image),
+      imageUrlFromObject(image.productionAsset),
+      imageUrlFromObject(image.production_asset),
+      imageUrlByKind(imageAssets, "production")
+    );
     return {
       ...scene,
       shotNumber,
@@ -6806,6 +12925,12 @@ function mergeShotImageUrlsIntoScenes(scenes = [], shotImages = []) {
       cameraPlanObjectKey: image.cameraPlanObjectKey || image.camera_plan_object_key || scene.cameraPlanObjectKey,
       cameraPlanImageUrl: cameraUrl || scene.cameraPlanImageUrl,
       dpImageUrl: cameraUrl || scene.dpImageUrl,
+      productionImageAssetId: image.productionImageAssetId || image.production_image_asset_id || scene.productionImageAssetId,
+      productionObjectKey: image.productionObjectKey || image.production_object_key || scene.productionObjectKey,
+      productionImageUrl: productionUrl || scene.productionImageUrl,
+      generatedProductImageUrl: productionUrl || scene.generatedProductImageUrl,
+      imageAnchorUrl: productionUrl || scene.imageAnchorUrl,
+      productionImagePrompt: image.productionImagePrompt || image.production_image_prompt || scene.productionImagePrompt,
     };
   });
 }
@@ -6833,6 +12958,12 @@ function hasShotImageUrlData(item = {}) {
       item.dp_image_url,
       item.cameraImageUrl,
       item.camera_image_url,
+      item.productionImageUrl,
+      item.production_image_url,
+      item.generatedProductImageUrl,
+      item.generated_product_image_url,
+      item.imageAnchorUrl,
+      item.image_anchor_url,
       imageUrlFromObject(item.storyboardImage),
       imageUrlFromObject(item.storyboard_image),
       imageUrlFromObject(item.lightingImage),
@@ -6843,7 +12974,8 @@ function hasShotImageUrlData(item = {}) {
       imageUrlFromObject(item.dp_image),
       imageUrlByKind(collectStoryboardImageAssets(item), "storyboard"),
       imageUrlByKind(collectStoryboardImageAssets(item), "lighting"),
-      imageUrlByKind(collectStoryboardImageAssets(item), "dp")
+      imageUrlByKind(collectStoryboardImageAssets(item), "dp"),
+      imageUrlByKind(collectStoryboardImageAssets(item), "production")
     )
     || item.storyboardImageAssetId
     || item.storyboard_image_asset_id
@@ -6851,6 +12983,8 @@ function hasShotImageUrlData(item = {}) {
     || item.lighting_image_asset_id
     || item.cameraPlanImageAssetId
     || item.camera_plan_image_asset_id
+    || item.productionImageAssetId
+    || item.production_image_asset_id
   );
 }
 
@@ -6886,7 +13020,7 @@ function firstPositiveNumber(...values) {
   return value || 0;
 }
 
-function summarizeShotExportAssets(scenes = [], expectedShotCount = 0) {
+function summarizeShotExportAssets(scenes = [], expectedShotCount = 0, requireProduction = false) {
   const shotCount = expectedShotCount || (Array.isArray(scenes) ? scenes.length : 0);
   const relevantScenes = (Array.isArray(scenes) ? scenes : []).slice(0, shotCount || undefined);
   const summary = relevantScenes.reduce((counts, scene) => {
@@ -6894,18 +13028,45 @@ function summarizeShotExportAssets(scenes = [], expectedShotCount = 0) {
     const storyboardReady = Boolean(urls.storyboardImageUrl);
     const lightingReady = Boolean(urls.lightingImageUrl);
     const dpReady = Boolean(urls.cameraPlanImageUrl);
+    const productionReady = Boolean(urls.productionImageUrl);
     return {
       storyboardReady: counts.storyboardReady + (storyboardReady ? 1 : 0),
       lightingReady: counts.lightingReady + (lightingReady ? 1 : 0),
       dpReady: counts.dpReady + (dpReady ? 1 : 0),
-      completeReady: counts.completeReady + (storyboardReady && lightingReady && dpReady ? 1 : 0),
+      productionReady: counts.productionReady + (productionReady ? 1 : 0),
+      completeReady: counts.completeReady + (
+        storyboardReady && lightingReady && dpReady && (!requireProduction || productionReady) ? 1 : 0
+      ),
     };
-  }, { storyboardReady: 0, lightingReady: 0, dpReady: 0, completeReady: 0 });
+  }, { storyboardReady: 0, lightingReady: 0, dpReady: 0, productionReady: 0, completeReady: 0 });
 
   return {
     expected: shotCount,
     ...summary,
   };
+}
+
+function defaultProductImagePrompt(scene = {}) {
+  return firstText(
+    scene.productImagePrompt,
+    scene.product_image_prompt,
+    scene.productionImagePrompt,
+    scene.production_image_prompt,
+    scene.rawShot?.productImagePrompt,
+    scene.rawShot?.product_image_prompt,
+    scene.rawShot?.productionImagePrompt,
+    scene.rawShot?.production_image_prompt,
+    scene.imagePrompt,
+    scene.image_prompt,
+    scene.storyboardImagePrompt,
+    scene.storyboard_image_prompt,
+    scene.visualPrompt,
+    scene.visual_prompt,
+    scene.sketchPrompt,
+    scene.visualDirection,
+    scene.description,
+    scene.action
+  );
 }
 
 function emitCreatorAnalyticsEvent(eventName, params = {}) {
@@ -6935,13 +13096,19 @@ function buildStoryboardPdfReport({
   scenes = [],
   durationSeconds,
   screenType,
+  productMode = false,
+  dialogueLanguage = "English",
+  clientReview = {},
   callbackUrl,
 }) {
   const generatedAt = formatExportDate(new Date());
-  const shotCards = (Array.isArray(scenes) ? scenes : []).map(renderShotPdfCard).join("\n");
+  const shotCards = (Array.isArray(scenes) ? scenes : [])
+    .map((scene, index) => renderShotPdfCard(scene, index, productMode))
+    .join("\n");
   const safeProjectTitle = escapeHtml(title || "Creator project");
   const safeStoryline = escapeHtml(storyline || "Storyline not available.");
   const safeCallbackUrl = escapeHtml(callbackUrl || "");
+  const reviewSummary = renderPdfClientReview(clientReview);
   const callbackAction = safeCallbackUrl
     ? `<a class="callback-button" href="${safeCallbackUrl}" target="_blank" rel="noreferrer">Open walkthrough / callback</a>`
     : "";
@@ -7046,7 +13213,7 @@ function buildStoryboardPdfReport({
     }
     .summary-grid {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 10px;
       margin-top: 22px;
     }
@@ -7076,6 +13243,44 @@ function buildStoryboardPdfReport({
       justify-content: space-between;
       gap: 14px;
       margin-top: 26px;
+    }
+    .client-review {
+      margin-top: 18px;
+      padding: 16px;
+      border: 1px solid rgba(34, 211, 238, 0.22);
+      border-radius: 8px;
+      background: rgba(34, 211, 238, 0.055);
+    }
+    .client-review h3 {
+      margin: 0 0 10px;
+      color: #a5f3fc;
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .review-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 9px;
+    }
+    .review-note {
+      padding: 9px;
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.045);
+    }
+    .review-note span {
+      color: #f7c948;
+      font-size: 9px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .review-note p {
+      margin: 5px 0 0;
+      color: #dce6f5;
+      font-size: 10px;
+      line-height: 1.45;
+      font-weight: 650;
     }
     .callback-button,
     .site-pill {
@@ -7146,6 +13351,9 @@ function buildStoryboardPdfReport({
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 12px;
+    }
+    .asset-grid.product-assets {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .asset {
       min-height: 210px;
@@ -7236,8 +13444,10 @@ function buildStoryboardPdfReport({
           <div class="summary-item"><span>Shots</span><strong>${scenes.length}</strong></div>
           <div class="summary-item"><span>Duration</span><strong>${escapeHtml(durationSeconds || 30)} sec</strong></div>
           <div class="summary-item"><span>Format</span><strong>${escapeHtml(screenType || "vertical")}</strong></div>
+          <div class="summary-item"><span>Dialogue</span><strong>${escapeHtml(dialogueLanguage || "English")}</strong></div>
           <div class="summary-item"><span>Project</span><strong>${escapeHtml(shortId(projectId))}</strong></div>
         </div>
+        ${reviewSummary}
       </div>
       <div class="cover-actions">
         ${callbackAction}
@@ -7252,11 +13462,33 @@ function buildStoryboardPdfReport({
   return { html, shotCount: scenes.length };
 }
 
-function renderShotPdfCard(scene = {}, index = 0) {
+function renderPdfClientReview(review = {}) {
+  const typography = review.typographySystem || {};
+  const referenceUrls = Array.isArray(review.referenceUrls) ? review.referenceUrls : [];
+  const notes = [
+    ["Storyboard direction", review.storyboardFeedback],
+    ["Production frames", review.productionFramesFeedback],
+    ["Dialogue direction", review.dialogueFeedback],
+    ["Typography", joinNonEmpty([
+      typography.primaryFont && `Primary: ${typography.primaryFont} ${typography.primaryWeight || ""}`,
+      typography.secondaryFont && `Supporting: ${typography.secondaryFont} ${typography.secondaryWeight || ""}`,
+      typography.caseRule,
+    ], " | ")],
+    ["Shared references", referenceUrls.length ? referenceUrls.join(" | ") : "Visual references required before final frame generation."],
+  ]
+    .filter(([, value]) => String(value || "").trim())
+    .map(([label, value]) => `<div class="review-note"><span>${escapeHtml(label)}</span><p>${escapeHtml(trimText(value, 520))}</p></div>`)
+    .join("");
+  if (!notes) return "";
+  return `<section class="client-review"><h3>Client review · ${escapeHtml(reviewStatusLabel(review.reviewStatus))}</h3><div class="review-grid">${notes}</div></section>`;
+}
+
+function renderShotPdfCard(scene = {}, index = 0, productMode = false) {
   const shotNumber = Number(scene.shotNumber || scene.shot_number || index + 1);
   const storyboardTag = extractStoryboardTag(scene) || {};
   const lightingTag = extractLightingTag(scene) || {};
   const cameraTag = extractCameraTag(scene) || {};
+  const overlayPlan = scene.overlayPlan || scene.overlay_plan || storyboardTag.overlayPlan || storyboardTag.overlay_plan || {};
   const imageFields = normalizeShotImageFields(scene);
   const title = firstText(scene.title, scene.shotTitle, storyboardTag.shotTitle, cameraTag.shotTitle, `Shot ${shotNumber}`);
   const timestamp = firstText(scene.timestamp, scene.time, buildTimestamp(scene.startTime, scene.endTime), `Shot ${shotNumber}`);
@@ -7278,18 +13510,36 @@ function renderShotPdfCard(scene = {}, index = 0) {
       </div>
       <div class="timestamp">${escapeHtml(timestamp)}</div>
     </div>
-    <div class="asset-grid">
+    <div class="asset-grid${productMode ? " product-assets" : ""}">
       ${renderPdfAsset("Storyboard", imageFields.storyboardImageUrl)}
       ${renderPdfAsset("Lighting Design", imageFields.lightingImageUrl)}
       ${renderPdfAsset("DP / Camera", imageFields.cameraPlanImageUrl)}
+      ${productMode ? renderPdfAsset("Product Frame", imageFields.productionImageUrl) : ""}
     </div>
     <div class="details-grid">
       ${renderPdfDetail("Visual", visual || "Visual direction pending.")}
       ${renderPdfDetail("Dialogue / VO", dialogue || "No dialogue.")}
       ${renderPdfDetail("Sound", sound || "Sound design pending.")}
       ${renderPdfDetail("Lighting + DP", joinNonEmpty([lighting, camera], " | ") || "Lighting and camera plan pending.")}
+      ${renderPdfDetail("Text overlay + motion", pdfOverlaySummary(overlayPlan))}
+      ${productMode ? renderPdfDetail("Product image prompt", defaultProductImagePrompt(scene) || "Product image prompt not available.") : ""}
     </div>
   </section>`;
+}
+
+function pdfOverlaySummary(overlay = {}) {
+  if (!overlay || overlay.enabled === false) return "No overlay; keep this as a visual-only beat.";
+  return joinNonEmpty([
+    overlay.text && `Copy: ${overlay.text}`,
+    overlay.fontFamily && `Font: ${overlay.fontFamily} ${overlay.fontWeight || ""}`,
+    overlay.entrance && `Entrance: ${overlay.entrance}`,
+    overlay.entranceDurationMs && `${overlay.entranceDurationMs} ms in`,
+    overlay.holdDurationMs && `${overlay.holdDurationMs} ms hold`,
+    overlay.exit && `Exit: ${overlay.exit}`,
+    overlay.position,
+    overlay.speed,
+    overlay.rationale,
+  ], " | ") || "Overlay plan pending AI review.";
 }
 
 function renderPdfAsset(label, url) {
@@ -7579,6 +13829,505 @@ function formatExportDate(value) {
   }
 }
 
+function proposalHasMeaningfulPlanningDelta(proposal = {}) {
+  const affectedShotNumbers = Array.isArray(proposal?.affectedShotNumbers)
+    ? proposal.affectedShotNumbers.map(Number).filter((value) => Number.isInteger(value) && value > 0)
+    : [];
+  if (!affectedShotNumbers.length) return true;
+  const previews = Array.isArray(proposal?.planningChangePreview)
+    ? proposal.planningChangePreview
+    : [];
+  const comparable = (value) => String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+  return affectedShotNumbers.every((shotNumber) => {
+    const preview = previews.find((item) => Number(item?.shotNumber || item?.shot_number) === shotNumber);
+    if (!preview) return false;
+    const current = comparable(preview.currentFrameDescription);
+    const proposed = comparable(preview.proposedFrameDescription);
+    const proposedIsComplete = proposed.split(" ").filter(Boolean).length >= 5
+      && !/(?:\bimage of|\buse image of|\bof|\bto|\bwith|\band|\bfor|\busing)$/.test(proposed);
+    return Boolean(current && proposed && current !== proposed && proposedIsComplete);
+  });
+}
+
+function reviewAffectedShotNumbers(message = {}, analysisMessage = {}, proposalValue = null) {
+  const proposal = proposalValue && typeof proposalValue === "object"
+    ? proposalValue
+    : analysisMessage?.proposal && typeof analysisMessage.proposal === "object"
+      ? analysisMessage.proposal
+      : {};
+  const revisionShotNumbers = (Array.isArray(proposal.shotRevisions) ? proposal.shotRevisions : [])
+    .map((item) => item?.shotNumber ?? item?.shot_number);
+  return [...new Set([
+    ...(Array.isArray(message?.affectedShotNumbers) ? message.affectedShotNumbers : []),
+    ...(Array.isArray(analysisMessage?.affectedShotNumbers) ? analysisMessage.affectedShotNumbers : []),
+    ...(Array.isArray(proposal?.affectedShotNumbers) ? proposal.affectedShotNumbers : []),
+    ...revisionShotNumbers,
+    message?.shotNumber,
+    analysisMessage?.shotNumber,
+    proposal?.shotNumber,
+  ]
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value > 0))]
+    .sort((left, right) => left - right);
+}
+
+function explicitReviewShotScope(value) {
+  const text = String(value || "");
+  const directive = /\b(?:review|revise|rework|redesign|edit|update|change|fix|generate|regenerate|improve|see|make)\s+(?:only\s+)?shots?\s*#?\s*/i.exec(text);
+  if (!directive) return [];
+  const tail = text.slice(directive.index + directive[0].length);
+  const boundary = /[.;:\n]|\b(?:maintain|preserve|keep|continuity|anchor|reference|read\s*-?\s*only|without|while|but)\b/i.exec(tail);
+  const scopeText = boundary ? tail.slice(0, boundary.index) : tail;
+  const shotNumbers = [];
+  for (const range of scopeText.matchAll(/#?\s*(\d+)\s*(?:-|to)\s*(?:shots?\s*)?#?\s*(\d+)/gi)) {
+    const start = Number(range[1]);
+    const end = Number(range[2]);
+    if (Number.isInteger(start) && Number.isInteger(end) && start > 0 && end > 0 && Math.abs(end - start) <= 50) {
+      const direction = start <= end ? 1 : -1;
+      for (let shotNumber = start; shotNumber !== end + direction; shotNumber += direction) {
+        shotNumbers.push(shotNumber);
+      }
+    }
+  }
+  for (const match of scopeText.matchAll(/\d+/g)) {
+    shotNumbers.push(Number(match[0]));
+  }
+  return [...new Set(shotNumbers)]
+    .filter((shotNumber) => Number.isInteger(shotNumber) && shotNumber > 0)
+    .sort((left, right) => left - right);
+}
+
+function compactReviewInstruction(value, maxLength = 24000) {
+  const normalized = String(value || "")
+    .normalize("NFKC")
+    .replace(/\r\n?/g, "\n")
+    .replace(/^[ \t]*#{1,6}[ \t]+/gm, "")
+    .replace(/^[ \t]*>[ \t]?/gm, "")
+    .replace(/^[ \t]*-{3,}[ \t]*$/gm, "")
+    .replace(/\*\*([^*\n]+)\*\*/g, "$1")
+    .replace(/[ \t]+$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  if (normalized.length <= maxLength) return normalized;
+  const marker = "\n\n[Long brief compacted: retain all stated constraints and use director/editor judgment.]\n\n";
+  const headLength = Math.max(1, Math.floor((maxLength - marker.length) * 0.68));
+  const tailLength = Math.max(1, maxLength - marker.length - headLength);
+  return `${normalized.slice(0, headLength).trimEnd()}${marker}${normalized.slice(-tailLength).trimStart()}`;
+}
+
+function mergeAppliedDialogueFields(base = {}, applied = {}, dialogueLanguage = "English") {
+  const merged = { ...(base || {}) };
+  for (const field of CLIENT_REVIEW_DIALOGUE_FIELDS) {
+    if (applied && Object.prototype.hasOwnProperty.call(applied, field)) {
+      merged[field] = applied[field];
+    }
+  }
+  merged.dialogueLanguage = String(dialogueLanguage || "English").trim() || "English";
+  return merged;
+}
+
+function mergeAppliedReviewScenes(existingScenes = [], updatedShots = []) {
+  const updatedByShot = new Map((Array.isArray(updatedShots) ? updatedShots : []).map((shot, index) => [
+    Number(shot?.shotNumber || shot?.shot_number || index + 1),
+    shot,
+  ]));
+  const sourceScenes = Array.isArray(existingScenes) && existingScenes.length
+    ? existingScenes
+    : Array.isArray(updatedShots)
+      ? updatedShots
+      : [];
+  return sourceScenes.map((scene, index) => {
+    const shotNumber = Number(scene?.shotNumber || scene?.shot_number || index + 1);
+    const updated = updatedByShot.get(shotNumber);
+    if (!updated) return scene;
+    const merged = { ...scene, ...updated };
+    [
+      "storyboardImage",
+      "storyboardImageUrl",
+      "storyboard_image_url",
+      "productionImage",
+      "productionImageUrl",
+      "production_image_url",
+      "generatedProductImageUrl",
+      "generatedProductImageAssets",
+      "imageAnchorUrl",
+      "lightingImageUrl",
+      "cameraImageUrl",
+      "signedUrl",
+      "imageUrl",
+      "publicUrl",
+      "assetUrl",
+    ].forEach((field) => {
+      const updatedValue = updated?.[field];
+      const hasUpdatedValue = Array.isArray(updatedValue)
+        ? updatedValue.length > 0
+        : updatedValue && (typeof updatedValue !== "object" || Object.keys(updatedValue).length > 0);
+      if (!hasUpdatedValue && scene?.[field]) merged[field] = scene[field];
+    });
+    return merged;
+  });
+}
+
+function compactClientReviewForInspection(value = {}) {
+  const review = value && typeof value === "object" ? value : {};
+  const compactAsset = (asset = {}) => ({
+    assetId: asset.assetId || asset.id || "",
+    id: asset.id || asset.assetId || "",
+    signedUrl: asset.signedUrl || "",
+    publicUrl: asset.publicUrl || "",
+    assetUrl: asset.assetUrl || asset.url || "",
+    originalFilename: asset.originalFilename || asset.filename || "",
+    usageMode: asset.usageMode || asset.visualReferenceUsageMode || "INSPIRATION_ONLY",
+    visualReferenceUsageMode: asset.visualReferenceUsageMode || asset.usageMode || "INSPIRATION_ONLY",
+    referenceRole: asset.referenceRole || asset.assetRole || "",
+    assetRole: asset.assetRole || asset.referenceRole || "",
+  });
+  const frameFeedback = (Array.isArray(review.frameFeedback) ? review.frameFeedback : [])
+    .slice(-40)
+    .map((item = {}) => ({
+      id: item.id || "",
+      targetType: item.targetType || "PLANNING",
+      shotNumber: item.shotNumber || "",
+      instruction: compactReviewInstruction(item.instruction || item.text || "", 3000),
+      visualReferenceAssetIds: (Array.isArray(item.visualReferenceAssetIds) ? item.visualReferenceAssetIds : []).slice(0, 8),
+      visualReferenceUsageMode: item.visualReferenceUsageMode || "INSPIRATION_ONLY",
+    }));
+  return {
+    storyboardFeedback: compactReviewInstruction(review.storyboardFeedback || "", 6000),
+    productionFramesFeedback: compactReviewInstruction(review.productionFramesFeedback || "", 6000),
+    dialogueFeedback: compactReviewInstruction(review.dialogueFeedback || "", 6000),
+    dialogueLanguage: review.dialogueLanguage || "English",
+    reviewStatus: review.reviewStatus || "CHANGES_REQUESTED",
+    frameFeedback,
+    referenceUrls: (Array.isArray(review.referenceUrls) ? review.referenceUrls : []).filter(Boolean).slice(-40),
+    visualReferenceImages: (Array.isArray(review.visualReferenceImages) ? review.visualReferenceImages : [])
+      .slice(-40)
+      .map(compactAsset),
+    fontReferenceImages: (Array.isArray(review.fontReferenceImages) ? review.fontReferenceImages : [])
+      .slice(-12)
+      .map(compactAsset),
+    typographySystem: review.typographySystem && typeof review.typographySystem === "object"
+      ? review.typographySystem
+      : {},
+    overlayPlan: (Array.isArray(review.overlayPlan) ? review.overlayPlan : []).map((item = {}) => ({
+      shotNumber: item.shotNumber,
+      enabled: item.enabled,
+      text: item.text,
+      copyRole: item.copyRole,
+      fontFamily: item.fontFamily,
+      fontWeight: item.fontWeight,
+      fontSizePx: item.fontSizePx,
+      position: item.position,
+      safeZone: item.safeZone,
+      backgroundStyle: item.backgroundStyle,
+      textColor: item.textColor,
+      entrance: item.entrance,
+      exit: item.exit,
+      speed: item.speed,
+      delayMs: item.delayMs,
+      entranceDurationMs: item.entranceDurationMs,
+      holdDurationMs: item.holdDurationMs,
+      exitDurationMs: item.exitDurationMs,
+      transitionPrompt: item.transitionPrompt,
+      finalVideoPromptClause: item.finalVideoPromptClause,
+      locked: item.locked,
+    })),
+  };
+}
+
+function compactReviewChatForMutation(value = []) {
+  const messages = (Array.isArray(value) ? value : []).slice(-24);
+  return messages.map((message = {}, index) => {
+    const compact = {
+      id: message.id,
+      role: message.role,
+      text: compactReviewInstruction(message.text || message.message || "", 12000),
+      targetType: message.targetType,
+      shotNumber: message.shotNumber,
+      affectedShotNumbers: Array.isArray(message.affectedShotNumbers) ? message.affectedShotNumbers.slice(0, 24) : [],
+      visualReferenceAssetIds: Array.isArray(message.visualReferenceAssetIds) ? message.visualReferenceAssetIds.slice(0, 8) : [],
+      visualReferenceUsageMode: message.visualReferenceUsageMode,
+      status: message.status,
+      createdAt: message.createdAt,
+      confirmationForMessageId: message.confirmationForMessageId,
+      completedAt: message.completedAt,
+      generatedFrames: Array.isArray(message.generatedFrames) ? message.generatedFrames.slice(0, 24) : undefined,
+      retrievedKeys: Array.isArray(message.retrievedKeys) ? message.retrievedKeys.slice(0, 20) : undefined,
+      attachedImageCount: message.attachedImageCount,
+      languageChangePrompt: message.languageChangePrompt,
+      sourceDialogueLanguage: message.sourceDialogueLanguage,
+      targetDialogueLanguage: message.targetDialogueLanguage,
+    };
+    if (message.proposal && typeof message.proposal === "object") {
+      compact.proposal = compactReviewProposalForMutation(
+        message.proposal,
+        index >= Math.max(0, messages.length - 4)
+      );
+    }
+    return compact;
+  });
+}
+
+function compactReviewProposalForMutation(proposal = {}, includeDetailedFrames = false) {
+  const compactShot = (shot = {}) => ({
+    shotNumber: shot.shotNumber ?? shot.shot_number,
+    sceneNumber: shot.sceneNumber,
+    sequenceNumber: shot.sequenceNumber,
+    title: compactReviewInstruction(shot.title || "", 500),
+    purpose: compactReviewInstruction(shot.purpose || "", 1200),
+    action: compactReviewInstruction(shot.action || "", 3000),
+    visualAction: compactReviewInstruction(shot.visualAction || "", 3000),
+    visualDirection: compactReviewInstruction(shot.visualDirection || "", 3000),
+    description: compactReviewInstruction(shot.description || "", 3000),
+    narrativeBeatSummary: compactReviewInstruction(shot.narrativeBeatSummary || "", 3000),
+    durationSeconds: shot.durationSeconds,
+    startTimeSeconds: shot.startTimeSeconds,
+    endTimeSeconds: shot.endTimeSeconds,
+    dialogue: shot.dialogue,
+    overlayPlan: shot.overlayPlan,
+    storyboardChangeRequired: shot.storyboardChangeRequired,
+    productFrameChangeRequired: shot.productFrameChangeRequired,
+  });
+  const compactRevision = (revision = {}) => ({
+    shotNumber: revision.shotNumber ?? revision.shot_number,
+    changeSummary: compactReviewInstruction(revision.changeSummary || "", 2500),
+    currentFrameDescription: compactReviewInstruction(revision.currentFrameDescription || "", 2500),
+    proposedFrameDescription: compactReviewInstruction(revision.proposedFrameDescription || "", 2500),
+    imageRevisionPrompt: compactReviewInstruction(revision.imageRevisionPrompt || "", 6000),
+    proposedShot: compactShot(revision.proposedShot || revision.shot || {}),
+    proposedOverlayPlan: revision.proposedOverlayPlan || revision.overlayPlan || {},
+    continuityIn: compactReviewInstruction(revision.continuityIn || "", 2500),
+    continuityOut: compactReviewInstruction(revision.continuityOut || "", 2500),
+    cameraPlan: compactReviewInstruction(revision.cameraPlan || "", 2500),
+    lensFocusPlan: compactReviewInstruction(revision.lensFocusPlan || "", 2500),
+    lightingPlan: compactReviewInstruction(revision.lightingPlan || "", 2500),
+    directionPlan: compactReviewInstruction(revision.directionPlan || "", 2500),
+    transitionPlan: compactReviewInstruction(revision.transitionPlan || "", 2500),
+    soundPlan: compactReviewInstruction(revision.soundPlan || "", 2500),
+    storyboardChangeRequired: revision.storyboardChangeRequired,
+    productFrameChangeRequired: revision.productFrameChangeRequired,
+  });
+  const compactPreview = (preview = {}) => ({
+    shotNumber: preview.shotNumber ?? preview.shot_number,
+    title: compactReviewInstruction(preview.title || "", 500),
+    changeSummary: compactReviewInstruction(preview.changeSummary || "", 2500),
+    currentFrameDescription: compactReviewInstruction(preview.currentFrameDescription || "", 2500),
+    proposedFrameDescription: compactReviewInstruction(preview.proposedFrameDescription || "", 2500),
+    cameraPlan: compactReviewInstruction(preview.cameraPlan || "", 2500),
+    lensFocusPlan: compactReviewInstruction(preview.lensFocusPlan || "", 2500),
+    lightingPlan: compactReviewInstruction(preview.lightingPlan || "", 2500),
+    directionPlan: compactReviewInstruction(preview.directionPlan || "", 2500),
+    transitionPlan: compactReviewInstruction(preview.transitionPlan || "", 2500),
+    soundPlan: compactReviewInstruction(preview.soundPlan || "", 2500),
+    continuityIn: compactReviewInstruction(preview.continuityIn || "", 2500),
+    continuityOut: compactReviewInstruction(preview.continuityOut || "", 2500),
+    imageRevisionPrompt: compactReviewInstruction(preview.imageRevisionPrompt || "", 6000),
+    storyboardChangeRequired: preview.storyboardChangeRequired,
+    productFrameChangeRequired: preview.productFrameChangeRequired,
+    overlayPlan: preview.overlayPlan || {},
+    premiumStandards: preview.premiumStandards || {},
+    perSecondFrames: includeDetailedFrames && Array.isArray(preview.perSecondFrames)
+      ? preview.perSecondFrames.slice(0, 20).map((frame = {}) => ({
+          second: frame.second,
+          startTimeSeconds: frame.startTimeSeconds,
+          endTimeSeconds: frame.endTimeSeconds,
+          frameDescription: compactReviewInstruction(frame.frameDescription || "", 1200),
+          cameraAction: compactReviewInstruction(frame.cameraAction || "", 1200),
+          lightingAction: compactReviewInstruction(frame.lightingAction || "", 1200),
+          focusAction: compactReviewInstruction(frame.focusAction || "", 1200),
+          directorAction: compactReviewInstruction(frame.directorAction || "", 1200),
+          transitionAction: compactReviewInstruction(frame.transitionAction || "", 1200),
+          continuityAnchor: compactReviewInstruction(frame.continuityAnchor || "", 1200),
+        }))
+      : [],
+  });
+  return {
+    targetType: proposal.targetType,
+    shotNumber: proposal.shotNumber,
+    affectedShotNumbers: Array.isArray(proposal.affectedShotNumbers) ? proposal.affectedShotNumbers.slice(0, 24) : [],
+    continuityAnchorShotNumbers: Array.isArray(proposal.continuityAnchorShotNumbers)
+      ? proposal.continuityAnchorShotNumbers.slice(0, 24)
+      : [],
+    changeSummary: compactReviewInstruction(proposal.changeSummary || "", 4000),
+    imageRevisionPrompt: compactReviewInstruction(proposal.imageRevisionPrompt || "", 6000),
+    proposedShot: compactShot(proposal.proposedShot || {}),
+    proposedOverlayPlan: proposal.proposedOverlayPlan || {},
+    shotRevisions: (Array.isArray(proposal.shotRevisions) ? proposal.shotRevisions : []).slice(0, 24).map(compactRevision),
+    planningChangePreview: (Array.isArray(proposal.planningChangePreview) ? proposal.planningChangePreview : []).slice(0, 24).map(compactPreview),
+    storyInterpretation: proposal.storyInterpretation || {},
+    creativeLearningCandidates: Array.isArray(proposal.creativeLearningCandidates)
+      ? proposal.creativeLearningCandidates.slice(0, 12)
+      : [],
+    requiresFrameRegeneration: proposal.requiresFrameRegeneration,
+    affectedPlanningStages: Array.isArray(proposal.affectedPlanningStages) ? proposal.affectedPlanningStages.slice(0, 20) : [],
+    analysisSource: proposal.analysisSource,
+    analysisWarning: compactReviewInstruction(proposal.analysisWarning || "", 1500),
+  };
+}
+
+function normalizeClientReview(value = {}, fallbackLanguage = "English") {
+  const source = value && typeof value === "object" ? value : {};
+  const defaultFrameFeedback = [{
+    id: "client-chocolate-variety",
+    targetType: "STORYBOARD_AND_PRODUCT",
+    shotNumber: "",
+    instruction: "Replace the repeated chocolate-pouring shot with a distinct product-detail or consumption beat while preserving continuity.",
+  }];
+  return {
+    scriptId: firstString(source.scriptId, source.script_id),
+    storyboardFeedback: firstString(
+      source.storyboardFeedback,
+      source.storyboard_feedback,
+      "Replace the repetitive chocolate-pouring beat with a distinct product moment while preserving story continuity. Add specific action, blocking, camera, and transition detail."
+    ),
+    productionFramesFeedback: firstString(
+      source.productionFramesFeedback,
+      source.production_frames_feedback,
+      "Use client visual references as inspiration only for mood, composition, lighting, texture, and pacing. Preserve the core ad idea. Never copy a reference name, logo, packaging, claims, trademark, or exact artwork; all product details must come only from this project's approved product data."
+    ),
+    dialogueFeedback: firstString(
+      source.dialogueFeedback,
+      source.dialogue_feedback,
+      "Use the selected dialogue language consistently. Do not use emojis in dialogue, voice-over, captions, or on-screen overlays. Keep delivery natural and provide performance detail."
+    ),
+    dialogueLanguage: firstString(
+      source.dialogueLanguage,
+      source.dialogue_language,
+      fallbackLanguage,
+      "English"
+    ),
+    reviewStatus: firstString(source.reviewStatus, source.review_status, "CHANGES_REQUESTED").toUpperCase(),
+    frameFeedback: Array.isArray(source.frameFeedback)
+      ? source.frameFeedback
+      : Array.isArray(source.frame_feedback)
+        ? source.frame_feedback
+        : defaultFrameFeedback,
+    referenceUrls: Array.isArray(source.referenceUrls)
+      ? source.referenceUrls.filter(Boolean)
+      : Array.isArray(source.reference_urls)
+        ? source.reference_urls.filter(Boolean)
+        : [],
+    visualReferenceImages: mergeStoryboardReferenceAssets(
+      [],
+      Array.isArray(source.visualReferenceImages)
+        ? source.visualReferenceImages
+        : Array.isArray(source.visual_reference_images)
+          ? source.visual_reference_images
+          : []
+    ).map((asset) => ({
+      ...asset,
+      referenceRole: asset.referenceRole || asset.reference_role || "visual_inspiration_only",
+      assetRole: asset.assetRole || asset.asset_role || asset.referenceRole || asset.reference_role || "visual_inspiration_only",
+      usageMode: asset.usageMode || asset.usage_mode || asset.visualReferenceUsageMode || asset.visual_reference_usage_mode || "INSPIRATION_ONLY",
+    })),
+    fontReferenceImages: mergeStoryboardReferenceAssets(
+      [],
+      Array.isArray(source.fontReferenceImages)
+        ? source.fontReferenceImages
+        : Array.isArray(source.font_reference_images)
+          ? source.font_reference_images
+          : []
+    ).map((asset) => ({
+      ...asset,
+      referenceRole: "typography_style_reference",
+      assetRole: "typography_style_reference",
+    })),
+    reviewChat: Array.isArray(source.reviewChat)
+      ? source.reviewChat
+      : Array.isArray(source.review_chat)
+        ? source.review_chat
+        : [],
+    typographySystem: {
+      overlayPolicy: "AUTO",
+      presetId: "SWISS_FMCG_SYSTEM",
+      presetName: "Premium FMCG / Swiss editorial system",
+      primaryFont: "Inter",
+      primaryWeight: 800,
+      secondaryFont: "Helvetica Neue",
+      secondaryWeight: 500,
+      fallbackStack: "Arial, sans-serif",
+      backgroundStyle: "none",
+      defaultEntrance: "fade-up",
+      defaultSpeed: "medium",
+      decisionSource: "AI recommendation pending",
+      draftOnly: true,
+      ...(
+        source.typographySystem && typeof source.typographySystem === "object"
+          ? source.typographySystem
+          : source.typography_system && typeof source.typography_system === "object"
+            ? source.typography_system
+            : {}
+      ),
+    },
+    overlayPlan: Array.isArray(source.overlayPlan)
+      ? source.overlayPlan
+      : Array.isArray(source.overlay_plan)
+        ? source.overlay_plan
+        : [],
+    videoDirectorPlan: (
+      source.videoDirectorPlan && typeof source.videoDirectorPlan === "object"
+        ? source.videoDirectorPlan
+        : source.video_director_plan && typeof source.video_director_plan === "object"
+          ? source.video_director_plan
+          : {}
+    ),
+    creativeLearning: (
+      source.creativeLearning && typeof source.creativeLearning === "object"
+        ? source.creativeLearning
+        : source.creative_learning && typeof source.creative_learning === "object"
+          ? source.creative_learning
+          : {}
+    ),
+    propagation: (
+      source.propagation && typeof source.propagation === "object"
+        ? source.propagation
+        : source.planningPropagation && typeof source.planningPropagation === "object"
+          ? source.planningPropagation
+          : source.planning_propagation && typeof source.planning_propagation === "object"
+            ? source.planning_propagation
+            : {}
+    ),
+    updatedShots: Array.isArray(source.updatedShots) ? source.updatedShots : [],
+    updatedAt: firstString(source.updatedAt, source.updated_at),
+    updatedBy: firstString(source.updatedBy, source.updated_by),
+  };
+}
+
+function reviewStatusLabel(value) {
+  return {
+    DRAFT: "Draft",
+    CHANGES_REQUESTED: "Changes requested",
+    READY_FOR_CLIENT: "Ready for client",
+    APPROVED: "Approved",
+  }[String(value || "DRAFT").toUpperCase()] || "Draft";
+}
+
+function animatedStoryboardLoadingHtml() {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Preparing animated storyboard</title><style>
+    html,body{height:100%;margin:0;background:#060910;color:#f8fafc;font-family:Inter,system-ui,sans-serif}
+    body{display:grid;place-items:center;background:radial-gradient(circle at 50% 35%,rgba(247,201,72,.16),transparent 30%),#060910}
+    .card{text-align:center}.mark{width:58px;height:58px;margin:0 auto;display:grid;place-items:center;border-radius:18px;background:linear-gradient(145deg,#ffe486,#d49d18);color:#07101f;font-weight:950;animation:pulse 1.2s ease-in-out infinite}
+    h1{margin:18px 0 0;font-size:20px}p{color:#94a3b8;font-size:13px}@keyframes pulse{50%{transform:scale(1.08);box-shadow:0 0 40px rgba(247,201,72,.25)}}
+  </style></head><body><div class="card"><div class="mark">DL</div><h1>Preparing client preview</h1><p>Loading frames, feedback, and dialogue direction…</p></div></body></html>`;
+}
+
+function downloadHtmlDocument(html, fileName) {
+  const blob = new Blob([String(html || "")], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName || "storyboard-animated.html";
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function productionPlanSoundDebug(plan = {}) {
   const storyboardTag = extractStoryboardTag(plan) || {};
   const scene = plan.sourceScene || plan.scene || {};
@@ -7713,7 +14462,19 @@ function extractCameraTag(value = {}) {
 }
 
 function looksLikeStoryboardTag(value = {}) {
-  return Boolean(value.shotTitle || value.narrativeBeatSummary || value.compositionSummary || value.primaryDialogue || value.targetFocalPoint || value.soundDesign || value.soundCues);
+  return Boolean(
+    value.shotTitle
+    || value.narrativeBeatSummary
+    || value.compositionSummary
+    || value.primaryDialogue
+    || value.targetFocalPoint
+    || value.soundDesign
+    || value.soundCues
+    || value.storyboardImagePrompt
+    || value.imagePrompt
+    || value.visualPrompt
+    || (value.shotType && value.visual)
+  );
 }
 
 function looksLikeLightingTag(value = {}) {
@@ -7849,7 +14610,7 @@ function removeSceneByOrderKey(scenes = [], scene = {}) {
 
 function mergeScenePreservingImages(existing = {}, replacement = {}) {
   const merged = { ...existing, ...replacement };
-  ["signedUrl", "imageUrl", "storyboardImageUrl", "publicUrl", "assetUrl", "lightingImageUrl", "lightImageUrl", "cameraPlanImageUrl", "dpImageUrl", "cameraImageUrl"].forEach((field) => {
+  ["signedUrl", "imageUrl", "storyboardImageUrl", "productionImageUrl", "generatedProductImageUrl", "imageAnchorUrl", "publicUrl", "assetUrl", "lightingImageUrl", "lightImageUrl", "cameraPlanImageUrl", "dpImageUrl", "cameraImageUrl"].forEach((field) => {
     if (!replacement[field] && existing[field]) {
       merged[field] = existing[field];
     }
@@ -7970,10 +14731,66 @@ function mergeUniqueIdeas(current = [], incoming = []) {
   return merged.filter((idea, index) => merged.findIndex((candidate) => candidate.id === idea.id) === index);
 }
 
+function findBestPersistedStoryIdea(sourceIdea = {}, candidates = []) {
+  const sourceLockedIdeaId = String(sourceIdea.lockedIdeaId || "").trim();
+  const persisted = (Array.isArray(candidates) ? candidates : [])
+    .filter((idea) => isUuid(idea?.id))
+    .filter((idea) => {
+      if (!isUuid(sourceLockedIdeaId)) return true;
+      const candidateLockedIdeaId = String(idea.lockedIdeaId || "").trim();
+      return !candidateLockedIdeaId || candidateLockedIdeaId === sourceLockedIdeaId;
+    });
+  if (!persisted.length) return null;
+
+  const sourceTitle = ideaMatchKey(sourceIdea.title);
+  const sourceDescription = ideaMatchKey(sourceIdea.description || sourceIdea.summary);
+  const exact = persisted.find((idea) => {
+    const title = ideaMatchKey(idea.title);
+    const description = ideaMatchKey(idea.description || idea.summary);
+    return title && title === sourceTitle && (!sourceDescription || description === sourceDescription);
+  });
+  if (exact) return exact;
+
+  const scored = persisted
+    .map((idea) => ({
+      idea,
+      score:
+        ideaTextOverlapScore(sourceTitle, ideaMatchKey(idea.title)) +
+        ideaTextOverlapScore(sourceDescription, ideaMatchKey(idea.description || idea.summary)),
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  return scored[0]?.idea || persisted[0];
+}
+
+function ideaMatchKey(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/^\s*\d+[\).\s:-]+/, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function ideaTextOverlapScore(left, right) {
+  if (!left || !right) return 0;
+  if (left === right) return 100;
+  if (left.includes(right) || right.includes(left)) return 60;
+  const leftWords = new Set(left.split(/\s+/).filter((word) => word.length > 2));
+  const rightWords = right.split(/\s+/).filter((word) => word.length > 2);
+  if (!leftWords.size || !rightWords.length) return 0;
+  return rightWords.reduce((score, word) => score + (leftWords.has(word) ? 1 : 0), 0);
+}
+
 function truncateText(value, maxLength) {
   const text = String(value || "");
   if (text.length <= maxLength) return text;
   return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
+}
+
+function limitTextWords(value, maxWords) {
+  const words = String(value || "").split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return String(value || "").trim();
+  return words.slice(0, maxWords).join(" ");
 }
 
 function buildPendingTrendInsight(trend) {
@@ -8333,6 +15150,65 @@ function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
 }
 
+function resolveWorkflowLockedIdeaId(...entities) {
+  const candidates = entities
+    .flatMap((entity) => {
+      const scriptJson = firstObject(entity?.scriptJson, entity?.script_json) || {};
+      const storyScriptJson = firstObject(entity?.storyScriptJson, entity?.story_script_json) || {};
+      return [
+        entity?.lockedIdeaId,
+        entity?.locked_idea_id,
+        entity?.parentLockedIdeaId,
+        entity?.parent_locked_idea_id,
+        scriptJson.lockedIdeaId,
+        scriptJson.locked_idea_id,
+        storyScriptJson.lockedIdeaId,
+        storyScriptJson.locked_idea_id,
+      ];
+    })
+    .map((value) => firstString(value))
+    .filter(Boolean);
+  return candidates.find(isUuid) || candidates[0] || "";
+}
+
+function resolveWorkflowStoryIdeaId(...entities) {
+  const candidates = entities
+    .flatMap((entity) => {
+      const scriptId = resolveWorkflowScriptId(entity);
+      const scriptJson = firstObject(entity?.scriptJson, entity?.script_json) || {};
+      const storyScriptJson = firstObject(entity?.storyScriptJson, entity?.story_script_json) || {};
+      return [
+        entity?.storyIdeaId,
+        entity?.story_idea_id,
+        entity?.ideaId,
+        entity?.idea_id,
+        scriptJson.storyIdeaId,
+        scriptJson.story_idea_id,
+        storyScriptJson.storyIdeaId,
+        storyScriptJson.story_idea_id,
+        entity?.id && String(entity.id) !== String(scriptId) ? entity.id : "",
+      ];
+    })
+    .map((value) => firstString(value))
+    .filter(Boolean);
+  return candidates.find(isUuid) || candidates[0] || "";
+}
+
+function resolveWorkflowScriptId(...entities) {
+  const candidates = entities
+    .flatMap((entity) => [
+      entity?.scriptId,
+      entity?.script_id,
+      entity?.screenplayId,
+      entity?.screenplay_id,
+      entity?.script?.id,
+      entity?.screenplay?.id,
+    ])
+    .map((value) => firstString(value))
+    .filter(Boolean);
+  return candidates.find(isUuid) || candidates[0] || "";
+}
+
 function logCreatorWorkflowError(message, error, context = {}) {
   if (typeof console === "undefined" || typeof console.error !== "function") return;
   console.error(`[creator-ui] ${message}`, {
@@ -8390,6 +15266,14 @@ function walletMinimumBalanceValue(wallet = {}, fallback = MINIMUM_PAID_GENERATI
     ?? fallback
   );
   return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function walletMinimumBalanceForInrPrice(amountInr = 0, currency = "INR") {
+  const amount = Number(amountInr);
+  if (!Number.isFinite(amount) || amount <= 0) return MINIMUM_PAID_GENERATION_WALLET_BALANCE;
+  const normalizedCurrency = String(currency || "INR").toUpperCase();
+  if (normalizedCurrency === "USD") return Math.ceil(amount / USD_INR_RATE);
+  return Math.ceil(amount);
 }
 
 function formatWalletAmount(amount = 0, currency = "INR") {
@@ -8450,6 +15334,58 @@ function isRateLimitedError(error = {}) {
     || /too many requests|rate limit|rate-limited|quota exceeded|resource exhausted|429/.test(text);
 }
 
+function isTransientServiceError(error = {}) {
+  const data = error?.data || error?.response?.data || {};
+  const status = Number(error?.status || error?.originalStatus || error?.response?.status || data?.status || data?.statusCode || 0);
+  const transportStatus = String(error?.status || "").toUpperCase();
+  const text = [
+    data?.message,
+    data?.error,
+    data?.reason,
+    data?.code,
+    error?.message,
+    error?.error,
+  ].filter(Boolean).join(" ").toLowerCase();
+  return [502, 503, 504].includes(status)
+    || transportStatus === "FETCH_ERROR"
+    || /database temporarily unavailable|service unavailable|connection (?:is )?closed|connection reset|sqlstate.?08006|temporarily restarting|gateway timeout/.test(text);
+}
+
+function reviewRetryDelayMs(error = {}) {
+  const data = error?.data || error?.response?.data || {};
+  const explicitDelay = Number(
+    data?.retryAfterMs
+    || data?.retry_after_ms
+    || data?.retryDelayMs
+    || data?.retry_delay_ms
+  );
+  if (Number.isFinite(explicitDelay) && explicitDelay > 0) {
+    return Math.min(120000, Math.max(1000, explicitDelay + 1000));
+  }
+  const text = [
+    data?.message,
+    data?.error,
+    data?.reason,
+    error?.message,
+    error?.error,
+  ].filter(Boolean).join(" ");
+  const secondsMatch = text.match(/retry\s+(?:after|in)(?:\s+about)?\s+([0-9]+(?:\.[0-9]+)?)\s*(?:seconds?|secs?|s)\b/i);
+  if (secondsMatch) {
+    return Math.min(120000, Math.max(1000, Math.ceil(Number(secondsMatch[1]) * 1000) + 1000));
+  }
+  const millisecondsMatch = text.match(/retry\s+(?:after|in)(?:\s+about)?\s+([0-9]+)\s*(?:milliseconds?|ms)\b/i);
+  if (millisecondsMatch) {
+    return Math.min(120000, Math.max(1000, Number(millisecondsMatch[1]) + 1000));
+  }
+  return isRateLimitedError(error) ? 61000 : 8000;
+}
+
+function waitForReviewRetry(delayMs) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, Math.max(0, Number(delayMs) || 0));
+  });
+}
+
 function apiErrorMessage(error, fallback = "Request failed. Please check the missing fields and try again.") {
   const data = error?.data || error?.response?.data || null;
   const fieldMessages = data?.fields && typeof data.fields === "object" ? Object.values(data.fields).filter(Boolean) : [];
@@ -8457,6 +15393,15 @@ function apiErrorMessage(error, fallback = "Request failed. Please check the mis
   if (data?.message) return String(data.message);
   if (data?.error && !/bad request/i.test(String(data.error))) return String(data.error);
   const raw = error?.message || error?.error || "";
+  if (String(error?.status || "").toUpperCase() === "FETCH_ERROR") {
+    return "The review service could not be reached. Please retry; if it continues, check the creator-service route.";
+  }
+  if (String(error?.status || "").toUpperCase() === "PARSING_ERROR") {
+    return `The review service returned an invalid response${error?.originalStatus ? ` (HTTP ${error.originalStatus})` : ""}.`;
+  }
+  if (Number(error?.status) >= 500) {
+    return `${fallback} (HTTP ${error.status}).`;
+  }
   if (/mappings/i.test(String(raw))) {
     return "Map at least one story character to a cast profile before confirming cast.";
   }
@@ -8544,20 +15489,41 @@ function normalizeGenerationJobs(response = []) {
 
 function buildLockedBriefFromGenerationJob(job = {}) {
   const input = job.inputPayload || job.input || {};
+  const inputLockedBrief = firstObject(input.lockedBrief, input.sourceBrief) || {};
   const page = extractPageFromGenerationJob(job);
   const firstIdea = Array.isArray(page?.content) ? page.content[0] : null;
   const lockedIdeaId = input.lockedIdeaId || job.lockedIdeaId || firstIdea?.lockedIdeaId;
   const projectId = input.projectId || job.projectId || firstIdea?.projectId;
   if (!lockedIdeaId) return null;
   const title = input.lockedIdeaTitle || input.title || firstIdea?.title || "Recovered creative brief";
+  const description = input.briefDescription || input.summary || input.ideaText || firstIdea?.description || title;
+  const productIntelligenceBrief = productIntelligenceBriefFromEntity(inputLockedBrief)
+    || productIntelligenceBriefFromEntity(input)
+    || productIntelligenceBriefFromEntity(firstIdea);
+  const recoveredStyleOptions = {
+    hybridSceneMode: input.hybridSceneMode || firstIdea?.hybridSceneMode,
+    brollStyle: input.brollStyle || firstIdea?.brollStyle,
+    captionStyle: input.captionStyle || firstIdea?.captionStyle,
+  };
   return {
     id: lockedIdeaId,
     lockedIdeaId,
     projectId,
     backendLocked: true,
     title,
-    description: input.summary || title,
+    description,
     durationSeconds: input.durationSeconds || firstIdea?.durationSeconds || 30,
+    topicType: normalizeTopicType(input.topicType || firstIdea?.topicType || inferTopicTypeFromText(description)),
+    topicTypeLabel: topicTypeLabelFor(input.topicType || firstIdea?.topicType || inferTopicTypeFromText(description)),
+    productionStyle: normalizeProductionStyle(input.productionStyle || firstIdea?.productionStyle || DEFAULT_PRODUCTION_STYLE),
+    hybridSceneMode: normalizeHybridSceneMode(recoveredStyleOptions.hybridSceneMode || DEFAULT_HYBRID_SCENE_MODE),
+    brollStyle: normalizeBrollStyle(recoveredStyleOptions.brollStyle || DEFAULT_BROLL_STYLE),
+    captionStyle: normalizeCaptionStyle(recoveredStyleOptions.captionStyle || DEFAULT_CAPTION_STYLE),
+    productionStyleGuidance: input.productionStyleGuidance || firstIdea?.productionStyleGuidance || productionStyleGuidanceFor(input.productionStyle || firstIdea?.productionStyle || DEFAULT_PRODUCTION_STYLE, recoveredStyleOptions),
+    briefMode: input.briefMode || inputLockedBrief.briefMode || firstIdea?.briefMode || (productIntelligenceBrief ? PRODUCT_AD_BRIEF_MODE : undefined),
+    productInputKey: input.productInputKey || inputLockedBrief.productInputKey || firstIdea?.productInputKey || productAdInputKey(productIntelligenceBrief),
+    productIntelligenceBrief,
+    adConceptLanes: input.adConceptLanes || inputLockedBrief.adConceptLanes || PRODUCT_AD_CONCEPT_LANES,
     source: String(input.source || "original").toLowerCase(),
     recoveredFromJobId: job.jobId || job.id,
   };
@@ -8573,6 +15539,18 @@ function compactBriefForStorage(brief = {}) {
     title: brief.title,
     description: brief.description,
     durationSeconds: brief.durationSeconds,
+    topicType: brief.topicType,
+    topicTypeLabel: brief.topicTypeLabel,
+    productionStyle: brief.productionStyle,
+    hybridSceneMode: brief.hybridSceneMode,
+    brollStyle: brief.brollStyle,
+    captionStyle: brief.captionStyle,
+    productionStyleGuidance: brief.productionStyleGuidance,
+    briefMode: brief.briefMode,
+    productInputKey: brief.productInputKey,
+    productIntelligenceBrief: brief.productIntelligenceBrief,
+    adConceptLanes: brief.adConceptLanes,
+    selectionPayload: brief.selectionPayload,
     trendId: brief.trendId,
     source: brief.source,
   };
@@ -8693,7 +15671,13 @@ function buildWorkflowStateFromProject(project = {}) {
     projectId,
     storytellingType: scriptDetailIdea?.storytellingType || storyScriptIdea?.storytellingType || savedStoryIdea?.storytellingType || lockedBrief?.storytellingType || DEFAULT_STORYTELLING_TYPE,
     hookLens: scriptDetailIdea?.hookLens || storyScriptIdea?.hookLens || savedStoryIdea?.hookLens || lockedBrief?.hookLens || DEFAULT_HOOK_LENS,
+    topicType: scriptDetailIdea?.topicType || storyScriptIdea?.topicType || savedStoryIdea?.topicType || lockedBrief?.topicType || inferTopicTypeFromText(lockedBrief?.description || lockedBrief?.title),
+    productionStyle: scriptDetailIdea?.productionStyle || storyScriptIdea?.productionStyle || savedStoryIdea?.productionStyle || lockedBrief?.productionStyle || DEFAULT_PRODUCTION_STYLE,
+    hybridSceneMode: scriptDetailIdea?.hybridSceneMode || storyScriptIdea?.hybridSceneMode || savedStoryIdea?.hybridSceneMode || lockedBrief?.hybridSceneMode || DEFAULT_HYBRID_SCENE_MODE,
+    brollStyle: scriptDetailIdea?.brollStyle || storyScriptIdea?.brollStyle || savedStoryIdea?.brollStyle || lockedBrief?.brollStyle || DEFAULT_BROLL_STYLE,
+    captionStyle: scriptDetailIdea?.captionStyle || storyScriptIdea?.captionStyle || savedStoryIdea?.captionStyle || lockedBrief?.captionStyle || DEFAULT_CAPTION_STYLE,
     lockedBrief,
+    productAdBrief: normalizeProductAdBrief(lockedBrief?.productIntelligenceBrief),
     ideaCandidates,
     savedStoryIdea,
     storyScriptIdea,
@@ -8745,6 +15729,9 @@ function buildLockedBriefFromProject(project = {}) {
     project.description ||
     project.summary ||
     title;
+  const productIntelligenceBrief = productIntelligenceBriefFromEntity(lockedIdea)
+    || productIntelligenceBriefFromEntity(project)
+    || productIntelligenceBriefFromEntity(lockedIdea.selectionPayload);
 
   if (!lockedIdeaId && !title) return null;
   return {
@@ -8759,6 +15746,22 @@ function buildLockedBriefFromProject(project = {}) {
     durationSeconds: project.durationSeconds || lockedIdea.durationSeconds || 30,
     storytellingType: project.storytellingType || lockedIdea.storytellingType || lockedIdea.selectionPayload?.storytellingType || DEFAULT_STORYTELLING_TYPE,
     hookLens: project.hookLens || lockedIdea.hookLens || lockedIdea.selectionPayload?.hookLens || DEFAULT_HOOK_LENS,
+    topicType: normalizeTopicType(project.topicType || lockedIdea.topicType || lockedIdea.selectionPayload?.topicType || inferTopicTypeFromText(description)),
+    topicTypeLabel: topicTypeLabelFor(project.topicType || lockedIdea.topicType || lockedIdea.selectionPayload?.topicType || inferTopicTypeFromText(description)),
+    productionStyle: normalizeProductionStyle(project.productionStyle || lockedIdea.productionStyle || lockedIdea.selectionPayload?.productionStyle || DEFAULT_PRODUCTION_STYLE),
+    hybridSceneMode: normalizeHybridSceneMode(project.hybridSceneMode || lockedIdea.hybridSceneMode || lockedIdea.selectionPayload?.hybridSceneMode || DEFAULT_HYBRID_SCENE_MODE),
+    brollStyle: normalizeBrollStyle(project.brollStyle || lockedIdea.brollStyle || lockedIdea.selectionPayload?.brollStyle || DEFAULT_BROLL_STYLE),
+    captionStyle: normalizeCaptionStyle(project.captionStyle || lockedIdea.captionStyle || lockedIdea.selectionPayload?.captionStyle || DEFAULT_CAPTION_STYLE),
+    productionStyleGuidance: lockedIdea.productionStyleGuidance || lockedIdea.selectionPayload?.productionStyleGuidance || productionStyleGuidanceFor(project.productionStyle || lockedIdea.productionStyle || lockedIdea.selectionPayload?.productionStyle || DEFAULT_PRODUCTION_STYLE, {
+      hybridSceneMode: project.hybridSceneMode || lockedIdea.hybridSceneMode || lockedIdea.selectionPayload?.hybridSceneMode,
+      brollStyle: project.brollStyle || lockedIdea.brollStyle || lockedIdea.selectionPayload?.brollStyle,
+      captionStyle: project.captionStyle || lockedIdea.captionStyle || lockedIdea.selectionPayload?.captionStyle,
+    }),
+    briefMode: lockedIdea.briefMode || lockedIdea.selectionPayload?.briefMode || project.briefMode || (productIntelligenceBrief ? PRODUCT_AD_BRIEF_MODE : undefined),
+    productInputKey: lockedIdea.productInputKey || lockedIdea.selectionPayload?.productInputKey || project.productInputKey || productAdInputKey(productIntelligenceBrief),
+    productIntelligenceBrief,
+    adConceptLanes: lockedIdea.adConceptLanes || lockedIdea.selectionPayload?.adConceptLanes || project.adConceptLanes || PRODUCT_AD_CONCEPT_LANES,
+    selectionPayload: lockedIdea.selectionPayload,
     source: String(project.sourceType || lockedIdea.source || lockedIdea.sourceType || "original").toLowerCase(),
   };
 }
@@ -8779,6 +15782,13 @@ function normalizeProjectStoryIdeas(project = {}, lockedBrief = null) {
     projectId: idea.projectId || project.projectId || project.project_id || project.id,
     storytellingType: idea.storytellingType || lockedBrief?.storytellingType || DEFAULT_STORYTELLING_TYPE,
     hookLens: idea.hookLens || lockedBrief?.hookLens || DEFAULT_HOOK_LENS,
+    topicType: idea.topicType || lockedBrief?.topicType || DEFAULT_TOPIC_TYPE,
+    productionStyle: idea.productionStyle || lockedBrief?.productionStyle || DEFAULT_PRODUCTION_STYLE,
+    productionStyleGuidance: idea.productionStyleGuidance || lockedBrief?.productionStyleGuidance,
+    briefMode: idea.briefMode || lockedBrief?.briefMode,
+    productInputKey: idea.productInputKey || lockedBrief?.productInputKey,
+    productIntelligenceBrief: productIntelligenceBriefFromEntity(idea) || lockedBrief?.productIntelligenceBrief,
+    adConceptStrategy: idea.adConceptStrategy || idea.creativeNotes?.adConceptStrategy,
   }));
 }
 
@@ -8803,6 +15813,13 @@ function normalizeProjectSavedStoryIdea(project = {}, ideaCandidates = [], locke
     projectId: source.projectId || project.projectId || project.project_id || project.id,
     storytellingType: source.storytellingType || lockedBrief?.storytellingType || DEFAULT_STORYTELLING_TYPE,
     hookLens: source.hookLens || lockedBrief?.hookLens || DEFAULT_HOOK_LENS,
+    topicType: source.topicType || lockedBrief?.topicType || DEFAULT_TOPIC_TYPE,
+    productionStyle: source.productionStyle || lockedBrief?.productionStyle || DEFAULT_PRODUCTION_STYLE,
+    productionStyleGuidance: source.productionStyleGuidance || lockedBrief?.productionStyleGuidance,
+    briefMode: source.briefMode || lockedBrief?.briefMode,
+    productInputKey: source.productInputKey || lockedBrief?.productInputKey,
+    productIntelligenceBrief: productIntelligenceBriefFromEntity(source) || lockedBrief?.productIntelligenceBrief,
+    adConceptStrategy: source.adConceptStrategy || source.creativeNotes?.adConceptStrategy,
   });
 }
 
@@ -8813,10 +15830,12 @@ function normalizeProjectStoryScript(project = {}, sourceIdea = null, lockedBrie
     project.storyScriptIdea
   );
   if (!rawScript && !sourceIdea?.storyScriptJson && !sourceIdea?.storyScriptText && !sourceIdea?.selectionContext?.storyScript && !sourceIdea?.scriptText && !sourceIdea?.script) return null;
+  const storyIdeaId = firstString(rawScript?.storyIdeaId, rawScript?.story_idea_id, rawScript?.ideaId, rawScript?.idea_id, sourceIdea?.storyIdeaId, sourceIdea?.id);
   return normalizeGeneratedIdea({
     ...(sourceIdea || {}),
     ...(rawScript || {}),
-    id: rawScript?.storyIdeaId || rawScript?.ideaId || sourceIdea?.id,
+    id: storyIdeaId,
+    storyIdeaId,
     title: rawScript?.title || sourceIdea?.title,
     storyScriptText: rawScript?.scriptText || rawScript?.script || sourceIdea?.storyScriptText || sourceIdea?.scriptText || sourceIdea?.script,
     storyScriptJson: buildInitialStoryRevisionPayload(rawScript?.scriptJson || rawScript?.storyScriptJson || sourceIdea?.storyScriptJson || sourceIdea?.selectionContext?.storyScript || {}),
@@ -8826,6 +15845,9 @@ function normalizeProjectStoryScript(project = {}, sourceIdea = null, lockedBrie
     storytellingGuidance: rawScript?.scriptJson?.storytellingGuidance || rawScript?.storyScriptJson?.storytellingGuidance || sourceIdea?.storytellingGuidance || {},
     hookLens: rawScript?.scriptJson?.hookLens || rawScript?.storyScriptJson?.hookLens || sourceIdea?.hookLens || DEFAULT_HOOK_LENS,
     hookLensGuidance: rawScript?.scriptJson?.hookLensGuidance || rawScript?.storyScriptJson?.hookLensGuidance || sourceIdea?.hookLensGuidance || {},
+    topicType: rawScript?.scriptJson?.topicType || rawScript?.storyScriptJson?.topicType || sourceIdea?.topicType || lockedBrief?.topicType || DEFAULT_TOPIC_TYPE,
+    productionStyle: rawScript?.scriptJson?.productionStyle || rawScript?.storyScriptJson?.productionStyle || sourceIdea?.productionStyle || lockedBrief?.productionStyle || DEFAULT_PRODUCTION_STYLE,
+    productionStyleGuidance: rawScript?.scriptJson?.productionStyleGuidance || rawScript?.storyScriptJson?.productionStyleGuidance || sourceIdea?.productionStyleGuidance || lockedBrief?.productionStyleGuidance,
     hookBridge: rawScript?.scriptJson?.hookBridge || rawScript?.storyScriptJson?.hookBridge || sourceIdea?.hookBridge || {},
     factualityNotes: rawScript?.scriptJson?.factualityNotes || rawScript?.storyScriptJson?.factualityNotes || sourceIdea?.factualityNotes || {},
     status: rawScript?.status || sourceIdea?.status || "SCRIPT_GENERATED",
@@ -8843,12 +15865,16 @@ function normalizeProjectScreenplay(project = {}, sourceIdea = null, lockedBrief
   if (!rawScreenplay && !sourceIdea?.scriptId && !sourceIdea?.scriptJson?.shots?.length && !sourceIdea?.scriptScenes?.length && !sourceIdea?.scenes?.length) return null;
   const scriptJson = rawScreenplay?.scriptJson || sourceIdea?.scriptJson || {};
   const scenes = rawScreenplay?.scenes || rawScreenplay?.shots || scriptJson.shots || sourceIdea?.scriptScenes || sourceIdea?.scenes || [];
+  const storyIdeaId = firstString(rawScreenplay?.storyIdeaId, rawScreenplay?.story_idea_id, rawScreenplay?.ideaId, rawScreenplay?.idea_id, sourceIdea?.storyIdeaId, sourceIdea?.id);
+  const rawScreenplayId = firstString(rawScreenplay?.id);
+  const scriptId = firstString(rawScreenplay?.scriptId, rawScreenplay?.script_id, rawScreenplay?.screenplayId, rawScreenplay?.screenplay_id, rawScreenplayId && rawScreenplayId !== storyIdeaId ? rawScreenplayId : "", sourceIdea?.scriptId);
   return normalizeGeneratedIdea({
     ...(sourceIdea || {}),
     ...(rawScreenplay || {}),
-    id: rawScreenplay?.storyIdeaId || rawScreenplay?.ideaId || sourceIdea?.id,
+    id: storyIdeaId || sourceIdea?.id,
+    storyIdeaId,
     title: rawScreenplay?.title || sourceIdea?.title,
-    scriptId: rawScreenplay?.scriptId || rawScreenplay?.id || sourceIdea?.scriptId,
+    scriptId,
     scriptText: rawScreenplay?.script || rawScreenplay?.scriptText || sourceIdea?.scriptText || sourceIdea?.script,
     scriptJson,
     scriptScenes: normalizeGeneratedScriptScenes(scenes),
@@ -8859,6 +15885,9 @@ function normalizeProjectScreenplay(project = {}, sourceIdea = null, lockedBrief
     storytellingGuidance: scriptJson.storytellingGuidance || sourceIdea?.storytellingGuidance || {},
     hookLens: scriptJson.hookLens || sourceIdea?.hookLens || DEFAULT_HOOK_LENS,
     hookLensGuidance: scriptJson.hookLensGuidance || sourceIdea?.hookLensGuidance || {},
+    topicType: scriptJson.topicType || sourceIdea?.topicType || lockedBrief?.topicType || DEFAULT_TOPIC_TYPE,
+    productionStyle: scriptJson.productionStyle || sourceIdea?.productionStyle || lockedBrief?.productionStyle || DEFAULT_PRODUCTION_STYLE,
+    productionStyleGuidance: scriptJson.productionStyleGuidance || sourceIdea?.productionStyleGuidance || lockedBrief?.productionStyleGuidance,
     hookBridge: scriptJson.hookBridge || sourceIdea?.hookBridge || {},
     factualityNotes: scriptJson.factualityNotes || sourceIdea?.factualityNotes || {},
     status: rawScreenplay?.status || sourceIdea?.status || "SCREENPLAY_GENERATED",
@@ -8909,12 +15938,757 @@ function normalizeProjectStoryboard(project = {}, scriptDetailIdea = null) {
   }, scriptDetailIdea || {});
 }
 
+function normalizeHumanWorkOrderList(response = []) {
+  if (Array.isArray(response)) return response;
+  return firstArray(response?.workOrders, response?.items, response?.content, response?.data);
+}
+
+function latestHumanWorkOrderOfType(workOrders = [], workType) {
+  const normalizedType = String(workType || "").toUpperCase();
+  return [...(Array.isArray(workOrders) ? workOrders : [])]
+    .filter((order) => String(order?.workType || order?.work_type || "").toUpperCase() === normalizedType)
+    .sort((left, right) => {
+      const leftTime = Date.parse(left?.updatedAt || left?.submittedAt || left?.createdAt || "") || 0;
+      const rightTime = Date.parse(right?.updatedAt || right?.submittedAt || right?.createdAt || "") || 0;
+      return rightTime - leftTime;
+    })[0] || null;
+}
+
 function firstObject(...values) {
   return values.find((value) => value && typeof value === "object" && !Array.isArray(value)) || null;
 }
 
 function firstArray(...values) {
   return values.find(Array.isArray) || [];
+}
+
+function uniqueStrings(values = []) {
+  return Array.from(new Set((Array.isArray(values) ? values : [])
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)));
+}
+
+function isActiveJobStatus(status) {
+  const normalized = String(status || "").toUpperCase();
+  if (!normalized || isCompletedJobStatus(normalized) || isFailedJobStatus(normalized)) return false;
+  return ["PENDING", "QUEUED", "RUNNING", "PAUSED", "STARTED", "IN_PROGRESS", "GENERATING", "RENDERING", "PROCESSING"]
+    .includes(normalized);
+}
+
+function isJobActuallyRunning(job, jobId, mutationLoading = false, isError = false) {
+  if (mutationLoading) return true;
+  if (!jobId || isError || !job) return false;
+  return isActiveJobStatus(job.status || job.jobStatus);
+}
+
+function mergeVideoRunAudioState(baseRun, audioRun) {
+  if (!baseRun && !audioRun) return null;
+  if (!baseRun) return audioRun;
+  if (!audioRun || typeof audioRun !== "object") return baseRun;
+  const merged = { ...baseRun };
+  [
+    "dialogueAudio",
+    "voiceTrack",
+    "audioPack",
+    "audioAssets",
+    "audioProductionPlan",
+    "freeMusicSelectionPlan",
+    "backgroundMusicSelection",
+    "backgroundMusic",
+    "musicTrack",
+    "editingPlan",
+    "editorHandoffPlan",
+  ].forEach((key) => {
+    const value = audioRun[key];
+    if (value == null) return;
+    if (typeof value === "string" && !value.trim()) return;
+    if (Array.isArray(value) && !value.length) return;
+    if (typeof value === "object" && !Array.isArray(value) && !Object.keys(value).length) return;
+    merged[key] = value;
+  });
+  return merged;
+}
+
+function jobIdFromPayload(payload = {}) {
+  return firstString(
+    payload?.jobId,
+    payload?.job_id,
+    payload?.generationJobId,
+    payload?.generation_job_id,
+    payload?.id
+  );
+}
+
+function runIdFromVideoPayload(payload = {}) {
+  const run = videoRunFromPayload(payload);
+  return firstString(
+    payload?.runId,
+    payload?.run_id,
+    payload?.videoRunId,
+    payload?.video_run_id,
+    payload?.screenplayVideoRunId,
+    payload?.screenplay_video_run_id,
+    run?.runId,
+    run?.run_id,
+    run?.videoRunId,
+    run?.video_run_id,
+    run?.id
+  );
+}
+
+function videoRunFromPayload(payload = {}) {
+  const run = firstObject(
+    payload?.videoRun,
+    payload?.video_run,
+    payload?.screenplayVideoRun,
+    payload?.screenplay_video_run,
+    payload?.run,
+    payload?.result?.videoRun,
+    payload?.outputPayload?.videoRun
+  );
+  if (run) return run;
+  if (
+    payload
+    && typeof payload === "object"
+    && !Array.isArray(payload)
+    && (
+      payload.runId
+      || payload.run_id
+      || payload.videoRunId
+      || payload.video_run_id
+      || payload.finalVideoUrl
+      || payload.final_video_url
+      || firstArray(payload.scenes, payload.sceneClips, payload.clips).length
+    )
+  ) {
+    return payload;
+  }
+  return null;
+}
+
+function finalVideoUrlFromPayload(payload = {}) {
+  const run = videoRunFromPayload(payload) || payload || {};
+  return firstString(
+    run?.finalVideo?.videoUrl,
+    run?.finalVideo?.video_url,
+    run?.finalVideo?.clipUrl,
+    run?.finalVideo?.clip_url,
+    run?.finalVideo?.publicUrl,
+    run?.finalVideo?.signedUrl,
+    run?.finalVideoUrl,
+    run?.final_video_url,
+    run?.finalAssetUrl,
+    run?.final_asset_url,
+    run?.publicUrl,
+    run?.public_url,
+    run?.signedUrl,
+    run?.signed_url,
+    run?.finalVideoAsset?.publicUrl,
+    run?.finalVideoAsset?.signedUrl,
+    run?.asset?.publicUrl,
+    run?.asset?.signedUrl
+  );
+}
+
+function screenplayVideoSceneCountFor(videoRun, fallbackScenes = []) {
+  const run = videoRunFromPayload(videoRun) || {};
+  return firstArray(run?.scenes, run?.sceneClips, run?.clips, run?.timeline?.scenes, run?.renderManifest?.scenes).length
+    || (Array.isArray(fallbackScenes) ? fallbackScenes.length : 0);
+}
+
+function screenplayVideoGeneratedCountFor(videoRun) {
+  const run = videoRunFromPayload(videoRun) || {};
+  return firstArray(run?.scenes, run?.sceneClips, run?.clips, run?.timeline?.scenes, run?.renderManifest?.scenes)
+    .filter((scene) => Boolean(
+      scene?.videoUrl
+      || scene?.video_url
+      || scene?.clipUrl
+      || scene?.clip_url
+      || scene?.publicUrl
+      || scene?.public_url
+      || ["READY", "READY_FOR_REVIEW", "RENDERED", "COMPLETED", "APPROVED"].includes(String(scene?.status || scene?.clipStatus || "").toUpperCase())
+    ))
+    .length;
+}
+
+function firstString(...values) {
+  for (const value of values) {
+    if (value !== undefined && value !== null && String(value).trim()) {
+      return String(value).trim();
+    }
+  }
+  return "";
+}
+
+function buildScreenplayVideoGenerationPackage(scriptJson = {}, options = {}) {
+  const source = scriptJson && typeof scriptJson === "object" ? scriptJson : {};
+  const shots = resolveScreenplayVideoShots(source);
+  const hasVideoContract = Boolean(
+    source.videoPacingProfile
+    || source.video_pacing_profile
+    || source.seedancePromptStrategy
+    || source.seedance_prompt_strategy
+    || source.videoConsistencyBible
+    || source.video_consistency_bible
+    || source.srt
+    || source.srtFile
+    || source.srt_file
+    || firstArray(source.srtCues, source.srt_cues).length
+  );
+  if (!shots.length && !hasVideoContract) return {};
+
+  const durationSeconds = numberValue(
+    firstString(source.durationSeconds, source.duration_seconds, source.duration, options.durationSeconds),
+    options.durationSeconds || 30
+  );
+  const provider = normalizeScreenplayVideoProvider(firstString(options.provider, source.provider, source.videoProvider, "gemini_omni"));
+  const model = firstString(options.model, source.model, source.videoModel, defaultScreenplayVideoModelForProvider(provider));
+  const maxClipSeconds = Math.max(1, numberValue(
+    firstString(options.maxClipSeconds, source.maxClipSeconds, source.max_clip_seconds),
+    maxClipSecondsForVideoProvider(provider, model)
+  ));
+  const videoPacingProfile = firstObject(source.videoPacingProfile, source.video_pacing_profile)
+    || deriveVideoPacingProfileForScreenplay(source, shots, { ...options, durationSeconds, provider, model, maxClipSeconds });
+  const videoConsistencyBible = firstObject(source.videoConsistencyBible, source.video_consistency_bible)
+    || deriveVideoConsistencyBibleForScreenplay(source, shots, options);
+  const seedancePromptStrategy = firstObject(source.seedancePromptStrategy, source.seedance_prompt_strategy)
+    || deriveSeedancePromptStrategyForScreenplay(source, videoPacingProfile, videoConsistencyBible, { ...options, provider, model, maxClipSeconds });
+  const generatedSrt = screenplaySrtArtifactForScreenplay(source, shots, durationSeconds, maxClipSeconds);
+  const existingSrtFile = firstObject(source.srtFile, source.srt_file, source.subtitleFile, source.subtitle_file) || {};
+  const existingSrtCues = firstArray(source.srtCues, source.srt_cues);
+  const srtContent = firstString(
+    existingSrtFile.content,
+    source.srt,
+    source.srtContent,
+    source.srt_content,
+    generatedSrt.content
+  );
+  const srtCues = existingSrtCues.length ? existingSrtCues : generatedSrt.cues;
+  const payload = {
+    videoPacingProfile,
+    seedancePromptStrategy,
+    videoConsistencyBible,
+    maxClipSeconds,
+    videoModelCapability: videoModelCapabilityForScreenplay(provider, model),
+    dialogueTimingPolicy: dialogueTimingPolicyForModelCapability(maxClipSeconds),
+    generatedSubtitleFilename: "generated.srt",
+  };
+  if (srtCues.length) payload.srtCues = srtCues;
+  if (srtContent) {
+    payload.srt = srtContent;
+    payload.srtFile = {
+      filename: firstString(existingSrtFile.filename, existingSrtFile.name, "generated.srt"),
+      contentType: firstString(existingSrtFile.contentType, existingSrtFile.content_type, "application/x-subrip"),
+      cueCount: numberValue(firstString(existingSrtFile.cueCount, existingSrtFile.cue_count), srtCues.length),
+      durationSeconds,
+      ...existingSrtFile,
+      content: srtContent,
+    };
+  } else if (Object.keys(existingSrtFile).length) {
+    payload.srtFile = existingSrtFile;
+  }
+  return payload;
+}
+
+function normalizeVideoFinishingPlan(plan = {}) {
+  const source = plan && typeof plan === "object" ? plan : {};
+  const musicVolume = Math.max(0, Math.min(100, numberValue(source.musicVolume ?? source.music_volume, DEFAULT_VIDEO_FINISHING_PLAN.musicVolume)));
+  return {
+    backgroundMusicMode: normalizedOptionValue(
+      firstString(source.backgroundMusicMode, source.background_music_mode, DEFAULT_VIDEO_FINISHING_PLAN.backgroundMusicMode),
+      ["auto", "energetic", "warm_cinematic", "documentary", "none"],
+      DEFAULT_VIDEO_FINISHING_PLAN.backgroundMusicMode
+    ),
+    backgroundMusicPrompt: firstString(source.backgroundMusicPrompt, source.background_music_prompt, DEFAULT_VIDEO_FINISHING_PLAN.backgroundMusicPrompt),
+    musicVolume,
+    ambiencePrompt: firstString(source.ambiencePrompt, source.ambience_prompt, source.ambientBedPrompt, source.ambient_bed_prompt, DEFAULT_VIDEO_FINISHING_PLAN.ambiencePrompt),
+    soundFxPrompt: firstString(source.soundFxPrompt, source.sound_fx_prompt, source.sfxPrompt, source.sfx_prompt, DEFAULT_VIDEO_FINISHING_PLAN.soundFxPrompt),
+    voiceMixMode: normalizedOptionValue(
+      firstString(source.voiceMixMode, source.voice_mix_mode, DEFAULT_VIDEO_FINISHING_PLAN.voiceMixMode),
+      ["balanced", "speech_forward", "music_forward", "ambient_only"],
+      DEFAULT_VIDEO_FINISHING_PLAN.voiceMixMode
+    ),
+    useStoryboardReferences: booleanValue(source.useStoryboardReferences ?? source.use_storyboard_references, DEFAULT_VIDEO_FINISHING_PLAN.useStoryboardReferences),
+    imageLedAdMode: booleanValue(source.imageLedAdMode ?? source.image_led_ad_mode, DEFAULT_VIDEO_FINISHING_PLAN.imageLedAdMode),
+    referenceImageMode: normalizedOptionValue(
+      firstString(source.referenceImageMode, source.reference_image_mode, source.storyboardReferenceMode, source.storyboard_reference_mode, DEFAULT_VIDEO_FINISHING_PLAN.referenceImageMode),
+      ["prompt_only", "product_packshot", "product_motion_anchor"],
+      DEFAULT_VIDEO_FINISHING_PLAN.referenceImageMode
+    ),
+    requireImageAnchors: booleanValue(source.requireImageAnchors ?? source.require_image_anchors, DEFAULT_VIDEO_FINISHING_PLAN.requireImageAnchors),
+    productMotionPrompt: firstString(source.productMotionPrompt, source.product_motion_prompt, DEFAULT_VIDEO_FINISHING_PLAN.productMotionPrompt),
+    voiceDialoguePrompt: firstString(source.voiceDialoguePrompt, source.voice_dialogue_prompt, source.dialoguePrompt, source.dialogue_prompt, DEFAULT_VIDEO_FINISHING_PLAN.voiceDialoguePrompt),
+    editingPlanPrompt: firstString(source.editingPlanPrompt, source.editing_plan_prompt, DEFAULT_VIDEO_FINISHING_PLAN.editingPlanPrompt),
+    burnCaptions: booleanValue(source.burnCaptions ?? source.burn_captions, DEFAULT_VIDEO_FINISHING_PLAN.burnCaptions),
+    useMixedAudio: booleanValue(source.useMixedAudio ?? source.use_mixed_audio, DEFAULT_VIDEO_FINISHING_PLAN.useMixedAudio),
+    audioMixStandards: normalizeAudioMixStandards(source.audioMixStandards || source.audio_mix_standards),
+  };
+}
+
+function normalizeAudioMusicSource(value = "free_licensed") {
+  const normalized = String(value || "free_licensed").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (["ai", "ai_music", "ai_generated", "google_lyria", "lyria"].includes(normalized)) return "ai_generated";
+  if (["none", "no_music", "off"].includes(normalized)) return "none";
+  return "free_licensed";
+}
+
+function imageLedAdPlanFromVideoFinishingPlan(plan = {}) {
+  const normalized = normalizeVideoFinishingPlan(plan);
+  return {
+    enabled: normalized.imageLedAdMode,
+    referenceImageMode: normalized.referenceImageMode,
+    useStoryboardReferences: normalized.useStoryboardReferences,
+    requireImageAnchors: normalized.requireImageAnchors,
+    productMotionPrompt: normalized.productMotionPrompt,
+    providerPolicy: normalized.imageLedAdMode
+      ? "generate_or_use_approved_image_anchors_then_render_video_from_image"
+      : "storyboard_guidance_in_prompt_only",
+    sceneUseCases: [
+      "d2c_product_packshot",
+      "slow_motion_food_or_texture",
+      "macro_product_detail",
+      "multi_direction_product_motion",
+    ],
+  };
+}
+
+function audioProductionPlanFromVideoFinishingPlan(plan = {}) {
+  const normalized = normalizeVideoFinishingPlan(plan);
+  return {
+    voiceDialogue: {
+      prompt: normalized.voiceDialoguePrompt,
+      mode: normalized.voiceMixMode,
+      policy: "native_voice_or_dialogue_when_provider_supports_audio_then_final_mix",
+    },
+    music: {
+      mode: normalized.backgroundMusicMode,
+      prompt: normalized.backgroundMusicPrompt,
+      source: "free_licensed",
+      volumePercent: normalized.musicVolume,
+      duckUnderSpeech: normalized.voiceMixMode !== "music_forward",
+    },
+    freeMusicPlan: {
+      status: "NEEDS_USER_SELECTION",
+      sourceType: "free_licensed",
+      searchQuery: normalized.backgroundMusicPrompt || `${normalized.backgroundMusicMode} instrumental ad music`,
+      licensePolicy: "Use only tracks with explicit commercial-use permission and save source, license URL, attribution text, and download timestamp.",
+    },
+    ambience: {
+      prompt: normalized.ambiencePrompt,
+      roomTone: "scene_matched_low_bed",
+    },
+    soundEffects: {
+      prompt: normalized.soundFxPrompt,
+      policy: "small_whooshes_clicks_transitions_sparingly",
+    },
+    audioMixStandards: normalized.audioMixStandards,
+  };
+}
+
+function editingPlanFromVideoFinishingPlan(plan = {}) {
+  const normalized = normalizeVideoFinishingPlan(plan);
+  return {
+    editorNotes: normalized.editingPlanPrompt,
+    pacing: "follow_screenplay_timeline_and_srt_cues",
+    imageLedAdMode: normalized.imageLedAdMode,
+    referenceImageMode: normalized.referenceImageMode,
+    deliverables: [
+      "final_master_video",
+      "verified_captions_srt",
+      "balanced_voice_music_sfx_mix",
+    ],
+    reviewPolicy: "two_included_revision_rounds_then_paid_changes",
+  };
+}
+
+function soundDesignPlanFromVideoFinishingPlan(plan = {}) {
+  const normalized = normalizeVideoFinishingPlan(plan);
+  return {
+    voiceDialogue: {
+      prompt: normalized.voiceDialoguePrompt,
+      mode: normalized.voiceMixMode,
+      enabled: Boolean(normalized.voiceDialoguePrompt) || normalized.voiceMixMode !== "ambient_only",
+    },
+    backgroundMusic: {
+      mode: normalized.backgroundMusicMode,
+      prompt: normalized.backgroundMusicPrompt,
+      volumePercent: normalized.musicVolume,
+      enabled: normalized.backgroundMusicMode !== "none",
+    },
+    ambience: {
+      prompt: normalized.ambiencePrompt,
+      enabled: Boolean(normalized.ambiencePrompt),
+    },
+    soundEffects: {
+      prompt: normalized.soundFxPrompt,
+      enabled: Boolean(normalized.soundFxPrompt),
+    },
+    voiceMix: {
+      mode: normalized.voiceMixMode,
+      duckMusicUnderSpeech: normalized.voiceMixMode !== "music_forward",
+    },
+    audioMixStandards: normalized.audioMixStandards,
+    mixPolicy: {
+      dialogueFirst: true,
+      duckBackgroundMusicUnderSpeech: true,
+      preserveAmbientRoomTone: true,
+      sparseSoundEffects: true,
+      sceneMatchedReverb: true,
+      smoothSegmentFades: true,
+    },
+    useMixedAudio: normalized.useMixedAudio,
+    burnCaptions: normalized.burnCaptions,
+    useStoryboardReferences: normalized.useStoryboardReferences,
+    imageLedAdPlan: imageLedAdPlanFromVideoFinishingPlan(normalized),
+    audioProductionPlan: audioProductionPlanFromVideoFinishingPlan(normalized),
+  };
+}
+
+function normalizeAudioMixStandards(value = {}) {
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    ...DEFAULT_AUDIO_MIX_STANDARDS,
+    ...source,
+    dialogueTargetDb: numberValue(source.dialogueTargetDb ?? source.dialogue_target_db, DEFAULT_AUDIO_MIX_STANDARDS.dialogueTargetDb),
+    musicBedDb: numberValue(source.musicBedDb ?? source.music_bed_db, DEFAULT_AUDIO_MIX_STANDARDS.musicBedDb),
+    ambienceBedDb: numberValue(source.ambienceBedDb ?? source.ambience_bed_db, DEFAULT_AUDIO_MIX_STANDARDS.ambienceBedDb),
+    sfxPeakDb: numberValue(source.sfxPeakDb ?? source.sfx_peak_db, DEFAULT_AUDIO_MIX_STANDARDS.sfxPeakDb),
+    fadeMs: numberValue(source.fadeMs ?? source.fade_ms, DEFAULT_AUDIO_MIX_STANDARDS.fadeMs),
+  };
+}
+
+function normalizedOptionValue(value, allowedValues = [], fallback = "") {
+  const normalized = String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  return allowedValues.includes(normalized) ? normalized : fallback;
+}
+
+function booleanValue(value, fallback = false) {
+  if (typeof value === "boolean") return value;
+  if (value == null || value === "") return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (["true", "1", "yes", "y", "on"].includes(normalized)) return true;
+  if (["false", "0", "no", "n", "off"].includes(normalized)) return false;
+  return fallback;
+}
+
+function resolveScreenplayVideoShots(scriptJson = {}) {
+  return firstArray(
+    scriptJson.shots,
+    scriptJson.scenes,
+    scriptJson.timeline?.shots,
+    scriptJson.timeline?.scenes
+  )
+    .filter((shot) => shot && typeof shot === "object")
+    .map((shot, index) => ({
+      ...shot,
+      shotNumber: Number(shot.shotNumber || shot.shot_number || shot.sceneNumber || shot.scene_number || index + 1),
+    }));
+}
+
+function deriveVideoPacingProfileForScreenplay(scriptJson = {}, shots = [], options = {}) {
+  const paceKey = videoPacingKeyForScreenplay(scriptJson, shots, options);
+  const durationSeconds = numberValue(options.durationSeconds || scriptJson.durationSeconds || scriptJson.duration, 30);
+  const maxClipSeconds = Math.max(1, numberValue(options.maxClipSeconds || scriptJson.maxClipSeconds || scriptJson.max_clip_seconds, 15));
+  const averageShotSeconds = shots.length ? Math.round((durationSeconds / shots.length) * 100) / 100 : durationSeconds;
+  return {
+    paceKey,
+    maxClipSeconds,
+    maxDialogueSecondsPerShot: Math.max(1, maxClipSeconds - 1),
+    dialogueTimingPolicy: dialogueTimingPolicyForModelCapability(maxClipSeconds),
+    averageShotSeconds,
+    cutDensity: paceKey === "fast_paced" ? "high" : paceKey === "slow_paced" ? "low" : "medium",
+    captionRhythm: paceKey === "fast_paced"
+      ? "short punchy captions every 1.2-2.4 seconds"
+      : paceKey === "slow_paced"
+        ? "readable captions every 2.8-5.0 seconds with emotional breathing room"
+        : "clean captions every 2.0-3.5 seconds",
+    shotDurationRule: paceKey === "fast_paced"
+      ? "Prefer 1.5-3.5 second shots, except payoff shots may breathe briefly."
+      : paceKey === "slow_paced"
+        ? "Prefer 4-8 second shots with steadier camera and fewer abrupt transitions."
+        : "Mix 2.5-5 second shots with faster hook and slower payoff.",
+  };
+}
+
+function videoPacingKeyForScreenplay(scriptJson = {}, shots = [], options = {}) {
+  const durationSeconds = numberValue(options.durationSeconds || scriptJson.durationSeconds || scriptJson.duration, 30);
+  const averageShotSeconds = shots.length ? durationSeconds / shots.length : durationSeconds;
+  const text = [
+    options.topicType,
+    options.storytellingType,
+    scriptJson.category,
+    scriptJson.pacingStyle,
+    scriptJson.emotionalArc,
+    scriptJson.inferredTone,
+    scriptJson.projectTitle,
+  ].join(" ").toLowerCase();
+  if (/comedy|meme|trend|fitness|kinetic|urgent|fast|challenge|product|demo/.test(text) || durationSeconds <= 45 || averageShotSeconds <= 3.25) {
+    return "fast_paced";
+  }
+  if (/emotional|romantic|documentary|dramatic|slow|cinematic|reflection|wellness/.test(text) || durationSeconds >= 120 || averageShotSeconds >= 6) {
+    return "slow_paced";
+  }
+  return "balanced";
+}
+
+function deriveSeedancePromptStrategyForScreenplay(scriptJson = {}, pacingProfile = {}, consistencyBible = {}, options = {}) {
+  const paceKey = pacingProfile.paceKey || "balanced";
+  const maxClipSeconds = Math.max(1, numberValue(options.maxClipSeconds || pacingProfile.maxClipSeconds || scriptJson.maxClipSeconds || scriptJson.max_clip_seconds, 15));
+  const pacingPrompt = paceKey === "fast_paced"
+    ? "Use energetic motion, punchy cuts, crisp hook text, fast but readable captions, and quick visual payoffs."
+    : paceKey === "slow_paced"
+      ? "Use steadier camera movement, longer emotional beats, smoother transitions, and fewer cuts so the moment can breathe."
+      : "Use a fast hook, readable middle, and clear payoff with no rushed emotional beats.";
+  return {
+    provider: "seedance",
+    maxClipSeconds,
+    maxDialogueSecondsPerShot: Math.max(1, maxClipSeconds - 1),
+    dialogueTimingPolicy: dialogueTimingPolicyForModelCapability(maxClipSeconds),
+    pacingKey: paceKey,
+    selectedPacingPrompt: pacingPrompt,
+    globalConsistencyPrompt: [
+      "Generate each scene from the screenplay JSON as the source of truth.",
+      dialogueTimingPolicyForModelCapability(maxClipSeconds),
+      pacingPrompt,
+      "Maintain the same character identity, face, age, wardrobe, hairstyle, props, set geography, lighting temperature, color palette, camera language, screen direction, and aspect ratio across clips.",
+      "Use approved storyboard frames or the first generated frame as reference frames when available.",
+      "Use the provided captionTrack/SRT cues only; avoid random subtitles or unreadable generated text.",
+      `Negative constraints: ${consistencyBible.negativePrompt || consistencyBible.globalNegativePrompt || "no face drift, wardrobe changes, extra limbs, watermarks, logo artifacts, or sudden environment changes"}.`,
+    ].join(" "),
+    fastPacedPrompt: "Use energetic cuts, visible motion, strong hook text, punchy camera movement, and short readable caption beats while preserving continuity locks.",
+    slowPacedPrompt: "Use steadier camera language, longer emotional beats, softer motion, fewer cuts, and readable captions while preserving continuity locks.",
+    continuityTechniques: [
+      "repeat locked character identity words in every scene prompt",
+      "carry wardrobe, hair, face, props, and set geography across adjacent shots",
+      "include previous-shot and next-shot continuity notes",
+      "preserve screen direction, eyeline, lighting temperature, lens language, and aspect ratio",
+      "use reference frames or approved storyboard images when available",
+      "use negative prompts against face drift, outfit changes, extra limbs, logo artifacts, random text, and environment jumps",
+    ],
+    srtRequired: true,
+    captionStyle: options.captionStyle || scriptJson.captionStyle || DEFAULT_CAPTION_STYLE,
+  };
+}
+
+function deriveVideoConsistencyBibleForScreenplay(scriptJson = {}, shots = [], options = {}) {
+  return {
+    projectTitle: firstString(scriptJson.projectTitle, scriptJson.title, "Creator video"),
+    screenType: firstString(options.screenType, scriptJson.screenType, "vertical"),
+    category: firstString(options.topicType, scriptJson.topicType, scriptJson.category, DEFAULT_TOPIC_TYPE),
+    characterIdentityLocks: uniqueScreenplayShotValues(shots, (shot) => [
+      shot.primaryActors,
+      shot.sideActors,
+      shot.primaryCharacters,
+      shot.sideCharacters,
+      shot.expression,
+      shot.bodyLanguage,
+    ]),
+    wardrobeAndAppearanceLocks: uniqueScreenplayShotValues(shots, (shot) => [
+      shot.wardrobe,
+      shot.costume,
+      shot.blockingNotes,
+      shot.primaryActorAction,
+      shot.creatorDirection,
+    ]),
+    setAndPropLocks: uniqueScreenplayShotValues(shots, (shot) => [
+      shot.setDesign,
+      shot.environment,
+      shot.resourceRequirements,
+      shot.props,
+    ]),
+    cameraLanguageLocks: uniqueScreenplayShotValues(shots, (shot) => [
+      shot.shotType,
+      shot.cameraAngle,
+      shot.cameraMovement,
+      shot.lensSuggestion,
+      shot.composition,
+    ]),
+    lightingAndColorLocks: uniqueScreenplayShotValues(shots, (shot) => [
+      shot.lighting,
+      shot.lightingMobile,
+      shot.lightingProfessional,
+      shot.colorPalette,
+    ]),
+    continuityRules: [
+      "Do not change the main character face, age, hairstyle, wardrobe, body type, or skin tone between shots.",
+      "Keep location geography and props stable unless the screenplay explicitly changes location.",
+      "Preserve left-right screen direction, eyeline, lens feel, lighting temperature, and color palette across adjacent clips.",
+      "Keep captions inside safe zones and leave room for platform UI.",
+      "When a scene is regenerated after chat, apply only the requested change and preserve all continuity locks.",
+    ],
+    negativePrompt: "No new actor, changed face, changed outfit, changed room layout, wrong aspect ratio, unreadable generated text, extra limbs, logo artifacts, watermark, random subtitles, or inconsistent lighting.",
+  };
+}
+
+function uniqueScreenplayShotValues(shots = [], collect, maxItems = 8) {
+  const seen = [];
+  (Array.isArray(shots) ? shots : []).forEach((shot) => {
+    const values = typeof collect === "function" ? collect(shot || {}) : [];
+    values.flatMap((value) => Array.isArray(value) ? value : [value]).forEach((value) => {
+      const text = truncateText(plainTextValue(value) || textValue(value), 160).replace(/\s+/g, " ").trim();
+      if (text && !seen.includes(text) && seen.length < maxItems) seen.push(text);
+    });
+  });
+  return seen;
+}
+
+function screenplaySrtArtifactForScreenplay(scriptJson = {}, shots = [], durationSeconds = 30, maxClipSeconds = 15) {
+  const existingContent = firstString(scriptJson.srt, scriptJson.srtContent, scriptJson.srt_content);
+  const existingCues = firstArray(scriptJson.srtCues, scriptJson.srt_cues);
+  const cues = existingCues.length
+    ? normalizeScreenplaySrtCues(existingCues)
+    : normalizedSrtCuesForScreenplay(shots, durationSeconds, maxClipSeconds);
+  const content = existingContent || screenplaySrtTextFromCues(cues);
+  return {
+    content,
+    cues,
+    cueCount: cues.length,
+    file: {
+      filename: "generated.srt",
+      contentType: "application/x-subrip",
+      cueCount: cues.length,
+      durationSeconds,
+      content,
+    },
+  };
+}
+
+function normalizedSrtCuesForScreenplay(shots = [], durationSeconds = 30, maxClipSeconds = 15) {
+  const cues = [];
+  let cursor = 0;
+  const safeMaxClipSeconds = Math.max(1.2, Number(maxClipSeconds) || 15);
+  const fallbackDuration = shots.length ? Math.max(1.2, Math.min(safeMaxClipSeconds, durationSeconds / shots.length)) : Math.max(1.2, Math.min(safeMaxClipSeconds, durationSeconds));
+  (Array.isArray(shots) ? shots : []).forEach((shot, index) => {
+    const range = timeRangeForScreenplayShot(shot);
+    const startSeconds = Number.isFinite(range.start) ? range.start : cursor;
+    const duration = shotDurationSecondsForSrt(shot, range, fallbackDuration, safeMaxClipSeconds);
+    const endSeconds = Math.max(startSeconds + 0.5, Number.isFinite(range.end) ? range.end : startSeconds + duration);
+    const captions = captionRowsForScreenplayShot(shot, startSeconds, endSeconds);
+    captions.forEach((caption) => cues.push({
+      shotNumber: Number(shot?.shotNumber || shot?.shot_number || index + 1),
+      startSeconds: caption.startSeconds,
+      endSeconds: caption.endSeconds,
+      text: caption.text,
+    }));
+    cursor = endSeconds;
+  });
+  return normalizeScreenplaySrtCues(cues);
+}
+
+function normalizeScreenplaySrtCues(cues = []) {
+  let index = 1;
+  let lastEnd = 0;
+  return (Array.isArray(cues) ? cues : [])
+    .map((cue) => cue && typeof cue === "object" ? cue : {})
+    .filter((cue) => firstString(cue.text, cue.caption, cue.line))
+    .sort((left, right) => secondsFromShotTimeValue(left.startSeconds ?? left.start, 0) - secondsFromShotTimeValue(right.startSeconds ?? right.start, 0))
+    .map((cue) => {
+      const start = Math.max(lastEnd, secondsFromShotTimeValue(cue.startSeconds ?? cue.start, lastEnd));
+      const end = Math.max(start + 0.5, secondsFromShotTimeValue(cue.endSeconds ?? cue.end, start + 1.5));
+      lastEnd = end;
+      return {
+        ...cue,
+        index: index++,
+        startSeconds: start,
+        endSeconds: end,
+        startTimecode: normalizeSrtTimestamp(start),
+        endTimecode: normalizeSrtTimestamp(end),
+        text: truncateText(firstString(cue.text, cue.caption, cue.line), 180),
+      };
+    });
+}
+
+function screenplaySrtTextFromCues(cues = []) {
+  return (Array.isArray(cues) ? cues : []).map((cue, index) => [
+    cue.index || index + 1,
+    `${cue.startTimecode || normalizeSrtTimestamp(cue.startSeconds)} --> ${cue.endTimecode || normalizeSrtTimestamp(cue.endSeconds)}`,
+    String(cue.text || "").replace(/[\r\n]+/g, " ").trim(),
+  ].join("\n")).join("\n\n");
+}
+
+function captionRowsForScreenplayShot(shot = {}, shotStart = 0, shotEnd = 0) {
+  const captionTrack = firstArray(shot.captionTrack, shot.caption_track, shot.captions);
+  if (!captionTrack.length) {
+    const text = captionTextForScreenplayShot(shot);
+    return text ? [{ startSeconds: shotStart, endSeconds: shotEnd, text }] : [];
+  }
+  return captionTrack
+    .map((caption) => {
+      const item = caption && typeof caption === "object" ? caption : { text: caption };
+      const rawStart = secondsFromShotTimeValue(item.startSeconds ?? item.startTime ?? item.start_time ?? item.start, shotStart);
+      const rawEnd = secondsFromShotTimeValue(item.endSeconds ?? item.endTime ?? item.end_time ?? item.end, Math.min(shotEnd, rawStart + 2.5));
+      const relativeWindow = Math.max(0, shotEnd - shotStart);
+      const startSeconds = rawStart >= 0 && rawStart <= relativeWindow + 0.25 ? shotStart + rawStart : rawStart;
+      const endSeconds = rawEnd > 0 && rawEnd <= relativeWindow + 0.25 ? shotStart + rawEnd : rawEnd;
+      const text = truncateText(firstString(item.text, item.caption, item.line, item.words, captionTextForScreenplayShot(shot)), 180);
+      return {
+        startSeconds: Math.max(0, Math.min(startSeconds, Math.max(shotStart, shotEnd - 0.5))),
+        endSeconds: Math.max(startSeconds + 0.5, Math.min(Math.max(shotEnd, startSeconds + 0.5), endSeconds)),
+        text,
+      };
+    })
+    .filter((caption) => caption.text);
+}
+
+function captionTextForScreenplayShot(shot = {}) {
+  return truncateText(firstString(
+    shot.textOverlay,
+    shot.text_overlay,
+    shot.voiceOver,
+    shot.voiceover,
+    plainTextValue(shot.dialogue),
+    shot.title,
+    shot.action,
+    shot.description
+  ), 180);
+}
+
+function timeRangeForScreenplayShot(shot = {}) {
+  const start = secondsFromShotTimeValue(shot.startTime ?? shot.start_time, Number.NaN);
+  const end = secondsFromShotTimeValue(shot.endTime ?? shot.end_time, Number.NaN);
+  if (Number.isFinite(start) || Number.isFinite(end)) return { start, end };
+  const text = firstString(shot.timestamp, shot.time);
+  const numericRange = text.match(/(\d+(?:\.\d+)?)\s*(?:s|sec|secs|seconds)?\s*(?:-|to|->)\s*(\d+(?:\.\d+)?)/i);
+  if (numericRange) {
+    return { start: Number(numericRange[1]), end: Number(numericRange[2]) };
+  }
+  return { start: Number.NaN, end: Number.NaN };
+}
+
+function shotDurationSecondsForSrt(shot = {}, range = {}, fallbackDuration = 3, maxClipSeconds = 15) {
+  const safeMaxClipSeconds = Math.max(1.2, Number(maxClipSeconds) || 15);
+  const explicit = numberValue(firstString(shot.durationSeconds, shot.duration_seconds), 0);
+  if (explicit > 0) return Math.min(safeMaxClipSeconds, explicit);
+  if (Number.isFinite(range.start) && Number.isFinite(range.end) && range.end > range.start) {
+    return Math.min(safeMaxClipSeconds, range.end - range.start);
+  }
+  return fallbackDuration;
+}
+
+function secondsFromShotTimeValue(value, fallback = 0) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const text = String(value ?? "").trim();
+  if (!text) return fallback;
+  const clock = text.match(/(?:(\d{1,2}):)?(\d{1,2}):(\d{2})(?:[,.](\d{1,3}))?/);
+  if (clock) {
+    const hours = Number(clock[1] || 0);
+    const minutes = Number(clock[2] || 0);
+    const seconds = Number(clock[3] || 0);
+    const millis = Number(String(clock[4] || "0").padEnd(3, "0"));
+    return hours * 3600 + minutes * 60 + seconds + millis / 1000;
+  }
+  const match = text.match(/-?\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : fallback;
+}
+
+function normalizeSrtTimestamp(seconds = 0) {
+  const safe = Math.max(0, Number(seconds) || 0);
+  const totalMillis = Math.round(safe * 1000);
+  const hours = Math.floor(totalMillis / 3600000);
+  const minutes = Math.floor((totalMillis % 3600000) / 60000);
+  const wholeSeconds = Math.floor((totalMillis % 60000) / 1000);
+  const millis = totalMillis % 1000;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(wholeSeconds).padStart(2, "0")},${String(millis).padStart(3, "0")}`;
 }
 
 function buildGeneratedTopicItem({ job = {}, brief = null, ideas = [] } = {}) {
@@ -9164,6 +16938,224 @@ function postProductionShotThumbnailUrl(shot = {}) {
     !isVideoLikeShotAsset(images.storyboardImageUrl, shot) ? images.storyboardImageUrl : "",
     !isVideoLikeShotAsset(images.lightingImageUrl, shot) ? images.lightingImageUrl : "",
     !isVideoLikeShotAsset(images.cameraPlanImageUrl, shot) ? images.cameraPlanImageUrl : ""
+  );
+}
+
+function normalizeStoryboardReferenceAsset(asset = {}) {
+  const source = asset && typeof asset === "object" ? asset : {};
+  const metadata = firstObject(source.metadata) || {};
+  return {
+    ...source,
+    assetId: firstString(source.assetId, source.id, metadata.assetId, metadata.id),
+    id: firstString(source.id, source.assetId, metadata.id, metadata.assetId),
+    publicUrl: firstString(source.publicUrl, source.signedUrl, source.assetUrl, source.url, metadata.publicUrl, metadata.signedUrl, metadata.assetUrl),
+    signedUrl: firstString(source.signedUrl, source.publicUrl, source.assetUrl, source.url, metadata.signedUrl, metadata.publicUrl, metadata.assetUrl),
+    assetUrl: firstString(source.assetUrl, source.signedUrl, source.publicUrl, source.url, metadata.assetUrl, metadata.signedUrl, metadata.publicUrl),
+    details: firstString(source.details, metadata.details),
+    originalFilename: firstString(source.originalFilename, source.filename, metadata.originalFilename, metadata.filename),
+    referenceRole: firstString(source.referenceRole, source.assetRole, metadata.referenceRole, metadata.assetRole, "product_visual_anchor"),
+    assetRole: firstString(source.assetRole, source.referenceRole, metadata.assetRole, metadata.referenceRole, "product_visual_anchor"),
+  };
+}
+
+function mergeStoryboardReferenceAssets(current = [], incoming = []) {
+  const merged = [];
+  [...firstArray(current), ...firstArray(incoming)]
+    .map(normalizeStoryboardReferenceAsset)
+    .filter((asset) => storyboardReferenceAssetUrl(asset) || asset.assetId || asset.id)
+    .forEach((asset) => {
+      const key = storyboardReferenceAssetKey(asset, merged.length);
+      if (!merged.some((item, index) => storyboardReferenceAssetKey(item, index) === key)) {
+        merged.push(asset);
+      }
+    });
+  return merged;
+}
+
+function applyStoryboardReferenceToScriptIdea(scriptIdea, assets = [], details = "", enhanceScreenplay = false) {
+  if (!scriptIdea) return scriptIdea;
+  const normalizedAssets = mergeStoryboardReferenceAssets([], assets);
+  if (!normalizedAssets.length && !details) return scriptIdea;
+  const scriptJson = firstObject(scriptIdea.scriptJson, scriptIdea.script_json) || {};
+  const creatorContext = firstObject(scriptJson.creatorContext, scriptJson.creator_context) || {};
+  const metadata = firstObject(creatorContext.metadata) || {};
+  const urls = uniqueStrings([
+    ...firstArray(scriptJson.referenceImageUrls, scriptJson.reference_image_urls),
+    ...firstArray(scriptJson.productImageUrls, scriptJson.product_image_urls),
+    ...normalizedAssets.map(storyboardReferenceAssetUrl),
+  ]);
+  const nextAssets = mergeStoryboardReferenceAssets(
+    [
+      ...firstArray(scriptJson.referenceImageAssets, scriptJson.reference_image_assets),
+      ...firstArray(scriptJson.productImageAssets, scriptJson.product_image_assets),
+    ],
+    normalizedAssets
+  );
+  const cleanDetails = firstString(details, scriptJson.referenceImageDetails, creatorContext.referenceImageDetails);
+  const nextMetadata = {
+    ...metadata,
+    referenceImageUrls: urls,
+    ...(cleanDetails ? { referenceImageDetails: cleanDetails } : {}),
+  };
+  const nextCreatorContext = {
+    ...creatorContext,
+    metadata: nextMetadata,
+    referenceImageUrls: urls,
+    productImageUrls: urls,
+    referenceImageAssets: nextAssets,
+    productImageAssets: nextAssets,
+    ...(cleanDetails ? { referenceImageDetails: cleanDetails } : {}),
+    ...(enhanceScreenplay && cleanDetails ? { screenplayEnhancementReferenceDetails: cleanDetails } : {}),
+    screenplayReferenceEnhancementEnabled: Boolean(enhanceScreenplay),
+  };
+  const nextScriptJson = {
+    ...scriptJson,
+    creatorContext: nextCreatorContext,
+    referenceImageUrls: urls,
+    productImageUrls: urls,
+    referenceImageAssets: nextAssets,
+    productImageAssets: nextAssets,
+    ...(cleanDetails ? { referenceImageDetails: cleanDetails } : {}),
+    ...(enhanceScreenplay && cleanDetails ? { screenplayEnhancementReferenceDetails: cleanDetails } : {}),
+    screenplayReferenceEnhancementEnabled: Boolean(enhanceScreenplay),
+  };
+  return {
+    ...scriptIdea,
+    scriptJson: nextScriptJson,
+  };
+}
+
+function storyboardReferenceAssetsFromScriptIdea(scriptIdea = {}) {
+  const scriptJson = firstObject(scriptIdea?.scriptJson, scriptIdea?.script_json) || {};
+  const creatorContext = firstObject(scriptJson.creatorContext, scriptJson.creator_context) || {};
+  return mergeStoryboardReferenceAssets(
+    [
+      ...firstArray(scriptJson.referenceImageAssets, scriptJson.reference_image_assets),
+      ...firstArray(scriptJson.productImageAssets, scriptJson.product_image_assets),
+      ...firstArray(creatorContext.referenceImageAssets, creatorContext.reference_image_assets),
+      ...firstArray(creatorContext.productImageAssets, creatorContext.product_image_assets),
+    ],
+    []
+  );
+}
+
+function storyboardReferenceDetailsFromScriptIdea(scriptIdea = {}) {
+  const scriptJson = firstObject(scriptIdea?.scriptJson, scriptIdea?.script_json) || {};
+  const creatorContext = firstObject(scriptJson.creatorContext, scriptJson.creator_context) || {};
+  const metadata = firstObject(creatorContext.metadata) || {};
+  return firstString(
+    scriptJson.referenceImageDetails,
+    scriptJson.screenplayEnhancementReferenceDetails,
+    creatorContext.referenceImageDetails,
+    creatorContext.screenplayEnhancementReferenceDetails,
+    metadata.referenceImageDetails
+  );
+}
+
+function storyboardReferenceEnhancementEnabledFromScriptIdea(scriptIdea = {}) {
+  const scriptJson = firstObject(scriptIdea?.scriptJson, scriptIdea?.script_json) || {};
+  const creatorContext = firstObject(scriptJson.creatorContext, scriptJson.creator_context) || {};
+  return Boolean(scriptJson.screenplayReferenceEnhancementEnabled || creatorContext.screenplayReferenceEnhancementEnabled);
+}
+
+function storyboardReferenceAssetUrl(asset = {}) {
+  return firstString(asset.publicUrl, asset.signedUrl, asset.assetUrl, asset.imageUrl, asset.url, asset.href);
+}
+
+function storyboardReferenceAssetKey(asset = {}, index = 0) {
+  return firstString(asset.assetId, asset.id, asset.objectKey, storyboardReferenceAssetUrl(asset), `reference-${index}`);
+}
+
+function StoryboardReferenceImagePanel({
+  assets = [],
+  details = "",
+  enhanceScreenplay = false,
+  uploading = false,
+  error = "",
+  disabled = false,
+  onDetailsChange,
+  onEnhanceChange,
+  onUpload,
+  onBlockedAction,
+}) {
+  const uploadInputRef = useRef(null);
+  const attachedCount = Array.isArray(assets) ? assets.length : 0;
+  const openUploadPicker = () => {
+    if (uploading) return;
+    if (disabled) {
+      onBlockedAction?.("Generate and save the screenplay before attaching a storyboard reference image.");
+      return;
+    }
+    uploadInputRef.current?.click();
+  };
+  return (
+    <section className="creator-panel p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-normal text-cyan-200">
+            <ImageIcon size={14} /> Optional storyboard reference
+          </p>
+          <h3 className="mt-1 text-base font-black text-white">Attach image before storyboard</h3>
+          <p className="mt-1 text-xs font-semibold text-slate-400">
+            {attachedCount ? `${attachedCount} image${attachedCount === 1 ? "" : "s"} attached` : "No image attached"}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={openUploadPicker}
+            disabled={uploading}
+            aria-disabled={disabled || uploading}
+            className={`creator-primary inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white ${
+              disabled || uploading ? "opacity-60" : ""
+            }`}
+          >
+            {uploading ? <Loader2 size={14} className="animate-spin" /> : <ImageIcon size={14} />}
+            {uploading ? "Uploading" : "Upload Image"}
+          </button>
+          <input ref={uploadInputRef} type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={onUpload} />
+          <label className="creator-control inline-flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-200">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-cyan-400"
+              checked={Boolean(enhanceScreenplay)}
+              onChange={(event) => onEnhanceChange?.(event.target.checked)}
+            />
+            Enhance screenplay
+          </label>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.75fr)]">
+        <textarea
+          value={details}
+          onChange={(event) => onDetailsChange?.(event.target.value)}
+          rows={3}
+          placeholder="Product, hair, wardrobe, background, logo placement, texture, colors, claims to preserve"
+          className="creator-input w-full resize-none px-3 py-2 text-sm font-semibold leading-5"
+        />
+        <div className="grid min-h-[5.75rem] gap-2 sm:grid-cols-2">
+          {attachedCount ? assets.slice(0, 4).map((asset, index) => (
+            <div key={storyboardReferenceAssetKey(asset, index)} className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.035]">
+              {storyboardReferenceAssetUrl(asset) ? (
+                <img src={storyboardReferenceAssetUrl(asset)} alt="" className="h-16 w-full bg-black/30 object-cover" />
+              ) : (
+                <div className="grid h-16 place-items-center bg-black/30 text-slate-500">
+                  <ImageIcon size={16} />
+                </div>
+              )}
+              <div className="min-w-0 px-2.5 py-2">
+                <p className="truncate text-xs font-bold text-white">{asset.details || asset.originalFilename || asset.label || `Reference ${index + 1}`}</p>
+              </div>
+            </div>
+          )) : (
+            <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.025] p-3 text-xs font-semibold text-slate-400 sm:col-span-2">
+              Product, character, hair, wardrobe, or background image anchors will be used by storyboard generation after upload.
+            </div>
+          )}
+        </div>
+      </div>
+      {error && <p className="mt-3 text-xs font-bold text-rose-200">{error}</p>}
+    </section>
   );
 }
 
@@ -9634,9 +17626,11 @@ function normalizeBackendHistoryItems(items = [], type = "storyline") {
 function normalizeBackendStorylineDetail(detail = {}) {
   const payload = firstObject(detail.payload) || {};
   const selectedIdea = firstObject(detail.selectedIdea) || {};
+  const storyIdeaId = firstString(detail.storyIdeaId, detail.story_idea_id, detail.id, selectedIdea.storyIdeaId, selectedIdea.story_idea_id, selectedIdea.id);
   return normalizeGeneratedIdea({
     ...selectedIdea,
-    id: detail.storyIdeaId || detail.id || selectedIdea.id,
+    id: storyIdeaId,
+    storyIdeaId,
     title: detail.title || selectedIdea.title || detail.topic || "Past storyline",
     description: selectedIdea.description || selectedIdea.summary || detail.preview,
     storyScriptText: payload.storyScriptText || detail.preview || selectedIdea.storyScriptText || selectedIdea.scriptText || "",
@@ -9648,6 +17642,9 @@ function normalizeBackendStorylineDetail(detail = {}) {
     storytellingGuidance: payload.storyScriptJson?.storytellingGuidance || selectedIdea.storytellingGuidance || selectedIdea.selectionContext?.storyScript?.storytellingGuidance || {},
     hookLens: payload.storyScriptJson?.hookLens || selectedIdea.hookLens || selectedIdea.selectionContext?.storyScript?.hookLens || DEFAULT_HOOK_LENS,
     hookLensGuidance: payload.storyScriptJson?.hookLensGuidance || selectedIdea.hookLensGuidance || selectedIdea.selectionContext?.storyScript?.hookLensGuidance || {},
+    topicType: payload.storyScriptJson?.topicType || selectedIdea.topicType || selectedIdea.selectionContext?.storyScript?.topicType || DEFAULT_TOPIC_TYPE,
+    productionStyle: payload.storyScriptJson?.productionStyle || selectedIdea.productionStyle || selectedIdea.selectionContext?.storyScript?.productionStyle || DEFAULT_PRODUCTION_STYLE,
+    productionStyleGuidance: payload.storyScriptJson?.productionStyleGuidance || selectedIdea.productionStyleGuidance || selectedIdea.selectionContext?.storyScript?.productionStyleGuidance,
     hookBridge: payload.storyScriptJson?.hookBridge || selectedIdea.hookBridge || selectedIdea.selectionContext?.storyScript?.hookBridge || {},
     factualityNotes: payload.storyScriptJson?.factualityNotes || selectedIdea.factualityNotes || selectedIdea.selectionContext?.storyScript?.factualityNotes || {},
     status: detail.status || selectedIdea.status || "SCRIPT_GENERATED",
@@ -9660,12 +17657,16 @@ function normalizeBackendScriptDetail(detail = {}) {
   const selectedIdea = firstObject(detail.selectedIdea) || {};
   const scriptJson = payload.scriptJson || {};
   const shots = payload.shots || scriptJson.shots || [];
+  const detailId = firstString(detail.id);
+  const storyIdeaId = firstString(detail.storyIdeaId, detail.story_idea_id, selectedIdea.storyIdeaId, selectedIdea.story_idea_id, selectedIdea.id);
+  const scriptId = firstString(detail.scriptId, detail.script_id, detailId && detailId !== storyIdeaId ? detailId : "");
   return normalizeGeneratedIdea({
     ...selectedIdea,
-    id: detail.storyIdeaId || selectedIdea.id || detail.id,
+    id: storyIdeaId || selectedIdea.id || detail.id,
+    storyIdeaId,
     title: detail.title || selectedIdea.title || scriptJson.projectTitle || "Past script",
     description: selectedIdea.description || selectedIdea.summary || detail.preview,
-    scriptId: detail.scriptId || detail.id,
+    scriptId,
     scriptText: payload.scriptText || detail.preview || "",
     scriptJson,
     scriptScenes: normalizeGeneratedScriptScenes(shots),
@@ -9677,6 +17678,9 @@ function normalizeBackendScriptDetail(detail = {}) {
     storytellingGuidance: scriptJson.storytellingGuidance || selectedIdea.storytellingGuidance || {},
     hookLens: scriptJson.hookLens || selectedIdea.hookLens || DEFAULT_HOOK_LENS,
     hookLensGuidance: scriptJson.hookLensGuidance || selectedIdea.hookLensGuidance || {},
+    topicType: scriptJson.topicType || selectedIdea.topicType || DEFAULT_TOPIC_TYPE,
+    productionStyle: scriptJson.productionStyle || selectedIdea.productionStyle || DEFAULT_PRODUCTION_STYLE,
+    productionStyleGuidance: scriptJson.productionStyleGuidance || selectedIdea.productionStyleGuidance,
     hookBridge: scriptJson.hookBridge || selectedIdea.hookBridge || {},
     factualityNotes: scriptJson.factualityNotes || selectedIdea.factualityNotes || {},
     status: detail.status || "SCREENPLAY_GENERATED",
@@ -9785,13 +17789,13 @@ function normalizePostProductionProject(project = {}) {
     projectId,
     scriptId,
     title,
-    lockedIdeaTitle: `${shotCount || shots.length || "Shot"} shots ready for polish`,
+    lockedIdeaTitle: `${shotCount || shots.length || "Shot"} shots ready for editor handoff`,
     status: project.status || "SHOT_DESIGN_READY",
     durationSeconds: project.durationSeconds || project.duration_seconds,
     time: updatedAt ? formatJobTime(updatedAt) : "",
     stage: {
-      label: "Open Polish",
-      description: `${shotCount || shots.length || 0} storyboard shots are ready for recording and polishing.`,
+      label: "Open Video",
+      description: `${shotCount || shots.length || 0} storyboard shots are ready for render and editor handoff.`,
       actionLabel: "Open",
       progressText: `${shotCount || shots.length || 0} shots`,
       steps: [],
@@ -9940,13 +17944,17 @@ function projectResumeStage(restored, project = {}) {
   const steps = [
     { id: "ideas", label: "Idea", fullLabel: "Idea selected" },
     { id: "script", label: "Story", fullLabel: "Storyline ready" },
-    { id: "cast", label: "Actor", fullLabel: "Actors mapped" },
-    { id: "screenplay", label: "Script", fullLabel: "Script ready" },
-    { id: "storyboard", label: "Shot Design", fullLabel: "Shot design ready" },
-    { id: "shoot-polish", label: "Polish", fullLabel: "Recorded takes ready" },
+    { id: "cast", label: "Cast", fullLabel: "Cast mapped" },
+    { id: "screenplay", label: "Screenplay", fullLabel: "Screenplay ready" },
+    { id: "storyboard", label: "Storyboard", fullLabel: "Storyboard ready" },
+    { id: "video", label: "Video", fullLabel: "Video render ready" },
   ];
   const completedSteps = restored?.planner?.completedSteps || {};
-  const resumePage = restored?.workspacePage || "ideas";
+  const resumePage = workspacePageIds.has(restored?.workspacePage)
+    ? restored.workspacePage
+    : restored?.workspacePage === "shoot-polish"
+      ? "video"
+      : "ideas";
   const resumeLabel = workspacePageLabel(resumePage);
   const lastCompleted = [...steps].reverse().find((step) => completedSteps[step.id]);
   const completedCount = steps.filter((step) => completedSteps[step.id]).length;
@@ -9977,16 +17985,18 @@ function workspacePageLabel(pageId) {
     ideas: "Ideas",
     "generated-ideas": "Generated Ideas",
     script: "Storyline",
-    cast: "Actor",
-    screenplay: "Script",
-    storyboard: "Shot Design",
-    "shoot-polish": "Polish",
+    cast: "Cast",
+    screenplay: "Screenplay",
+    video: "Video",
+    storyboard: "Storyboard",
+    "client-review": "Client Review",
   }[pageId] || "Workflow";
 }
 
 function sectionForWorkspacePage(pageId) {
+  if (pageId === "video") return "video";
   if (pageId === "storyboard") return "storyboard";
-  if (pageId === "shoot-polish") return "shoot-polish";
+  if (pageId === "client-review") return "client-review";
   if (pageId === "generated-ideas") return "generated-ideas";
   if (pageId === "ideas") return "trends";
   return "workflow";

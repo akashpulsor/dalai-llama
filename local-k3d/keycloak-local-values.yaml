@@ -1,0 +1,20 @@
+replicaCount: 1
+
+keycloak:
+  hostname: https://auth.dalaillama.in
+
+theme:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+istio:
+  enabled: true
+  host: auth.dalaillama.in
+  gatewayName: istio-system/central-gateway

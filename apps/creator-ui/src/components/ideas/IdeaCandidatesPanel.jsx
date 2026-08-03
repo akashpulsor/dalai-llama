@@ -17,6 +17,18 @@ export default function IdeaCandidatesPanel({
   onStorytellingTypeChange,
   hookLens = "direct",
   onHookLensChange,
+  productionStyle = "hybrid",
+  onProductionStyleChange,
+  productionStyleOptions = [],
+  hybridSceneMode = "ask_speaking_scenes",
+  onHybridSceneModeChange,
+  hybridSceneModeOptions = [],
+  brollStyle = "cinematic_social",
+  onBrollStyleChange,
+  brollStyleOptions = [],
+  captionStyle = "bold_keyword",
+  onCaptionStyleChange,
+  captionStyleOptions = [],
   aiProviders = [],
   selectedProviderCode,
   selectedProvider,
@@ -26,6 +38,12 @@ export default function IdeaCandidatesPanel({
   pageInfo,
   onPageChange,
   onGenerateIdeas,
+  campaignAngleSuggestions = [],
+  selectedCampaignAngle = null,
+  onGenerateCampaignAngles,
+  onSelectCampaignAngle,
+  isGeneratingCampaignAngles = false,
+  isSelectingCampaignAngle = false,
   showGenerateIdeasAction = true,
   onSelectIdea,
   onSaveStoryIdea,
@@ -131,6 +149,48 @@ export default function IdeaCandidatesPanel({
                 ? "Generating story ideas from the saved brief..."
                 : "No story ideas are available for this project yet."}
             </p>
+            <div className="mt-4 rounded-lg border border-emerald-300/20 bg-emerald-400/[0.055] p-3 text-left">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-black uppercase tracking-normal text-emerald-100">Campaign angle</p>
+                <button
+                  type="button"
+                  onClick={onGenerateCampaignAngles}
+                  disabled={isGeneratingCampaignAngles || isSelectingCampaignAngle}
+                  className="creator-control inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-emerald-100 disabled:opacity-50"
+                >
+                  {isGeneratingCampaignAngles ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                  {campaignAngleSuggestions.length ? "Refresh angles" : "Generate AI angles"}
+                </button>
+              </div>
+              {campaignAngleSuggestions.length > 0 && (
+                <div className="mt-3 grid gap-2 md:grid-cols-3">
+                  {campaignAngleSuggestions.slice(0, 3).map((angle) => {
+                    const selected = selectedCampaignAngle?.id === angle.id
+                      || (selectedCampaignAngle?.title && selectedCampaignAngle.title === angle.title);
+                    return (
+                      <button
+                        key={angle.id || angle.title}
+                        type="button"
+                        onClick={() => onSelectCampaignAngle?.(angle)}
+                        disabled={isSelectingCampaignAngle}
+                        aria-pressed={selected}
+                        className={`min-h-[5.5rem] rounded-md border px-3 py-2 text-left transition disabled:opacity-60 ${
+                          selected
+                            ? "border-emerald-300/55 bg-emerald-400/[0.14]"
+                            : "border-white/10 bg-black/20 hover:border-emerald-300/35 hover:bg-white/[0.06]"
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5 text-sm font-black text-white">
+                          {selected && <Check size={13} className="text-emerald-200" />}
+                          {angle.title}
+                        </span>
+                        <span className="mt-1 line-clamp-2 block text-xs font-semibold leading-5 text-slate-400">{angle.description}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             <WorkflowSetupControls
               duration={duration}
               onDurationChange={onDurationChange}
@@ -142,6 +202,18 @@ export default function IdeaCandidatesPanel({
               onStorytellingTypeChange={onStorytellingTypeChange}
               hookLens={hookLens}
               onHookLensChange={onHookLensChange}
+              productionStyle={productionStyle}
+              onProductionStyleChange={onProductionStyleChange}
+              productionStyleOptions={productionStyleOptions}
+              hybridSceneMode={hybridSceneMode}
+              onHybridSceneModeChange={onHybridSceneModeChange}
+              hybridSceneModeOptions={hybridSceneModeOptions}
+              brollStyle={brollStyle}
+              onBrollStyleChange={onBrollStyleChange}
+              brollStyleOptions={brollStyleOptions}
+              captionStyle={captionStyle}
+              onCaptionStyleChange={onCaptionStyleChange}
+              captionStyleOptions={captionStyleOptions}
               aiProviders={aiProviders}
               selectedProviderCode={selectedProviderCode}
               selectedProvider={selectedProvider}
@@ -344,6 +416,62 @@ export default function IdeaCandidatesPanel({
                   </option>
                 ))}
               </select>
+              {productionStyleOptions.length > 0 && (
+                <select
+                  value={productionStyle}
+                  onChange={(event) => onProductionStyleChange?.(event.target.value)}
+                  className="creator-control min-h-[2.125rem] rounded-lg px-3 py-2 text-xs font-bold text-slate-200 outline-none"
+                  aria-label="Production style"
+                >
+                  {productionStyleOptions.map((option) => (
+                    <option key={option.value} value={option.value} className="bg-slate-950 text-slate-100">
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {productionStyle === "hybrid" && hybridSceneModeOptions.length > 0 && (
+                <select
+                  value={hybridSceneMode}
+                  onChange={(event) => onHybridSceneModeChange?.(event.target.value)}
+                  className="creator-control min-h-[2.125rem] rounded-lg px-3 py-2 text-xs font-bold text-slate-200 outline-none"
+                  aria-label="Hybrid scene mode"
+                >
+                  {hybridSceneModeOptions.map((option) => (
+                    <option key={option.value} value={option.value} className="bg-slate-950 text-slate-100">
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {brollStyleOptions.length > 0 && (
+                <select
+                  value={brollStyle}
+                  onChange={(event) => onBrollStyleChange?.(event.target.value)}
+                  className="creator-control min-h-[2.125rem] rounded-lg px-3 py-2 text-xs font-bold text-slate-200 outline-none"
+                  aria-label="B-roll style"
+                >
+                  {brollStyleOptions.map((option) => (
+                    <option key={option.value} value={option.value} className="bg-slate-950 text-slate-100">
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {captionStyleOptions.length > 0 && (
+                <select
+                  value={captionStyle}
+                  onChange={(event) => onCaptionStyleChange?.(event.target.value)}
+                  className="creator-control min-h-[2.125rem] rounded-lg px-3 py-2 text-xs font-bold text-slate-200 outline-none"
+                  aria-label="Caption style"
+                >
+                  {captionStyleOptions.map((option) => (
+                    <option key={option.value} value={option.value} className="bg-slate-950 text-slate-100">
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              )}
               <button
                 type="button"
                 onClick={onSaveStoryIdea}
@@ -418,6 +546,18 @@ function WorkflowSetupControls({
   onStorytellingTypeChange,
   hookLens,
   onHookLensChange,
+  productionStyle,
+  onProductionStyleChange,
+  productionStyleOptions = [],
+  hybridSceneMode,
+  onHybridSceneModeChange,
+  hybridSceneModeOptions = [],
+  brollStyle,
+  onBrollStyleChange,
+  brollStyleOptions = [],
+  captionStyle,
+  onCaptionStyleChange,
+  captionStyleOptions = [],
   aiProviders,
   selectedProviderCode,
   selectedProvider,
@@ -426,7 +566,7 @@ function WorkflowSetupControls({
   providersError,
 }) {
   return (
-    <div className="mx-auto mt-5 grid min-w-0 gap-3 rounded-lg border border-white/10 bg-white/[0.035] p-3 text-left sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+    <div className="mx-auto mt-5 grid min-w-0 gap-3 rounded-lg border border-white/10 bg-white/[0.035] p-3 text-left sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-7">
       <div className="min-w-0 sm:col-span-2 lg:col-span-1">
         <p className="mb-2 text-[10px] font-black uppercase tracking-normal text-slate-500">Video Duration</p>
         <div className="grid min-h-[2.75rem] grid-cols-4 gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
@@ -510,6 +650,74 @@ function WorkflowSetupControls({
           ))}
         </select>
       </label>
+      {productionStyleOptions.length > 0 && (
+        <label className="block min-w-0">
+          <span className="mb-2 block text-[10px] font-black uppercase tracking-normal text-slate-500">Production</span>
+          <select
+            value={productionStyle}
+            onChange={(event) => onProductionStyleChange?.(event.target.value)}
+            className="creator-control min-h-[2.75rem] w-full rounded-lg px-3 py-2 text-xs font-bold text-slate-200 outline-none"
+            aria-label="Production style"
+          >
+            {productionStyleOptions.map((option) => (
+              <option key={option.value} value={option.value} className="bg-slate-950 text-slate-100">
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {productionStyle === "hybrid" && hybridSceneModeOptions.length > 0 && (
+        <label className="block min-w-0">
+          <span className="mb-2 block text-[10px] font-black uppercase tracking-normal text-slate-500">Scene Choice</span>
+          <select
+            value={hybridSceneMode}
+            onChange={(event) => onHybridSceneModeChange?.(event.target.value)}
+            className="creator-control min-h-[2.75rem] w-full rounded-lg px-3 py-2 text-xs font-bold text-slate-200 outline-none"
+            aria-label="Hybrid scene choice"
+          >
+            {hybridSceneModeOptions.map((option) => (
+              <option key={option.value} value={option.value} className="bg-slate-950 text-slate-100">
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {brollStyleOptions.length > 0 && (
+        <label className="block min-w-0">
+          <span className="mb-2 block text-[10px] font-black uppercase tracking-normal text-slate-500">B-roll</span>
+          <select
+            value={brollStyle}
+            onChange={(event) => onBrollStyleChange?.(event.target.value)}
+            className="creator-control min-h-[2.75rem] w-full rounded-lg px-3 py-2 text-xs font-bold text-slate-200 outline-none"
+            aria-label="B-roll style"
+          >
+            {brollStyleOptions.map((option) => (
+              <option key={option.value} value={option.value} className="bg-slate-950 text-slate-100">
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {captionStyleOptions.length > 0 && (
+        <label className="block min-w-0">
+          <span className="mb-2 block text-[10px] font-black uppercase tracking-normal text-slate-500">Captions</span>
+          <select
+            value={captionStyle}
+            onChange={(event) => onCaptionStyleChange?.(event.target.value)}
+            className="creator-control min-h-[2.75rem] w-full rounded-lg px-3 py-2 text-xs font-bold text-slate-200 outline-none"
+            aria-label="Caption style"
+          >
+            {captionStyleOptions.map((option) => (
+              <option key={option.value} value={option.value} className="bg-slate-950 text-slate-100">
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <div className="min-w-0 sm:col-span-2 lg:col-span-3 2xl:col-span-1">
         <p className="mb-2 text-[10px] font-black uppercase tracking-normal text-slate-500">AI</p>
         <AiProviderSelect
@@ -559,7 +767,7 @@ function WeeklyIdeaCloud({ cloud, isLoading, hasTags, onRefresh, onSelectTag }) 
         <div className="flex min-w-0 items-start gap-2">
           <Sparkles size={16} className="mt-0.5 shrink-0 text-purple-200" />
           <div className="min-w-0">
-            <p className="text-xs font-extrabold uppercase tracking-normal text-purple-100">Next 7 days trend tags</p>
+            <p className="text-xs font-extrabold uppercase tracking-normal text-purple-100">Trend moments for marketing</p>
             <p className="mt-1 text-xs font-medium text-slate-500">
               Pick a tag to copy its brief into the Creative Brief topic box.
             </p>
@@ -570,9 +778,10 @@ function WeeklyIdeaCloud({ cloud, isLoading, hasTags, onRefresh, onSelectTag }) 
           onClick={onRefresh}
           disabled={isLoading}
           className="creator-control inline-flex shrink-0 items-center justify-center gap-2 px-3 py-2 text-[11px] font-bold text-slate-100 disabled:opacity-50"
+          title="Refresh trend moments"
         >
           <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
-          Refresh tags
+          Refresh moments
         </button>
       </div>
 
@@ -605,7 +814,7 @@ function WeeklyIdeaCloud({ cloud, isLoading, hasTags, onRefresh, onSelectTag }) 
         })}
         {!isLoading && !hasTags ? (
           <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs font-semibold text-slate-400">
-            Weekly trend tags are not loaded yet. Refresh tags to create the first cloud.
+            Trend moments are not loaded yet. Refresh moments to create the first marketing cloud.
           </p>
         ) : null}
       </div>

@@ -1,0 +1,492 @@
+﻿{
+    "status":  "COMPLETED",
+    "provider":  "dalai_llama",
+    "model":  "faster_whisper",
+    "engine":  "faster_whisper",
+    "language":  "en",
+    "segments":  [
+                     {
+                         "start":  0.0,
+                         "end":  4.68,
+                         "text":  "If pro-cultination merrily about will power, why do we avoid the task that matter",
+                         "words":  [
+                                       {
+                                           "start":  0.0,
+                                           "end":  0.56,
+                                           "word":  " If"
+                                       },
+                                       {
+                                           "start":  0.56,
+                                           "end":  0.78,
+                                           "word":  " pro"
+                                       },
+                                       {
+                                           "start":  0.78,
+                                           "end":  1.24,
+                                           "word":  "-cultination"
+                                       },
+                                       {
+                                           "start":  1.24,
+                                           "end":  1.78,
+                                           "word":  " merrily"
+                                       },
+                                       {
+                                           "start":  1.78,
+                                           "end":  2.06,
+                                           "word":  " about"
+                                       },
+                                       {
+                                           "start":  2.06,
+                                           "end":  2.34,
+                                           "word":  " will"
+                                       },
+                                       {
+                                           "start":  2.34,
+                                           "end":  2.82,
+                                           "word":  " power,"
+                                       },
+                                       {
+                                           "start":  3.2,
+                                           "end":  3.22,
+                                           "word":  " why"
+                                       },
+                                       {
+                                           "start":  3.22,
+                                           "end":  3.36,
+                                           "word":  " do"
+                                       },
+                                       {
+                                           "start":  3.36,
+                                           "end":  3.52,
+                                           "word":  " we"
+                                       },
+                                       {
+                                           "start":  3.52,
+                                           "end":  3.76,
+                                           "word":  " avoid"
+                                       },
+                                       {
+                                           "start":  3.76,
+                                           "end":  4.0,
+                                           "word":  " the"
+                                       },
+                                       {
+                                           "start":  4.0,
+                                           "end":  4.16,
+                                           "word":  " task"
+                                       },
+                                       {
+                                           "start":  4.16,
+                                           "end":  4.46,
+                                           "word":  " that"
+                                       },
+                                       {
+                                           "start":  4.46,
+                                           "end":  4.68,
+                                           "word":  " matter"
+                                       }
+                                   ]
+                     },
+                     {
+                         "start":  4.68,
+                         "end":  5.12,
+                         "text":  "moves?",
+                         "words":  [
+                                       {
+                                           "start":  4.68,
+                                           "end":  5.12,
+                                           "word":  " moves?"
+                                       }
+                                   ]
+                     },
+                     {
+                         "start":  5.76,
+                         "end":  11.0,
+                         "text":  "Psychologically, procrastination is often emotional avoidance, a task can trigger fear",
+                         "words":  [
+                                       {
+                                           "start":  5.76,
+                                           "end":  6.28,
+                                           "word":  " Psychologically,"
+                                       },
+                                       {
+                                           "start":  6.86,
+                                           "end":  7.52,
+                                           "word":  " procrastination"
+                                       },
+                                       {
+                                           "start":  7.52,
+                                           "end":  7.84,
+                                           "word":  " is"
+                                       },
+                                       {
+                                           "start":  7.84,
+                                           "end":  8.06,
+                                           "word":  " often"
+                                       },
+                                       {
+                                           "start":  8.06,
+                                           "end":  8.52,
+                                           "word":  " emotional"
+                                       },
+                                       {
+                                           "start":  8.52,
+                                           "end":  9.44,
+                                           "word":  " avoidance,"
+                                       },
+                                       {
+                                           "start":  9.78,
+                                           "end":  9.84,
+                                           "word":  " a"
+                                       },
+                                       {
+                                           "start":  9.84,
+                                           "end":  10.16,
+                                           "word":  " task"
+                                       },
+                                       {
+                                           "start":  10.16,
+                                           "end":  10.36,
+                                           "word":  " can"
+                                       },
+                                       {
+                                           "start":  10.36,
+                                           "end":  10.64,
+                                           "word":  " trigger"
+                                       },
+                                       {
+                                           "start":  10.64,
+                                           "end":  11.0,
+                                           "word":  " fear"
+                                       }
+                                   ]
+                     },
+                     {
+                         "start":  11.0,
+                         "end":  16.52,
+                         "text":  "failure, perfectionism, uncertainty or overwhelm, avoiding it gives your brain immediately",
+                         "words":  [
+                                       {
+                                           "start":  11.0,
+                                           "end":  11.46,
+                                           "word":  " failure,"
+                                       },
+                                       {
+                                           "start":  11.66,
+                                           "end":  12.56,
+                                           "word":  " perfectionism,"
+                                       },
+                                       {
+                                           "start":  12.88,
+                                           "end":  13.18,
+                                           "word":  " uncertainty"
+                                       },
+                                       {
+                                           "start":  13.18,
+                                           "end":  13.74,
+                                           "word":  " or"
+                                       },
+                                       {
+                                           "start":  13.74,
+                                           "end":  14.42,
+                                           "word":  " overwhelm,"
+                                       },
+                                       {
+                                           "start":  14.94,
+                                           "end":  15.12,
+                                           "word":  " avoiding"
+                                       },
+                                       {
+                                           "start":  15.12,
+                                           "end":  15.38,
+                                           "word":  " it"
+                                       },
+                                       {
+                                           "start":  15.38,
+                                           "end":  15.62,
+                                           "word":  " gives"
+                                       },
+                                       {
+                                           "start":  15.62,
+                                           "end":  15.78,
+                                           "word":  " your"
+                                       },
+                                       {
+                                           "start":  15.78,
+                                           "end":  16.02,
+                                           "word":  " brain"
+                                       },
+                                       {
+                                           "start":  16.02,
+                                           "end":  16.52,
+                                           "word":  " immediately"
+                                       }
+                                   ]
+                     },
+                     {
+                         "start":  17.0,
+                         "end":  23.12,
+                         "text":  "to the habit gets stronger, instead of asking, why am I so lazy, ask, what feeling am I",
+                         "words":  [
+                                       {
+                                           "start":  17.0,
+                                           "end":  17.3,
+                                           "word":  " to"
+                                       },
+                                       {
+                                           "start":  17.3,
+                                           "end":  17.5,
+                                           "word":  " the"
+                                       },
+                                       {
+                                           "start":  17.5,
+                                           "end":  17.7,
+                                           "word":  " habit"
+                                       },
+                                       {
+                                           "start":  17.7,
+                                           "end":  18.06,
+                                           "word":  " gets"
+                                       },
+                                       {
+                                           "start":  18.06,
+                                           "end":  18.56,
+                                           "word":  " stronger,"
+                                       },
+                                       {
+                                           "start":  19.32,
+                                           "end":  19.42,
+                                           "word":  " instead"
+                                       },
+                                       {
+                                           "start":  19.42,
+                                           "end":  19.6,
+                                           "word":  " of"
+                                       },
+                                       {
+                                           "start":  19.6,
+                                           "end":  19.88,
+                                           "word":  " asking,"
+                                       },
+                                       {
+                                           "start":  20.42,
+                                           "end":  20.56,
+                                           "word":  " why"
+                                       },
+                                       {
+                                           "start":  20.56,
+                                           "end":  20.78,
+                                           "word":  " am"
+                                       },
+                                       {
+                                           "start":  20.78,
+                                           "end":  20.84,
+                                           "word":  " I"
+                                       },
+                                       {
+                                           "start":  20.84,
+                                           "end":  21.02,
+                                           "word":  " so"
+                                       },
+                                       {
+                                           "start":  21.02,
+                                           "end":  21.4,
+                                           "word":  " lazy,"
+                                       },
+                                       {
+                                           "start":  22.04,
+                                           "end":  22.04,
+                                           "word":  " ask,"
+                                       },
+                                       {
+                                           "start":  22.34,
+                                           "end":  22.54,
+                                           "word":  " what"
+                                       },
+                                       {
+                                           "start":  22.54,
+                                           "end":  22.8,
+                                           "word":  " feeling"
+                                       },
+                                       {
+                                           "start":  22.8,
+                                           "end":  23.06,
+                                           "word":  " am"
+                                       },
+                                       {
+                                           "start":  23.06,
+                                           "end":  23.12,
+                                           "word":  " I"
+                                       }
+                                   ]
+                     },
+                     {
+                         "start":  23.12,
+                         "end":  23.58,
+                         "text":  "avoiding?",
+                         "words":  [
+                                       {
+                                           "start":  23.12,
+                                           "end":  23.58,
+                                           "word":  " avoiding?"
+                                       }
+                                   ]
+                     },
+                     {
+                         "start":  24.24,
+                         "end":  30.3,
+                         "text":  "Then make the next step smaller, open the document, write one line or work for just",
+                         "words":  [
+                                       {
+                                           "start":  24.24,
+                                           "end":  24.82,
+                                           "word":  " Then"
+                                       },
+                                       {
+                                           "start":  24.82,
+                                           "end":  25.16,
+                                           "word":  " make"
+                                       },
+                                       {
+                                           "start":  25.16,
+                                           "end":  25.36,
+                                           "word":  " the"
+                                       },
+                                       {
+                                           "start":  25.36,
+                                           "end":  25.5,
+                                           "word":  " next"
+                                       },
+                                       {
+                                           "start":  25.5,
+                                           "end":  25.8,
+                                           "word":  " step"
+                                       },
+                                       {
+                                           "start":  25.8,
+                                           "end":  26.26,
+                                           "word":  " smaller,"
+                                       },
+                                       {
+                                           "start":  27.1,
+                                           "end":  27.28,
+                                           "word":  " open"
+                                       },
+                                       {
+                                           "start":  27.28,
+                                           "end":  27.52,
+                                           "word":  " the"
+                                       },
+                                       {
+                                           "start":  27.52,
+                                           "end":  27.94,
+                                           "word":  " document,"
+                                       },
+                                       {
+                                           "start":  28.44,
+                                           "end":  28.62,
+                                           "word":  " write"
+                                       },
+                                       {
+                                           "start":  28.62,
+                                           "end":  28.94,
+                                           "word":  " one"
+                                       },
+                                       {
+                                           "start":  28.94,
+                                           "end":  29.24,
+                                           "word":  " line"
+                                       },
+                                       {
+                                           "start":  29.24,
+                                           "end":  29.6,
+                                           "word":  " or"
+                                       },
+                                       {
+                                           "start":  29.6,
+                                           "end":  29.82,
+                                           "word":  " work"
+                                       },
+                                       {
+                                           "start":  29.82,
+                                           "end":  30.04,
+                                           "word":  " for"
+                                       },
+                                       {
+                                           "start":  30.04,
+                                           "end":  30.3,
+                                           "word":  " just"
+                                       }
+                                   ]
+                     },
+                     {
+                         "start":  30.3,
+                         "end":  33.94,
+                         "text":  "two minutes, cover it begins with feeling safe, not studying yourself.",
+                         "words":  [
+                                       {
+                                           "start":  30.3,
+                                           "end":  30.44,
+                                           "word":  " two"
+                                       },
+                                       {
+                                           "start":  30.44,
+                                           "end":  30.9,
+                                           "word":  " minutes,"
+                                       },
+                                       {
+                                           "start":  31.3,
+                                           "end":  31.5,
+                                           "word":  " cover"
+                                       },
+                                       {
+                                           "start":  31.5,
+                                           "end":  31.68,
+                                           "word":  " it"
+                                       },
+                                       {
+                                           "start":  31.68,
+                                           "end":  32.0,
+                                           "word":  " begins"
+                                       },
+                                       {
+                                           "start":  32.0,
+                                           "end":  32.24,
+                                           "word":  " with"
+                                       },
+                                       {
+                                           "start":  32.24,
+                                           "end":  32.48,
+                                           "word":  " feeling"
+                                       },
+                                       {
+                                           "start":  32.48,
+                                           "end":  32.9,
+                                           "word":  " safe,"
+                                       },
+                                       {
+                                           "start":  33.12,
+                                           "end":  33.26,
+                                           "word":  " not"
+                                       },
+                                       {
+                                           "start":  33.26,
+                                           "end":  33.54,
+                                           "word":  " studying"
+                                       },
+                                       {
+                                           "start":  33.54,
+                                           "end":  33.94,
+                                           "word":  " yourself."
+                                       }
+                                   ]
+                     }
+                 ],
+    "srt":  "1\n00:00:00,000 --\u003e 00:00:04,680\nIf pro-cultination merrily about will power, why do we avoid the task that matter\n\n2\n00:00:04,680 --\u003e 00:00:05,120\nmoves?\n\n3\n00:00:05,760 --\u003e 00:00:11,000\nPsychologically, procrastination is often emotional avoidance, a task can trigger fear\n\n4\n00:00:11,000 --\u003e 00:00:16,520\nfailure, perfectionism, uncertainty or overwhelm, avoiding it gives your brain immediately\n\n5\n00:00:17,000 --\u003e 00:00:23,120\nto the habit gets stronger, instead of asking, why am I so lazy, ask, what feeling am I\n\n6\n00:00:23,120 --\u003e 00:00:23,580\navoiding?\n\n7\n00:00:24,240 --\u003e 00:00:30,300\nThen make the next step smaller, open the document, write one line or work for just\n\n8\n00:00:30,300 --\u003e 00:00:33,940\ntwo minutes, cover it begins with feeling safe, not studying yourself.\n",
+    "srtFile":  {
+                    "filename":  "captions.srt",
+                    "contentType":  "application/x-subrip",
+                    "cueCount":  8,
+                    "content":  "1\n00:00:00,000 --\u003e 00:00:04,680\nIf pro-cultination merrily about will power, why do we avoid the task that matter\n\n2\n00:00:04,680 --\u003e 00:00:05,120\nmoves?\n\n3\n00:00:05,760 --\u003e 00:00:11,000\nPsychologically, procrastination is often emotional avoidance, a task can trigger fear\n\n4\n00:00:11,000 --\u003e 00:00:16,520\nfailure, perfectionism, uncertainty or overwhelm, avoiding it gives your brain immediately\n\n5\n00:00:17,000 --\u003e 00:00:23,120\nto the habit gets stronger, instead of asking, why am I so lazy, ask, what feeling am I\n\n6\n00:00:23,120 --\u003e 00:00:23,580\navoiding?\n\n7\n00:00:24,240 --\u003e 00:00:30,300\nThen make the next step smaller, open the document, write one line or work for just\n\n8\n00:00:30,300 --\u003e 00:00:33,940\ntwo minutes, cover it begins with feeling safe, not studying yourself.\n"
+                }
+}

@@ -11,6 +11,7 @@ export default function SceneCard({
   frameAspectRatio = "9 / 16",
   frameOrientation = "vertical",
   loadingImageKinds = [],
+  productMode = false,
   onClick,
   onGenerateImage,
 }) {
@@ -28,7 +29,8 @@ export default function SceneCard({
   const storyboardImageUrl = sceneImageUrl(scene, "storyboard");
   const lightingImageUrl = sceneImageUrl(scene, "lighting");
   const cameraPlanImageUrl = sceneImageUrl(scene, "dp");
-  const hasRealShotImage = Boolean(storyboardImageUrl || lightingImageUrl || cameraPlanImageUrl);
+  const productionImageUrl = sceneImageUrl(scene, "production");
+  const hasRealShotImage = Boolean(storyboardImageUrl || lightingImageUrl || cameraPlanImageUrl || productionImageUrl);
   const assetSlots = [
     {
       kind: "storyboard",
@@ -40,6 +42,13 @@ export default function SceneCard({
     },
     { kind: "lighting", title: "Lighting", icon: Lightbulb, src: lightingImageUrl, isGenerating: loadingKindSet.has("lighting") },
     { kind: "dp", title: "DP Plan", icon: Camera, src: cameraPlanImageUrl, isGenerating: loadingKindSet.has("dp") },
+    ...(productMode ? [{
+      kind: "production",
+      title: "Product Frame",
+      icon: Sparkles,
+      src: productionImageUrl,
+      isGenerating: loadingKindSet.has("production"),
+    }] : []),
   ];
   const generatingAsset = assetSlots.find((asset) => asset.isGenerating);
   const imageAssets = assetSlots.filter((asset) => asset.src);
@@ -106,6 +115,34 @@ export default function SceneCard({
           <div className="scene-sketch h-full w-full" />
         )}
       </div>
+
+      {shot.overlayPlan?.enabled !== false && shot.overlayPlan?.text && (
+        <div className={`pointer-events-none absolute inset-x-[8%] z-10 flex ${
+          String(shot.overlayPlan.position || "").toLowerCase().includes("upper") ? "top-[12%]" : "bottom-[15%]"
+        } ${
+          String(shot.overlayPlan.position || "").toLowerCase().includes("left")
+            ? "justify-start text-left"
+            : String(shot.overlayPlan.position || "").toLowerCase().includes("right")
+              ? "justify-end text-right"
+              : "justify-center text-center"
+        }`}>
+          <div className="max-w-[88%]">
+            <p
+              className="leading-[1.02] tracking-[-0.035em] text-white [text-shadow:0_3px_16px_rgba(0,0,0,.85)]"
+              style={{
+                fontFamily: `${shot.overlayPlan.fontFamily || "Montserrat"}, sans-serif`,
+                fontWeight: shot.overlayPlan.fontWeight || 800,
+                fontSize: `clamp(1.25rem, 3.2vw, ${Math.min(72, Number(shot.overlayPlan.fontSizePx) || 52)}px)`,
+              }}
+            >
+              {shot.overlayPlan.text}
+            </p>
+            <span className="mt-2 inline-flex rounded-full border border-white/15 bg-black/65 px-2 py-1 text-[9px] font-black uppercase tracking-normal text-slate-200 backdrop-blur">
+              {shot.overlayPlan.entrance || "Fade"} / {shot.overlayPlan.speed || "Measured"}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="absolute right-2 top-2 z-20 flex items-center gap-1.5">
         <button
@@ -241,7 +278,7 @@ function ShotDetailsPanel({
             <section className="rounded-lg border border-white/10 bg-black/22 p-3">
               <AssetPreview asset={availableAsset} />
 
-              <div className="mt-2 grid grid-cols-3 gap-1.5">
+              <div className={`mt-2 grid gap-1.5 ${assetSlots.length > 3 ? "grid-cols-2" : "grid-cols-3"}`}>
                 {assetSlots.map((asset) => (
                   <AssetStripButton
                     key={asset.kind}
@@ -261,6 +298,9 @@ function ShotDetailsPanel({
                 <QuickMetric label="Storyboard" value={storyboardImageUrl ? "Ready" : imageReady ? "Mock" : "Pending"} />
                 <QuickMetric label="Lighting" value={sceneImageUrl(scene, "lighting") ? "Ready" : "Pending"} />
                 <QuickMetric label="DP" value={sceneImageUrl(scene, "dp") ? "Ready" : "Pending"} />
+                {assetSlots.some((asset) => asset.kind === "production") && (
+                  <QuickMetric label="Product" value={sceneImageUrl(scene, "production") ? "Ready" : "Pending"} />
+                )}
                 <QuickMetric label="Duration" value={`${shot.durationSeconds}s`} />
               </div>
             </section>
@@ -293,6 +333,10 @@ function ShotDetailsPanel({
                         ["Body Language", shot.bodyLanguage],
                         ["Dialogue / VO", shot.dialogue],
                         ["Text Overlay", shot.textOverlay],
+                        ["Overlay Font", shot.overlayFont],
+                        ["Overlay Motion", shot.overlayMotion],
+                        ["Overlay Position", shot.overlayPosition],
+                        ["Overlay Rationale", shot.overlayRationale],
                       ]}
                     />
                   </DetailSection>
@@ -306,6 +350,7 @@ function ShotDetailsPanel({
                         ["Gimbal", shot.gimbalSettings],
                         ["Lens Suggestion", shot.lensSuggestion],
                         ["FPS", shot.fps],
+                        ["Visual Treatment", shot.visualTreatment],
                       ]}
                     />
                   </DetailSection>
@@ -569,6 +614,23 @@ function CreativeImageLoader({ label = "Loading Image", detail = "Preparing fram
 function sceneImageUrl(scene = {}, kind = "storyboard") {
   const normalizedKind = normalizeImageAssetKind(kind);
   const assets = collectSceneImageAssets(scene);
+  if (normalizedKind === "production") {
+    return firstTextValue(
+      scene.productionImageUrl,
+      scene.production_image_url,
+      scene.generatedProductImageUrl,
+      scene.generated_product_image_url,
+      scene.imageAnchorUrl,
+      scene.image_anchor_url,
+      imageUrlFromObject(scene.productionImage),
+      imageUrlFromObject(scene.production_image),
+      imageUrlFromObject(scene.productionAsset),
+      imageUrlFromObject(scene.production_asset),
+      imageUrlFromObject(scene.generatedProductImage),
+      imageUrlFromObject(scene.generated_product_image),
+      imageUrlByKind(assets, "production")
+    );
+  }
   if (normalizedKind === "lighting") {
     return firstTextValue(
       scene.lightingImageUrl,
@@ -641,6 +703,12 @@ function collectSceneImageAssets(scene = {}) {
     ...(Array.isArray(scene.camera_plan_images) ? scene.camera_plan_images : []),
     ...(Array.isArray(scene.dpImages) ? scene.dpImages : []),
     ...(Array.isArray(scene.dp_images) ? scene.dp_images : []),
+    ...(Array.isArray(scene.productionImages) ? scene.productionImages : []),
+    ...(Array.isArray(scene.production_images) ? scene.production_images : []),
+    ...(Array.isArray(scene.productImages) ? scene.productImages : []),
+    ...(Array.isArray(scene.product_images) ? scene.product_images : []),
+    ...(Array.isArray(scene.generatedProductImageAssets) ? scene.generatedProductImageAssets : []),
+    ...(Array.isArray(scene.generated_product_image_assets) ? scene.generated_product_image_assets : []),
   ].filter((item) => item && typeof item === "object");
 }
 
@@ -710,6 +778,7 @@ function imageUrlFromObject(value = {}) {
 
 function normalizeImageAssetKind(value = "") {
   const text = String(value || "").toLowerCase();
+  if (text.includes("production") || text.includes("product") || text.includes("video_anchor") || text.includes("image_anchor")) return "production";
   if (text.includes("light")) return "lighting";
   if (text.includes("camera") || text.includes("dp") || text.includes("director_photography")) return "dp";
   return "storyboard";
@@ -753,7 +822,9 @@ function SpecRow({ label, value }) {
 }
 
 function normalizeShot(scene, index) {
-  const cinematic = scene.cinematicExecution || {};
+  const rawShot = scene.rawShot || {};
+  const cinematic = scene.cinematicExecution || rawShot.cinematicExecution || {};
+  const treatment = scene.visualTreatment || rawShot.visualTreatment || {};
   const difficulty = scene.executionDifficulty || {};
   const rookie = scene.rookieFriendlyGuide || {};
   const storyboardTag = scene.storyboardTag || {};
@@ -770,6 +841,7 @@ function normalizeShot(scene, index) {
   const bodyLanguage = toKeyValueText(scene.bodyLanguage || storyboardTag.bodyLanguage);
   const dialogue = toKeyValueText(scene.dialogue) || primaryDialogue.line || scene.voiceOver || scene.vo || scene.voiceover || "";
   const voiceOver = scene.voiceOver || scene.vo || scene.voiceover || "";
+  const overlayPlan = scene.overlayPlan || scene.overlay_plan || storyboardTag.overlayPlan || storyboardTag.overlay_plan || {};
 
   return {
     number: scene.shotNumber || index + 1,
@@ -794,7 +866,22 @@ function normalizeShot(scene, index) {
     action: scene.action || storyboardTag.action || scene.description || scene.visualDirection || "",
     dialogue: dialogue || "No dialogue",
     voiceOver: voiceOver || "None",
-    textOverlay: scene.textOverlay ?? storyboardTag.textOverlay ?? "",
+    textOverlay: overlayPlan.enabled === false
+      ? "No overlay; visual-only beat"
+      : overlayPlan.text ?? scene.textOverlay ?? storyboardTag.textOverlay ?? "",
+    overlayPlan,
+    overlayFont: overlayPlan.fontFamily
+      ? `${overlayPlan.fontFamily} ${overlayPlan.fontWeight || ""}`.trim()
+      : "",
+    overlayMotion: compactLines([
+      overlayPlan.entrance,
+      overlayPlan.entranceDurationMs && `${overlayPlan.entranceDurationMs} ms in`,
+      overlayPlan.holdDurationMs && `${overlayPlan.holdDurationMs} ms hold`,
+      overlayPlan.exit,
+      overlayPlan.speed,
+    ]),
+    overlayPosition: compactLines([overlayPlan.position, overlayPlan.safeZone]),
+    overlayRationale: overlayPlan.rationale || "",
     transition: scene.transition || storyboardTag.transitionNote || cinematic.transitionStyle || "",
     soundDesign: toText(scene.soundDesign || storyboardTag.soundDesign || storyboardTag.soundCues || storyboardTag.audioCues || storyboardTag.ambientBedDescription || storyboardTag.syncHitDescription || scene.soundNote || scene.musicNote),
     editingNotes: toText(scene.editingNotes),
@@ -818,6 +905,12 @@ function normalizeShot(scene, index) {
     zoomRecommendation: cinematic.zoomRecommendation || framePreview.lensCompressionFeel || "",
     motionIntensity: cinematic.motionIntensity || movementSpec.speed || "",
     editingComplexity: cinematic.editingComplexity || cameraPlanTag.coverageSpec?.editorIntent || "",
+    visualTreatment: compactLines([
+      treatment.motionStyle && `Motion: ${treatment.motionStyle}`,
+      treatment.colorGrade && `Colour: ${treatment.colorGrade}`,
+      treatment.editorialEffect && treatment.editorialEffect !== "none" && `Effect: ${treatment.editorialEffect}`,
+      treatment.notes,
+    ]),
     rookieGuide: compactLines([
       rookie.whatIsThis && `What is this: ${rookie.whatIsThis}`,
       rookie.whyThisWorks && `Why it works: ${rookie.whyThisWorks}`,

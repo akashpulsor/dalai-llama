@@ -2964,6 +2964,20 @@ function defaultMixerAutomationDraft(take = {}) {
 
 function normalizeMixSettings(settings = {}) {
   const rawAutomation = settings.volumeAutomation || settings.volume_automation || settings.automation || [];
+  const audioMixStandards = {
+    dialogueLevel: "consistent_speech_first",
+    backgroundMusicDucking: "duck_under_speech",
+    ambientRoomTone: "maintain_low_scene_matched_room_tone",
+    soundEffectsUse: "small_sfx_sparingly_for_whooshes_clicks_transitions",
+    reverbMatch: "match_scene_space_and_camera_distance",
+    fades: "smooth_fades_between_audio_segments",
+    dialogueTargetDb: -3,
+    musicBedDb: -18,
+    ambienceBedDb: -22,
+    sfxPeakDb: -9,
+    fadeMs: 120,
+    ...(settings.audioMixStandards || settings.audio_mix_standards || {}),
+  };
   return {
     primaryLayer: normalizeOvertakeLayer(settings.primaryLayer || "dialogue"),
     overtakeLayer: normalizeOvertakeLayer(settings.overtakeLayer || "dialogue"),
@@ -2973,6 +2987,8 @@ function normalizeMixSettings(settings = {}) {
     ambienceBedDb: Math.max(-48, Math.min(0, safeTimelineNumber(settings.ambienceBedDb, -22))),
     backgroundMusicDucksUnderDialogue: settings.backgroundMusicDucksUnderDialogue !== false,
     foleyDucksUnderDialogue: settings.foleyDucksUnderDialogue !== false,
+    snippetFadeMs: Math.max(0, Math.min(2000, safeTimelineNumber(settings.snippetFadeMs ?? settings.snippet_fade_ms, 120))),
+    audioMixStandards,
     volumeAutomation: (Array.isArray(rawAutomation) ? rawAutomation : []).map(normalizeVolumeAutomation),
   };
 }

@@ -6,10 +6,14 @@ import {
   useAddQueueMemberMutation, useRemoveQueueMemberMutation,
   useListAgentsQuery,
 } from '@dalaillama/shared-store/slices/pbxCoreApi.js';
+import {
+  useGetCreativeWorkOrdersQuery,
+  useUpdateCreativeWorkOrderMutation,
+} from '../api/creatorWorkOrderEndpoints.js';
 import { useSelector } from 'react-redux';
 import { selectTenantId } from '@dalaillama/shared-store/slices/tenantSlice.js';
 import {
-  Layers, Plus, ArrowLeft, Users, BarChart3, Trash2, UserPlus,
+  ArrowLeft, BarChart3, CheckCircle2, ClipboardCheck, FileText, Film, Layers, Loader2, Plus, Send, Trash2, UserPlus, Users,
 } from 'lucide-react';
 
 export default function Queues() {
@@ -50,6 +54,8 @@ function QueueList() {
           <Plus className="w-4 h-4" /> Create Queue
         </button>
       </div>
+
+      <CreativeWorkQueue />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {isLoading ? (
@@ -123,6 +129,204 @@ function QueueList() {
       )}
     </div>
   );
+}
+
+function CreativeWorkQueue() {
+  const { data = [], isLoading, isFetching, refetch } = useGetCreativeWorkOrdersQuery(
+    { status: 'SUBMITTED,ASSIGNED,IN_PROGRESS,DELIVERED,CHANGE_REQUESTED', limit: 25 },
+    { pollingInterval: 15000 }
+  );
+  const [updateWorkOrder, updateState] = useUpdateCreativeWorkOrderMutation();
+  const [forms, setForms] = useState({});
+  const orders = normalizeCreativeWorkOrders(data);
+
+  const formFor = (order) => forms[creativeWorkOrderId(order)] || {};
+  const updateForm = (order, patch) => {
+    const id = creativeWorkOrderId(order);
+    setForms((current) => ({ ...current, [id]: { ...(current[id] || {}), ...patch } }));
+  };
+  const changeStatus = async (order, status) => {
+    const id = creativeWorkOrderId(order);
+    if (!id) return;
+    const form = formFor(order);
+    try {
+      await updateWorkOrder({
+        workOrderId: id,
+        status,
+        assignedTo: form.assignedTo || undefined,
+        reviewerNotes: form.reviewerNotes || undefined,
+        deliveryPayload: status === 'DELIVERED' ? deliveryPayloadFor(order, form) : undefined,
+      }).unwrap();
+      refetch();
+    } catch (/** @type {any} */ error) {
+      alert(error?.data?.message || error?.message || 'Could not update creative work order');
+    }
+  };
+
+  return (
+    <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <ClipboardCheck className="w-5 h-5 text-primary-600" />
+            <h2 className="text-lg font-bold text-slate-900">Creative Work Queue</h2>
+          </div>
+          <p className="mt-1 text-sm text-slate-500">{orders.length} screenplay review or editing job{orders.length === 1 ? '' : 's'}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+        >
+          {isFetching ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
+
+      <div className="mt-4 overflow-hidden rounded-xl border border-slate-100">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-primary-600" />
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="px-4 py-10 text-center text-sm text-slate-400">No creative work is waiting right now</div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {orders.map((order) => {
+              const id = creativeWorkOrderId(order);
+              const form = formFor(order);
+              const status = String(order.status || '').toUpperCase();
+              const workType = String(order.workType || order.work_type || '').toUpperCase();
+              const Icon = workType === 'EDITING_JOB' ? Film : FileText;
+              const sourceUrl = sourceFinalClip(order);
+              return (
+                <div key={id} className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(18rem,0.75fr)_auto] xl:items-start">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-primary-50 px-2.5 py-1 text-[11px] font-bold uppercase text-primary-700">
+                        <Icon className="h-3.5 w-3.5" /> {creativeWorkTypeLabel(workType)}
+                      </span>
+                      <span className={`rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase ${creativeStatusClass(status)}`}>
+                        {creativeStatusLabel(status)}
+                      </span>
+                    </div>
+                    <h3 className="mt-2 truncate text-sm font-bold text-slate-900">{order.title || 'Untitled creative job'}</h3>
+                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{order.description || order.requesterNotes || 'No description provided.'}</p>
+                    {sourceUrl && (
+                      <a href={sourceUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-semibold text-primary-700 hover:text-primary-800">
+                        Download source assets
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="grid gap-2">
+                    <input
+                      value={form.assignedTo || order.assignedTo || ''}
+                      onChange={(event) => updateForm(order, { assignedTo: event.target.value })}
+                      placeholder="Reviewer or editor name"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                    <textarea
+                      value={form.reviewerNotes || ''}
+                      onChange={(event) => updateForm(order, { reviewerNotes: event.target.value })}
+                      rows={2}
+                      placeholder={workType === 'EDITING_JOB' ? 'Editing notes, asset notes, revision summary' : 'Improved script notes and review summary'}
+                      className="min-h-[4.5rem] w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                    <input
+                      value={form.deliveryUrl || ''}
+                      onChange={(event) => updateForm(order, { deliveryUrl: event.target.value })}
+                      placeholder={workType === 'EDITING_JOB' ? 'Edited video URL' : 'Improved screenplay URL'}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 xl:w-44 xl:flex-col">
+                    <button
+                      type="button"
+                      onClick={() => changeStatus(order, 'ASSIGNED')}
+                      disabled={updateState.isLoading || status === 'ASSIGNED'}
+                      className="flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+                    >
+                      <Users className="h-3.5 w-3.5" /> Claim
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => changeStatus(order, 'IN_PROGRESS')}
+                      disabled={updateState.isLoading || status === 'IN_PROGRESS'}
+                      className="flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+                    >
+                      <Send className="h-3.5 w-3.5" /> Start
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => changeStatus(order, 'DELIVERED')}
+                      disabled={updateState.isLoading || !form.deliveryUrl}
+                      className="flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700 disabled:bg-slate-300"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Deliver
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function normalizeCreativeWorkOrders(response) {
+  if (Array.isArray(response)) return response;
+  return [response?.workOrders, response?.items, response?.content, response?.data].find(Array.isArray) || [];
+}
+
+function creativeWorkOrderId(order = {}) {
+  return order.workOrderId || order.work_order_id || order.id;
+}
+
+function creativeWorkTypeLabel(workType = '') {
+  return workType === 'EDITING_JOB' ? 'Editing job' : 'Screenplay review';
+}
+
+function creativeStatusLabel(status = '') {
+  return String(status || 'SUBMITTED').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function creativeStatusClass(status = '') {
+  const normalized = String(status || '').toUpperCase();
+  if (normalized === 'DELIVERED') return 'bg-emerald-50 text-emerald-700';
+  if (normalized === 'CHANGE_REQUESTED') return 'bg-amber-50 text-amber-700';
+  if (normalized === 'IN_PROGRESS') return 'bg-blue-50 text-blue-700';
+  if (normalized === 'ASSIGNED') return 'bg-violet-50 text-violet-700';
+  return 'bg-slate-100 text-slate-600';
+}
+
+function sourceFinalClip(order = {}) {
+  const source = order.sourcePayload || order.source_payload || {};
+  return source.finalClipUrl
+    || source.final_clip_url
+    || source.videoRun?.finalVideoUrl
+    || source.videoRun?.final_video_url
+    || source.videoRun?.finalUrl
+    || source.videoRun?.final_url
+    || '';
+}
+
+function deliveryPayloadFor(order = {}, form = {}) {
+  const workType = String(order.workType || order.work_type || '').toUpperCase();
+  const payload = {
+    reviewerNotes: form.reviewerNotes || '',
+    deliveredAt: new Date().toISOString(),
+  };
+  if (workType === 'EDITING_JOB') {
+    payload.editedVideoUrl = form.deliveryUrl || '';
+    payload.assetNotes = form.reviewerNotes || '';
+  } else {
+    payload.improvedScreenplayUrl = form.deliveryUrl || '';
+    payload.scriptReviewNotes = form.reviewerNotes || '';
+  }
+  return payload;
 }
 
 function QueueDetail() {

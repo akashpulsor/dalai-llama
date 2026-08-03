@@ -1,0 +1,29 @@
+{
+  "clientId": "dashboard-ui",
+  "name": "Dashboard UI",
+  "protocol": "openid-connect",
+  "enabled": true,
+  "publicClient": true,
+  "standardFlowEnabled": true,
+  "directAccessGrantsEnabled": true,
+  "implicitFlowEnabled": false,
+  "serviceAccountsEnabled": false,
+  "redirectUris": [
+    "http://localhost:5177/*",
+    "http://127.0.0.1:5177/*",
+    "http://localhost:5181/*",
+    "http://127.0.0.1:5181/*",
+    "https://dashboard.dalaillama.in/*"
+  ],
+  "webOrigins": [
+    "http://localhost:5177",
+    "http://127.0.0.1:5177",
+    "http://localhost:5181",
+    "http://127.0.0.1:5181",
+    "https://dashboard.dalaillama.in"
+  ],
+  "attributes": {
+    "pkce.code.challenge.method": "S256"
+  },
+  "fullScopeAllowed": true
+}

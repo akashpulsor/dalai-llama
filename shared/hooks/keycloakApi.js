@@ -32,6 +32,9 @@ const LOCALHOST_PORT_CLIENT_MAP = {
   "5177": "dashboard-ui",
   "5181": "creator-ui",
   "5182": "creator-ui",
+  "5183": "copywriter-ui",
+  "5184": "editor-ui",
+  "5185": "operations-ui",
 };
 
 /**
@@ -112,6 +115,9 @@ export const resolveClientId = () => {
   if (hostname.startsWith("agent-")) return "agent-ui";
   if (hostname.startsWith("dashboard.")) return "dashboard-ui";
   if (hostname.startsWith("creator.")) return "creator-ui";
+  if (hostname.startsWith("copywriter.")) return "copywriter-ui";
+  if (hostname.startsWith("editor.")) return "editor-ui";
+  if (hostname.startsWith("operations.") || hostname.startsWith("ops.")) return "operations-ui";
   if (hostname.startsWith("platform.")) return "platform-ui";
 
   return appConfig.KEYCLOAK_CLIENT_ID;
@@ -199,7 +205,7 @@ const generateState = () => crypto.randomUUID();
 /**
  * @param {KeycloakJwtPayload} tokenPayload
  * @param {string} resolvedClientId
- * @returns {"admin" | "supervisor" | "agent"}
+ * @returns {"admin" | "supervisor" | "agent" | "creator" | "copywriter" | "editor" | "operations"}
  */
 const extractRole = (tokenPayload, resolvedClientId) => {
   const realmRoles = (tokenPayload.realm_access?.roles || []).map((role) =>
@@ -213,6 +219,13 @@ const extractRole = (tokenPayload, resolvedClientId) => {
 
   if (allRoles.includes("admin")) return "admin";
   if (allRoles.includes("supervisor")) return "supervisor";
+  if (allRoles.includes("creator_ops") || allRoles.includes("operations") || allRoles.includes("ops")) return "operations";
+  if (allRoles.includes("creator_editor") || allRoles.includes("editor")) return "editor";
+  if (allRoles.includes("creator_copywriter") || allRoles.includes("copywriter")) return "copywriter";
+  if (allRoles.includes("creator")) return "creator";
+  if (tokenClientId === "operations-ui" || tokenClientId === "ops-ui") return "operations";
+  if (tokenClientId === "editor-ui") return "editor";
+  if (tokenClientId === "copywriter-ui") return "copywriter";
   return "agent";
 };
 

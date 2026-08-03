@@ -1,7 +1,17 @@
 // @ts-check
 // apps/platform-ui/src/pages/LandingPage.jsx
 import React, { useState, useEffect } from "react";
-import { Play, StopCircle, MessageCircle, X } from "lucide-react";
+import {
+  CheckCircle2,
+  Film,
+  MessageCircle,
+  Play,
+  Scissors,
+  Sparkles,
+  StopCircle,
+  WalletCards,
+  X,
+} from "lucide-react";
 import { useInitiateLoginMutation } from "@dalaillama/shared-hooks/keycloakApi";
 import { appConfig } from "@dalaillama/shared-config";
 
@@ -93,6 +103,181 @@ const AudioPlayer = () => {
     </div>
   );
 };
+
+const pricingPlans = [
+  {
+    name: "AI Short Starter",
+    price: "Rs 3,999",
+    minimumBalance: "Rs 3,999",
+    label: "60-second full AI video",
+    icon: Film,
+    accent: "border-emerald-300",
+    button: "Start AI short",
+    features: [
+      "Idea, outline, screenplay, actor prompts, storyboard path, scene video, final merge",
+      "Seedance or Omini generation with consistency seeds and caption/SRT support",
+      "Wallet package floor is applied after final video render",
+    ],
+  },
+  {
+    name: "AI Short Pro",
+    price: "Rs 5,999",
+    minimumBalance: "Rs 5,999",
+    label: "60-second ad-ready video",
+    icon: Sparkles,
+    accent: "border-sky-300",
+    button: "Start pro short",
+    features: [
+      "Everything in Starter plus stronger ad angles and conversion-focused script shaping",
+      "Storyboard-first generation guidance for better character and location consistency",
+      "Includes extra polish budget for scene fixes before final merge",
+    ],
+  },
+  {
+    name: "Human Polished",
+    price: "Rs 7,999",
+    minimumBalance: "Rs 7,999",
+    label: "AI video plus human review",
+    icon: Scissors,
+    accent: "border-amber-300",
+    button: "Request polish",
+    features: [
+      "Includes AI Short Pro, screenplay review, and freelancer editing workflow",
+      "Editor receives final clips, assets, music, captions, voice, and editing plan",
+      "Creator can request up to 2 revision rounds before approval",
+    ],
+  },
+];
+
+const addOns = [
+  ["Screenplay review", "Rs 999"],
+  ["Freelancer editing approval", "Rs 1,500"],
+  ["Extra 15 seconds", "Rs 999"],
+  ["Storyboard consistency pack", "Rs 499"],
+];
+
+const walletRequirements = [
+  ["Starter video flow", "Rs 3,999"],
+  ["Pro video flow", "Rs 5,999"],
+  ["Human polished flow", "Rs 7,999"],
+  ["Trend moment refresh", "Rs 100"],
+  ["Screenplay review", "Rs 999"],
+  ["Editor approval reserve", "Rs 1,500"],
+];
+
+/**
+ * Pricing section for creator video packages
+ * @param {{ onStart: () => void }} props
+ */
+const PricingSection = ({ onStart }) => (
+  <section id="pricing" className="py-10 sm:py-14">
+    <AnimatedCard className="mb-8">
+      <p className="mb-3 text-sm font-bold uppercase tracking-[0.18em] text-emerald-700">
+        Creator pricing
+      </p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-950 sm:text-3xl lg:text-4xl">
+            Packages for 60-second AI videos
+          </h2>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-700 sm:text-base">
+            Start from ideation and finish with a merged video preview. Human
+            review and editing are available as paid add-ons when the script or
+            final cut needs expert hands.
+          </p>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">
+          Minimum wallet balance starts at <span className="text-slate-950">Rs 3,999</span>
+        </div>
+      </div>
+    </AnimatedCard>
+
+    <AnimatedCard className="mb-5">
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
+              <WalletCards size={20} />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-emerald-950">Wallet balance required before paid flows</p>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-emerald-900/80">
+                Dalaillama uses wallet debit, not subscription checkout. If the wallet is zero or below the required balance for a selected flow, the studio asks the user to recharge before continuing.
+              </p>
+            </div>
+          </div>
+          <div className="grid min-w-[min(100%,30rem)] gap-2 sm:grid-cols-2">
+            {walletRequirements.map(([name, amount]) => (
+              <div key={name} className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-white/75 px-3 py-2">
+                <span className="text-xs font-bold text-emerald-950">{name}</span>
+                <span className="text-xs font-black text-emerald-700">{amount}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </AnimatedCard>
+
+    <div className="grid gap-4 lg:grid-cols-3">
+      {pricingPlans.map((plan) => {
+        const Icon = plan.icon;
+        return (
+          <AnimatedCard
+            key={plan.name}
+            className={`rounded-lg border-2 ${plan.accent} bg-white p-5 shadow-lg shadow-slate-200/70`}
+          >
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-bold text-slate-950">{plan.name}</h3>
+                <p className="mt-1 text-sm font-semibold text-slate-600">
+                  {plan.label}
+                </p>
+              </div>
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
+                <Icon size={22} />
+              </div>
+            </div>
+            <div className="mb-5">
+              <p className="text-3xl font-black text-slate-950">{plan.price}</p>
+              <p className="text-sm font-medium text-slate-500">debited from wallet</p>
+              <p className="mt-2 rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700">
+                Keep at least {plan.minimumBalance} before starting this flow.
+              </p>
+            </div>
+            <ul className="mb-6 space-y-3">
+              {plan.features.map((feature) => (
+                <li key={feature} className="flex gap-3 text-sm leading-6 text-slate-700">
+                  <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-emerald-600" />
+                  <span>{feature}</span>
+                </li>
+              ))}
+            </ul>
+            <button
+              onClick={onStart}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-slate-700"
+            >
+              <Sparkles size={18} />
+              {plan.button}
+            </button>
+          </AnimatedCard>
+        );
+      })}
+    </div>
+
+    <AnimatedCard className="mt-6">
+      <div className="grid gap-3 rounded-lg border border-slate-200 bg-white/80 p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+        {addOns.map(([name, price]) => (
+          <div key={name} className="flex items-center justify-between gap-3">
+            <span className="text-sm font-semibold text-slate-700">{name}</span>
+            <span className="rounded-lg bg-slate-100 px-3 py-1 text-sm font-bold text-slate-950">
+              {price}
+            </span>
+          </div>
+        ))}
+      </div>
+    </AnimatedCard>
+  </section>
+);
 
 /**
  * @typedef {Object} FloatingContactButtonProps
@@ -257,17 +442,26 @@ const LandingPage = () => {
             Dalai Llama
           </h1>
         </div>
-        <button
-          onClick={handleLogin}
-          className="w-full rounded-xl bg-slate-800 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-900 sm:w-auto sm:text-base"
-        >
-          Login
-        </button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <a
+            href="#pricing"
+            className="rounded-lg px-4 py-2 text-center text-sm font-bold text-slate-700 transition-colors hover:bg-white/70 hover:text-slate-950"
+          >
+            Pricing
+          </a>
+          <button
+            onClick={handleLogin}
+            className="w-full rounded-lg bg-slate-800 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-900 sm:w-auto sm:text-base"
+          >
+            Login
+          </button>
+        </div>
       </header>
 
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pb-24 sm:px-6 lg:px-8">
         <HeroSection />
         <AudioPlayer />
+        <PricingSection onStart={handleLogin} />
       </main>
 
       <FloatingContactButton onClick={openContactModal} />

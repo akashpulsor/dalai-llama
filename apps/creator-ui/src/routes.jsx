@@ -2,19 +2,12 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import PlannerPage from "./pages/PlannerPage.jsx";
-import GenerateShortsPage from "./pages/GenerateShortsPage.jsx";
-import ShortsHistoryPage from "./pages/ShortsHistoryPage.jsx";
-import { enableShortGeneration } from "./config/featureFlags.js";
 
 const routes = [
   { index: true, element: <PlannerPage /> },
-  ...(enableShortGeneration
-    ? [
-        { path: "generate-shorts", element: <GenerateShortsPage /> },
-        { path: "shorts-history", element: <ShortsHistoryPage /> },
-        { path: "shorts", element: <Navigate to="/generate-shorts" replace /> },
-      ]
-    : []),
+  { path: "generate-shorts", element: <Navigate to="/#projects" replace /> },
+  { path: "shorts-history", element: <Navigate to="/#projects" replace /> },
+  { path: "shorts", element: <Navigate to="/#projects" replace /> },
   { path: "trends", element: <Navigate to="/#ideas" replace /> },
   { path: "generated-ideas", element: <Navigate to="/#generated-ideas" replace /> },
   { path: "storyline", element: <Navigate to="/#script" replace /> },

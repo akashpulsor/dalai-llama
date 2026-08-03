@@ -7,10 +7,23 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 .codex-tmp/*
+.local-k3d/*
+.CosyVoice/*
+.chrome-url-check-profile-2/*
+.artifacts/*
+.founder-video-procrastination/*
+.chrome-url-check-profile/*
+.email-templates/*
+.codex-deep-transcript-critic.ps1
+.avatar-envs/*
+.avatar-models/*
 node_modules
 dist
 dist-ssr
 *.local
+.env
+.env.*
+!.env.example
 
 # Editor directories and files
 .vscode/*
