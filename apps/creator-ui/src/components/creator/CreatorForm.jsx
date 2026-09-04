@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, Plus, Sparkles, Trash2, Users, X } from "lucide-react";
+import { ImagePlus, Loader2, Plus, Sparkles, Trash2, Users, X } from "lucide-react";
 
 const vibes = ["Relatable", "Soft Spoken", "Determined", "Funny", "Energetic", "Confident", "Shy", "Luxury Vibe", "Beginner Creator"];
 const styles = ["Casual Gym Wear", "Athleisure", "Home Setup", "Minimal Studio", "Indian Home Wear", "Office Casual"];
@@ -57,6 +57,7 @@ export default function CreatorForm({
   audience,
   onConfirm,
   onCreateActor,
+  onUploadActorPhoto,
   onEnhanceIdeaWithCast,
   openActorModalSignal = 0,
   isCreatingActor = false,
@@ -71,6 +72,8 @@ export default function CreatorForm({
   const [actorModalOpen, setActorModalOpen] = useState(false);
   const [actorDraft, setActorDraft] = useState(() => buildActorDraft(aiRoleDefaults()));
   const [createdActors, setCreatedActors] = useState([]);
+  const [actorPhotoUploading, setActorPhotoUploading] = useState(false);
+  const [actorPhotoError, setActorPhotoError] = useState("");
 
   const activeMember = castMembers.find((member) => member.castId === activeCastId) || castMembers[0];
   const aiRoles = useMemo(() => suggestRolesForIdea(idea, castMembers), [castMembers, idea]);
@@ -163,6 +166,29 @@ export default function CreatorForm({
 
   const updateActive = (patch) => {
     setCastMembers((current) => current.map((member) => (member.castId === activeMember.castId ? { ...member, ...patch } : member)));
+  };
+
+  const handleActorPhotoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!isUuid(activeMember.actorId)) {
+      setActorPhotoError("Save this actor first (Confirm cast below), then add a photo.");
+      return;
+    }
+    const uploadingActorId = activeMember.actorId;
+    setActorPhotoError("");
+    setActorPhotoUploading(true);
+    try {
+      const saved = await onUploadActorPhoto?.(uploadingActorId, file);
+      const referenceImageUrl = saved?.attributes?.referenceImageUrl || saved?.referenceImageUrl || "";
+      setCastMembers((current) => current.map((member) => (member.actorId === uploadingActorId ? { ...member, referenceImageUrl } : member)));
+      setCreatedActors((current) => current.map((actor) => (actor.id === uploadingActorId ? { ...actor, referenceImageUrl } : actor)));
+    } catch {
+      setActorPhotoError("Couldn't upload that photo. Use a JPG, PNG, or WebP under 15 MB.");
+    } finally {
+      setActorPhotoUploading(false);
+    }
   };
 
   const toggleVibe = (vibe) => {
@@ -369,11 +395,20 @@ export default function CreatorForm({
         <div className="min-h-0 rounded-lg border border-white/10 bg-white/[0.025] p-3">
           <div className="mb-3 flex items-center gap-3">
             <ActorAvatar member={activeMember} />
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-lg font-bold text-white">{activeMember.name}</p>
               <p className="text-sm font-medium text-slate-400">Age {activeMember.age} - {activeMember.gender}</p>
             </div>
+            <label
+              className={`creator-control flex shrink-0 cursor-pointer items-center gap-2 px-3 py-2 text-xs font-bold text-slate-200 ${actorPhotoUploading ? "pointer-events-none opacity-60" : ""}`}
+              title={isUuid(activeMember.actorId) ? "Upload a face photo for this actor" : "Save this actor first, then add a photo"}
+            >
+              {actorPhotoUploading ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />}
+              {activeMember.referenceImageUrl ? "Replace photo" : "Add photo"}
+              <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={actorPhotoUploading} onChange={handleActorPhotoUpload} />
+            </label>
           </div>
+          {actorPhotoError && <p className="mb-3 text-xs font-bold text-rose-300">{actorPhotoError}</p>}
 
           <div className="mb-3 grid gap-2 sm:grid-cols-3">
             <TextField label="Name" value={activeMember.name} onChange={(name) => updateActive({ name })} />
@@ -469,6 +504,7 @@ function normalizeActor(actor = {}, index = 0) {
     scenePresence: actor.scenePresence || attributes.scenePresence || "Reaction shots",
     look: actor.look || attributes.look || "",
     profile: actor.profile || attributes.profile || "",
+    referenceImageUrl: actor.referenceImageUrl || attributes.referenceImageUrl || "",
   };
 }
 
@@ -561,6 +597,10 @@ function sameCastMember(left = {}, right = {}) {
   return (leftId && rightId && leftId === rightId) || (leftName && rightName && leftName === rightName);
 }
 
+function isUuid(value) {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
 function slugify(value) {
   return String(value || "character").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "character";
 }
@@ -568,6 +608,8 @@ function slugify(value) {
 function ActorAvatar({ member, size = "lg" }) {
   const [failed, setFailed] = useState(false);
   const dimension = size === "sm" ? "h-11 w-11" : "h-16 w-16";
+  const photoUrl = member?.referenceImageUrl || "";
+  useEffect(() => setFailed(false), [photoUrl, member?.actorId]);
   if (failed) {
     return (
       <span className={`${dimension} flex shrink-0 items-center justify-center rounded-full border border-white/10 bg-purple-500/15 text-sm font-extrabold text-purple-100`}>
@@ -577,8 +619,8 @@ function ActorAvatar({ member, size = "lg" }) {
   }
   return (
     <img
-      className={`creator-avatar-img ${dimension} shrink-0`}
-      src={`/mocks/creator/${member.actorId}.png`}
+      className={`creator-avatar-img ${dimension} shrink-0 object-cover`}
+      src={photoUrl || `/mocks/creator/${member.actorId}.png`}
       alt=""
       onError={() => setFailed(true)}
     />
@@ -598,6 +640,7 @@ function toCastMember(actor, role, scenePresence) {
     cameraConfidence: actor.cameraConfidence,
     look: actor.look,
     profile: actor.profile,
+    referenceImageUrl: actor.referenceImageUrl || "",
     role,
     scenePresence,
   };

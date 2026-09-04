@@ -1,5 +1,6 @@
 // @ts-nocheck
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   selectTenantId,
@@ -9,7 +10,7 @@ import {
   useGetWalletBalanceQuery,
   useVerifyWalletPaymentMutation,
 } from "@dalaillama/shared-store";
-import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle, Clapperboard, FolderOpen, GripVertical, HelpCircle, History, Image as ImageIcon, ListChecks, Loader2, LockKeyhole, MessageSquareText, Plus, RefreshCw, Sparkles, WalletCards, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle, Clapperboard, Download, FolderOpen, GripVertical, HelpCircle, History, Image as ImageIcon, ListChecks, Loader2, LockKeyhole, MessageSquareText, Plus, RefreshCw, Sparkles, WalletCards, X } from "lucide-react";
 import {
   useConfirmAudienceMutation,
   useCreateCreatorMutation,
@@ -17,6 +18,7 @@ import {
   useGenerateLockedIdeaOptionsAsyncMutation,
   useGenerateLockedIdeaOptionsMutation,
   useGenerateStoryIdeaScriptMutation,
+  useRunGraphPipelineMutation,
   useGenerateStoryIdeaScreenplayAsyncMutation,
   useGetAiProvidersQuery,
   useGetCreatorProviderCreditsQuery,
@@ -26,6 +28,12 @@ import {
   useGetCreatorProjectsQuery,
   useLazyGetCreatorProjectQuery,
   useGetPostProductionProjectsQuery,
+  useGetPreProductionProjectQuery,
+  useAdvanceProjectStatusMutation,
+  useGetProjectSpendQuery,
+  useCreateFinalRenderMutation,
+  useGetLatestFinalRenderQuery,
+  useUpdateFinalVideoLockMutation,
   useGetOrganizationQuery,
   useGetJobQuery,
   useGetJobsQuery,
@@ -42,12 +50,15 @@ import {
   useGenerateStoryboardFromScriptAsyncMutation,
   useGenerateProductionPlansAsyncMutation,
   useGenerateShotImageMutation,
+  useAnalyzeShotProductReferenceMutation,
+  useConfirmShotProductReferenceMutation,
   useEditStoryboardShotWithAiMutation,
   useInsertStoryboardTimelineShotMutation,
   useGetProductionPlansQuery,
   useGetStoryboardClientReviewQuery,
   useSaveStoryboardClientReviewMutation,
   useChatStoryboardClientReviewMutation,
+  useEmbedOfflineAnimatedStoryboardHtmlMutation,
   useApplyStoryboardClientReviewMutation,
   useRevertStoryboardClientReviewMutation,
   useUploadStoryboardFontReferenceImageMutation,
@@ -105,12 +116,16 @@ import {
   useApproveFounderAvatarPreviewMutation,
   useUploadFounderFinalAudioMutation,
   useGetLatestScreenplayVideoRunQuery,
+  useLazyGetLatestScreenplayVideoRunQuery,
   useGetScreenplayVideoRunQuery,
+  useGetScreenplaySceneAssetsQuery,
+  useSetScreenplaySceneAssetAcceptedMutation,
   useChatScreenplayVideoSceneMutation,
   useGenerateScreenplaySceneDialogueVoiceMutation,
   useDecideScreenplaySceneDialogueVoiceMutation,
   useCombineScreenplaySceneDialogueAudioMutation,
   useUploadScreenplaySceneAvatarImageMutation,
+  useUploadScreenplaySceneReferenceImageMutation,
   useUploadScreenplaySceneProductionImageMutation,
   useGenerateScreenplayVideoSceneAsyncMutation,
   useRegenerateScreenplayVideoSceneAsyncMutation,
@@ -125,6 +140,7 @@ import {
   useSuggestCampaignAnglesMutation,
   useSelectLockedCampaignAngleMutation,
   useUpdateCreatorMutation,
+  useUploadActorReferenceImageMutation,
   useUnsaveStoryboardMutation,
 } from "../api/creatorEndpoints.js";
 import {
@@ -147,6 +163,7 @@ import TrendCard from "../components/trends/TrendCard.jsx";
 import WhyTrendingStrip from "../components/trends/WhyTrendingStrip.jsx";
 import AudienceForm from "../components/audience/AudienceForm.jsx";
 import CreatorForm from "../components/creator/CreatorForm.jsx";
+import GraphPipelineTracePanel from "../components/creator/GraphPipelineTracePanel.jsx";
 import IdeaCandidatesPanel from "../components/ideas/IdeaCandidatesPanel.jsx";
 import StoryScriptPanel from "../components/ideas/StoryScriptPanel.jsx";
 import ScriptReviewPanel from "../components/ideas/ScriptReviewPanel.jsx";
@@ -156,13 +173,15 @@ import ShotTakePanel from "../components/storyboard/ShotTakePanel.jsx";
 import StoryboardHistoryPanel from "../components/storyboard/StoryboardHistoryPanel.jsx";
 import ProductionPlanPanel from "../components/storyboard/ProductionPlanPanel.jsx";
 import ClientReviewPanel from "../components/storyboard/ClientReviewPanel.jsx";
-import ScreenplayVideoGenerationPanel from "../components/storyboard/ScreenplayVideoGenerationPanel.jsx";
+import WorkspaceChatPanel from "../components/storyboard/WorkspaceChatPanel.jsx";
+import ScreenplayVideoGenerationPanel, { isReadyStatus } from "../components/storyboard/ScreenplayVideoGenerationPanel.jsx";
+import ScenePreparationPanel from "../components/storyboard/ScenePreparationPanel.jsx";
 import MobileFrame from "../components/preview/MobileFrame.jsx";
 import GenerationStatusBar from "../components/jobs/GenerationStatusBar.jsx";
 import OrganizationSetupCard from "../components/billing/OrganizationSetupCard.jsx";
 import RechargeWalletModal from "../components/billing/RechargeWalletModal.jsx";
 import WalletBalanceButton from "../components/billing/WalletBalanceButton.jsx";
-import { animatedStoryboardFileName, buildAnimatedStoryboardHtml } from "../utils/storyboardAnimatedExport.js";
+import { animatedStoryboardFileName, buildAnimatedStoryboardHtml, embedAndWatermarkImages } from "../utils/storyboardAnimatedExport.js";
 
 const MINIMUM_PAID_GENERATION_WALLET_BALANCE = 100;
 const AI_SHORT_STARTER_PRICE_INR = 5999;
@@ -420,7 +439,7 @@ const filterLabels = {
   timeframe: { "7d": "Last 7 Days", "24h": "Last 24 Hours", "30d": "Last 30 Days" },
 };
 
-const TREND_DISCOVERY_ENABLED = false;
+const TREND_DISCOVERY_ENABLED = true;
 const DEFAULT_STORYTELLING_TYPE = "narrator_visual_mix";
 const DEFAULT_HOOK_LENS = "direct";
 const DEFAULT_TOPIC_TYPE = "lifestyle";
@@ -960,11 +979,14 @@ const fallbackScenes = [
 
 export default function PlannerPage() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const planner = useSelector(selectCreatorPlanner);
   const preview = useSelector(selectCreatorPreview);
   const storyboardLocal = useSelector(selectCreatorStoryboardLocal);
   const reduxTenantId = sanitizeTenantId(useSelector(selectTenantId));
   const authTenantId = sanitizeTenantId(useSelector((state) => state.auth?.user?.tenantId || null));
+  const tenantCompanyName = useSelector((state) => state.tenant?.companyName || state.tenant?.name || null);
+  const authUserName = useSelector((state) => state.auth?.user?.name || null);
   const eventWallet = useSelector((state) => state.billing?.wallet || null);
   const localTenantId = useMemo(() => {
     try {
@@ -990,6 +1012,8 @@ export default function PlannerPage() {
   const [modal, setModal] = useState(null);
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [postProductionOpen, setPostProductionOpen] = useState(false);
+  const [scenePreparationOpen, setScenePreparationOpen] = useState(false);
+  const [scenePreparationShotId, setScenePreparationShotId] = useState(null);
   const [selectedPostProductionProject, setSelectedPostProductionProject] = useState(null);
   const [postProductionShotRailCollapsed, setPostProductionShotRailCollapsed] = useState(false);
   const [postProductionSceneOrder, setPostProductionSceneOrder] = useState([]);
@@ -1077,6 +1101,9 @@ export default function PlannerPage() {
   const [screenplayVideoFinalJobId, setScreenplayVideoFinalJobId] = useState(() => storedWorkflowSnapshot?.screenplayVideoFinalJobId || null);
   const [screenplayVideoAudioJobId, setScreenplayVideoAudioJobId] = useState(() => storedWorkflowSnapshot?.screenplayVideoAudioJobId || null);
   const [productionPlanJobId, setProductionPlanJobId] = useState(null);
+  // "Run full pipeline" (story script -> screenplay -> shot plan -> storyboard), each stage
+  // running its own critic/retry loop already - see CreatorGenerationGraphOrchestratorService.
+  const [pipelineJobId, setPipelineJobId] = useState(null);
   const screenplayStartInFlightRef = useRef(false);
   const productionPlanStartInFlightRef = useRef(false);
   const [shotTakeJobId, setShotTakeJobId] = useState(null);
@@ -1164,6 +1191,7 @@ export default function PlannerPage() {
   const { data: creators = [] } = useListCreatorsQuery();
   const [createCreator, createCreatorState] = useCreateCreatorMutation();
   const [updateCreator, updateCreatorState] = useUpdateCreatorMutation();
+  const [uploadActorReferenceImage, uploadActorReferenceImageState] = useUploadActorReferenceImageMutation();
   const [generateIdeas, ideasState] = useGenerateIdeasMutation();
   const [generateProductAdPipeline, productAdPipelineState] = useGenerateProductAdPipelineMutation();
   const [uploadProductReferenceImages, uploadProductReferenceImagesState] = useUploadProductReferenceImagesMutation();
@@ -1172,6 +1200,7 @@ export default function PlannerPage() {
   const [fetchJobStatus] = useLazyGetJobQuery();
   const [saveStoryIdea, saveStoryIdeaState] = useSaveStoryIdeaMutation();
   const [generateStoryIdeaScript, generateScriptState] = useGenerateStoryIdeaScriptMutation();
+  const [runGraphPipeline, runGraphPipelineState] = useRunGraphPipelineMutation();
   const [saveStoryIdeaScript, saveStoryScriptState] = useSaveStoryIdeaScriptMutation();
   const [saveCharacterCastMappings, saveCharacterCastMappingsState] = useSaveCharacterCastMappingsMutation();
   const [generateStoryIdeaScreenplay, generateScreenplayState] = useGenerateStoryIdeaScreenplayMutation();
@@ -1195,6 +1224,7 @@ export default function PlannerPage() {
   const [decideScreenplaySceneDialogueVoice] = useDecideScreenplaySceneDialogueVoiceMutation();
   const [combineScreenplaySceneDialogueAudio] = useCombineScreenplaySceneDialogueAudioMutation();
   const [uploadScreenplaySceneAvatarImage] = useUploadScreenplaySceneAvatarImageMutation();
+  const [uploadScreenplaySceneReferenceImage] = useUploadScreenplaySceneReferenceImageMutation();
   const [uploadScreenplaySceneProductionImage] = useUploadScreenplaySceneProductionImageMutation();
   const [generateScreenplayVideoSceneAsync, generateScreenplayVideoSceneState] = useGenerateScreenplayVideoSceneAsyncMutation();
   const [regenerateScreenplayVideoSceneAsync, regenerateScreenplayVideoSceneState] = useRegenerateScreenplayVideoSceneAsyncMutation();
@@ -1209,12 +1239,21 @@ export default function PlannerPage() {
   const [generateProductionPlansAsync, generateProductionPlansState] = useGenerateProductionPlansAsyncMutation();
   const [saveStoryboardClientReview, saveClientReviewState] = useSaveStoryboardClientReviewMutation();
   const [chatStoryboardClientReview, chatClientReviewState] = useChatStoryboardClientReviewMutation();
+  const [embedOfflineAnimatedStoryboardHtml] = useEmbedOfflineAnimatedStoryboardHtmlMutation();
   const [applyStoryboardClientReview, applyClientReviewState] = useApplyStoryboardClientReviewMutation();
   const [revertStoryboardClientReview, revertClientReviewState] = useRevertStoryboardClientReviewMutation();
   const [uploadStoryboardFontReferenceImage, uploadFontReferenceState] = useUploadStoryboardFontReferenceImageMutation();
   const [uploadStoryboardVisualReferenceImage, uploadVisualReferenceState] = useUploadStoryboardVisualReferenceImageMutation();
   const [fetchAnimatedStoryboardPreview] = useLazyGetAnimatedStoryboardPreviewQuery();
   const [generateShotImage, generateShotImageState] = useGenerateShotImageMutation();
+  const [analyzeShotProductReference] = useAnalyzeShotProductReferenceMutation();
+  const [confirmShotProductReference] = useConfirmShotProductReferenceMutation();
+  // Multi-shot batching: staged uploads (not yet analyzed) and mismatch reviews that came back
+  // from a batch analysis run for a shot whose detail panel wasn't open at the time - both are
+  // in-memory only, matching every other in-progress upload state in this app.
+  const [pendingProductReferences, setPendingProductReferences] = useState(new Map());
+  const [pendingProductMismatchReviews, setPendingProductMismatchReviews] = useState(new Map());
+  const [analyzingStagedProductReferences, setAnalyzingStagedProductReferences] = useState(false);
   const [editStoryboardShotWithAi, editStoryboardShotWithAiState] = useEditStoryboardShotWithAiMutation();
   const [insertStoryboardTimelineShot, insertStoryboardTimelineShotState] = useInsertStoryboardTimelineShotMutation();
   const [uploadShotTake, uploadShotTakeState] = useUploadShotTakeMutation();
@@ -1246,6 +1285,7 @@ export default function PlannerPage() {
   const { data: productAdPipelineJob } = useGetJobQuery(productAdPipelineJobId, { skip: !productAdPipelineJobId, pollingInterval: productAdPipelineJobId ? 2200 : 0 });
   const { data: screenplayJob } = useGetJobQuery(screenplayJobId, { skip: !screenplayJobId, pollingInterval: screenplayJobId ? 1600 : 0 });
   const { data: productionPlanJob } = useGetJobQuery(productionPlanJobId, { skip: !productionPlanJobId, pollingInterval: productionPlanJobId ? 1600 : 0 });
+  const { data: pipelineJob } = useGetJobQuery(pipelineJobId, { skip: !pipelineJobId, pollingInterval: pipelineJobId ? 2200 : 0 });
   const {
     data: shotTakeJob,
     error: shotTakeJobError,
@@ -1338,6 +1378,44 @@ export default function PlannerPage() {
     )
   );
   const {
+    data: screenplaySceneAssets,
+    refetch: refetchScreenplaySceneAssets,
+  } = useGetScreenplaySceneAssetsQuery(
+    { scriptId: scriptDetailIdea?.scriptId },
+    {
+      skip: !isUuid(scriptDetailIdea?.scriptId),
+      pollingInterval: screenplayVideoPollingActive ? 2200 : MEDIA_URL_RENEWAL_INTERVAL_MS,
+      refetchOnMountOrArgChange: true,
+      refetchOnFocus: true,
+    }
+  );
+  const [setScreenplaySceneAssetAccepted] = useSetScreenplaySceneAssetAcceptedMutation();
+  // The reliable source for "which shots are already generated" - reads creator_assets
+  // directly rather than reconstructing it from whichever generation job happened to
+  // complete most recently, which an unrelated failure (e.g. final-render billing error)
+  // can silently poison. Used both for accurate progress display and to let "run complete
+  // pipeline" skip shots that are already done instead of re-generating everything.
+  const generatedShotNumbers = useMemo(
+    () => new Set(
+      (screenplaySceneAssets?.scenes || [])
+        .filter((scene) => scene?.status === "READY")
+        .map((scene) => scene?.shotNumber)
+        .filter((shotNumber) => Number.isInteger(shotNumber))
+    ),
+    [screenplaySceneAssets]
+  );
+  const combinedVideoAsset = screenplaySceneAssets?.combinedVideo || null;
+  // This hook is declared once at the top of the component and never remounts as the
+  // user moves between storyboard/video, so RTK Query's mount-based refetch heuristics
+  // don't apply when switching pages. Force a refetch on entry so the video page always
+  // shows the latest generated shots instead of waiting on the next poll tick.
+  useEffect(() => {
+    if (workspacePage === "video" && isUuid(scriptDetailIdea?.scriptId)) {
+      refetchScreenplaySceneAssets();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspacePage, scriptDetailIdea?.scriptId]);
+  const {
     data: screenplayVideoRun,
     isFetching: screenplayVideoRunLoading,
     refetch: refetchScreenplayVideoRun,
@@ -1392,6 +1470,7 @@ export default function PlannerPage() {
     { skip: !postProductionOpen, refetchOnMountOrArgChange: true }
   );
   const [fetchCreatorProject, fetchCreatorProjectState] = useLazyGetCreatorProjectQuery();
+  const [fetchLatestScreenplayVideoRun] = useLazyGetLatestScreenplayVideoRunQuery();
   const { data: ideaGenerationJobs = [], isFetching: ideaGenerationJobsLoading, refetch: refetchIdeaGenerationJobs } = useGetJobsQuery(
     { jobType: "IDEA_GENERATE" },
     { pollingInterval: ideaGenerationJobId ? 5000 : 0, refetchOnMountOrArgChange: true }
@@ -1706,9 +1785,78 @@ export default function PlannerPage() {
     () => applySceneOrder(mergedScenes, postProductionSceneOrder),
     [mergedScenes, postProductionSceneOrder]
   );
+  // The video-generation panel reads raw scriptScenes/scriptJson.shots (it needs their full
+  // per-shot planning fields - dialogue, camera notes, etc. - which the storyboard-oriented
+  // `scenes` above doesn't carry the same way), but that raw data has no image URLs on it at
+  // all: productionImageUrl only ever lands on scriptScenes as a client-side, this-session-only
+  // patch when a shot's "Generate" click resolves (see handleGenerateShotImage's optimistic
+  // setScriptDetailIdea update). On a fresh load, or for any shot generated in an earlier
+  // session/via the bulk generator, that patch never happened, so the panel silently fell back
+  // to the unrelated product-brief reference image instead of the real generated frame. Patch
+  // the same authoritative DB-backed image URLs (backendShotImageUrls) onto it that `scenes`
+  // already gets, so every shot - not just the one generated most recently in this tab - shows
+  // its real production frame.
+  const videoPanelScenes = useMemo(() => {
+    const raw = scriptDetailIdea?.scriptScenes?.length
+      ? scriptDetailIdea.scriptScenes
+      : scriptDetailIdea?.scriptJson?.shots || scenes;
+    return mergeShotImageUrlsIntoScenes(raw, backendShotImageUrls);
+  }, [scriptDetailIdea?.scriptScenes, scriptDetailIdea?.scriptJson?.shots, scenes, backendShotImageUrls]);
+  const { data: activeProjectDetail } = useGetPreProductionProjectQuery(activeProjectId, { skip: !isUuid(activeProjectId) });
+  const { data: activeProjectSpend } = useGetProjectSpendQuery(
+    { tenantId: reduxTenantId, projectId: activeProjectId },
+    { skip: !isUuid(activeProjectId) || !isUuid(reduxTenantId) }
+  );
+  const [triggerAdvanceProjectStatus] = useAdvanceProjectStatusMutation();
+  const allShotsVideoGenerated = videoPanelScenes.length > 0 && videoPanelScenes.every((scene) => isReadyStatus(scene?.status));
+  const videoGenerationCompleteFiredRef = useRef(null);
+  useEffect(() => {
+    if (!allShotsVideoGenerated || !isUuid(activeProjectId)) return;
+    if (videoGenerationCompleteFiredRef.current === activeProjectId) return;
+    videoGenerationCompleteFiredRef.current = activeProjectId;
+    triggerAdvanceProjectStatus({ projectId: activeProjectId, target: "VIDEO_GENERATION_COMPLETE" });
+  }, [allShotsVideoGenerated, activeProjectId, triggerAdvanceProjectStatus]);
+  const {
+    data: latestFinalRender,
+    isFetching: latestFinalRenderLoading,
+    refetch: refetchLatestFinalRender,
+  } = useGetLatestFinalRenderQuery(activeProjectId, { skip: !isUuid(activeProjectId) });
+  const [triggerCreateFinalRender, createFinalRenderState] = useCreateFinalRenderMutation();
+  const [triggerUpdateFinalVideoLock, updateFinalVideoLockState] = useUpdateFinalVideoLockMutation();
+  const handleToggleFinalVideoLock = useCallback(async (unlocked) => {
+    if (!isUuid(activeProjectId)) return;
+    try {
+      await triggerUpdateFinalVideoLock({ projectId: activeProjectId, unlocked }).unwrap();
+    } catch (error) {
+      setFinalRenderError(error?.data?.message || error?.error || "Could not update download lock.");
+    }
+  }, [activeProjectId, triggerUpdateFinalVideoLock]);
+  const [finalRenderError, setFinalRenderError] = useState(null);
+  const handleAssembleFinalVideo = useCallback(async () => {
+    if (!isUuid(activeProjectId)) return;
+    setFinalRenderError(null);
+    try {
+      await triggerCreateFinalRender(activeProjectId).unwrap();
+      refetchLatestFinalRender?.();
+    } catch (error) {
+      setFinalRenderError(error?.data?.message || error?.error || "Could not assemble the final video.");
+    }
+  }, [activeProjectId, triggerCreateFinalRender, refetchLatestFinalRender]);
   useEffect(() => {
     setPostProductionSceneOrder((current) => reconcileSceneOrder(mergedScenes, current));
   }, [mergedScenes]);
+  // Shots whose shot plan lists a character - candidates for "apply this same cast face to other
+  // shots too" after a CAST reference is confirmed for one shot.
+  const castCandidateShots = useMemo(
+    () => scenes
+      .filter((scene) => shotHasHumanCharacter(scene))
+      .map((scene) => ({
+        shotNumber: Number(scene.shotNumber || 0),
+        title: firstText(scene.title, scene.shotTitle, `Shot ${scene.shotNumber || ""}`),
+      }))
+      .filter((entry) => entry.shotNumber > 0),
+    [scenes]
+  );
   const backendShotImageLoadingKeys = useMemo(
     () => shotImageUrlsLoading ? shotImageLoadingKeysForScenes(baseScenes) : [],
     [baseScenes, shotImageUrlsLoading]
@@ -2159,6 +2307,32 @@ export default function PlannerPage() {
     && !selectedAudienceDecision
     && !generatedStoryboard
     && !storyboardSaved;
+  // Self-heal: the persisted localStorage snapshot can end up with scriptDetailIdea
+  // cleared (e.g. a script-generation modal was opened and cancelled) while still
+  // carrying a real projectId and workspacePage="video"/"storyboard" - the app then
+  // reads as "no screenplay" even though one exists on the backend. Re-fetch from the
+  // durable source instead of trusting the cached snapshot as the only source of truth.
+  useEffect(() => {
+    if (!workflowRestored || !isUuid(activeProjectId) || scriptDetailIdea || freshNewIdeaMode) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const project = await fetchCreatorProject(activeProjectId).unwrap();
+        const restored = buildWorkflowStateFromProject(project);
+        if (!cancelled && restored?.scriptDetailIdea) {
+          setScriptDetailIdea(restored.scriptDetailIdea);
+          if (restored.storyScriptIdea) setStoryScriptIdea(restored.storyScriptIdea);
+        }
+      } catch {
+        // No recoverable screenplay for this project - leave the UI's own
+        // "generate a screenplay" prompt as the correct next step.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workflowRestored, activeProjectId, scriptDetailIdea, freshNewIdeaMode]);
   const effectiveStoryScriptReady = !freshNewIdeaMode && Boolean(storyScriptIdea);
   const effectiveCastStepComplete = !freshNewIdeaMode
     && Boolean(storyScriptIdea || scriptDetailIdea || castPlan || activeProjectId)
@@ -2178,8 +2352,11 @@ export default function PlannerPage() {
   const acceptedShotTakeCount = (Array.isArray(shotTakes) ? shotTakes : []).filter((take) => take?.accepted).length;
   const effectiveShootPolishReady = Boolean(expectedShotTakeCount && acceptedShotTakeCount >= expectedShotTakeCount);
   const screenplayVideoSceneCount = screenplayVideoSceneCountFor(screenplayVideoRun, scenes);
-  const screenplayVideoGeneratedCount = screenplayVideoGeneratedCountFor(screenplayVideoRun);
-  const activeFinalVideoUrl = finalVideoUrlFromPayload(currentScreenplayVideoRun)
+  const screenplayVideoGeneratedCount = generatedShotNumbers.size > 0
+    ? generatedShotNumbers.size
+    : screenplayVideoGeneratedCountFor(screenplayVideoRun);
+  const activeFinalVideoUrl = combinedVideoAsset?.videoUrl
+    || finalVideoUrlFromPayload(currentScreenplayVideoRun)
     || finalVideoUrlFromPayload(screenplayVideoFinalJob?.result)
     || finalVideoUrlFromPayload(screenplayVideoFinalJob?.outputPayload);
   useEffect(() => {
@@ -2188,12 +2365,13 @@ export default function PlannerPage() {
       || !productStoryboardMode
       || canExportShotsPdf
       || activeFinalVideoUrl
+      || screenplayVideoGeneratedCount > 0
       || !scriptDetailIdea?.scriptId
     ) return;
     setWorkspacePage("storyboard");
     dispatch(setActiveStep("storyboard"));
     window.history.replaceState(null, "", "/#storyboard");
-  }, [activeFinalVideoUrl, canExportShotsPdf, dispatch, productStoryboardMode, scriptDetailIdea?.scriptId, workspacePage]);
+  }, [activeFinalVideoUrl, canExportShotsPdf, dispatch, productStoryboardMode, screenplayVideoGeneratedCount, scriptDetailIdea?.scriptId, workspacePage]);
   const effectiveScreenplayVideoReady = Boolean(
     activeFinalVideoUrl
   );
@@ -2543,19 +2721,11 @@ export default function PlannerPage() {
     }
   }, [lowBalanceNotice, paidGenerationMinimumBalance, tenantId, walletBalanceAmount]);
 
-  useEffect(() => {
-    const openRecharge = () => {
-      if (!tenantId) {
-        flash("Set up organization before wallet recharge", "error");
-        scrollToSection("dashboard");
-        return;
-      }
-      setLowBalanceNotice(null);
-      setRechargeOpen(true);
-    };
-    window.addEventListener("creator:open-recharge", openRecharge);
-    return () => window.removeEventListener("creator:open-recharge", openRecharge);
-  }, [tenantId]);
+  // "creator:open-recharge" is now handled globally by GlobalRechargeModal (mounted in
+  // CreatorShell, so the sidebar's Recharge button works on every page, not just this one) --
+  // PlannerPage no longer listens for it itself, to avoid two recharge modals opening at once
+  // here. setRechargeOpen(true) is still called directly elsewhere in this page (its own
+  // low-balance guard before a paid action), which still opens this page's own modal below.
 
   useEffect(() => {
     if (TREND_DISCOVERY_ENABLED
@@ -3846,11 +4016,14 @@ export default function PlannerPage() {
     const loadingKey = shotImageLoadingKey(shotNumber, normalizedImageKind);
     setShotImageLoadingKeys((current) => current.includes(loadingKey) ? current : [...current, loadingKey]);
     try {
+      // productionImagePrompt is the full backend-rendered prompt echoed back for
+      // display/debugging (can run past 12000 chars) - it must never be resubmitted as an
+      // imagePrompt override, or each plain Redo compounds it into buildProductionImagePrompt's
+      // own template again and eventually trips the server's @Size(max=12000) validation.
       const requestedImagePrompt = firstText(
         imageOptions.imagePrompt,
         imageOptions.productImagePrompt,
         scene?.productImagePrompt,
-        scene?.productionImagePrompt,
         scene?.imagePrompt,
         scene?.storyboardImagePrompt,
         scene?.visualPrompt
@@ -3967,7 +4140,9 @@ export default function PlannerPage() {
           generatedProductImageUrl: productionImageUrl,
           generatedProductImageAssets: [productionImageAsset],
           imageAnchorUrl: productionImageUrl,
-          productImagePrompt: productionImagePrompt,
+          // productionImagePrompt is display/debug-only (the full backend-rendered prompt) -
+          // never mirror it into productImagePrompt, which every Redo fallback chain treats as
+          // a short, resubmittable creative brief.
           productionImagePrompt,
         };
       }
@@ -4007,6 +4182,144 @@ export default function PlannerPage() {
     } finally {
       setShotImageLoadingKeys((current) => current.filter((key) => key !== loadingKey));
     }
+  };
+
+  const handleAnalyzeShotProductReference = async (scene, file, classification) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId)) {
+      flash("Generate screenplay before attaching a product reference.", "error");
+      return null;
+    }
+    const shotNumber = Number(scene?.shotNumber || 1);
+    try {
+      const result = await analyzeShotProductReference({
+        scriptId: scriptDetailIdea.scriptId,
+        shotNumber,
+        file,
+        classification,
+      }).unwrap();
+      if (classification === "INSPIRATION" && result?.analysis?.mismatches?.length) {
+        flash("This reference doesn't fully match your current planning - review before attaching it.", "warning");
+      }
+      return result;
+    } catch (error) {
+      creatorDebugLog("shot product reference analyze failed", { scriptId: scriptDetailIdea?.scriptId, shotNumber, error });
+      flash("Could not analyze the reference photo. Try again.", "error");
+      return null;
+    }
+  };
+
+  const handleConfirmShotProductReference = async (scene, reference, options = {}) => {
+    if (!scriptDetailIdea?.scriptId || !isUuid(scriptDetailIdea.scriptId) || !reference) {
+      return null;
+    }
+    const shotNumber = Number(scene?.shotNumber || 1);
+    try {
+      const result = await confirmShotProductReference({
+        scriptId: scriptDetailIdea.scriptId,
+        shotNumber,
+        bucket: reference.bucket,
+        objectKey: reference.objectKey,
+        url: reference.url,
+        classification: reference.classification,
+        castProfileId: reference.castProfileId || "",
+        castDisplayName: reference.castDisplayName || "",
+        approvedUpdates: Array.isArray(options.approvedUpdates) ? options.approvedUpdates : [],
+        ignoreSubject: Boolean(options.ignoreSubject),
+        detectedSubject: options.detectedSubject || "",
+        dominantMood: options.dominantMood || "",
+        cameraAngle: options.cameraAngle || "",
+        lightingStyle: options.lightingStyle || "",
+        motion: options.motion || "",
+      }).unwrap();
+      addActivity(
+        reference.classification === "CAST" ? "Cast reference attached" : "Style reference attached",
+        result?.planningUpdated ? `Shot ${shotNumber} - planning updated (${(result.updatedFields || []).join(", ")})` : `Shot ${shotNumber} - regenerate the product frame to apply it`
+      );
+      flash(
+        result?.planningUpdated
+          ? "Reference attached and planning updated."
+          : "Reference photo attached. Regenerate this shot's product frame to apply it.",
+        "success"
+      );
+      return result;
+    } catch (error) {
+      creatorDebugLog("shot product reference confirm failed", { scriptId: scriptDetailIdea?.scriptId, shotNumber, error });
+      flash("Could not attach the reference photo. Try again.", "error");
+      return null;
+    }
+  };
+
+  const handleApplyCastReferenceToOtherShots = async (reference, shotNumbers = []) => {
+    const targets = Array.from(new Set(shotNumbers.map(Number))).filter(Boolean);
+    if (!reference || !targets.length) return;
+    let appliedCount = 0;
+    for (const shotNumber of targets) {
+      // eslint-disable-next-line no-await-in-loop
+      const result = await handleConfirmShotProductReference({ shotNumber }, reference, { approvedUpdates: [] });
+      if (result) appliedCount += 1;
+    }
+    if (appliedCount) {
+      addActivity("Cast reference applied to more shots", `${appliedCount} additional shot${appliedCount === 1 ? "" : "s"} - regenerate each product frame to apply it`);
+      flash(`Applied to ${appliedCount} more shot${appliedCount === 1 ? "" : "s"}. Regenerate each one's product frame when ready.`, "success");
+    }
+  };
+
+  const handleStageShotProductReference = (scene, file, classification, castName) => {
+    const shotNumber = Number(scene?.shotNumber || 1);
+    setPendingProductReferences((current) => {
+      const next = new Map(current);
+      next.set(shotNumber, { scene, file, classification, castName });
+      return next;
+    });
+    flash(`Reference staged for shot ${shotNumber}. Analyze it from the toolbar when you're ready.`, "success");
+  };
+
+  const handleAnalyzeStagedProductReferences = async () => {
+    const staged = Array.from(pendingProductReferences.values());
+    if (!staged.length || analyzingStagedProductReferences) return;
+    setAnalyzingStagedProductReferences(true);
+    setPendingProductReferences(new Map());
+    try {
+      for (const item of staged) {
+        const shotNumber = Number(item.scene?.shotNumber || 1);
+        const result = await handleAnalyzeShotProductReference(item.scene, item.file, item.classification);
+        if (!result?.reference) continue;
+        const mismatches = Array.isArray(result.analysis?.mismatches) ? result.analysis.mismatches : [];
+        const isCast = item.classification === "CAST";
+        if (isCast || !mismatches.length) {
+          // No review needed - attach immediately, same as the single-shot "no mismatch" path.
+          await handleConfirmShotProductReference(item.scene, { ...result.reference, castDisplayName: item.castName }, {
+            approvedUpdates: [],
+            detectedSubject: result.analysis?.detectedSubject || "",
+            dominantMood: result.analysis?.dominantMood || "",
+            cameraAngle: result.analysis?.cameraAngle || "",
+            lightingStyle: result.analysis?.lightingStyle || "",
+            motion: result.analysis?.motion || "",
+          });
+        } else {
+          // A mismatch needs a human decision - stash the analysis so opening this shot's detail
+          // panel resumes straight into the review state instead of losing the (already-paid-for)
+          // analysis and forcing the user to re-upload and re-analyze.
+          setPendingProductMismatchReviews((current) => {
+            const next = new Map(current);
+            next.set(shotNumber, result);
+            return next;
+          });
+          flash(`Shot ${shotNumber}'s reference needs review - open that shot to resolve it.`, "warning");
+        }
+      }
+    } finally {
+      setAnalyzingStagedProductReferences(false);
+    }
+  };
+
+  const handleConsumeProductMismatchReview = (shotNumber) => {
+    setPendingProductMismatchReviews((current) => {
+      if (!current.has(shotNumber)) return current;
+      const next = new Map(current);
+      next.delete(shotNumber);
+      return next;
+    });
   };
 
   const handleGenerateAllScreenplaySceneImages = async (candidateScenes = [], options = {}) => {
@@ -4782,9 +5095,16 @@ export default function PlannerPage() {
       : Array.isArray(currentScreenplayVideoRun?.sceneClips)
         ? currentScreenplayVideoRun.sceneClips
         : [];
+    // generatedShotNumbers comes from creator_assets (reliable) rather than the JSONB
+    // videoRun snapshot, which an unrelated job failure can leave stale/incomplete - prefer
+    // it so "run complete pipeline" correctly skips shots already generated even when the
+    // old run payload undercounts them.
     const resumingStoredRun = !generationOptions.forceNewRun
-      && activeRunScenes.some(screenplaySceneHasGeneratedClip)
-      && activeRunScenes.some((scene) => !screenplaySceneHasGeneratedClip(scene));
+      && (
+        (generatedShotNumbers.size > 0 && expectedShotTakeCount > generatedShotNumbers.size)
+        || (activeRunScenes.some(screenplaySceneHasGeneratedClip)
+          && activeRunScenes.some((scene) => !screenplaySceneHasGeneratedClip(scene)))
+      );
     if (!preparingSceneWorkspace
         && !resumingStoredRun
         && !canRunPaidModelAction("60-second AI video production", { minimumBalance: creatorFlowMinimumBalance })) return;
@@ -5390,6 +5710,30 @@ export default function PlannerPage() {
     }
   };
 
+  const handleUploadScreenplaySceneReferenceImage = async (scene, file, priority) => {
+    const runId = activeScreenplayVideoRunId;
+    const sceneId = scene?.id || scene?.sceneId || scene?.scene_id;
+    if (!runId || !sceneId || !file) return null;
+    try {
+      const result = await uploadScreenplaySceneReferenceImage({ runId, sceneId, file, priority }).unwrap();
+      addActivity(
+        "Scene reference image uploaded",
+        `${priority === "override" ? "Replacing" : "Combined with"} existing references for ${scene?.title || `Scene ${scene?.sceneNumber || ""}`.trim()}`
+      );
+      flash(
+        priority === "override"
+          ? "Reference image attached. It will replace other references the next time this scene generates."
+          : "Reference image attached. It will be combined with other references the next time this scene generates.",
+        "success"
+      );
+      void refetchScreenplayVideoRun?.();
+      return result;
+    } catch (error) {
+      flash(apiErrorMessage(error, "Could not upload the scene reference image."), "error");
+      return null;
+    }
+  };
+
   const handleUploadScreenplaySceneProductionImage = async (scene, file, details) => {
     const runId = activeScreenplayVideoRunId;
     const sceneId = scene?.id || scene?.sceneId || scene?.scene_id;
@@ -5549,7 +5893,7 @@ export default function PlannerPage() {
         sourcePayload: {
           brief: lockedBrief,
           screenplay: scriptDetailIdea,
-          scenes: scriptDetailIdea?.scriptScenes?.length ? scriptDetailIdea.scriptScenes : scriptDetailIdea?.scriptJson?.shots || scenes,
+          scenes: videoPanelScenes,
           style: activeVideoStylePayload,
           durationSeconds: selectedDuration,
           screenType,
@@ -5597,7 +5941,7 @@ export default function PlannerPage() {
           screenplay: scriptDetailIdea,
           videoRun: currentScreenplayVideoRun,
           finalClipUrl,
-          scenes: scriptDetailIdea?.scriptScenes?.length ? scriptDetailIdea.scriptScenes : scriptDetailIdea?.scriptJson?.shots || scenes,
+          scenes: videoPanelScenes,
           acceptedShotSequence,
           videoFinishingPlan: activeVideoFinishingPlan,
           soundDesignPlan: soundDesignPlanFromVideoFinishingPlan(activeVideoFinishingPlan),
@@ -5696,7 +6040,7 @@ export default function PlannerPage() {
     const currentSection = workspacePage === "ideas" && projectWorkspaceMode ? "workflow" : sectionForWorkspacePage(workspacePage);
     const nextSection = nextPage === "ideas" && projectWorkspaceMode ? "workflow" : sectionForWorkspacePage(nextPage);
     const gateStep = nextPage === "generated-ideas" ? "" : nextPage;
-    const storyboardVideoGate = workspacePage === "storyboard" && nextPage === "video"
+    const storyboardVideoGate = workspacePage === "storyboard" && nextPage === "video" && !activeFinalVideoUrl && !generatedShotNumbers.size
       ? !effectiveShotPlansReady
         ? "Generate shot plans before continuing to Video."
         : !storyboardSaved
@@ -6526,6 +6870,48 @@ export default function PlannerPage() {
     scrollToSection("workflow");
   };
 
+  // Opt-in "run the whole graph" trigger: story script -> screenplay -> shot plan -> storyboard,
+  // each stage already running its own critic/retry loop server-side. Fires the async job and
+  // leaves the existing per-stage screens as the source of truth once it completes - this only
+  // adds a single button + a readable trace of what each stage did while it runs.
+  const handleRunGraphPipeline = async () => {
+    const storyIdea = ideas.find((idea) => idea.id === planner.selectedIdeaId);
+    if (!lockedBrief || !storyIdea) {
+      flash("Select a story idea first", "error");
+      return;
+    }
+    const workflowLockedBrief = await ensureSavedLockedBriefForWorkflow();
+    if (!isUuid(workflowLockedBrief?.lockedIdeaId)) {
+      flash("Could not save the topic to the backend. Save the topic again after the backend is reachable.", "error");
+      return;
+    }
+    let sourceStoryIdea = await ensureBackendStoryIdeaForWorkflow(storyIdea, workflowLockedBrief, { silent: true });
+    if (!isUuid(sourceStoryIdea?.id)) {
+      flash("Story ideas are still local only. Regenerate story ideas once the backend can return saved UUIDs.", "error");
+      return;
+    }
+    if (savedStoryIdeaId !== sourceStoryIdea.id) {
+      const saved = await saveSelectedStoryIdeaForWorkflow(sourceStoryIdea, { silent: true, lockedBriefOverride: workflowLockedBrief });
+      if (!saved?.idea) {
+        flash("Could not save selected story idea before generation", "error");
+        return;
+      }
+      sourceStoryIdea = saved.idea;
+    }
+    if (!canRunPaidModelAction("Full pipeline generation")) return;
+    try {
+      const result = await runGraphPipeline({
+        lockedIdeaId: workflowLockedBrief.lockedIdeaId,
+        storyIdeaId: sourceStoryIdea.id,
+      }).unwrap();
+      setPipelineJobId(result?.jobId || result?.id || null);
+      addActivity("Full pipeline run started", sourceStoryIdea.title);
+      flash("Running story script -> screenplay -> shot plan -> storyboard. Track progress below.", "success");
+    } catch (error) {
+      handlePaidModelError(error, "Full pipeline run failed to start.", "Full pipeline generation");
+    }
+  };
+
   const applyScreenplayResult = (screenplayResult, sourceIdea, draftStoryScript = null) => {
     if (!screenplayResult || !sourceIdea) return null;
     const storyIdeaId = resolveWorkflowStoryIdeaId(screenplayResult, sourceIdea);
@@ -6839,12 +7225,12 @@ export default function PlannerPage() {
   };
 
   const handleCreateActor = async (actorDraft) => {
-    const normalized = normalizeSavedActorProfile(
+    // Persisted right away (not deferred to "Confirm cast") so the actor has a real profile id
+    // and a photo can be uploaded immediately after adding it.
+    const payload = castMemberToProfilePayload(
       {
-        id: `actor-local-${Date.now()}`,
         name: actorDraft?.name?.trim() || "Local Actor",
-        displayName: actorDraft?.name?.trim() || "Local Actor",
-        roleInShort: actorDraft?.roleInShort || actorDraft?.role || "Supporting Actor",
+        role: actorDraft?.roleInShort || actorDraft?.role || "Supporting Actor",
         age: actorDraft?.age,
         gender: actorDraft?.gender,
         vibe: actorDraft?.vibe,
@@ -6852,17 +7238,113 @@ export default function PlannerPage() {
         cameraConfidence: actorDraft?.cameraConfidence,
         look: actorDraft?.look,
         profile: actorDraft?.profile,
-        confirmed: true,
-        attributes: {
-          scenePresence: actorDraft?.scenePresence || "Reaction shots",
-          localOnly: true,
-        },
+        scenePresence: actorDraft?.scenePresence || "Reaction shots",
       },
-      actorDraft
+      activeProjectId
     );
-    addActivity("Actor added locally", normalized.name);
-    flash("Actor saved locally. You can map it to characters now.", "success");
-    return normalized;
+    try {
+      const saved = await createCreator(payload).unwrap();
+      const normalized = normalizeSavedActorProfile(saved, actorDraft);
+      addActivity("Actor added", normalized.name);
+      flash("Actor saved. Add a photo, then map it to characters.", "success");
+      return normalized;
+    } catch {
+      const normalized = normalizeSavedActorProfile(
+        {
+          id: `actor-local-${Date.now()}`,
+          name: actorDraft?.name?.trim() || "Local Actor",
+          displayName: actorDraft?.name?.trim() || "Local Actor",
+          roleInShort: actorDraft?.roleInShort || actorDraft?.role || "Supporting Actor",
+          age: actorDraft?.age,
+          gender: actorDraft?.gender,
+          vibe: actorDraft?.vibe,
+          style: actorDraft?.style,
+          cameraConfidence: actorDraft?.cameraConfidence,
+          look: actorDraft?.look,
+          profile: actorDraft?.profile,
+          confirmed: true,
+          attributes: {
+            scenePresence: actorDraft?.scenePresence || "Reaction shots",
+            localOnly: true,
+          },
+        },
+        actorDraft
+      );
+      addActivity("Actor added locally", normalized.name);
+      flash("Couldn't save to your account right now; actor added locally. Photo upload needs a saved actor — try Confirm cast, then add a photo.", "warning");
+      return normalized;
+    }
+  };
+
+  const handleUploadActorPhoto = async (actorId, file) => {
+    const saved = await uploadActorReferenceImage({ id: actorId, file }).unwrap();
+    flash("Actor photo saved. It'll be used to lock this character's face in video and storyboard generation.", "success");
+    return saved;
+  };
+
+  const handleUploadCastReferenceImage = async (characterName, file) => {
+    const normalize = (value) => String(value || "").trim().toLowerCase();
+    const mapping = activeCharacterMappings.find((item) => normalize(item.characterName) === normalize(characterName));
+
+    if (!mapping || !isUuid(mapping.castProfileId)) {
+      flash("This character isn't mapped to a cast member yet. Open the Cast step to assign one first.", "error");
+      throw new Error("No cast profile mapped for this character yet.");
+    }
+
+    let savedActor;
+    try {
+      savedActor = await handleUploadActorPhoto(mapping.castProfileId, file);
+    } catch (error) {
+      flash(apiErrorMessage(error, "Photo upload failed. Try a JPG, PNG, or WebP under 15 MB."), "error");
+      throw error;
+    }
+
+    const referenceImageUrl = savedActor?.attributes?.referenceImageUrl || savedActor?.referenceImageUrl || "";
+    const updatedMappings = activeCharacterMappings.map((item) =>
+      item === mapping
+        ? {
+            ...item,
+            castDisplayName: savedActor?.name || savedActor?.displayName || item.castDisplayName,
+            castPayload: {
+              ...(item.castPayload || {}),
+              referenceImageUrl,
+              actorId: mapping.castProfileId,
+            },
+          }
+        : item
+    );
+
+    try {
+      const mappingResult = await saveCharacterCastMappings({
+        lockedIdeaId: activeLockedIdeaIdForCast,
+        storyIdeaId: activeStoryIdeaIdForCast,
+        projectId: activeProjectId,
+        scriptId: isUuid(scriptDetailIdea?.scriptId) ? scriptDetailIdea.scriptId : null,
+        mappings: updatedMappings,
+      }).unwrap();
+      const savedMappings = mappingResult.mappings || updatedMappings;
+      setCastPlan((current) => {
+        const base = current || selectedCreator || {};
+        return {
+          ...base,
+          characterMappings: savedMappings,
+          actors: (base.actors || []).map((actor) =>
+            actor.actorId === mapping.castProfileId ? { ...actor, referenceImageUrl } : actor
+          ),
+        };
+      });
+      flash(`Cast reference set for ${mapping.castDisplayName || characterName}.`, "success");
+    } catch (error) {
+      setCastPlan((current) => {
+        const base = current || selectedCreator || {};
+        return { ...base, characterMappings: updatedMappings };
+      });
+      flash(
+        apiErrorMessage(error, "Photo saved to the actor, but syncing it to this scene's cast mapping failed. Retry to confirm it sticks."),
+        "warning"
+      );
+      throw error;
+    }
   };
 
   const handleCreatorConfirm = async (creatorProfile) => {
@@ -6890,6 +7372,7 @@ export default function PlannerPage() {
           cameraConfidence: saved.cameraConfidence || actor.cameraConfidence,
           look: saved.look || actor.look,
           profile: saved.profile || actor.profile,
+          referenceImageUrl: saved.attributes?.referenceImageUrl || actor.referenceImageUrl || "",
         });
       }
     } catch {
@@ -7164,18 +7647,8 @@ export default function PlannerPage() {
   };
 
   const handleContinueStoryboardToVideo = () => {
-    if (!effectiveShotPlansReady) {
-      flash("Generate shot plans before continuing to Video.", "warning");
-      return;
-    }
-    if (!storyboardSaved) {
-      flash("Save Production before continuing to Video.", "warning");
-      return;
-    }
-    if (!canExportShotsPdf) {
-      flash(exportBlockedReason || "Generate every required shot image before continuing to Video.", "warning");
-      return;
-    }
+    // handleWorkspacePageClick already applies the same shot-plan/save/export gate
+    // (and bypasses it when a combined video already exists) - no need to duplicate it here.
     handleWorkspacePageClick("video");
   };
 
@@ -8061,9 +8534,14 @@ export default function PlannerPage() {
       const savedReview = reviewNeededSaving ? await persistClientReview({ silent: true }) : null;
       const report = await resolveAnimatedStoryboardReport(savedReview || clientReview, !reviewNeededSaving || Boolean(savedReview));
       const title = buildExportTitle({ activeProjectId, storyScriptIdea, scriptDetailIdea, selectedIdea, currentStoryboard });
-      downloadHtmlDocument(report.html, animatedStoryboardFileName(title));
-      addActivity("Animated HTML exported", `${report.shotCount} client-ready shots`);
-      flash("Animated storyboard HTML downloaded.", "success");
+      flash("Preparing an offline copy - embedding and watermarking images...", "success");
+      const offlineHtml = await embedAndWatermarkImages(report.html, `${title} · DRAFT FOR REVIEW`, async (html, watermarkText) => {
+        const response = await embedOfflineAnimatedStoryboardHtml({ scriptId: scriptDetailIdea.scriptId, html, watermarkText }).unwrap();
+        return response.html;
+      });
+      downloadHtmlDocument(offlineHtml, animatedStoryboardFileName(title));
+      addActivity("Animated HTML exported", `${report.shotCount} client-ready shots (offline, watermarked)`);
+      flash("Animated storyboard HTML downloaded - fully offline, images watermarked for review.", "success");
     } catch (error) {
       creatorDebugLog("animated storyboard HTML export failed", { scriptId: scriptDetailIdea?.scriptId, error });
       flash("Could not export the animated storyboard HTML.", "error");
@@ -8105,6 +8583,7 @@ export default function PlannerPage() {
         productMode: productStoryboardMode,
         dialogueLanguage,
         clientReview,
+        creatorName: tenantCompanyName || authUserName || "",
         callbackUrl: buildPdfCallbackUrl(activeProjectId, scriptDetailIdea?.scriptId),
       });
       emitCreatorAnalyticsEvent("creator_pdf_export_opened", {
@@ -8395,6 +8874,22 @@ export default function PlannerPage() {
     const restored = buildWorkflowStateFromProject(project);
     const nextProjectId = restored?.projectId || requestedProjectId;
 
+    // The lightweight project list doesn't carry video-render status, so if the
+    // caller didn't pin a workspace page, check for an already-combined video and
+    // land there directly instead of stopping at whatever step buildWorkflowStateFromProject
+    // (which has no visibility into video generation) guessed.
+    if (restored?.projectId && !options.workspacePage && isUuid(restored.scriptDetailIdea?.scriptId)) {
+      try {
+        const latestVideoRun = await fetchLatestScreenplayVideoRun({ scriptId: restored.scriptDetailIdea.scriptId }).unwrap();
+        if (finalVideoUrlFromPayload(latestVideoRun)) {
+          restored.workspacePage = "video";
+          restored.planner.completedSteps.video = true;
+        }
+      } catch {
+        // No persisted video run for this project yet - keep the derived workspace page.
+      }
+    }
+
     if (restored?.projectId) {
       const requestedWorkspacePage = options.workspacePage || restored.workspacePage;
       const targetWorkspacePage = workspacePageIds.has(requestedWorkspacePage)
@@ -8567,6 +9062,7 @@ export default function PlannerPage() {
   const renderWorkflowSlide = (slideId) => {
     if (slideId === "ideas") {
       return (
+        <>
         <IdeaCandidatesPanel
           lockedBrief={lockedBrief}
           ideas={ideaCandidatePageItems}
@@ -8629,6 +9125,14 @@ export default function PlannerPage() {
           onSelectWeeklyIdeaTag={handleSelectWeeklyIdeaTag}
           onRefreshWeeklyIdeaTags={handleRefreshWeeklyIdeaTags}
         />
+        {planner.selectedIdeaId ? (
+          <GraphPipelineTracePanel
+            onRun={handleRunGraphPipeline}
+            isStarting={runGraphPipelineState.isLoading}
+            job={pipelineJob}
+          />
+        ) : null}
+        </>
       );
     }
 
@@ -8710,6 +9214,7 @@ export default function PlannerPage() {
           idea={selectedIdea}
           audience={selectedAudienceSummary}
           onCreateActor={handleCreateActor}
+          onUploadActorPhoto={handleUploadActorPhoto}
           onConfirm={handleCreatorConfirm}
           onEnhanceIdeaWithCast={handleEnhanceIdeaWithCast}
           openActorModalSignal={workspacePage === "cast" ? actorModalSignal : 0}
@@ -9026,10 +9531,130 @@ export default function PlannerPage() {
 
       {workspacePage === "video" && (
       <section id="video" className="creator-section space-y-5">
+        {activeProjectSpend?.quotedTotalPrice != null && (
+          <p className={`text-xs font-bold ${activeProjectSpend.withinCap ? "text-slate-400" : "text-rose-300"}`}>
+            {activeProjectSpend.withinCap
+              ? `₹${Math.round(activeProjectSpend.totalSpent)} of ₹${Math.round(activeProjectSpend.quotedTotalPrice)} budget used`
+              : `Budget exceeded — ₹${Math.round(activeProjectSpend.totalSpent)} spent against a ₹${Math.round(activeProjectSpend.quotedTotalPrice)} quote. Further generation is blocked until this is resolved.`}
+          </p>
+        )}
+        {isUuid(activeProjectId) && (
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => setScenePreparationOpen((open) => !open)}
+              className="creator-control flex items-center gap-2 px-3 py-2 text-xs font-black text-slate-100"
+            >
+              <Sparkles size={14} className="text-purple-200" />
+              {scenePreparationOpen ? "Hide Prepare Scene" : "Prepare Scene"}
+            </button>
+          </div>
+        )}
+        {scenePreparationOpen && isUuid(activeProjectId) && (
+          <ScenePreparationPanel
+            projectId={activeProjectId}
+            shots={videoPanelScenes}
+            activeShotId={scenePreparationShotId || selectedScene?.id || null}
+            onSelectShot={setScenePreparationShotId}
+            onClose={() => setScenePreparationOpen(false)}
+          />
+        )}
+        {isUuid(activeProjectId) && allShotsVideoGenerated && (
+          <div className="rounded-lg border border-purple-300/25 bg-purple-400/[0.06] p-4 space-y-3">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-black text-white">Assemble the final video</p>
+                <p className="mt-1 text-xs font-semibold text-slate-400">
+                  Concatenates every completed shot into one deliverable the client can watch.
+                  {latestFinalRender?.completedAt
+                    ? ` Last assembled ${new Date(latestFinalRender.completedAt).toLocaleString()} (${latestFinalRender.shotCount} shots).`
+                    : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAssembleFinalVideo}
+                disabled={createFinalRenderState.isLoading}
+                className="creator-primary flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-55"
+              >
+                {createFinalRenderState.isLoading
+                  ? <Loader2 size={16} className="animate-spin" />
+                  : <Sparkles size={16} />}
+                {createFinalRenderState.isLoading
+                  ? "Assembling…"
+                  : latestFinalRender?.videoUrl ? "Re-assemble" : "Assemble Final Video"}
+              </button>
+            </div>
+            {finalRenderError && (
+              <p className="text-[11px] font-semibold text-rose-300">{finalRenderError}</p>
+            )}
+            {latestFinalRender?.status === "COMPLETED" && latestFinalRender?.videoUrl && (
+              <>
+                <div className="flex flex-col gap-3 rounded-md border border-white/10 bg-black/25 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-black text-white">Client download</p>
+                    <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
+                      Flip this once the client has paid you. They can preview the video regardless; this only gates the download link on their review page.
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <a
+                      href={latestFinalRender.videoUrl}
+                      download
+                      className="creator-control flex items-center gap-1.5 px-3 py-2 text-xs font-black text-slate-100"
+                    >
+                      <Download size={14} /> Download
+                    </a>
+                    <label className="flex items-center gap-2 text-xs font-black text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(activeProjectDetail?.finalVideoDownloadUnlocked)}
+                        onChange={(event) => handleToggleFinalVideoLock(event.target.checked)}
+                        disabled={updateFinalVideoLockState.isLoading}
+                        className="h-4 w-4 accent-purple-400"
+                      />
+                      Unlocked for client
+                    </label>
+                  </div>
+                </div>
+              <video
+                key={latestFinalRender.renderId}
+                src={latestFinalRender.videoUrl}
+                controls
+                className="mt-2 w-full rounded-lg border border-white/10 bg-black"
+              />
+              </>
+            )}
+            {latestFinalRender?.status === "FAILED" && latestFinalRender?.lastError && (
+              <p className="text-[11px] font-semibold text-rose-300">Last render failed: {latestFinalRender.lastError}</p>
+            )}
+            {latestFinalRenderLoading && !latestFinalRender && (
+              <p className="text-[11px] font-semibold text-slate-500">Checking for a previous render…</p>
+            )}
+          </div>
+        )}
+        {activeProjectDetail?.status === "VIDEO_GENERATION_COMPLETE" && (
+          <div className="flex flex-col items-start gap-3 rounded-lg border border-emerald-300/25 bg-emerald-400/[0.06] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-black text-white">Every shot has finished generating</p>
+              <p className="mt-1 text-xs font-semibold text-slate-400">Move this project into post-production to dub, edit, or upscale the final video.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/editor", { state: { projectId: activeProjectId } })}
+              className="creator-primary flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-bold text-white"
+            >
+              Move to Post-Production <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
         <div className="grid gap-5 2xl:grid-cols-[minmax(0,3fr)_minmax(19rem,1fr)]">
           <ScreenplayVideoGenerationPanel
             screenplay={scriptDetailIdea}
-            scenes={scriptDetailIdea?.scriptScenes?.length ? scriptDetailIdea.scriptScenes : scriptDetailIdea?.scriptJson?.shots || scenes}
+            scenes={videoPanelScenes}
+            characterCastMappings={activeCharacterMappings}
+            onOpenCastStep={() => handleWorkspacePageClick("cast")}
+            onUploadCastReference={handleUploadCastReferenceImage}
             screenplayApproved={effectiveScreenplayApprovedForVideo}
             videoRun={currentScreenplayVideoRun}
             videoRunLoading={screenplayVideoRunLoading || latestPersistedScreenplayVideoRunLoading}
@@ -9082,7 +9707,14 @@ export default function PlannerPage() {
             onDecideSceneDialogueVoice={handleDecideScreenplaySceneDialogueVoice}
             onCombineSceneDialogueAudio={handleCombineScreenplaySceneDialogueAudio}
             onUploadSceneAvatarImage={handleUploadScreenplaySceneAvatarImage}
+            onUploadSceneReferenceImage={handleUploadScreenplaySceneReferenceImage}
             onRegenerateScene={handleRegenerateScreenplayVideoScene}
+            sceneAssets={screenplaySceneAssets?.scenes || []}
+            combinedVideoAsset={combinedVideoAsset}
+            onSetSceneAssetAccepted={(assetId, accepted) => {
+              if (!scriptDetailIdea?.scriptId) return;
+              setScreenplaySceneAssetAccepted({ scriptId: scriptDetailIdea.scriptId, assetId, accepted });
+            }}
             onFinalRender={handleRenderScreenplayFinalVideo}
             onGenerateAudioPack={handleGenerateScreenplayAudioPack}
             onRefreshMedia={refreshScreenplayMedia}
@@ -9121,7 +9753,7 @@ export default function PlannerPage() {
           />
           <MobileFrame
             scene={selectedScene}
-            scenes={scriptDetailIdea?.scriptScenes?.length ? scriptDetailIdea.scriptScenes : scriptDetailIdea?.scriptJson?.shots || scenes}
+            scenes={videoPanelScenes}
             videoRun={currentScreenplayVideoRun}
             finalVideoUrl={activeFinalVideoUrl}
             screenplay={scriptDetailIdea}
@@ -9166,6 +9798,12 @@ export default function PlannerPage() {
               </button>
             </div>
           </div>
+          {isUuid(scriptDetailIdea?.scriptId) && (
+            <WorkspaceChatPanel
+              scriptId={scriptDetailIdea.scriptId}
+              onMerged={(result) => flash(`Workspace merged into the project (version ${result.mergedVersion}).`, "success")}
+            />
+          )}
           <ClientReviewPanel
             review={clientReview}
             shots={scenes}
@@ -9308,6 +9946,16 @@ export default function PlannerPage() {
           activeSceneIndex={preview.currentSceneIndex}
           onSelectScene={handleSceneSelect}
           onGenerateImage={handleGenerateShotImage}
+          onAnalyzeProductReference={handleAnalyzeShotProductReference}
+          onConfirmProductReference={handleConfirmShotProductReference}
+          onStageProductReference={handleStageShotProductReference}
+          stagedProductReferenceCount={pendingProductReferences.size}
+          onAnalyzeStagedProductReferences={handleAnalyzeStagedProductReferences}
+          isAnalyzingStagedProductReferences={analyzingStagedProductReferences}
+          pendingProductMismatchReviews={pendingProductMismatchReviews}
+          onConsumeProductMismatchReview={handleConsumeProductMismatchReview}
+          castCandidateShots={castCandidateShots}
+          onApplyCastToShots={handleApplyCastReferenceToOtherShots}
           onGenerateProductImages={() => handleGenerateAllScreenplaySceneImages(scenes)}
           onEditShot={handleEditStoryboardShotWithAi}
           onInsertShot={handleInsertStoryboardTimelineShot}
@@ -9374,17 +10022,20 @@ export default function PlannerPage() {
           <button
             type="button"
             onClick={handleContinueStoryboardToVideo}
-            aria-disabled={!effectiveShotPlansReady || !storyboardSaved || !canExportShotsPdf}
+            disabled={!activeFinalVideoUrl && !generatedShotNumbers.size && (!effectiveShotPlansReady || !storyboardSaved || !canExportShotsPdf)}
+            aria-disabled={!activeFinalVideoUrl && !generatedShotNumbers.size && (!effectiveShotPlansReady || !storyboardSaved || !canExportShotsPdf)}
             className={`creator-primary flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white ${
-              !effectiveShotPlansReady || !storyboardSaved || !canExportShotsPdf ? "opacity-60" : ""
+              !activeFinalVideoUrl && !generatedShotNumbers.size && (!effectiveShotPlansReady || !storyboardSaved || !canExportShotsPdf) ? "opacity-60" : ""
             }`}
-            title={!effectiveShotPlansReady
-              ? "Generate shot plans before continuing"
-              : !storyboardSaved
-                ? "Save Production before continuing"
-                : !canExportShotsPdf
-                  ? exportBlockedReason
-                : "Continue to Video"}
+            title={activeFinalVideoUrl
+              ? "Continue to Video"
+              : !effectiveShotPlansReady
+                ? "Generate shot plans before continuing"
+                : !storyboardSaved
+                  ? "Save Production before continuing"
+                  : !canExportShotsPdf
+                    ? exportBlockedReason
+                    : "Continue to Video"}
           >
             Continue to Video <ChevronRight size={16} />
           </button>
@@ -10235,6 +10886,7 @@ function normalizeSavedActorProfile(saved = {}, fallback = {}) {
     scenePresence: fallback.scenePresence || attributes.scenePresence || "Reaction shots",
     look: saved.look || fallback.look || attributes.look || "",
     profile: saved.profile || fallback.profile || attributes.profile || "",
+    referenceImageUrl: attributes.referenceImageUrl || saved.referenceImageUrl || fallback.referenceImageUrl || "",
   };
 }
 
@@ -11042,15 +11694,13 @@ function normalizeProductAdBrief(value = {}) {
   const selectedShotTypes = uniqueStrings(firstArray(source.selectedShotTypes, source.shotTypes, source.preferredShotTypes))
     .filter((value) => PRODUCT_AD_SHOT_TYPE_OPTIONS.some((option) => option.value === value));
   const customShotRecipe = source.shotRecipeSource === "custom" && selectedShotTypes.length > 0;
-  const productInput = firstString(
-    source.productInput,
-    source.input,
-    source.productUrl,
-    source.sourceUrl,
-    source.productName,
-    source.displayName,
-    source.productInputLabel
-  );
+  // Preserve source.productInput exactly as typed (including a trailing space mid-word) rather
+  // than routing it through firstString's trim() - this runs on every keystroke via
+  // handleProductAdBriefChange, so trimming here silently ate the space the user just pressed.
+  // Only fall back to the other (trimmed) candidates when productInput itself is genuinely empty.
+  const productInput = source.productInput !== undefined && source.productInput !== null && String(source.productInput) !== ""
+    ? String(source.productInput)
+    : firstString(source.input, source.productUrl, source.sourceUrl, source.productName, source.displayName, source.productInputLabel);
   return {
     ...DEFAULT_PRODUCT_AD_BRIEF,
     ...source,
@@ -13047,15 +13697,14 @@ function summarizeShotExportAssets(scenes = [], expectedShotCount = 0, requirePr
 }
 
 function defaultProductImagePrompt(scene = {}) {
+  // productionImagePrompt/production_image_prompt are the full backend-rendered prompt echoed
+  // back for display only - never a resubmittable short brief, and can exceed the server's
+  // @Size(max=12000) imagePrompt limit if fed back in.
   return firstText(
     scene.productImagePrompt,
     scene.product_image_prompt,
-    scene.productionImagePrompt,
-    scene.production_image_prompt,
     scene.rawShot?.productImagePrompt,
     scene.rawShot?.product_image_prompt,
-    scene.rawShot?.productionImagePrompt,
-    scene.rawShot?.production_image_prompt,
     scene.imagePrompt,
     scene.image_prompt,
     scene.storyboardImagePrompt,
@@ -13099,6 +13748,7 @@ function buildStoryboardPdfReport({
   productMode = false,
   dialogueLanguage = "English",
   clientReview = {},
+  creatorName = "",
   callbackUrl,
 }) {
   const generatedAt = formatExportDate(new Date());
@@ -13108,6 +13758,7 @@ function buildStoryboardPdfReport({
   const safeProjectTitle = escapeHtml(title || "Creator project");
   const safeStoryline = escapeHtml(storyline || "Storyline not available.");
   const safeCallbackUrl = escapeHtml(callbackUrl || "");
+  const safeCreatorName = escapeHtml(creatorName || "");
   const reviewSummary = renderPdfClientReview(clientReview);
   const callbackAction = safeCallbackUrl
     ? `<a class="callback-button" href="${safeCallbackUrl}" target="_blank" rel="noreferrer">Open walkthrough / callback</a>`
@@ -13117,7 +13768,7 @@ function buildStoryboardPdfReport({
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${safeProjectTitle} - DalaiLlama Story Board</title>
+  <title>${safeProjectTitle} - Dalaillama Creator Studio Story Board</title>
   <style>
     @page { size: A4; margin: 14mm; }
     * { box-sizing: border-box; }
@@ -13177,6 +13828,43 @@ function buildStoryboardPdfReport({
       color: #070a12;
       font-weight: 900;
       box-shadow: 0 10px 24px rgba(247, 201, 72, 0.28);
+    }
+    .brand-name {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.15;
+    }
+    .brand-name .sub {
+      color: #b8c2d6;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    .premium-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin-left: 8px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: linear-gradient(145deg, #f7c948, #d49d18);
+      color: #07101f;
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      box-shadow: 0 8px 18px rgba(247, 201, 72, 0.25);
+    }
+    .creator-line {
+      margin-top: 6px;
+      color: #dbe5f6;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .creator-line strong {
+      color: #f7c948;
+      font-weight: 900;
     }
     .meta {
       color: #b8c2d6;
@@ -13433,12 +14121,19 @@ function buildStoryboardPdfReport({
   <main class="page">
     <section class="cover">
       <div class="brand-row">
-        <div class="brand"><span class="brand-mark">DL</span><span>DalaiLlama Creator</span></div>
+        <div class="brand">
+          <span class="brand-mark">DL</span>
+          <span class="brand-name">
+            <span>Dalaillama<span class="premium-pill">Premium</span></span>
+            <span class="sub">Creator Studio</span>
+          </span>
+        </div>
         <div class="meta">Generated ${escapeHtml(generatedAt)}<br />Story Board</div>
       </div>
       <div>
         <h1>Story Board</h1>
         <div class="project-title">${safeProjectTitle}</div>
+        ${safeCreatorName ? `<div class="creator-line">Prepared by <strong>${safeCreatorName}</strong></div>` : ""}
         <div class="storyline">${safeStoryline}</div>
         <div class="summary-grid">
           <div class="summary-item"><span>Shots</span><strong>${scenes.length}</strong></div>
@@ -13455,7 +14150,7 @@ function buildStoryboardPdfReport({
       </div>
     </section>
     ${shotCards}
-    <div class="pdf-footer">dalaillama.in</div>
+    <div class="pdf-footer">${safeCreatorName ? `${safeCreatorName} &middot; ` : ""}Dalaillama Creator Studio &middot; Premium &middot; dalaillama.in</div>
   </main>
 </body>
 </html>`;
@@ -14418,6 +15113,13 @@ function productionPlanForShot(plans = [], scene = {}, shotNumber = 1) {
     || plan?.camera_plan_sheet_tag?.shot_number
     || index + 1
   ) === targetShotNumber) || (Number(scene?.shotNumber || scene?.shot_number || 0) === targetShotNumber ? scene : null);
+}
+
+function shotHasHumanCharacter(scene = {}) {
+  const tag = extractStoryboardTag(scene) || {};
+  const primary = Array.isArray(tag.primaryCharacters) ? tag.primaryCharacters : (Array.isArray(scene.primaryCharacters) ? scene.primaryCharacters : []);
+  const side = Array.isArray(tag.sideCharacters) ? tag.sideCharacters : (Array.isArray(scene.sideCharacters) ? scene.sideCharacters : []);
+  return primary.some((name) => String(name || "").trim()) || side.some((name) => String(name || "").trim());
 }
 
 function extractStoryboardTag(value = {}) {

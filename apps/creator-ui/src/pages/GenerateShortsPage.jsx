@@ -1998,7 +1998,7 @@ function TimelineClipPropertiesPanel({
         <div className="mt-2 flex flex-wrap gap-1.5">
           {arrayValue(clip.effects).length ? arrayValue(clip.effects).map((effect, index) => (
             <button
-              key={`${effect?.type || effect}-${index}`}
+              key={effect?.id || effect?.effectId || `${effect?.type || effect || "effect"}-${index}`}
               type="button"
               onClick={() => onUpdate({ effects: arrayValue(clip.effects).filter((_, effectIndex) => effectIndex !== index) })}
               className="rounded border border-white/10 bg-white/[0.04] px-2 py-1 text-[10px] font-black uppercase text-slate-200"
@@ -2222,7 +2222,7 @@ function CanvasCandidateStrip({ candidates, selectedCandidateId, onSelectCandida
           const duration = canvasCandidateDuration(candidate);
           return (
             <button
-              key={candidateId || index}
+              key={candidateId || `candidate-${index}`}
               type="button"
               onClick={() => candidateId && onSelectCandidate(candidateId)}
               className={`min-w-[13rem] rounded-lg border p-3 text-left transition xl:min-w-0 ${
@@ -2295,7 +2295,7 @@ function CanvasTimelineBoard({ candidate, tracks, duration, selectedClipId = "",
       <div className="mt-2 space-y-2">
         {arrayValue(tracks).map((track, index) => (
           <CanvasTimelineTrack
-            key={track.trackId || index}
+            key={track.trackId || track.id || `track-${index}`}
             track={track}
             duration={duration}
             index={index}
@@ -2361,7 +2361,7 @@ function CanvasAssetRequests({ requests }) {
       </div>
       <div className="grid gap-2 md:grid-cols-2">
         {visible.slice(0, 6).map((request, index) => (
-          <div key={`${request.type || "asset"}-${index}`} className="rounded border border-white/10 bg-black/20 px-3 py-2">
+          <div key={request.id || request.requestId || `${request.type || "asset"}-${request.query || request.reason || index}`} className="rounded border border-white/10 bg-black/20 px-3 py-2">
             <p className="truncate text-xs font-black text-white">{request.type || request.assetType || "asset"}</p>
             <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-300">{request.reason || request.description || request.query || "Additional visual requested"}</p>
           </div>
@@ -3490,7 +3490,7 @@ function CandidatePreview({ candidate, candidates = [], selectedCandidateId, onS
         <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
           {renderedCandidates.map((item, index) => (
             <button
-              key={idOf(item) || index}
+              key={idOf(item) || `rendered-${index}`}
               type="button"
               onClick={() => selectRenderedAt(index)}
               className={`h-1.5 min-w-8 rounded-full transition ${idOf(item) === playerCandidateId ? "bg-purple-300" : "bg-white/15 hover:bg-white/30"}`}
@@ -3689,7 +3689,7 @@ function JsonTimelinePreview({ candidate, sourceUrl, renderStatus, rerenderJob }
       <div className="mt-3 max-h-28 space-y-1 overflow-auto pr-1">
         {segments.map((segment, index) => (
           <button
-            key={segment.segmentId || segment.id || index}
+            key={segment.segmentId || segment.id || `cut-segment-${index}`}
             type="button"
             onClick={() => jumpToSegment(index, false)}
             className={`grid w-full grid-cols-[3.25rem_minmax(0,1fr)] gap-2 rounded border px-2 py-1.5 text-left ${
@@ -4072,7 +4072,7 @@ function CandidateRetentionWorkbench({ candidate, candidateEditDraft, onAddEffec
 
       <div className="mt-3 space-y-2">
         {retentionPlan.length ? retentionPlan.map((effect, index) => (
-          <div key={effect.id || index} className="rounded-lg border border-white/10 bg-slate-950 p-3">
+          <div key={effect.id || effect.effectId || `retention-effect-${index}`} className="rounded-lg border border-white/10 bg-slate-950 p-3">
             <div className="grid gap-2 md:grid-cols-[9rem_5rem_5rem_minmax(0,1fr)_2.25rem] md:items-end">
               <label>
                 <span className="mb-1 block text-[10px] font-black uppercase tracking-normal text-slate-500">Effect</span>
@@ -4176,7 +4176,7 @@ function CandidateTimelineWorkbench({ candidate, candidateEditDraft, frameLookup
               const segmentCaptions = captionsForSegment(captions, segment);
               const frames = arrayValue(segment.frames);
               return (
-              <div key={segment.segmentId || index} className="rounded-md border border-white/10 bg-slate-950 p-3">
+              <div key={segment.segmentId || segment.id || segment.nodeId || `picked-segment-${index}`} className="rounded-md border border-white/10 bg-slate-950 p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-xs font-black text-white">{segment.label || segment.nodeId || `Picked scene ${index + 1}`}</p>
@@ -4197,7 +4197,7 @@ function CandidateTimelineWorkbench({ candidate, candidateEditDraft, frameLookup
                 </div>
                 <div className="mt-3 grid grid-cols-4 gap-2">
                   {(frames.length ? frames : [segment.sceneId || segment.nodeId || `S${index + 1}`]).slice(0, 4).map((frame, frameIndex) => (
-                    <FrameThumb key={`${segment.segmentId || index}-picked-frame-${frameIndex}`} frame={frame} frameLookup={frameLookup} />
+                    <FrameThumb key={`${segment.segmentId || segment.id || segment.nodeId || `picked-segment-${index}`}-picked-frame-${frame?.id || frame?.frameId || frame?.nodeId || frame || frameIndex}`} frame={frame} frameLookup={frameLookup} />
                   ))}
                 </div>
                 <div className="mt-3 rounded-md bg-white/[0.04] px-2 py-2">
@@ -4209,7 +4209,7 @@ function CandidateTimelineWorkbench({ candidate, candidateEditDraft, frameLookup
                   {segmentCaptions.length ? (
                     <div className="mt-1 space-y-1">
                       {segmentCaptions.slice(0, 3).map((caption, captionIndex) => (
-                        <p key={caption.id || caption.captionId || captionIndex} className="truncate text-xs font-semibold text-slate-300">
+                        <p key={caption.id || caption.captionId || `caption-${caption.start || caption.timelineStart || captionIndex}`} className="truncate text-xs font-semibold text-slate-300">
                           {timeRange(caption)} | {captionText(caption)}
                         </p>
                       ))}
@@ -4261,7 +4261,7 @@ function CandidateCaptionWorkbench({ candidate, candidateEditDraft, onRemoveCapt
         </div>
         <div className="grid max-h-[28rem] content-start gap-2 overflow-y-auto pr-1">
           {captions.length ? captions.map((caption, index) => (
-            <div key={caption.id || caption.captionId || index} className="rounded-md border border-white/10 bg-slate-950 px-3 py-2">
+            <div key={caption.id || caption.captionId || `caption-${caption.start || caption.timelineStart || index}`} className="rounded-md border border-white/10 bg-slate-950 px-3 py-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="truncate text-[10px] font-black uppercase tracking-normal text-slate-500">{timeRange(caption)}</p>
@@ -4303,7 +4303,7 @@ function CandidateQueuePanel({ candidates, selectedCandidateId, onSelectCandidat
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1 pr-1 2xl:block 2xl:max-h-[42rem] 2xl:space-y-2 2xl:overflow-y-auto 2xl:pb-0">
         {candidates.map((candidate, index) => (
           <CandidateCard
-            key={idOf(candidate) || index}
+            key={idOf(candidate) || `candidate-card-${index}`}
             candidate={candidate}
             rank={index + 1}
             active={idOf(candidate) === selectedCandidateId}
@@ -5871,7 +5871,7 @@ function TraceWorkspace({ traceRows }) {
       </div>
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         {traceRows.map((row, index) => (
-          <div key={`${row.stage}-${index}`} className="rounded-lg border border-white/10 bg-black/25 p-3">
+          <div key={row.id || row.traceId || `${row.stage || "stage"}-${row.at || row.timestamp || index}`} className="rounded-lg border border-white/10 bg-black/25 p-3">
             <div className="flex items-start justify-between gap-3">
               <p className="text-[10px] font-black uppercase tracking-normal text-slate-500">{row.stage || "stage"}</p>
               <StatusPill status={row.status} />
@@ -5959,7 +5959,7 @@ function CandidateInspectorWorkspace({ currentVideo, selectedCandidate, transcri
             </div>
             <div className="mt-3 space-y-2">
               {criticalScenes.length ? criticalScenes.map((scene, index) => (
-                <div key={scene.sceneId || index} className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
+                <div key={scene.sceneId || scene.id || `critical-scene-${index}`} className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-black text-white">{scene.sceneId || `Scene ${index + 1}`}</p>
@@ -6178,7 +6178,7 @@ function SceneTimelinePanel({ sceneTimeline, selectedScene, selectedSceneId, onS
             <p className="text-[10px] font-black uppercase tracking-normal text-slate-500">Scene Dialogue</p>
             <div className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1">
               {selectedDialogue.length ? selectedDialogue.slice(0, 5).map((node, index) => (
-                <div key={node.id || index} className="rounded-md bg-white/[0.04] px-2 py-1.5">
+                <div key={node.id || node.nodeId || `dialogue-node-${index}`} className="rounded-md bg-white/[0.04] px-2 py-1.5">
                   <p className="text-[10px] font-black text-slate-500">{timeRange(node)} | {node.speaker || "Speaker"}</p>
                   <p className="line-clamp-2 text-xs font-semibold leading-5 text-slate-300">{node.text || node.transcript}</p>
                 </div>
@@ -6434,7 +6434,7 @@ function GraphRail({ graph, onEditNode }) {
       <div className="space-y-3">
         <p className="text-[10px] font-black uppercase tracking-normal text-slate-500">Edges</p>
         {edges.map((edge, index) => (
-          <div key={`${edge.from}-${edge.to}-${index}`} className="rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-sm font-black text-white">
+          <div key={edge.id || edge.edgeId || `${edge.from || edge.source || "src"}-${edge.to || edge.target || "dst"}-${edge.type || edge.reason || index}`} className="rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-sm font-black text-white">
             <p className="truncate">{edge.from || edge.source} {"->"} {edge.to || edge.target}</p>
             <p className="mt-1 truncate text-[11px] font-semibold text-slate-400">{edge.type || edge.reason || "edge"}</p>
           </div>
@@ -6507,7 +6507,7 @@ function StoryGraphNodeEditorModal({ node, draft, onDraftChange, onClose, onSubm
             <p className="text-[10px] font-black uppercase tracking-normal text-slate-500">Beats</p>
             <div className="mt-2 space-y-2">
               {beats.length ? beats.map((beat, index) => (
-                <label key={beat.beatId || beat.nodeId || index} className="block rounded-lg border border-white/10 bg-black/20 p-2">
+                <label key={beat.beatId || beat.nodeId || beat.id || `beat-${beat.role || index}`} className="block rounded-lg border border-white/10 bg-black/20 p-2">
                   <span className="mb-1 block truncate text-[10px] font-black uppercase tracking-normal text-slate-500">
                     {beat.role || `Beat ${index + 1}`} {beat.nodeId ? `| ${beat.nodeId}` : ""}
                   </span>
@@ -6565,7 +6565,7 @@ function StoryGraphNodeEditorModal({ node, draft, onDraftChange, onClose, onSubm
                   </div>
                   <div className="mt-3 grid grid-cols-4 gap-2">
                     {(arrayValue(segment.frames).length ? arrayValue(segment.frames) : [segment.sceneId || segment.nodeId || `S${index + 1}`]).slice(0, 4).map((frame, frameIndex) => (
-                      <FrameThumb key={`${segment.segmentId || index}-frame-${frameIndex}`} frame={frame} frameLookup={frameLookup} />
+                      <FrameThumb key={`${segment.segmentId || segment.id || segment.nodeId || `segment-${index}`}-frame-${frame?.id || frame?.frameId || frame?.nodeId || frame || frameIndex}`} frame={frame} frameLookup={frameLookup} />
                     ))}
                   </div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -6671,7 +6671,7 @@ function TimelinePreview({ segments, frameLookup }) {
           const width = Math.max(8, ((Number(segment.sourceEnd) - Number(segment.sourceStart)) / total) * 100);
           return (
             <div
-              key={segment.segmentId || index}
+              key={segment.segmentId || segment.id || segment.nodeId || `wave-segment-${index}`}
               className="min-h-[4.5rem] border-r border-white/10 bg-white/[0.035] p-1 last:border-r-0"
               style={{ width: `${width}%` }}
               title={`${segment.label || segment.nodeId || "Segment"} ${formatSecondsShort(segment.sourceStart)}-${formatSecondsShort(segment.sourceEnd)}s`}

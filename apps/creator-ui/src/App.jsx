@@ -6,6 +6,8 @@ import { useAuthBootstrap, useAuthGuard } from "@dalaillama/shared-hooks";
 import useTenantEvents from "@dalaillama/shared-hooks/useTenantEvents.js";
 import CreatorShell from "./layout/CreatorShell.jsx";
 import routes from "./routes.jsx";
+import ClientFundingPage from "./pages/ClientFundingPage.jsx";
+import ClientReviewPage from "./pages/ClientReviewPage.jsx";
 import "./api/creatorEndpoints.js";
 
 const AuthCallbackPage = () => {
@@ -35,6 +37,9 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
+        {/* Public, unauthenticated -- whoever holds the share link, not a tenant user. */}
+        <Route path="/brief/:shareToken" element={<ClientFundingPage />} />
+        <Route path="/review/:token" element={<ClientReviewPage />} />
         <Route path="/" element={<ProtectedCreatorShell />}>
           {routes.map((route) => (
             <Route key={route.path || "index"} index={route.index} path={route.path} element={route.element} />

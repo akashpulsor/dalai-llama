@@ -11,6 +11,18 @@ importers:
       '@reduxjs/toolkit':
         specifier: ^2.2.7
         version: 2.11.2(react-redux@9.2.0(@types/react@19.2.14)(react@18.3.1)(redux@5.0.1))(react@18.3.1)
+      '@remix-run/router':
+        specifier: ^1.19.0
+        version: 1.23.2
+      '@standard-schema/utils':
+        specifier: ^0.1.0
+        version: 0.1.1
+      '@stomp/stompjs':
+        specifier: ^7.3.0
+        version: 7.3.0
+      immer:
+        specifier: ^10.1.1
+        version: 10.2.0
       jwt-decode:
         specifier: ^4.0.0
         version: 4.0.0
@@ -26,9 +38,27 @@ importers:
       react-redux:
         specifier: ^9.1.2
         version: 9.2.0(@types/react@19.2.14)(react@18.3.1)(redux@5.0.1)
+      react-router:
+        specifier: ^6.26.2
+        version: 6.30.3(react@18.3.1)
       react-router-dom:
         specifier: ^6.26.2
         version: 6.30.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      redux:
+        specifier: ^5.0.1
+        version: 5.0.1
+      redux-thunk:
+        specifier: ^3.1.0
+        version: 3.1.0(redux@5.0.1)
+      reselect:
+        specifier: ^5.1.0
+        version: 5.1.1
+      sockjs-client:
+        specifier: ^1.6.1
+        version: 1.6.1
+      use-sync-external-store:
+        specifier: ^1.2.2
+        version: 1.6.0(react@18.3.1)
     devDependencies:
       '@types/react':
         specifier: ^19.2.7
@@ -183,8 +213,124 @@ importers:
         specifier: ^5.4.21
         version: 5.4.21
 
+  apps/creative-worker-ui:
+    dependencies:
+      '@dalaillama/shared-config':
+        specifier: workspace:*
+        version: link:../../shared/config
+      '@dalaillama/shared-hooks':
+        specifier: workspace:*
+        version: link:../../shared/hooks
+      '@dalaillama/shared-store':
+        specifier: workspace:*
+        version: link:../../shared/store
+      '@dalaillama/shared-ui':
+        specifier: workspace:*
+        version: link:../../shared/ui
+      '@dalaillama/shared-utils':
+        specifier: workspace:*
+        version: link:../../shared/utils
+      '@reduxjs/toolkit':
+        specifier: ^2.5.0
+        version: 2.11.2(react-redux@9.2.0(@types/react@19.2.14)(react@18.3.1)(redux@5.0.1))(react@18.3.1)
+      lucide-react:
+        specifier: ^0.452.0
+        version: 0.452.0(react@18.3.1)
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
+      react-redux:
+        specifier: ^9.1.2
+        version: 9.2.0(@types/react@19.2.14)(react@18.3.1)(redux@5.0.1)
+      react-router-dom:
+        specifier: ^6.26.0
+        version: 6.30.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+    devDependencies:
+      '@vitejs/plugin-react':
+        specifier: ^5.1.0
+        version: 5.2.0(vite@5.4.21)
+      autoprefixer:
+        specifier: ^10.4.21
+        version: 10.4.27(postcss@8.5.8)
+      postcss:
+        specifier: ^8.5.6
+        version: 8.5.8
+      tailwindcss:
+        specifier: ^3.4.18
+        version: 3.4.19
+      vite:
+        specifier: ^5.4.21
+        version: 5.4.21
+
+  apps/creator-ui:
+    dependencies:
+      '@dalaillama/shared-config':
+        specifier: workspace:*
+        version: link:../../shared/config
+      '@dalaillama/shared-hooks':
+        specifier: workspace:*
+        version: link:../../shared/hooks
+      '@dalaillama/shared-store':
+        specifier: workspace:*
+        version: link:../../shared/store
+      '@dalaillama/shared-ui':
+        specifier: workspace:*
+        version: link:../../shared/ui
+      '@dalaillama/shared-utils':
+        specifier: workspace:*
+        version: link:../../shared/utils
+      '@ffmpeg/ffmpeg':
+        specifier: ^0.12.15
+        version: 0.12.15
+      '@ffmpeg/util':
+        specifier: ^0.12.2
+        version: 0.12.2
+      '@reduxjs/toolkit':
+        specifier: ^2.2.7
+        version: 2.11.2(react-redux@9.2.0(@types/react@19.2.14)(react@18.3.1)(redux@5.0.1))(react@18.3.1)
+      lucide-react:
+        specifier: ^0.452.0
+        version: 0.452.0(react@18.3.1)
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
+      react-redux:
+        specifier: ^9.1.2
+        version: 9.2.0(@types/react@19.2.14)(react@18.3.1)(redux@5.0.1)
+      react-router-dom:
+        specifier: ^6.26.2
+        version: 6.30.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      scheduler:
+        specifier: ^0.23.2
+        version: 0.23.2
+    devDependencies:
+      '@vitejs/plugin-react':
+        specifier: ^4.7.0
+        version: 4.7.0(vite@5.4.21)
+      autoprefixer:
+        specifier: ^10.4.20
+        version: 10.4.27(postcss@8.5.8)
+      postcss:
+        specifier: ^8.4.47
+        version: 8.5.8
+      tailwindcss:
+        specifier: ^3.4.14
+        version: 3.4.19
+      vite:
+        specifier: ^5.4.8
+        version: 5.4.21
+
   apps/dashboard-ui:
     dependencies:
+      '@stomp/stompjs':
+        specifier: ^7.3.0
+        version: 7.3.0
       lucide-react:
         specifier: ^0.257.0
         version: 0.257.0(react@18.3.1)
@@ -197,6 +343,9 @@ importers:
       react-router-dom:
         specifier: ^6.15.0
         version: 6.30.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      sockjs-client:
+        specifier: ^1.6.1
+        version: 1.6.1
     devDependencies:
       '@vitejs/plugin-react':
         specifier: ^4.7.0
@@ -562,6 +711,18 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@ffmpeg/ffmpeg@0.12.15':
+    resolution: {integrity: sha512-1C8Obr4GsN3xw+/1Ww6PFM84wSQAGsdoTuTWPOj2OizsRDLT4CXTaVjPhkw6ARyDus1B9X/L2LiXHqYYsGnRFw==}
+    engines: {node: '>=18.x'}
+
+  '@ffmpeg/types@0.12.4':
+    resolution: {integrity: sha512-k9vJQNBGTxE5AhYDtOYR5rO5fKsspbg51gbcwtbkw2lCdoIILzklulcjJfIDwrtn7XhDeF2M+THwJ2FGrLeV6A==}
+    engines: {node: '>=16.x'}
+
+  '@ffmpeg/util@0.12.2':
+    resolution: {integrity: sha512-ouyoW+4JB7WxjeZ2y6KpRvB+dLp7Cp4ro8z0HIVpZVCM7AwFlHa0c4R8Y/a4M3wMqATpYKhC7lSFHQ0T11MEDw==}
+    engines: {node: '>=18.x'}
+
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
 
@@ -751,6 +912,9 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
+  '@standard-schema/utils@0.1.1':
+    resolution: {integrity: sha512-Uc/EWqUoxElTp50GChAK4l/QTn82RiSMsJB9dtUiIo54HHCpxByOxBGAOh73J1AGxMjk1ALvlDCyueOdvaxxPw==}
 
   '@standard-schema/utils@0.3.0':
     resolution: {integrity: sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g==}
@@ -1040,6 +1204,9 @@ packages:
 
   http-parser-js@0.5.10:
     resolution: {integrity: sha512-Pysuw9XpUq5dVc/2SMHpuTY01RFl8fttgcyunjL7eEMhGM3cI4eOmiCycJDVCo/7O7ClfQD3SaI6ftDzqOXYMA==}
+
+  immer@10.2.0:
+    resolution: {integrity: sha512-d/+XTN3zfODyjr89gM3mPq1WNX2B8pYsu7eORitdwyA2sBubnTl3laYlBk4sXY5FUa5qTZGBDPJICVbvqzjlbw==}
 
   immer@11.1.4:
     resolution: {integrity: sha512-XREFCPo6ksxVzP4E0ekD5aMdf8WMwmdNaz6vuvxgI40UaEiu6q3p8X52aU6GdyvLY3XXX/8R7JOTXStz/nBbRw==}
@@ -1658,6 +1825,14 @@ snapshots:
   '@esbuild/win32-x64@0.21.5':
     optional: true
 
+  '@ffmpeg/ffmpeg@0.12.15':
+    dependencies:
+      '@ffmpeg/types': 0.12.4
+
+  '@ffmpeg/types@0.12.4': {}
+
+  '@ffmpeg/util@0.12.2': {}
+
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
@@ -1783,6 +1958,8 @@ snapshots:
     optional: true
 
   '@standard-schema/spec@1.1.0': {}
+
+  '@standard-schema/utils@0.1.1': {}
 
   '@standard-schema/utils@0.3.0': {}
 
@@ -2070,6 +2247,8 @@ snapshots:
       function-bind: 1.1.2
 
   http-parser-js@0.5.10: {}
+
+  immer@10.2.0: {}
 
   immer@11.1.4: {}
 

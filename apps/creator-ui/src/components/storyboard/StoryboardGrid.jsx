@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React from "react";
-import { Check, Download, FileDown, Loader2, MonitorPlay, Plus, RefreshCw, Save, Sparkles, Wand2 } from "lucide-react";
+import { Check, Download, FileDown, Image as ImageIcon, Loader2, MonitorPlay, Plus, RefreshCw, Save, Sparkles, Wand2 } from "lucide-react";
 import SceneCard from "./SceneCard.jsx";
 
 export default function StoryboardGrid({
@@ -13,6 +13,16 @@ export default function StoryboardGrid({
   activeSceneIndex,
   onSelectScene,
   onGenerateImage,
+  onAnalyzeProductReference,
+  onConfirmProductReference,
+  onStageProductReference,
+  stagedProductReferenceCount = 0,
+  onAnalyzeStagedProductReferences,
+  isAnalyzingStagedProductReferences = false,
+  pendingProductMismatchReviews,
+  onConsumeProductMismatchReview,
+  castCandidateShots,
+  onApplyCastToShots,
   onGenerateProductImages,
   onEditShot,
   onInsertShot,
@@ -94,6 +104,20 @@ export default function StoryboardGrid({
                   : "Generate Product Frames"}
             </button>
           )}
+          {productMode && stagedProductReferenceCount > 0 && (
+            <button
+              type="button"
+              onClick={onAnalyzeStagedProductReferences}
+              disabled={isAnalyzingStagedProductReferences}
+              title="Analyze every staged reference photo now"
+              className="creator-control flex items-center gap-2 px-4 py-2 text-xs font-bold text-amber-100 transition disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isAnalyzingStagedProductReferences ? <Loader2 size={15} className="animate-spin" /> : <ImageIcon size={15} />}
+              {isAnalyzingStagedProductReferences
+                ? "Analyzing Staged References"
+                : `${stagedProductReferenceCount} Reference${stagedProductReferenceCount === 1 ? "" : "s"} Staged - Analyze All`}
+            </button>
+          )}
           <button type="button" onClick={onGenerateAgain} disabled={isGenerating} className="creator-primary flex items-center gap-2 px-4 py-2 text-xs font-bold text-white transition disabled:opacity-60">
             <RefreshCw size={15} className={isGenerating ? "animate-spin" : ""} /> Shot Plans
           </button>
@@ -165,6 +189,13 @@ export default function StoryboardGrid({
                 productMode={productMode}
                 onClick={() => onSelectScene?.(index)}
                 onGenerateImage={onGenerateImage}
+                onAnalyzeProductReference={onAnalyzeProductReference}
+                onConfirmProductReference={onConfirmProductReference}
+                onStageProductReference={onStageProductReference}
+                resumeProductMismatchReview={pendingProductMismatchReviews?.get(shotNumber)}
+                onConsumeProductMismatchReview={onConsumeProductMismatchReview}
+                otherCastCandidateShots={(castCandidateShots || []).filter((candidate) => candidate.shotNumber !== shotNumber)}
+                onApplyCastToShots={onApplyCastToShots}
               />
               {active && productMode && (
                 <div className="mt-2">
@@ -254,11 +285,11 @@ function ProductImagePromptComposer({ scene, value, onChange, onGenerate, isGene
 }
 
 function defaultProductImagePrompt(scene = {}) {
+  // productionImagePrompt is the full backend-rendered prompt echoed back for display only -
+  // never a resubmittable short brief, and can exceed the server's @Size(max=12000) limit.
   return [
     scene.productImagePrompt,
-    scene.productionImagePrompt,
     scene.rawShot?.productImagePrompt,
-    scene.rawShot?.productionImagePrompt,
     scene.imagePrompt,
     scene.storyboardImagePrompt,
     scene.visualPrompt,

@@ -206,6 +206,20 @@ export function buildAnimatedStoryboardHtml({
   return { html, shotCount: normalizedScenes.length };
 }
 
+// Turns the "Preview" (live, signed-URL) HTML into a truly offline, self-contained file. This
+// used to fetch every remote image via a crossOrigin canvas in the browser, which depends on
+// CORS and the signed URL being reachable/trusted from wherever the browser sits - exactly what
+// breaks in a local dev environment. The embedding (watermark + base64-inline) now happens
+// server-side instead: creator-service reads the same image bytes directly out of object storage
+// (no HTTP fetch, no CORS, no signed-URL expiry race) and returns the same HTML with every image
+// swapped for a watermarked data URI. `callEmbedOfflineHtml` is injected rather than imported
+// directly so this stays a plain function - the actual API call is an RTK Query mutation, which
+// can only be invoked from inside a component/hook.
+export async function embedAndWatermarkImages(html, watermarkText, callEmbedOfflineHtml) {
+  if (!html) return html;
+  return callEmbedOfflineHtml(html, watermarkText);
+}
+
 export function animatedStoryboardFileName(title = "storyboard") {
   const safe = String(title || "storyboard")
     .toLowerCase()

@@ -1533,6 +1533,19 @@ const isTenantOnboardingProbe = (path) => {
   return normalized === "/tenants/me" || normalized === "/me";
 };
 
+/** Every {@code /public/...} backend route (ClientReviewPage's /review/:token, the public brief-
+ * funding page, ...) is deliberately permitAll/no-JWT -- see e.g. PublicProjectController's own
+ * javadoc. Confirmed live this matters: a visitor to one of these pages can have a stale, expired
+ * auth_token/refresh_token sitting in this origin's shared localStorage from an unrelated earlier
+ * creator-dashboard session (the two apps share the same origin/storage), and the refresh-token
+ * fetch() this file makes to Keycloak has no timeout/AbortController at all -- if that request
+ * hangs (auth host unreachable, slow network, anything short of a clean rejection), the whole
+ * pipeline stalls forever *before* the actual public request ever fires, since it's awaited ahead
+ * of the real queryFn call. A public route never needs a token in the first place, so it has no
+ * business waiting on one being refreshed. */
+/** @param {string} path */
+const isPublicRoute = (path) => /\/public\//.test(path.split("?")[0]);
+
 /* -------------------------------------------------------------------------- */
 /*                        WRAPPED BASE QUERY (FINAL)                          */
 /* -------------------------------------------------------------------------- */
@@ -1546,7 +1559,7 @@ const baseQueryWithMetrics = async (args, api, extra) => {
 
   const queryFn = appConfig.MOCK_MODE ? mockBaseQuery : realBaseQuery;
 
-  if (!appConfig.MOCK_MODE) {
+  if (!appConfig.MOCK_MODE && !isPublicRoute(requestPath)) {
     const token = getAccessToken();
     if (token && isTokenExpired(token)) {
       try {
@@ -1569,7 +1582,7 @@ const baseQueryWithMetrics = async (args, api, extra) => {
   const error = normalizeError(rawResult.error);
   let status = error.status;
 
-  if (!appConfig.MOCK_MODE && status === 401 && getAccessToken()) {
+  if (!appConfig.MOCK_MODE && !isPublicRoute(requestPath) && status === 401 && getAccessToken()) {
     try {
       await refreshAuthToken(api);
       rawResult = await queryFn(args, api, extra);
@@ -1584,7 +1597,7 @@ const baseQueryWithMetrics = async (args, api, extra) => {
     }
   }
 
-  if (!appConfig.MOCK_MODE) {
+  if (!appConfig.MOCK_MODE && !isPublicRoute(requestPath)) {
     if (status === 401) {
       clearAuthState();
       api.dispatch(logout());
@@ -1663,6 +1676,62 @@ const unwrapJavaTypedJson = (value) => {
   }
 
   return value;
+};
+
+const firstNonBlankText = (...values) =>
+  values.find((value) => typeof value === "string" && value.trim()) || "";
+
+const runtimeRazorpayKeyId = () => {
+  const runtimeEnv = typeof window !== "undefined" && window.__ENV__ ? window.__ENV__ : {};
+  return firstNonBlankText(
+    runtimeEnv.RAZORPAY_KEY_ID,
+    runtimeEnv.VITE_RAZORPAY_KEY_ID,
+    import.meta.env?.VITE_RAZORPAY_KEY_ID
+  );
+};
+
+/**
+ * Keep every shared billing order on one checkout contract. Billing-service is the
+ * authoritative source for the public key because it created the Razorpay order;
+ * the container/Vite value is a fallback for older responses that omitted keyId.
+ * @param {any} response
+ * @returns {any}
+ */
+export const normalizeRazorpayPaymentOrder = (response) => {
+  const order = unwrapJavaTypedJson(response);
+  if (!order || typeof order !== "object" || Array.isArray(order)) return order;
+
+  const checkout = order.checkoutDetails || order.checkout_details || order.checkout || {};
+  const keyId = firstNonBlankText(
+    checkout.key,
+    checkout.keyId,
+    checkout.key_id,
+    order.key,
+    order.keyId,
+    order.key_id,
+    runtimeRazorpayKeyId()
+  );
+  const gatewayOrderId = firstNonBlankText(
+    checkout.order_id,
+    checkout.orderId,
+    checkout.gatewayOrderId,
+    checkout.gateway_order_id,
+    order.order_id,
+    order.orderId,
+    order.gatewayOrderId,
+    order.gateway_order_id
+  );
+
+  return {
+    ...order,
+    ...(keyId ? { keyId } : {}),
+    ...(gatewayOrderId ? { gatewayOrderId } : {}),
+    checkoutDetails: {
+      ...checkout,
+      ...(keyId ? { key: firstNonBlankText(checkout.key, keyId), keyId } : {}),
+      ...(gatewayOrderId ? { order_id: firstNonBlankText(checkout.order_id, gatewayOrderId) } : {}),
+    },
+  };
 };
 
 /* -------------------------------------------------------------------------- */
@@ -1781,6 +1850,7 @@ export const api = createApi({
           body: payload,
         };
       },
+      transformResponse: normalizeRazorpayPaymentOrder,
       invalidatesTags: ["CreatorWallet"],
     }),
     verifyWalletPayment: builder.mutation({
@@ -1793,6 +1863,27 @@ export const api = createApi({
         };
       },
       invalidatesTags: ["CreatorWallet"],
+    }),
+
+    // Same order-creation + verify pair as wallet recharge, scoped to one creative-planning-service
+    // ProjectRequirement instead of the tenant's general wallet -- see PaymentController's
+    // project-requirements endpoints. Verification still goes through verifyWalletPayment above
+    // (same underlying handlePaymentSuccess call regardless of what the payment was for).
+    createProjectRequirementPayment: builder.mutation({
+      query: (/** @type {{ tenantId: string, requirementId: string, amount: number, currency?: string, description?: string }} */ body) => {
+        const { tenantId, requirementId, ...payload } = body || {};
+        return {
+          url: `/billing/${tenantId}/project-requirements/${requirementId}/payments`,
+          method: "POST",
+          body: payload,
+        };
+      },
+      transformResponse: normalizeRazorpayPaymentOrder,
+    }),
+    getProjectRequirementFunding: builder.query({
+      query: (/** @type {{ tenantId: string, requirementId: string }} */ args) =>
+        `/billing/${args?.tenantId}/project-requirements/${args?.requirementId}/funding`,
+      providesTags: (_result, _error, args) => [{ type: "CreatorProjectRequirements", id: `funding-${args?.requirementId || "current"}` }],
     }),
 
     getLiveCall: builder.query({
@@ -2571,6 +2662,8 @@ export const {
   useGetWalletBalanceQuery,
   useAddWalletBalanceMutation,
   useVerifyWalletPaymentMutation,
+  useCreateProjectRequirementPaymentMutation,
+  useGetProjectRequirementFundingQuery,
   useGetLiveCallQuery,
   useGetInvoicesQuery,
   useGetDashboardStatsQuery,

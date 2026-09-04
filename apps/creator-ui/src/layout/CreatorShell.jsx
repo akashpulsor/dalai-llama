@@ -3,6 +3,7 @@ import React from "react";
 import { Outlet } from "react-router-dom";
 import CreatorTenantOnboardingModal from "../components/onboarding/CreatorTenantOnboardingModal.jsx";
 import Sidebar from "./Sidebar.jsx";
+import GlobalRechargeModal from "./GlobalRechargeModal.jsx";
 
 export default function CreatorShell() {
   return (
@@ -12,6 +13,7 @@ export default function CreatorShell() {
         <Outlet />
       </main>
       <CreatorTenantOnboardingModal />
+      <GlobalRechargeModal />
     </div>
   );
 }

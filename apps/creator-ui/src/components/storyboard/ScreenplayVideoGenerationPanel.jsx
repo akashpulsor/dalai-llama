@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   CheckCircle2,
   Clapperboard,
@@ -19,9 +20,11 @@ import {
   Sparkles,
   Timer,
   Upload,
+  User,
   Volume2,
   X,
 } from "lucide-react";
+import CastReferenceUploadModal from "./CastReferenceUploadModal.jsx";
 
 const terminalStatuses = new Set(["COMPLETED", "READY", "READY_FOR_REVIEW", "RENDERED", "FAILED", "CANCELLED", "CANCELED"]);
 const DEFAULT_AUDIO_MIX_STANDARDS = {
@@ -103,6 +106,9 @@ export default function ScreenplayVideoGenerationPanel({
   storyboardGenerated = false,
   storyboardLoading = false,
   onOpenStoryboard,
+  characterCastMappings = [],
+  onOpenCastStep,
+  onUploadCastReference,
   onGenerateStoryboard,
   onGenerateSceneImage,
   onGenerateAllSceneImages,
@@ -133,7 +139,11 @@ export default function ScreenplayVideoGenerationPanel({
   onDecideSceneDialogueVoice,
   onCombineSceneDialogueAudio,
   onUploadSceneAvatarImage,
+  onUploadSceneReferenceImage,
   onRegenerateScene,
+  sceneAssets = [],
+  combinedVideoAsset = null,
+  onSetSceneAssetAccepted,
   onFinalRender,
   onGenerateAudioPack,
   onRefreshMedia,
@@ -163,14 +173,18 @@ export default function ScreenplayVideoGenerationPanel({
   isGeneratingSceneImage,
   isSceneWorking,
 }) {
+  const navigate = useNavigate();
   const [sceneDrafts, setSceneDrafts] = useState({});
   const [videoPromptDrafts, setVideoPromptDrafts] = useState({});
   const [sceneImagePromptDrafts, setSceneImagePromptDrafts] = useState({});
   const [sceneSoundDrafts, setSceneSoundDrafts] = useState({});
   const [sceneModeOverrides, setSceneModeOverrides] = useState({});
   const [sceneAiProviders, setSceneAiProviders] = useState({});
+  const [sceneVideoModels, setSceneVideoModels] = useState({});
   const [sceneUploadedImageAssets, setSceneUploadedImageAssets] = useState({});
   const [sceneProductionImageUploading, setSceneProductionImageUploading] = useState({});
+  const [sceneReferenceImagePriority, setSceneReferenceImagePriority] = useState({});
+  const [sceneReferenceImageUploading, setSceneReferenceImageUploading] = useState({});
   const [sceneDialogueLanguages, setSceneDialogueLanguages] = useState({});
   const [sceneVoiceMethods, setSceneVoiceMethods] = useState({});
   const [sceneVoiceWorking, setSceneVoiceWorking] = useState({});
@@ -184,6 +198,9 @@ export default function ScreenplayVideoGenerationPanel({
   const [editorRevisionDraft, setEditorRevisionDraft] = useState("");
   const [musicSource, setMusicSource] = useState("free_licensed");
   const [pendingPaidAction, setPendingPaidAction] = useState(null);
+  const [castReferenceModalCharacter, setCastReferenceModalCharacter] = useState(null);
+  const [castReferenceUploading, setCastReferenceUploading] = useState(false);
+  const [castReferenceUploadError, setCastReferenceUploadError] = useState("");
   const [referenceDetails, setReferenceDetails] = useState("");
   const [uploadedReferenceAssets, setUploadedReferenceAssets] = useState([]);
   const [referenceUploadError, setReferenceUploadError] = useState("");
@@ -200,7 +217,7 @@ export default function ScreenplayVideoGenerationPanel({
       window.setTimeout(() => refreshedMediaUrls.current.delete(mediaUrl), 15000);
     }
   };
-  const sceneRows = useMemo(() => normalizeSceneRows(videoRun, scenes), [videoRun, scenes]);
+  const sceneRows = useMemo(() => normalizeSceneRows(videoRun, scenes, sceneAssets), [videoRun, scenes, sceneAssets]);
   const persistedCombinedDialogueAsset = combinedSceneDialogueAudioAsset(videoRun);
   const combinedDialogueAsset = firstObject(
     combinedDialogueResult?.combinedDialogueAudio,
@@ -224,10 +241,11 @@ export default function ScreenplayVideoGenerationPanel({
     .filter((scene) => !sceneDialogueAudioUrl(scene))
     .map((scene, index) => Number(scene.sceneNumber || scene.shotNumber || index + 1));
   const status = statusValue(videoRun?.status || videoJob?.status || (sceneRows.length ? "PLANNED" : "WAITING"));
-  const finalVideoVariants = finalVideoVariantsFrom(videoRun, finalRenderJob?.result, finalRenderJob?.outputPayload);
+  const finalVideoVariants = finalVideoVariantsFrom(combinedVideoAsset, videoRun, finalRenderJob?.result, finalRenderJob?.outputPayload);
   const customVoiceFinalVideo = finalVideoVariants.find((variant) => variant.audioVariant === "CUSTOM_GENERATED_VOICE");
   const nativeAudioFinalVideo = finalVideoVariants.find((variant) => variant.audioVariant === "VIDEO_GENERATED_AUDIO");
   const finalUrl = firstText(
+    combinedVideoAsset?.videoUrl,
     customVoiceFinalVideo?.url,
     nativeAudioFinalVideo?.url,
     finalVideoVariants[0]?.url,
@@ -548,11 +566,20 @@ export default function ScreenplayVideoGenerationPanel({
     });
   };
 
+  const persistSceneAcceptance = (scene, accepted) => {
+    const shotNumber = scene?.shotNumber ?? scene?.sceneNumber;
+    const matchingAsset = sceneAssets.find((asset) => asset?.shotNumber === shotNumber);
+    if (matchingAsset?.id) {
+      onSetSceneAssetAccepted?.(matchingAsset.id, accepted);
+    }
+  };
+
   const handleAcceptScene = (scene) => {
     if (!hasGeneratedSceneClip(scene)) return;
     const key = clipReviewKey(scene, videoRun);
     if (!key) return;
     setAcceptedClipKeys((current) => ({ ...current, [key]: true }));
+    persistSceneAcceptance(scene, true);
   };
 
   const handleAcceptAllReady = () => {
@@ -560,6 +587,7 @@ export default function ScreenplayVideoGenerationPanel({
     generatedClipRows.forEach((scene) => {
       const key = clipReviewKey(scene, videoRun);
       if (key) next[key] = true;
+      persistSceneAcceptance(scene, true);
     });
     setAcceptedClipKeys((current) => ({ ...current, ...next }));
   };
@@ -880,6 +908,42 @@ export default function ScreenplayVideoGenerationPanel({
       setSceneUploadedImageAssets((current) => ({ ...current, [sceneId]: asset }));
     } finally {
       setSceneProductionImageUploading((current) => ({ ...current, [sceneId]: false }));
+    }
+  };
+
+  const handleSceneReferenceImageUpload = async (scene, event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    const sceneId = scene?.id;
+    if (!file || !sceneId || sceneReferenceImageUploading[sceneId]) return;
+    if (!String(file.type || "").startsWith("image/")) {
+      onBlockedAction?.("Upload a JPG, PNG, WebP, AVIF, or GIF image.");
+      return;
+    }
+    if (!hasVideoRun) {
+      onBlockedAction?.("Prepare the scene workspace before uploading a reference image.");
+      return;
+    }
+    const priority = sceneReferenceImagePriority[sceneId] === "override" ? "override" : "combine";
+    setSceneReferenceImageUploading((current) => ({ ...current, [sceneId]: true }));
+    try {
+      await onUploadSceneReferenceImage?.(scene, file, priority);
+    } finally {
+      setSceneReferenceImageUploading((current) => ({ ...current, [sceneId]: false }));
+    }
+  };
+
+  const handleCastReferenceUpload = async (file) => {
+    if (!castReferenceModalCharacter) return;
+    setCastReferenceUploading(true);
+    setCastReferenceUploadError("");
+    try {
+      await onUploadCastReference?.(castReferenceModalCharacter.characterName, file);
+      setCastReferenceModalCharacter(null);
+    } catch (error) {
+      setCastReferenceUploadError(error?.message || "Couldn't upload that photo. Try again.");
+    } finally {
+      setCastReferenceUploading(false);
     }
   };
 
@@ -1234,26 +1298,60 @@ export default function ScreenplayVideoGenerationPanel({
             </p>
           </div>
 
-          {!screenplayApproved && (
+          <div className="flex flex-wrap items-center gap-2">
+            {!screenplayApproved && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!screenplay?.scriptId) {
+                    onBlockedAction?.("Generate and save the screenplay before approval.");
+                    return;
+                  }
+                  onApprove?.();
+                }}
+                disabled={isApproving}
+                aria-disabled={!screenplay?.scriptId || isApproving}
+                className={`creator-control flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-slate-200 disabled:opacity-50 ${
+                  !screenplay?.scriptId ? "opacity-50" : ""
+                }`}
+              >
+                {isApproving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                Approve screenplay
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
-                if (!screenplay?.scriptId) {
-                  onBlockedAction?.("Generate and save the screenplay before approval.");
+                if (!finalUrl) {
+                  onBlockedAction?.("Combine all accepted scenes into a final video first.");
                   return;
                 }
-                onApprove?.();
+                document.getElementById("combined-video-preview")?.scrollIntoView({ behavior: "smooth", block: "start" });
               }}
-              disabled={isApproving}
-              aria-disabled={!screenplay?.scriptId || isApproving}
-              className={`creator-control flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-slate-200 disabled:opacity-50 ${
-                !screenplay?.scriptId ? "opacity-50" : ""
-              }`}
+              disabled={!finalUrl}
+              aria-disabled={!finalUrl}
+              title={finalUrl ? "Jump to the combined video preview" : "Generate all assets and combine the final video first"}
+              className="creator-control flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-slate-200 disabled:opacity-50"
             >
-              {isApproving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-              Approve screenplay
+              <Clapperboard size={16} /> Combined video
             </button>
-          )}
+            <button
+              type="button"
+              onClick={() => {
+                if (!finalUrl) {
+                  onBlockedAction?.("Combine all accepted scenes into a final video before opening the editor.");
+                  return;
+                }
+                navigate("/editor", { state: { assetUrl: finalUrl, assetName: finalFilename } });
+              }}
+              disabled={!finalUrl}
+              aria-disabled={!finalUrl}
+              title={finalUrl ? "Open the combined video in the editor" : "Generate all assets and combine the final video first"}
+              className="creator-control flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-slate-200 disabled:opacity-50"
+            >
+              <SlidersHorizontal size={16} /> Editor
+            </button>
+          </div>
 
         </div>
       </div>
@@ -1262,6 +1360,18 @@ export default function ScreenplayVideoGenerationPanel({
         action={pendingPaidAction}
         onCancel={() => setPendingPaidAction(null)}
         onConfirm={confirmPaidAction}
+      />
+
+      <CastReferenceUploadModal
+        character={castReferenceModalCharacter}
+        isUploading={castReferenceUploading}
+        error={castReferenceUploadError}
+        onUpload={handleCastReferenceUpload}
+        onClose={() => {
+          if (castReferenceUploading) return;
+          setCastReferenceModalCharacter(null);
+          setCastReferenceUploadError("");
+        }}
       />
 
       <section className="border-b border-white/10 p-4">
@@ -1580,7 +1690,7 @@ export default function ScreenplayVideoGenerationPanel({
       )}
 
       {finalVideoVariants.length > 0 && (
-        <div className="border-b border-white/10 p-4">
+        <div id="combined-video-preview" className="border-b border-white/10 p-4">
           <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-sm font-black uppercase tracking-normal text-emerald-200">Complete video previews</p>
@@ -1603,7 +1713,7 @@ export default function ScreenplayVideoGenerationPanel({
                   onError={() => refreshMediaUrl(variant.url)}
                   className={`${videoPlayerFrameClass(videoAspectRatio(variant, videoRun, screenplay))} bg-black object-contain`}
                 />
-                <div className="grid grid-cols-2 gap-2 p-3">
+                <div className="grid grid-cols-3 gap-2 p-3">
                   <a
                     href={variant.url}
                     download={finalVariantFilename(finalFilename, variant.audioVariant, index)}
@@ -1619,6 +1729,20 @@ export default function ScreenplayVideoGenerationPanel({
                   >
                     <Play size={15} /> Preview
                   </a>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate("/editor", {
+                        state: {
+                          assetUrl: variant.url,
+                          assetName: finalVariantFilename(finalFilename, variant.audioVariant, index),
+                        },
+                      })
+                    }
+                    className="creator-control flex items-center justify-center gap-2 px-3 py-2 text-xs font-bold text-slate-200"
+                  >
+                    <SlidersHorizontal size={15} /> Open in Editor
+                  </button>
                 </div>
               </div>
             ))}
@@ -2003,7 +2127,10 @@ export default function ScreenplayVideoGenerationPanel({
               scene.targetProvider,
               normalizedVideoProvider
             ));
-            const selectedAiModel = defaultModelForProvider(selectedAiProvider);
+            const selectedAiModel = compatibleModelForProvider(
+              selectedAiProvider,
+              firstText(sceneVideoModels[scene.id], resolvedVideoModel)
+            );
             const effectiveSceneImageAsset = firstObject(
               generatedSceneImageAsset,
               isProductLed ? {} : canonicalProductImageAssets[0]
@@ -2199,6 +2326,65 @@ export default function ScreenplayVideoGenerationPanel({
                     )}
                   </div>
                 </div>
+
+                {sceneCharacterNames(scene).length > 0 && (
+                  <div className="mt-3 rounded-md border border-purple-300/15 bg-purple-400/[0.045] px-3 py-2.5">
+                    <span className="text-[10px] font-black uppercase text-purple-200">Cast reference</span>
+                    <div className="mt-1.5 flex flex-wrap gap-2">
+                      {sceneCharacterNames(scene).map((characterName) => {
+                        const mapping = castMappingForCharacter(characterCastMappings, characterName);
+                        const referenceImageUrl = mapping?.castPayload?.referenceImageUrl || "";
+                        return (
+                          <div
+                            key={characterName}
+                            className="flex items-center gap-2 rounded-md border border-white/10 bg-black/25 px-2 py-1.5"
+                          >
+                            {referenceImageUrl ? (
+                              <img
+                                src={referenceImageUrl}
+                                alt={`${mapping?.castDisplayName || characterName} cast reference`}
+                                className="h-8 w-8 rounded object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-8 w-8 items-center justify-center rounded bg-white/5 text-slate-500">
+                                <User size={14} />
+                              </div>
+                            )}
+                            <div className="text-[11px] leading-tight">
+                              <p className="font-bold text-slate-200">{characterName}</p>
+                              {referenceImageUrl ? (
+                                <p className="text-emerald-300">
+                                  {mapping?.castDisplayName || "Cast set"} - this face will be used
+                                </p>
+                              ) : (
+                                <p className="text-amber-200">No cast reference - generic identity will be used</p>
+                              )}
+                            </div>
+                            {(onUploadCastReference || onOpenCastStep) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (mapping?.castProfileId && onUploadCastReference) {
+                                    setCastReferenceModalCharacter({
+                                      characterName,
+                                      castDisplayName: mapping?.castDisplayName || characterName,
+                                      referenceImageUrl,
+                                    });
+                                  } else {
+                                    onOpenCastStep?.();
+                                  }
+                                }}
+                                className="ml-1 rounded-md border border-purple-300/30 bg-purple-400/15 px-2 py-1 text-[10px] font-black uppercase text-purple-100 transition hover:bg-purple-400/25"
+                              >
+                                {referenceImageUrl ? "Replace photo" : "Set cast reference"}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-3 rounded-md border border-cyan-300/15 bg-cyan-400/[0.045] px-3 py-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2473,7 +2659,7 @@ export default function ScreenplayVideoGenerationPanel({
                       </span>
                     </div>
 
-                    <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    <div className="mt-3 grid gap-2 md:grid-cols-3">
                       <label className="min-w-0">
                         <span className="mb-1 block text-[10px] font-black uppercase text-slate-500">Dialogue language</span>
                         <input
@@ -2497,19 +2683,39 @@ export default function ScreenplayVideoGenerationPanel({
                       </label>
 
                       <label className="min-w-0">
-                        <span className="mb-1 block text-[10px] font-black uppercase text-slate-500">Video model</span>
+                        <span className="mb-1 block text-[10px] font-black uppercase text-slate-500">AI provider</span>
                         <select
                           value={selectedAiProvider}
                           onChange={(event) => {
-                            setSceneAiProviders((current) => ({ ...current, [scene.id]: aiSceneProvider(event.target.value) }));
+                            const nextProvider = aiSceneProvider(event.target.value);
+                            setSceneAiProviders((current) => ({ ...current, [scene.id]: nextProvider }));
+                            setSceneVideoModels((current) => ({ ...current, [scene.id]: defaultModelForProvider(nextProvider) }));
                             handleModeChange(scene, "ai_generated");
                           }}
                           disabled={sceneBusy || otherSceneBusy}
                           className="creator-input h-11 w-full px-3 text-xs font-bold"
-                          title="Choose the model used for this scene."
+                          title="Choose the provider used for this scene."
                         >
-                          <option value="seedance">Seedance 2.0</option>
+                          <option value="seedance">Seedance</option>
                           <option value="omini">Omini</option>
+                        </select>
+                      </label>
+
+                      <label className="min-w-0">
+                        <span className="mb-1 block text-[10px] font-black uppercase text-slate-500">Model version</span>
+                        <select
+                          value={selectedAiModel}
+                          onChange={(event) => {
+                            setSceneVideoModels((current) => ({ ...current, [scene.id]: event.target.value }));
+                            handleModeChange(scene, "ai_generated");
+                          }}
+                          disabled={sceneBusy || otherSceneBusy}
+                          className="creator-input h-11 w-full px-3 text-xs font-bold"
+                          title="Test a specific model version for this scene, independent of the global default."
+                        >
+                          {videoModelOptions(selectedAiProvider).map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
                         </select>
                       </label>
                     </div>
@@ -2633,7 +2839,36 @@ export default function ScreenplayVideoGenerationPanel({
                   </label>
                 </div>
 
-                <div className="mt-3 flex flex-wrap justify-end gap-2">
+                <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+                  <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/20 p-1">
+                    <select
+                      value={sceneReferenceImagePriority[scene.id] === "override" ? "override" : "combine"}
+                      onChange={(event) =>
+                        setSceneReferenceImagePriority((current) => ({ ...current, [scene.id]: event.target.value }))
+                      }
+                      title="If you upload a reference image below: combine it with this scene's existing product/cast references, or override them entirely"
+                      className="h-8 rounded-md border border-white/10 bg-black/40 px-2 text-[11px] font-bold text-slate-200 focus:border-purple-400/60 focus:outline-none"
+                    >
+                      <option value="combine" className="bg-slate-950 text-slate-100">Combine with existing</option>
+                      <option value="override" className="bg-slate-950 text-slate-100">Override existing</option>
+                    </select>
+                    <label
+                      className={`flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-2 text-[11px] font-bold text-slate-300 hover:bg-white/[0.06] hover:text-white ${
+                        sceneReferenceImageUploading[scene.id] ? "pointer-events-none opacity-60" : ""
+                      }`}
+                      title="Attach a reference image for this scene's next generation"
+                    >
+                      {sceneReferenceImageUploading[scene.id] ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                      Reference image
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={sceneReferenceImageUploading[scene.id]}
+                        onChange={(event) => handleSceneReferenceImageUpload(scene, event)}
+                      />
+                    </label>
+                  </div>
                   {isAvatarScene && (
                     <button
                       type="button"
@@ -2679,14 +2914,46 @@ export default function ScreenplayVideoGenerationPanel({
                   </button>
                 </div>
 
-                <details className="mt-3 border-t border-white/10 pt-2">
-                  <summary className="cursor-pointer text-[11px] font-black text-slate-400">Request a scene revision</summary>
+                <div className="mt-3 rounded-md border border-emerald-300/15 bg-emerald-400/[0.045] px-3 py-2.5">
+                  <div className="flex items-center gap-2 text-[10px] font-black uppercase text-emerald-200">
+                    <MessageSquareText size={13} /> Chat to adjust this scene
+                  </div>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                    Ask for a tone/emotion change, a dialogue-language change, or any other tweak to the plan - your prior plan is kept as-is except what you ask for.
+                    This only edits the plan (no video credits spent) until you click Generate.
+                  </p>
+                  {Array.isArray(scene.revisions) && scene.revisions.length > 0 && (
+                    <div className="custom-scrollbar mt-2 max-h-48 space-y-2 overflow-y-auto pr-1">
+                      {scene.revisions.map((revision) => {
+                        const editingNotes = firstText(
+                          revision?.aiOutput?.shot?.editingNotes,
+                          revision?.aiOutput?.scene?.editingNotes,
+                          revision?.aiOutput?.editingNotes
+                        );
+                        return (
+                          <div key={revision.id} className="space-y-1">
+                            <div className="rounded-md bg-black/25 px-2.5 py-1.5 text-[12px] text-slate-200">
+                              <span className="font-bold text-emerald-200">You: </span>
+                              {revision.message}
+                            </div>
+                            <div className="rounded-md bg-black/15 px-2.5 py-1.5 text-[11px] text-slate-400">
+                              <span className="font-bold text-slate-300">Applied: </span>
+                              {editingNotes
+                                || (revision.status === "APPLIED_WITH_FALLBACK"
+                                  ? "Change saved (fallback path - review before generating)."
+                                  : "Change saved to this scene's plan.")}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                     <textarea
                       value={draft}
                       onChange={(event) => handleDraftChange(scene.id, event.target.value)}
                       rows={2}
-                      placeholder="Describe the shot change"
+                      placeholder='e.g. "make her more confident and energetic" or "switch dialogue to Hindi"'
                       className="creator-input min-h-[4.5rem] w-full resize-none px-3 py-2 text-sm"
                     />
                     <button
@@ -2700,13 +2967,7 @@ export default function ScreenplayVideoGenerationPanel({
                       Send
                     </button>
                   </div>
-                </details>
-
-                {Array.isArray(scene.revisions) && scene.revisions.length > 0 && (
-                  <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold text-slate-500">
-                    <MessageSquareText size={13} /> {scene.revisions.length} revision{scene.revisions.length === 1 ? "" : "s"}
-                  </div>
-                )}
+                </div>
               </div>
             );
           }) : (
@@ -4521,7 +4782,7 @@ function humanWorkOrderRevisionCount(order = {}) {
   }).length;
 }
 
-function normalizeSceneRows(videoRun = {}, screenplayScenes = []) {
+function normalizeSceneRows(videoRun = {}, screenplayScenes = [], sceneAssets = []) {
   const backendScenes = firstArray(
     videoRun?.scenes,
     videoRun?.sceneClips,
@@ -4531,12 +4792,31 @@ function normalizeSceneRows(videoRun = {}, screenplayScenes = []) {
   );
   const screenplayRows = arrayValue(screenplayScenes);
   const source = backendScenes.length ? backendScenes : screenplayRows;
+  const sceneAssetsByShot = new Map(
+    arrayValue(sceneAssets)
+      .filter((asset) => Number.isInteger(asset?.shotNumber))
+      .map((asset) => [asset.shotNumber, asset])
+  );
   return source.map((rawScene, index) => {
     const rawSceneNumber = Number(rawScene?.sceneNumber || rawScene?.scene_number || rawScene?.shotNumber || rawScene?.shot_number || index + 1);
     const screenplayScene = screenplayRows.find((candidate, candidateIndex) => Number(
       candidate?.sceneNumber || candidate?.scene_number || candidate?.shotNumber || candidate?.shot_number || candidateIndex + 1
     ) === rawSceneNumber) || {};
-    const scene = { ...screenplayScene, ...rawScene };
+    // creator_assets (sceneAssetsByShot) is the durable, DB-backed source of truth for
+    // "is this shot actually generated" - it wins over the videoRun/job JSONB, which can
+    // go stale or get poisoned by an unrelated failure (e.g. a billing error mid-run).
+    const matchingAsset = sceneAssetsByShot.get(rawSceneNumber);
+    const scene = {
+      ...screenplayScene,
+      ...rawScene,
+      ...(matchingAsset ? {
+        videoUrl: matchingAsset.videoUrl,
+        status: matchingAsset.status,
+        durationSeconds: matchingAsset.durationSeconds,
+        contentType: matchingAsset.contentType,
+        accepted: matchingAsset.accepted,
+      } : {}),
+    };
     const sceneNumber = Number(scene?.sceneNumber || scene?.scene_number || scene?.shotNumber || scene?.shot_number || index + 1);
     const id = String(scene?.id || scene?.sceneId || scene?.scene_id || scene?.clipId || scene?.clip_id || `scene-${sceneNumber || index + 1}`);
     const prompt = firstText(
@@ -4686,6 +4966,35 @@ function productSceneFrameAsset(scene = {}) {
   };
 }
 
+// Same character extraction as PlannerPage.jsx's shotHasHumanCharacter/extractStoryboardTag -
+// duplicated here (not exported from that file) rather than only returning a boolean, since this
+// needs the actual character names to look up their cast mapping.
+function sceneCharacterNames(scene = {}) {
+  const tag = firstObject(
+    scene.storyboardTag,
+    scene.storyboard_tag,
+    scene.storyboard,
+    scene.storyboardPlan,
+    scene.storyboard_plan,
+    scene.tags?.storyboardTag,
+    scene.tags?.storyboard
+  ) || {};
+  const primary = Array.isArray(tag.primaryCharacters) ? tag.primaryCharacters : (Array.isArray(scene.primaryCharacters) ? scene.primaryCharacters : []);
+  const side = Array.isArray(tag.sideCharacters) ? tag.sideCharacters : (Array.isArray(scene.sideCharacters) ? scene.sideCharacters : []);
+  return [...primary, ...side]
+    .map((name) => String(name || "").trim())
+    .filter(Boolean)
+    .filter((name, index, all) => all.indexOf(name) === index);
+}
+
+function castMappingForCharacter(characterCastMappings = [], characterName = "") {
+  const normalized = String(characterName || "").trim().toLowerCase();
+  if (!normalized) return null;
+  return (Array.isArray(characterCastMappings) ? characterCastMappings : []).find(
+    (mapping) => String(mapping?.characterName || "").trim().toLowerCase() === normalized
+  ) || null;
+}
+
 function canonicalProductReferenceUrls(videoRun = {}, screenplay = {}, assets = []) {
   const productBrief = firstObject(
     screenplay?.scriptJson?.productIntelligenceBrief,
@@ -4727,12 +5036,13 @@ function productionImagePromptForScene(scene = {}, productLed = false) {
     productShotPlan?.cgiFramePrompt,
     productShotPlan?.cgi_frame_prompt
   );
+  // productionImagePrompt/production_image_prompt are the full backend-rendered prompt echoed
+  // back for display only - never a resubmittable short brief, and can exceed the server's
+  // @Size(max=12000) imagePrompt limit if fed back in.
   const plannedPrompt = firstText(
     structuredPrompt,
     scene?.productImagePrompt,
     scene?.product_image_prompt,
-    scene?.productionImagePrompt,
-    scene?.production_image_prompt,
     scene?.imagePrompt,
     scene?.storyboardImagePrompt,
     scene?.visualPrompt,
@@ -5140,7 +5450,7 @@ function isAcceptedStatus(status) {
   return ["ACCEPTED", "APPROVED", "CLIP_ACCEPTED", "SCENE_ACCEPTED"].includes(statusValue(status));
 }
 
-function isReadyStatus(status) {
+export function isReadyStatus(status) {
   return ["READY", "VIDEO_READY", "READY_FOR_REVIEW", "RENDERED", "COMPLETED", "APPROVED"].includes(statusValue(status));
 }
 
@@ -5443,6 +5753,9 @@ function videoModelOptions(provider) {
   return [
     { value: "bytedance/seedance-2.0", label: "Seedance 2.0" },
     { value: "bytedance/seedance-2.0/fast", label: "Seedance 2.0 Fast" },
+    // Confirmed live against fal.ai - single reference-image model, see
+    // ScreenplayVideoProviderGenerationService.buildFalSeedance25Request on the backend.
+    { value: "bytedance/seedance-2.5/image-to-video", label: "Seedance 2.5 (single reference image)" },
   ];
 }
 

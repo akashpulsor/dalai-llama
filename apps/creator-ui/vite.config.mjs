@@ -53,6 +53,15 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false,
         },
+        // The 9 real backend services (creative-planning-service, pre-production-service,
+        // trend-intelligence-service, ...) are mounted at the gateway's bare /v1/* -- see
+        // infra-platform/charts/backend-service/values.yaml's apiPaths and the matching
+        // absolute-URL calls in src/api/creatorEndpoints.js.
+        "/v1": {
+          target: proxyTarget,
+          changeOrigin: true,
+          secure: false,
+        },
       },
     },
     build: {

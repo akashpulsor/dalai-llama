@@ -14,6 +14,13 @@ export default function SceneCard({
   productMode = false,
   onClick,
   onGenerateImage,
+  onAnalyzeProductReference,
+  onConfirmProductReference,
+  onStageProductReference,
+  resumeProductMismatchReview,
+  onConsumeProductMismatchReview,
+  otherCastCandidateShots,
+  onApplyCastToShots,
 }) {
   const [selectedAssetKind, setSelectedAssetKind] = useState("storyboard");
   const [failedAssetKeys, setFailedAssetKeys] = useState({});
@@ -192,6 +199,13 @@ export default function SceneCard({
           }}
           onPreviewAssetKind={setSelectedAssetKind}
           onGenerateImage={onGenerateImage}
+          onAnalyzeProductReference={onAnalyzeProductReference}
+          onConfirmProductReference={onConfirmProductReference}
+          onStageProductReference={onStageProductReference}
+          resumeProductMismatchReview={resumeProductMismatchReview}
+          onConsumeProductMismatchReview={onConsumeProductMismatchReview}
+          otherCastCandidateShots={otherCastCandidateShots}
+          onApplyCastToShots={onApplyCastToShots}
         />
       )}
 
@@ -222,8 +236,18 @@ function ShotDetailsPanel({
   onSelectAsset,
   onPreviewAssetKind,
   onGenerateImage,
+  onAnalyzeProductReference,
+  onConfirmProductReference,
+  onStageProductReference,
+  resumeProductMismatchReview,
+  onConsumeProductMismatchReview,
+  otherCastCandidateShots,
+  onApplyCastToShots,
 }) {
   const availableAsset = selectedAsset || assetSlots.find((asset) => asset.src) || assetSlots[0];
+  // Starts open if a batch analysis left a mismatch review waiting for this shot - otherwise the
+  // resumed review would be hidden behind a closed toggle with no way to know it's there.
+  const [referenceUploadOpen, setReferenceUploadOpen] = useState(Boolean(resumeProductMismatchReview));
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -290,6 +314,11 @@ function ShotDetailsPanel({
                       onPreviewAssetKind?.(asset.kind);
                       onGenerateImage(scene, asset.kind);
                     } : null}
+                    onUploadReference={asset.kind === "production" ? (event) => {
+                      event.stopPropagation();
+                      setReferenceUploadOpen((open) => !open);
+                    } : null}
+                    uploadReferenceActive={referenceUploadOpen}
                   />
                 ))}
               </div>
@@ -303,6 +332,21 @@ function ShotDetailsPanel({
                 )}
                 <QuickMetric label="Duration" value={`${shot.durationSeconds}s`} />
               </div>
+
+              {referenceUploadOpen && assetSlots.some((asset) => asset.kind === "production") && (
+                <ProductReferenceUpload
+                  scene={scene}
+                  onAnalyze={onAnalyzeProductReference}
+                  onConfirm={onConfirmProductReference}
+                  onRegenerateStoryboard={(targetScene) => onGenerateImage?.(targetScene, "storyboard")}
+                  onRegenerateProduction={(targetScene) => onGenerateImage?.(targetScene, "production")}
+                  onStage={onStageProductReference}
+                  resumeReview={resumeProductMismatchReview}
+                  onResumeConsumed={onConsumeProductMismatchReview}
+                  otherCastCandidateShots={otherCastCandidateShots}
+                  onApplyCastToShots={onApplyCastToShots}
+                />
+              )}
             </section>
 
             <section>
@@ -404,6 +448,410 @@ function ShotDetailsPanel({
   );
 }
 
+function ProductReferenceUpload({
+  scene,
+  onAnalyze,
+  onConfirm,
+  onRegenerateStoryboard,
+  onRegenerateProduction,
+  onStage,
+  resumeReview,
+  onResumeConsumed,
+  otherCastCandidateShots,
+  onApplyCastToShots,
+}) {
+  // CAST (identity-preserving generation) is disabled pending further research - see
+  // CreatorProperties.Ai.identityPreservingGenerationPath (parked at NONE). Style/INSPIRATION
+  // references are unaffected and remain the default here.
+  const [classification, setClassification] = useState("INSPIRATION");
+  const [castName, setCastName] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedOtherShots, setSelectedOtherShots] = useState({});
+  // idle -> fileSelected -> analyzing -> (castConfirm | reviewing) -> confirming -> offerRegenerate
+  // -> (CAST only) offerApplyToOtherShots
+  // This panel unmounts whenever the shot detail modal closes, so a resumeReview left behind by a
+  // batch analysis run (see StoryboardGrid's staged-references toolbar) is picked up here purely
+  // via lazy initial state - no effect needed, the component remounts fresh each time this shot's
+  // panel is reopened and simply starts already in the review state.
+  const [phase, setPhase] = useState(resumeReview ? "reviewing" : "idle");
+  const [pending, setPending] = useState(resumeReview || null);
+  const [checkedFields, setCheckedFields] = useState(() => {
+    const mismatches = Array.isArray(resumeReview?.analysis?.mismatches) ? resumeReview.analysis.mismatches : [];
+    return Object.fromEntries(mismatches.map((mismatch) => [mismatch.field, true]));
+  });
+  const fileInputRef = React.useRef(null);
+  const reference = scene?.productReferenceImage || scene?.rawShot?.productReferenceImage || null;
+  const busy = phase === "analyzing" || phase === "confirming";
+
+  useEffect(() => {
+    if (resumeReview) onResumeConsumed?.(Number(scene?.shotNumber || 1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleFileSelected = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setSelectedFile(file);
+    setPhase("fileSelected");
+  };
+
+  const cancelSelection = () => {
+    setSelectedFile(null);
+    setPhase("idle");
+  };
+
+  const stageSelection = () => {
+    onStage?.(scene, selectedFile, classification, castName);
+    setSelectedFile(null);
+    setPhase("idle");
+  };
+
+  const analyzeSelection = async () => {
+    if (!selectedFile || !onAnalyze) return;
+    const file = selectedFile;
+    setSelectedFile(null);
+    setPhase("analyzing");
+    const result = await onAnalyze(scene, file, classification);
+    if (!result?.reference) {
+      setPhase("idle");
+      return;
+    }
+    if (classification === "CAST") {
+      setPending(result);
+      setPhase("castConfirm");
+      return;
+    }
+    const mismatches = Array.isArray(result.analysis?.mismatches) ? result.analysis.mismatches : [];
+    if (!mismatches.length) {
+      setPhase("confirming");
+      await onConfirm?.(scene, result.reference, {
+        approvedUpdates: [],
+        detectedSubject: result.analysis?.detectedSubject || "",
+        dominantMood: result.analysis?.dominantMood || "",
+        cameraAngle: result.analysis?.cameraAngle || "",
+        lightingStyle: result.analysis?.lightingStyle || "",
+        motion: result.analysis?.motion || "",
+      });
+      setPhase("idle");
+      return;
+    }
+    setCheckedFields(Object.fromEntries(mismatches.map((mismatch) => [mismatch.field, true])));
+    setPending(result);
+    setPhase("reviewing");
+  };
+
+  const resolveCast = async (accept) => {
+    if (!pending) return;
+    if (!accept) {
+      setPending(null);
+      setPhase("idle");
+      return;
+    }
+    setPhase("confirming");
+    const confirmedReference = { ...pending.reference, castDisplayName: castName };
+    await onConfirm?.(scene, confirmedReference, { approvedUpdates: [] });
+    await onRegenerateProduction?.(scene);
+    if ((otherCastCandidateShots || []).length) {
+      setSelectedOtherShots({});
+      setPending({ reference: confirmedReference });
+      setPhase("offerApplyToOtherShots");
+      return;
+    }
+    setPending(null);
+    setPhase("idle");
+  };
+
+  const applyToOtherShots = async () => {
+    const targets = Object.entries(selectedOtherShots).filter(([, checked]) => checked).map(([shotNumber]) => Number(shotNumber));
+    setPending(null);
+    setPhase("idle");
+    if (!targets.length) return;
+    await onApplyCastToShots?.(pending?.reference, targets);
+  };
+
+  const resolveMismatch = async (mode) => {
+    if (!pending) return;
+    if (mode === "discard") {
+      setPending(null);
+      setPhase("idle");
+      return;
+    }
+    setPhase("confirming");
+    const mismatches = Array.isArray(pending.analysis?.mismatches) ? pending.analysis.mismatches : [];
+    const approvedUpdates = mode === "update"
+      ? mismatches.filter((mismatch) => checkedFields[mismatch.field]).map((mismatch) => ({ field: mismatch.field, value: mismatch.suggestedUpdate }))
+      : [];
+    const result = await onConfirm?.(scene, pending.reference, {
+      approvedUpdates,
+      ignoreSubject: mode === "style",
+      detectedSubject: pending.analysis?.detectedSubject || "",
+      dominantMood: pending.analysis?.dominantMood || "",
+      cameraAngle: pending.analysis?.cameraAngle || "",
+      lightingStyle: pending.analysis?.lightingStyle || "",
+      motion: pending.analysis?.motion || "",
+    });
+    setPending(null);
+    setPhase(mode === "update" && result?.planningUpdated ? "offerRegenerate" : "idle");
+  };
+
+  const regenerateNow = async () => {
+    setPhase("confirming");
+    await onRegenerateStoryboard?.(scene);
+    setPhase("idle");
+  };
+
+  return (
+    <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+      <p className="text-[10px] font-black uppercase tracking-normal text-slate-400">Product frame reference</p>
+
+      {phase === "fileSelected" && selectedFile && (
+        <div className="mt-2 space-y-2 rounded-md border border-white/10 bg-black/20 p-2.5">
+          <p className="text-[11px] leading-4 text-slate-300">
+            Ready to analyze <strong className="text-white">{selectedFile.name}</strong> as a {classification === "CAST" ? "cast" : "style"} reference.
+          </p>
+          <div className={`grid gap-1.5 ${onStage ? "grid-cols-3" : "grid-cols-2"}`}>
+            <button
+              type="button"
+              onClick={analyzeSelection}
+              className="creator-primary rounded-md px-2 py-1.5 text-[10px] font-black uppercase tracking-normal text-white"
+            >
+              Analyze now
+            </button>
+            {onStage && (
+              <button
+                type="button"
+                onClick={stageSelection}
+                className="creator-control rounded-md px-2 py-1.5 text-[10px] font-black uppercase tracking-normal text-slate-200"
+              >
+                Stage, add more shots
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={cancelSelection}
+              className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[10px] font-black uppercase tracking-normal text-slate-400"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {phase === "analyzing" && (
+        <div className="mt-2 flex items-center gap-2 rounded-md border border-white/10 bg-black/20 p-2.5 text-[11px] font-semibold text-slate-300">
+          <Loader2 size={13} className="animate-spin" /> Analyzing photo against current planning...
+        </div>
+      )}
+
+      {phase === "castConfirm" && pending && (
+        <div className="mt-2 space-y-2 rounded-md border border-purple-300/30 bg-purple-400/10 p-2.5">
+          <div className="flex items-start gap-2">
+            {pending.reference?.url && (
+              <img src={pending.reference.url} alt="Uploaded reference" className="h-14 w-14 shrink-0 rounded-md border border-white/15 object-cover" />
+            )}
+            <p className="text-[11px] leading-4 text-purple-100">{pending.analysis?.confirmationMessage}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={() => resolveCast(true)}
+              disabled={busy}
+              className="creator-primary flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[10px] font-black uppercase tracking-normal text-white disabled:opacity-55"
+            >
+              {phase === "confirming" ? <Loader2 size={11} className="animate-spin" /> : null}
+              Yes, use this face
+            </button>
+            <button
+              type="button"
+              onClick={() => resolveCast(false)}
+              disabled={busy}
+              className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[10px] font-black uppercase tracking-normal text-slate-400 disabled:opacity-55"
+            >
+              No, discard
+            </button>
+          </div>
+        </div>
+      )}
+
+      {phase === "reviewing" && pending && (
+        <div className="mt-2 space-y-2 rounded-md border border-amber-300/30 bg-amber-400/10 p-2.5">
+          <div className="flex items-start gap-2">
+            {pending.reference?.url && (
+              <img src={pending.reference.url} alt="Uploaded reference" className="h-14 w-14 shrink-0 rounded-md border border-white/15 object-cover" />
+            )}
+            <p className="text-[11px] leading-4 text-amber-100">
+              This photo looks like <strong>{pending.analysis?.detectedSubject || "something different"}</strong> - it doesn't fully
+              match what's already planned for this shot. Review before attaching:
+            </p>
+          </div>
+          {[pending.analysis?.cameraAngle, pending.analysis?.lightingStyle, pending.analysis?.motion].some(Boolean) && (
+            <p className="rounded-md border border-white/10 bg-black/20 p-2 text-[10px] leading-4 text-slate-400">
+              <span className="font-black uppercase tracking-normal text-slate-500">Also used for style (not editable): </span>
+              {[pending.analysis?.cameraAngle, pending.analysis?.lightingStyle, pending.analysis?.motion].filter(Boolean).join(" · ")}
+            </p>
+          )}
+          <div className="space-y-1.5">
+            {(pending.analysis?.mismatches || []).map((mismatch) => (
+              <label key={mismatch.field} className="flex items-start gap-2 rounded-md border border-white/10 bg-black/25 p-2 text-[10px] leading-4">
+                <input
+                  type="checkbox"
+                  checked={Boolean(checkedFields[mismatch.field])}
+                  onChange={(event) => setCheckedFields((current) => ({ ...current, [mismatch.field]: event.target.checked }))}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="font-black uppercase tracking-normal text-slate-400">{mismatch.label}</span>
+                  <span className="mt-0.5 block text-slate-500">{mismatch.reason}</span>
+                  <span className="mt-1 block text-slate-300">→ {mismatch.suggestedUpdate}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            <button
+              type="button"
+              onClick={() => resolveMismatch("style")}
+              disabled={busy}
+              className="creator-control rounded-md px-2 py-1.5 text-[10px] font-black uppercase tracking-normal text-slate-200 disabled:opacity-55"
+            >
+              Style only
+            </button>
+            <button
+              type="button"
+              onClick={() => resolveMismatch("update")}
+              disabled={busy || !Object.values(checkedFields).some(Boolean)}
+              className="creator-primary rounded-md px-2 py-1.5 text-[10px] font-black uppercase tracking-normal text-white disabled:opacity-55"
+            >
+              Update selected
+            </button>
+            <button
+              type="button"
+              onClick={() => resolveMismatch("discard")}
+              disabled={busy}
+              className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[10px] font-black uppercase tracking-normal text-slate-400 disabled:opacity-55"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
+
+      {phase === "offerRegenerate" && (
+        <div className="mt-2 space-y-2 rounded-md border border-emerald-300/30 bg-emerald-400/10 p-2.5">
+          <p className="text-[11px] leading-4 text-emerald-100">Planning updated. Regenerate this shot's storyboard image now to reflect the change?</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={regenerateNow}
+              disabled={busy}
+              className="creator-primary flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[10px] font-black uppercase tracking-normal text-white disabled:opacity-55"
+            >
+              {phase === "confirming" ? <Loader2 size={11} className="animate-spin" /> : null}
+              Regenerate now
+            </button>
+            <button
+              type="button"
+              onClick={() => setPhase("idle")}
+              className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[10px] font-black uppercase tracking-normal text-slate-400"
+            >
+              Later
+            </button>
+          </div>
+        </div>
+      )}
+
+      {phase === "offerApplyToOtherShots" && (
+        <div className="mt-2 space-y-2 rounded-md border border-purple-300/30 bg-purple-400/10 p-2.5">
+          <p className="text-[11px] leading-4 text-purple-100">
+            This shot also has other shots with characters in them. Apply this same face to any of them too?
+          </p>
+          <div className="max-h-32 space-y-1 overflow-y-auto">
+            {(otherCastCandidateShots || []).map((candidate) => (
+              <label key={candidate.shotNumber} className="flex items-center gap-2 rounded-md border border-white/10 bg-black/20 p-1.5 text-[11px] text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={Boolean(selectedOtherShots[candidate.shotNumber])}
+                  onChange={(event) => setSelectedOtherShots((current) => ({ ...current, [candidate.shotNumber]: event.target.checked }))}
+                />
+                Shot {candidate.shotNumber} - {candidate.title}
+              </label>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={applyToOtherShots}
+              disabled={!Object.values(selectedOtherShots).some(Boolean)}
+              className="creator-primary rounded-md px-2 py-1.5 text-[10px] font-black uppercase tracking-normal text-white disabled:opacity-55"
+            >
+              Apply to selected
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPending(null);
+                setPhase("idle");
+              }}
+              className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[10px] font-black uppercase tracking-normal text-slate-400"
+            >
+              Skip
+            </button>
+          </div>
+        </div>
+      )}
+
+      {phase === "idle" && (
+        <>
+          <p className="mt-1 text-[11px] leading-4 text-slate-500">
+            {reference
+              ? `Attached as ${reference.classification === "CAST" ? "a cast reference" : "a style reference"} - regenerate the product frame to apply it.`
+              : "Optional. Without one, this shot's product frame generates faceless. Upload a Style reference for mood/composition only."}
+          </p>
+          <div className="mt-2 flex gap-1.5">
+            <button
+              type="button"
+              disabled
+              title="Cast (identity-preserving) references are in beta and temporarily unavailable while we improve result quality."
+              className="flex-1 cursor-not-allowed rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[10px] font-black uppercase tracking-normal text-slate-600"
+            >
+              Cast reference <span className="normal-case tracking-normal text-slate-500">(beta - under process)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setClassification("INSPIRATION")}
+              className={`flex-1 rounded-md border px-2 py-1.5 text-[10px] font-black uppercase tracking-normal transition ${
+                classification === "INSPIRATION" ? "border-purple-300 bg-purple-400/15 text-purple-100" : "border-white/10 bg-white/[0.03] text-slate-400"
+              }`}
+            >
+              Style reference
+            </button>
+          </div>
+          {classification === "CAST" && (
+            <input
+              type="text"
+              value={castName}
+              onChange={(event) => setCastName(event.target.value)}
+              placeholder="Name of the person in the photo"
+              className="mt-2 w-full rounded-md border border-white/10 bg-black/35 px-2 py-1.5 text-[11px] font-semibold text-white outline-none placeholder:text-slate-600 focus:border-purple-300"
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={!onAnalyze}
+            className="creator-control mt-2 flex w-full items-center justify-center gap-2 px-3 py-1.5 text-[11px] font-black text-slate-200 disabled:cursor-not-allowed disabled:opacity-55"
+          >
+            <ImageIcon size={12} />
+            {reference ? "Replace reference photo" : "Upload reference photo"}
+          </button>
+        </>
+      )}
+      <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileSelected} />
+    </div>
+  );
+}
+
 function AssetPreview({ asset }) {
   const Icon = asset?.icon || ImageIcon;
   if (asset?.isGenerating) {
@@ -428,7 +876,7 @@ function AssetPreview({ asset }) {
   );
 }
 
-function AssetStripButton({ asset, selected, onSelect, onGenerateImage }) {
+function AssetStripButton({ asset, selected, onSelect, onGenerateImage, onUploadReference, uploadReferenceActive }) {
   const Icon = asset.icon;
   const hasImage = Boolean(asset.src);
   const isGenerating = Boolean(asset.isGenerating);
@@ -450,16 +898,32 @@ function AssetStripButton({ asset, selected, onSelect, onGenerateImage }) {
           </span>
         </span>
       </button>
-      {onGenerateImage && (
-        <button
-          type="button"
-          disabled={isGenerating}
-          onClick={onGenerateImage}
-          className="mt-1.5 flex h-7 w-full items-center justify-center gap-1 rounded-md border border-white/10 text-[9px] font-black uppercase tracking-normal text-purple-100 transition hover:border-purple-200 hover:bg-purple-500/10 disabled:cursor-wait disabled:opacity-70"
-        >
-          {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
-          {hasImage && !asset.isFallback ? "Redo" : "Render"}
-        </button>
+      {(onGenerateImage || onUploadReference) && (
+        <div className="mt-1.5 flex gap-1">
+          {onGenerateImage && (
+            <button
+              type="button"
+              disabled={isGenerating}
+              onClick={onGenerateImage}
+              className="flex h-7 flex-1 items-center justify-center gap-1 rounded-md border border-white/10 text-[9px] font-black uppercase tracking-normal text-purple-100 transition hover:border-purple-200 hover:bg-purple-500/10 disabled:cursor-wait disabled:opacity-70"
+            >
+              {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
+              {hasImage && !asset.isFallback ? "Redo" : "Render"}
+            </button>
+          )}
+          {onUploadReference && (
+            <button
+              type="button"
+              title="Upload a cast or style reference photo for this frame"
+              onClick={onUploadReference}
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border text-purple-100 transition hover:border-purple-200 hover:bg-purple-500/10 ${
+                uploadReferenceActive ? "border-purple-300 bg-purple-400/15" : "border-white/10"
+              }`}
+            >
+              <ImageIcon size={11} />
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
