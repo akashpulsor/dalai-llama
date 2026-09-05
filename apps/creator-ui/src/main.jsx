@@ -6,12 +6,14 @@ import store from "@dalaillama/shared-store";
 import { ErrorBoundary, Toaster } from "@dalaillama/shared-ui";
 import App from "./App.jsx";
 import { initGoogleAnalytics } from "./analytics.js";
+import { initFaro } from "./faro.js";
 import "./index.css";
 
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("Root element #root not found");
 
 initGoogleAnalytics();
+initFaro();
 
 ReactDOM.createRoot(rootEl).render(
   <Provider store={store}>
