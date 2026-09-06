@@ -1,15 +1,17 @@
 // @ts-nocheck
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Film, FileDown, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Film, FileDown, Loader2, Plus, RefreshCw, Save, Sparkles } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
+  useCreatePreProductionShotMutation,
   useExportShotsPdfMutation,
   useGeneratePreProductionShotListMutation,
   useGetAnimatedPreviewHtmlMutation,
   useListPreProductionShotsQuery,
   useListShotAssetCompletionQuery,
   useListShotPlanIssuesQuery,
+  useUpdatePreProductionShotMutation,
 } from "../../api/creatorEndpoints.js";
 import ShotImagesPanel from "./ShotImagesPanel.jsx";
 import ShotProductReferencePanel from "./ShotProductReferencePanel.jsx";
@@ -38,6 +40,49 @@ function FieldGroup({ title, fields }) {
   );
 }
 
+/** Hand-edit a shot's script line and/or length -- the two fields
+ * pre-production-service's PATCH /v1/shots/{shotId} actually accepts. Local draft state so
+ * typing doesn't fire a save per keystroke; "Save" only enables once something actually changed. */
+function EditShotFields({ shot, onSave, saving }) {
+  const [scriptLine, setScriptLine] = useState(shot.scriptLine || "");
+  const [durationSeconds, setDurationSeconds] = useState(shot.durationSeconds ?? "");
+  const dirty = scriptLine !== (shot.scriptLine || "") || String(durationSeconds) !== String(shot.durationSeconds ?? "");
+
+  return (
+    <div className="rounded-md border border-purple-400/20 bg-purple-500/[0.04] p-2.5">
+      <p className="mb-1.5 text-[9px] font-extrabold uppercase tracking-wide text-purple-300">Script &amp; length</p>
+      <textarea
+        value={scriptLine}
+        onChange={(event) => setScriptLine(event.target.value)}
+        rows={2}
+        placeholder="Script line"
+        className="creator-input w-full resize-y text-xs"
+      />
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          type="number"
+          min={1}
+          value={durationSeconds}
+          onChange={(event) => setDurationSeconds(event.target.value)}
+          className="creator-input h-8 w-20 text-xs"
+        />
+        <span className="text-[10px] font-bold text-slate-500">seconds</span>
+        <button
+          type="button"
+          onClick={() => onSave({
+            scriptLine: scriptLine || undefined,
+            durationSeconds: durationSeconds === "" ? undefined : Number(durationSeconds),
+          })}
+          disabled={!dirty || saving}
+          className="creator-primary ml-auto flex h-8 items-center gap-1.5 px-3 text-[11px] font-black text-white disabled:opacity-55"
+        >
+          {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Save
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function ShotsSection({ projectId }) {
   const dispatch = useDispatch();
   const [openShotId, setOpenShotId] = useState(null);
@@ -50,6 +95,17 @@ export default function ShotsSection({ projectId }) {
   const [generateList, { isLoading: generating }] = useGeneratePreProductionShotListMutation();
   const [exportPdf, { isLoading: exporting }] = useExportShotsPdfMutation();
   const [getAnimatedPreview, { isLoading: loadingPreview }] = useGetAnimatedPreviewHtmlMutation();
+  const [createShot, { isLoading: creatingShot }] = useCreatePreProductionShotMutation();
+  const [updateShot, { isLoading: updatingShot }] = useUpdatePreProductionShotMutation();
+
+  const [addingShot, setAddingShot] = useState(false);
+  const [newScriptLine, setNewScriptLine] = useState("");
+  const [newDurationSeconds, setNewDurationSeconds] = useState("4");
+  // New shots need an existing screenplay scene to belong to -- default to the same scene the
+  // last shot in the list is already in, since "add one more shot" almost always means "one more
+  // beat in the scene I'm already looking at", not a brand new scene (creating one of those is a
+  // separate, screenplay-level action, not a shot-level one).
+  const lastScreenplaySceneId = shots.length ? shots[shots.length - 1].screenplaySceneId : null;
 
   const handleGenerate = async () => {
     try {
@@ -76,6 +132,33 @@ export default function ShotsSection({ projectId }) {
       window.open(URL.createObjectURL(blob), "_blank");
     } catch (error) {
       dispatch(showFlash({ message: error?.data?.message || "Could not build the preview", type: "error" }));
+    }
+  };
+
+  const handleAddShot = async () => {
+    if (!lastScreenplaySceneId) return;
+    try {
+      await createShot({
+        projectId,
+        screenplaySceneId: lastScreenplaySceneId,
+        scriptLine: newScriptLine || undefined,
+        durationSeconds: newDurationSeconds === "" ? undefined : Number(newDurationSeconds),
+      }).unwrap();
+      dispatch(showFlash({ message: "Shot added", type: "success" }));
+      setAddingShot(false);
+      setNewScriptLine("");
+      setNewDurationSeconds("4");
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not add the shot", type: "error" }));
+    }
+  };
+
+  const handleUpdateShot = async (shotId, patch) => {
+    try {
+      await updateShot({ projectId, shotId, ...patch }).unwrap();
+      dispatch(showFlash({ message: "Shot updated", type: "success" }));
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not update the shot", type: "error" }));
     }
   };
 
@@ -113,6 +196,16 @@ export default function ShotsSection({ projectId }) {
               </button>
             </>
           )}
+          {shots.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setAddingShot((open) => !open)}
+              className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-bold text-slate-200 hover:border-purple-400/30"
+            >
+              <Plus size={13} />
+              Add shot
+            </button>
+          )}
           <button
             type="button"
             disabled={generating}
@@ -129,6 +222,39 @@ export default function ShotsSection({ projectId }) {
         <p className="rounded-lg border border-dashed border-white/10 py-8 text-center text-xs font-medium text-slate-500">
           No shots yet — generate the shot list from the screenplay above.
         </p>
+      )}
+
+      {addingShot && (
+        <div className="mb-3 rounded-lg border border-purple-400/25 bg-purple-500/[0.05] p-3">
+          <p className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-purple-300">
+            New shot — added to the same scene as the last shot below
+          </p>
+          <textarea
+            value={newScriptLine}
+            onChange={(event) => setNewScriptLine(event.target.value)}
+            rows={2}
+            placeholder="Script line for this shot"
+            className="creator-input w-full resize-y text-xs"
+          />
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              value={newDurationSeconds}
+              onChange={(event) => setNewDurationSeconds(event.target.value)}
+              className="creator-input h-8 w-20 text-xs"
+            />
+            <span className="text-[10px] font-bold text-slate-500">seconds</span>
+            <button
+              type="button"
+              onClick={handleAddShot}
+              disabled={creatingShot || !lastScreenplaySceneId}
+              className="creator-primary ml-auto flex h-8 items-center gap-1.5 px-3 text-[11px] font-black text-white disabled:opacity-55"
+            >
+              {creatingShot ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Add shot
+            </button>
+          </div>
+        </div>
       )}
 
       <ShotAssetBatchPanel projectId={projectId} shots={shots} />
@@ -222,6 +348,11 @@ export default function ShotsSection({ projectId }) {
                       </div>
                     </div>
                   )}
+                  <EditShotFields
+                    shot={shot}
+                    saving={updatingShot}
+                    onSave={(patch) => handleUpdateShot(shot.id, patch)}
+                  />
                   <FieldGroup
                     title="Direction"
                     fields={[

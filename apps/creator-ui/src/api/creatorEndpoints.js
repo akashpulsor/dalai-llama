@@ -2367,6 +2367,29 @@ export const creatorApi = apiSlice.injectEndpoints({
       providesTags: (_result, _error, projectId) => [{ type: "CreatorHomeProjects", id: `shots-${projectId}` }],
     }),
 
+    // Manually insert one shot into an existing screenplay scene -- pre-production-service's
+    // ShotListController.createShot. Does NOT survive "Regenerate shot list" (that wipes and
+    // rebuilds every shot from the screenplay), same caveat as any hand-edit to an AI shot.
+    createPreProductionShot: builder.mutation({
+      query: ({ projectId, ...body }) => ({
+        url: platformUrl(`/projects/${projectId}/shots`),
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, _error, args) => [{ type: "CreatorHomeProjects", id: `shots-${args?.projectId}` }],
+    }),
+
+    // Hand-edit a shot's script line and/or length -- pre-production-service's
+    // ShotListController.updateShot. Every other field on the shot is left untouched.
+    updatePreProductionShot: builder.mutation({
+      query: ({ projectId, shotId, ...body }) => ({
+        url: platformUrl(`/shots/${shotId}`),
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: (_result, _error, args) => [{ type: "CreatorHomeProjects", id: `shots-${args?.projectId}` }],
+    }),
+
     // pre-production-service ShotImageController -- one row per (shot, kind); kind is one of
     // STORYBOARD/PRODUCTION/LIGHTING/CAMERA_PLAN.
     generatePreProductionShotImage: builder.mutation({
@@ -3186,6 +3209,8 @@ export const {
   useCreateCastAssignmentMutation,
   useGeneratePreProductionShotListMutation,
   useListPreProductionShotsQuery,
+  useCreatePreProductionShotMutation,
+  useUpdatePreProductionShotMutation,
   useGeneratePreProductionShotImageMutation,
   useListPreProductionShotImagesQuery,
   useAnalyzePreProductionShotProductReferenceMutation,

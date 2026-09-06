@@ -37,6 +37,10 @@ export default function ScenePreparationPanel({ projectId, shots = [], activeSho
   const [editing, setEditing] = useState(false);
   const [editedText, setEditedText] = useState("");
   const [flashError, setFlashError] = useState(null);
+  // Blank = provider default (Seedance 720p, Wan 480p) -- see video-generation-service's
+  // VideoResolution for why only these two tiers are offered (no model registered today honors
+  // 1080p, so it isn't in the list).
+  const [resolutionOverride, setResolutionOverride] = useState("");
 
   useEffect(() => {
     setPreparedPrompt(null);
@@ -62,7 +66,11 @@ export default function ScenePreparationPanel({ projectId, shots = [], activeSho
     if (!activeShotId) return;
     setFlashError(null);
     try {
-      const prompt = await prepareShot({ projectId, shotId: activeShotId }).unwrap();
+      const prompt = await prepareShot({
+        projectId,
+        shotId: activeShotId,
+        resolutionOverride: resolutionOverride || undefined,
+      }).unwrap();
       setPreparedPrompt(prompt);
       setEditedText(prompt.promptCompressed || prompt.promptOriginal || "");
       setEditing(false);
@@ -177,15 +185,30 @@ export default function ScenePreparationPanel({ projectId, shots = [], activeSho
               <p className="mt-1 line-clamp-2 text-[11px] font-medium text-slate-500">{activeShot.scriptLine}</p>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={handlePrepareShot}
-            disabled={!activeShotId || !projectPrepared || preparingShot}
-            className="creator-primary flex min-h-9 shrink-0 items-center gap-1.5 px-3 text-xs font-black text-white disabled:opacity-55"
-          >
-            {preparingShot ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-            {preparedPrompt ? "Re-prepare shot" : "Prepare shot"}
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] font-black uppercase tracking-normal text-slate-500">Resolution</span>
+              <select
+                value={resolutionOverride}
+                onChange={(event) => setResolutionOverride(event.target.value)}
+                disabled={preparingShot}
+                className="h-9 rounded-lg border border-white/10 bg-black/40 px-2 text-xs font-bold text-slate-100 focus:border-purple-400/60 focus:outline-none disabled:opacity-60"
+              >
+                <option value="" className="bg-slate-950 text-slate-100">Default (cheapest)</option>
+                <option value="480p" className="bg-slate-950 text-slate-100">480p</option>
+                <option value="720p" className="bg-slate-950 text-slate-100">720p</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={handlePrepareShot}
+              disabled={!activeShotId || !projectPrepared || preparingShot}
+              className="creator-primary flex min-h-9 shrink-0 items-center gap-1.5 px-3 text-xs font-black text-white disabled:opacity-55"
+            >
+              {preparingShot ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+              {preparedPrompt ? "Re-prepare shot" : "Prepare shot"}
+            </button>
+          </div>
         </div>
 
         {shots.length > 0 && !activeShotId && (
