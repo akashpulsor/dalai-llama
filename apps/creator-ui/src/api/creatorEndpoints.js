@@ -588,14 +588,6 @@ export const creatorApi = apiSlice.injectEndpoints({
       transformResponse: normalizeCreatorProject,
       providesTags: (_result, _error, projectId) => [{ type: "CreatorProjects", id: projectId || "detail" }],
     }),
-    getPostProductionProjects: builder.query({
-      query: ({ limit = 30 } = {}) => ({
-        url: "/creator/post-production/projects",
-        params: { limit },
-      }),
-      transformResponse: (response = []) => arrayFromResponse(response, ["projects", "items", "content"]),
-      providesTags: ["CreatorProjects", "Storyboard"],
-    }),
     createCreatorProject: builder.mutation({
       query: (body = {}) => ({
         url: "/creator/projects",
@@ -1802,6 +1794,20 @@ export const creatorApi = apiSlice.injectEndpoints({
       providesTags: ["CreatorHomeProjects"],
     }),
 
+    // pre-production-service ProjectController: GET /v1/projects/shot-design-ready -- every
+    // recent project that has at least one real shot, shots included inline. Replaces
+    // getPostProductionProjects (GET /creator/post-production/projects), which only ever existed
+    // on creator-service -- decommissioned, not deployed, and even when it was, that route lived
+    // behind the /api/v1/creator/* apiPath, which the gateway never routes to a disabled service.
+    // No per-shot storyboard/lighting/camera-plan thumbnail URLs here -- see
+    // ShotDesignReadyProjectView's javadoc for why; PlannerPage's normalizer already tolerates a
+    // shot with no image fields.
+    listShotDesignReadyProjects: builder.query({
+      query: ({ limit = 30 } = {}) => ({ url: platformUrl("/projects/shot-design-ready"), params: { limit } }),
+      transformResponse: (response) => (Array.isArray(response) ? response : []),
+      providesTags: ["CreatorProjects"],
+    }),
+
     // trend-intelligence-service TrendReportController: GET /v1/trend-reports -- the
     // tenant's own saved reports, newest-first. There is no discovery/browse endpoint --
     // this only ever returns reports the tenant already generated via generateTrendReport.
@@ -2997,7 +3003,6 @@ export const {
   useReviewShortCandidateMutation,
   useGetCreatorProjectsQuery,
   useLazyGetCreatorProjectQuery,
-  useGetPostProductionProjectsQuery,
   useCreateCreatorProjectMutation,
   useSuggestAudienceMutation,
   useSuggestCampaignAnglesMutation,
@@ -3130,6 +3135,7 @@ export const {
   useGetCreatorSubscriptionQuery,
   useStartSubscriptionUpgradeMutation,
   useListPreProductionProjectsQuery,
+  useListShotDesignReadyProjectsQuery,
   useListTrendReportsQuery,
   useGenerateTrendReportMutation,
   useListBrandsQuery,

@@ -6,7 +6,6 @@ import { usePatchEditor } from "../state/PatchEditorProvider.jsx";
 import { isCompletedJobStatus, isFailedJobStatus, jobErrorMessage, sleep } from "../utils/jobStatus.js";
 import {
   useGetAcceptedShotSequenceQuery,
-  useGetPostProductionProjectsQuery,
   useGetShotTakesQuery,
   useLazyGetJobQuery,
   useListPreProductionProjectsQuery,
@@ -19,33 +18,40 @@ const JOB_POLL_INTERVAL_MS = 2500;
 // already has generated video. The combined video is the creator-service "accepted shot
 // sequence" (locally ffmpeg-stitched into one clip); individual shots are the per-shot takes.
 //
-// Only projects whose video generation has actually finished (pre-production-service's
-// VIDEO_GENERATION_COMPLETE) are offered -- joined client-side against
-// listPreProductionProjects (real project status) since this panel's own project list is
-// keyed differently (scriptId) and doesn't carry status itself. Arriving here via the "Move
-// to Post-Production" CTA (PlannerPage) passes the project id in route state, so it's
+// The dropdown itself is sourced straight from listPreProductionProjects (pre-production-service's
+// real, live GET /v1/projects) filtered to VIDEO_GENERATION_COMPLETE -- it used to also join
+// against a getPostProductionProjects call to GET /creator/post-production/projects, but that
+// route only ever existed on creator-service (decommissioned, not deployed) behind the
+// /api/v1/creator/* apiPath, which is disabled along with it. That call 404'd every time,
+// silently emptying this dropdown regardless of how many projects actually had finished video.
+// listPreProductionProjects alone has everything the dropdown needs (id, name, status); it just
+// doesn't carry a shot count, so that part of the label is dropped rather than faked.
+//
+// Selecting a project still calls getAcceptedShotSequence/getShotTakes/
+// renderAcceptedShotSequenceAsync below, which remain on creator-service's own
+// /creator/storyboards/* routes and are equally unreachable -- rebuilding "load combined video"/
+// "load individual shots" against the current video-generation-service + post-production-service
+// pipeline is a separate, larger piece of work, not covered by this fix. Arriving here via the
+// "Move to Post-Production" CTA (PlannerPage) passes the project id in route state, so it's
 // auto-selected instead of requiring a manual pick.
 export default function ProjectPickerPanel() {
   const { actions } = usePatchEditor();
   const location = useLocation();
-  const { data: allProjects = [], isLoading: projectsLoading } = useGetPostProductionProjectsQuery();
-  const { data: preProductionProjects = [] } = useListPreProductionProjectsQuery();
+  const { data: preProductionProjects = [], isLoading: projectsLoading } = useListPreProductionProjectsQuery();
   const [scriptId, setScriptId] = useState("");
   const [stitching, setStitching] = useState(false);
   const [stitchError, setStitchError] = useState(null);
   const [loadingUrl, setLoadingUrl] = useState(null);
 
-  const videoGeneratedProjectIds = useMemo(
-    () => new Set(
-      preProductionProjects
-        .filter((project) => project.status === "VIDEO_GENERATION_COMPLETE")
-        .map((project) => String(project.id))
-    ),
-    [preProductionProjects]
-  );
   const projects = useMemo(
-    () => allProjects.filter((project) => videoGeneratedProjectIds.has(String(project.projectId))),
-    [allProjects, videoGeneratedProjectIds]
+    () => preProductionProjects
+      .filter((project) => project.status === "VIDEO_GENERATION_COMPLETE")
+      .map((project) => ({
+        projectId: String(project.id),
+        scriptId: String(project.id),
+        title: project.name || "Creator project",
+      })),
+    [preProductionProjects]
   );
 
   const incomingProjectId = location.state?.projectId;

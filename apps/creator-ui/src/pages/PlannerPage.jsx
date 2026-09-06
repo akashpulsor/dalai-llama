@@ -27,7 +27,7 @@ import {
   useGetCreatorPlatformsQuery,
   useGetCreatorProjectsQuery,
   useLazyGetCreatorProjectQuery,
-  useGetPostProductionProjectsQuery,
+  useListShotDesignReadyProjectsQuery,
   useGetPreProductionProjectQuery,
   useAdvanceProjectStatusMutation,
   useGetProjectSpendQuery,
@@ -1465,7 +1465,7 @@ export default function PlannerPage() {
     data: postProductionProjects = [],
     isFetching: postProductionProjectsLoading,
     refetch: refetchPostProductionProjects,
-  } = useGetPostProductionProjectsQuery(
+  } = useListShotDesignReadyProjectsQuery(
     { limit: 30 },
     { skip: !postProductionOpen, refetchOnMountOrArgChange: true }
   );
