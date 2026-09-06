@@ -17,7 +17,7 @@ import {
   Wand2,
   X,
 } from "lucide-react";
-import { selectTenantId, showFlash } from "@dalaillama/shared-store";
+import { selectTenantId, showFlash, useGetWalletBalanceQuery } from "@dalaillama/shared-store";
 import {
   useCreateProjectRequirementMutation,
   useGenerateTrendReportMutation,
@@ -81,6 +81,9 @@ export default function HomePage() {
   const navigate = useNavigate();
   const user = useSelector((state) => state.auth?.user);
   const firstName = (user?.name || user?.email || "there").split(" ")[0].split("@")[0];
+  const tenantId = useSelector(selectTenantId);
+  const { data: wallet, isFetching: walletLoading } = useGetWalletBalanceQuery(tenantId, { skip: !tenantId });
+  const walletBalance = Number(wallet?.balance ?? wallet?.totalBalance ?? 0);
 
   // "Recent projects" is real pre-production Projects only -- briefs that haven't become one yet
   // (funded or not) live in their own separate list below (see briefsModalOpen) rather than
@@ -118,12 +121,17 @@ export default function HomePage() {
   useEffect(() => {
     if (attemptedTrendGeneration.current) return;
     if (trendReportsLoading || trendReports.length > 0) return;
+    // Wait for a real balance reading, and don't spend a paid generation call when there's
+    // nothing to pay for it -- leaves attemptedTrendGeneration unset so this re-checks (and
+    // fires) automatically once the tenant recharges, same as any other deps change.
+    if (!tenantId || walletLoading) return;
+    if (walletBalance <= 0) return;
     attemptedTrendGeneration.current = true;
     generateTrendReport({ topic: DEFAULT_TREND_TOPIC }).catch(() => {
       // Silent -- the "Trending now" section just stays hidden if generation fails, same as any
       // other optional home-page widget with no data yet.
     });
-  }, [trendReportsLoading, trendReports.length, generateTrendReport]);
+  }, [trendReportsLoading, trendReports.length, generateTrendReport, tenantId, walletLoading, walletBalance]);
 
   const [brief, setBrief] = useState("");
   const [projectsModalOpen, setProjectsModalOpen] = useState(false);
@@ -134,7 +142,6 @@ export default function HomePage() {
     window.addEventListener("creator:open-projects", openProjects);
     return () => window.removeEventListener("creator:open-projects", openProjects);
   }, []);
-  const tenantId = useSelector(selectTenantId);
   const [modalStep, setModalStep] = useState("form"); // "form" | "success"
   const [targetAudience, setTargetAudience] = useState("");
   const [campaignDirection, setCampaignDirection] = useState("");
