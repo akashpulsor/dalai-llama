@@ -1,1 +1,0 @@
-Creator: line: So, instead of battling with willpower, lineEndTime: 41.8 deliveryNote: Slightly reflective, then a shift. lineStartTime: 38 line: understanding these triggers is the first step. lineEndTime: 46 deliveryNote: Emphatic, clear solution. lineStartTime: 41.8 line: That's the real solution. lineEndTime: 48 deliveryNote: Confident, final statement. lineStartTime: 46

@@ -1,4 +1,0 @@
-task_0:
-  video_path: "C:/Users/Akash/workspace/v4/dalai-llama/founder-video-procrastination/founder-source-30s-720x1280.mp4"
-  audio_path: "C:/Users/Akash/workspace/v4/dalai-llama/founder-video-procrastination/worker-jobs/lip-sync-3d31c1bda9-2e2e0cd6/dialogue.wav"
-  result_name: "lip-sync-output.mp4"
