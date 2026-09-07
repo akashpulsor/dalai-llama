@@ -28,9 +28,13 @@ export default function DialogueBeatsEditor({ shot }) {
   // PRODUCTION (photoreal) is generated on demand and may not exist yet -- STORYBOARD (sketch)
   // is generated eagerly with the rest of the shot list, so it's there from the start as a stand-in.
   const frame = images.find((img) => img.kind === "PRODUCTION") || images.find((img) => img.kind === "STORYBOARD");
-  // shot.voiceOver is the actual line to be spoken; shot.scriptLine is the shot's creative
-  // brief/purpose, not dialogue -- only a fallback for shots with no V.O. line at all.
-  const dialogueText = (shot?.voiceOver || shot?.scriptLine || "").trim();
+  // shot.voiceOver is the actual line to be spoken. shot.scriptLine is the shot's CREATIVE brief
+  // -- for ACTION/B_ROLL/MOTION_GRAPHIC shots that's a visual scene description ("Priya smiling
+  // in slow motion"), NOT dialogue; cloning it would produce a voice-over of scene direction,
+  // which was the reported bug ("dialogues are not written, narration/scene details are given").
+  // Only fall back for DIALOGUE-type shots where scriptLine actually IS what's being said (even
+  // when it's "Narrator: '...'" -- still the spoken line, not visual direction).
+  const dialogueText = (shot?.voiceOver || (shot?.shotType === "DIALOGUE" ? shot?.scriptLine : "") || "").trim();
   const cast = shot?.cast;
 
   // Only orderIndex/startSeconds describe this beat's placement -- everything else (line,

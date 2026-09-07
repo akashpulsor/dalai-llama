@@ -195,6 +195,30 @@ export default function VideoGenerationSection({ projectId }) {
         </div>
       )}
 
+      {/* Project-level default video resolution -- picked up by every shot's Technical at
+       * assembly time (see ShotContextCommonFields.technical + ProjectConfig.preferredResolution).
+       * A per-shot resolutionOverride from the prepare-scene panel still wins over this when set.
+       * No 1080p option: no video provider in this deployment currently supports it, and offering
+       * it would silently downgrade the render (see VideoResolution.java in video-generation-
+       * service for the confirmed evidence behind that decision). */}
+      <div className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+        <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+          Resolution
+        </span>
+        <select
+          value={projectConfig?.preferredResolution || ""}
+          onChange={(event) => updateProjectConfig({ projectId, preferredResolution: event.target.value || "" })}
+          className="creator-input px-2.5 py-1.5 text-[11px] font-semibold"
+        >
+          <option value="">Provider default</option>
+          <option value="480p">480p (cheapest)</option>
+          <option value="720p">720p</option>
+        </select>
+        <span className="text-[10px] font-medium text-slate-500">
+          Applies to every shot; per-shot override in the prepare-scene panel still wins when set.
+        </span>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {shots.map((shot) => (
           <ShotVideoCard

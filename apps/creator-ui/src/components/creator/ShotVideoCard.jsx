@@ -74,10 +74,15 @@ const ASPECT_RATIO_CSS = {
  * full prepare/approve panel below it, spanning the grid so it doesn't stretch its neighbors. */
 export default function ShotVideoCard({ shot, isOpen, onToggle, info, busy, video, onPrepare, onApprove, onReject, onAutoFix }) {
   const { data: images = [] } = useListPreProductionShotImagesQuery(shot.id, { skip: !shot.id });
-  const frame = images.find((img) => img.kind === "PRODUCTION") || images.find((img) => img.kind === "STORYBOARD");
+  const isMotionGraphic = shot.shotType === "MOTION_GRAPHIC";
+  // MG shots don't have PRODUCTION/STORYBOARD (see ShotImagesPanel's kindsForShotType) -- their
+  // equivalent frame is the MOTION_GRAPHIC preview. Preferring it first for MG shots means the
+  // video card actually shows the graphic instead of the empty-frame Sparkles placeholder.
+  const frame = isMotionGraphic
+    ? images.find((img) => img.kind === "MOTION_GRAPHIC")
+    : images.find((img) => img.kind === "PRODUCTION") || images.find((img) => img.kind === "STORYBOARD");
   const aspect = ASPECT_RATIO_CSS[shot.aspectRatio] || "9 / 16";
   const dialogue = shot.voiceOver || shot.scriptLine;
-  const isMotionGraphic = shot.shotType === "MOTION_GRAPHIC";
 
   return (
     <div className={`overflow-hidden rounded-lg border border-white/10 bg-white/[0.02] ${isOpen ? "col-span-full" : ""}`}>
