@@ -58,7 +58,7 @@ const STATUS_STYLES = {
 
 // Common creator-ui languages for the Start New Idea modal's multi-language picker -- a custom
 // language can still be typed into "Other" since this list is a shortcut, not a hard enum.
-const COMMON_LANGUAGES = ["English", "Hindi", "Tamil", "Telugu", "Kannada", "Malayalam", "Bengali", "Marathi"];
+const COMMON_LANGUAGES = ["English", "Hinglish", "Hindi", "Tamil", "Telugu", "Kannada", "Malayalam", "Bengali", "Marathi"];
 
 function relativeTime(iso) {
   if (!iso) return "";
