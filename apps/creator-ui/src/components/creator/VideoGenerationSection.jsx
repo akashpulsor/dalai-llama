@@ -10,6 +10,7 @@ import {
   useLazyGetVideoGenPromptQuery,
   useListCloningModelsQuery,
   useListPreProductionShotsQuery,
+  useListTtsModelsQuery,
   useListVideoFeatureFlagsQuery,
   useListVideoModelsQuery,
   useRejectVideoGenJobMutation,
@@ -32,6 +33,7 @@ export default function VideoGenerationSection({ projectId }) {
   const { data: projectConfig } = useGetProjectConfigQuery(projectId, { skip: !projectId });
   const { data: cloningModels = [] } = useListCloningModelsQuery();
   const { data: videoModels = [] } = useListVideoModelsQuery();
+  const { data: ttsModels = [] } = useListTtsModelsQuery();
   const [updateProjectConfig] = useUpdateProjectConfigMutation();
   const [openShotId, setOpenShotId] = useState(null);
   const [preparing, setPreparing] = useState({});
@@ -156,70 +158,73 @@ export default function VideoGenerationSection({ projectId }) {
         </div>
       )}
 
-      {cloningModels.length > 0 && (
-        <div className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
-          <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-            Voice clone model for auto-dub
-          </span>
+      {/* Voice clone model, video model, and resolution are all "defaults for shots prepared
+       * after this change" -- one row keeps them scannable instead of three near-identical
+       * boxes stacked on top of each other. No 1080p option: no video provider in this
+       * deployment currently supports it, and offering it would silently downgrade the render
+       * (see VideoResolution.java in video-generation-service for the confirmed evidence behind
+       * that decision). */}
+      <div className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+        {cloningModels.length > 0 && (
+          <label className="flex items-center gap-2" title="Applies to beat-timed auto-dub on shots prepared after this change.">
+            <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Voice clone</span>
+            <select
+              value={projectConfig?.preferredVoiceModel || ""}
+              onChange={(event) => updateProjectConfig({ projectId, preferredVoiceModel: event.target.value || null })}
+              className="creator-input px-2.5 py-1.5 text-[11px] font-semibold"
+            >
+              <option value="">Default</option>
+              {cloningModels.map((m) => (
+                <option key={m.modelId} value={m.modelId}>{m.modelId}</option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {videoModels.length > 0 && (
+          <label className="flex items-center gap-2" title="Overrides the auto-recommended model for shots prepared after this change.">
+            <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Video model</span>
+            <select
+              value={projectConfig?.preferredVideoModel || ""}
+              onChange={(event) => updateProjectConfig({ projectId, preferredVideoModel: event.target.value || null })}
+              className="creator-input px-2.5 py-1.5 text-[11px] font-semibold"
+            >
+              <option value="">Recommended</option>
+              {videoModels.map((m) => (
+                <option key={m.modelId} value={m.modelId}>{m.modelId}</option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        <label className="flex items-center gap-2" title="Applies to every shot; per-shot override in the prepare-scene panel still wins when set.">
+          <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Resolution</span>
           <select
-            value={projectConfig?.preferredVoiceModel || ""}
-            onChange={(event) => updateProjectConfig({ projectId, preferredVoiceModel: event.target.value || null })}
+            value={projectConfig?.preferredResolution || ""}
+            onChange={(event) => updateProjectConfig({ projectId, preferredResolution: event.target.value || "" })}
             className="creator-input px-2.5 py-1.5 text-[11px] font-semibold"
           >
-            <option value="">Default</option>
-            {cloningModels.map((m) => (
-              <option key={m.modelId} value={m.modelId}>{m.modelId}</option>
-            ))}
+            <option value="">Provider default</option>
+            <option value="480p">480p (cheapest)</option>
+            <option value="720p">720p</option>
           </select>
-          <span className="text-[10px] font-medium text-slate-500">
-            Applies to beat-timed auto-dub on shots prepared after this change.
-          </span>
-        </div>
-      )}
+        </label>
 
-      {videoModels.length > 0 && (
-        <div className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
-          <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-            Video model
-          </span>
-          <select
-            value={projectConfig?.preferredVideoModel || ""}
-            onChange={(event) => updateProjectConfig({ projectId, preferredVideoModel: event.target.value || null })}
-            className="creator-input px-2.5 py-1.5 text-[11px] font-semibold"
-          >
-            <option value="">Recommended</option>
-            {videoModels.map((m) => (
-              <option key={m.modelId} value={m.modelId}>{m.modelId}</option>
-            ))}
-          </select>
-          <span className="text-[10px] font-medium text-slate-500">
-            Overrides the auto-recommended model for shots prepared after this change.
-          </span>
-        </div>
-      )}
-
-      {/* Project-level default video resolution -- picked up by every shot's Technical at
-       * assembly time (see ShotContextCommonFields.technical + ProjectConfig.preferredResolution).
-       * A per-shot resolutionOverride from the prepare-scene panel still wins over this when set.
-       * No 1080p option: no video provider in this deployment currently supports it, and offering
-       * it would silently downgrade the render (see VideoResolution.java in video-generation-
-       * service for the confirmed evidence behind that decision). */}
-      <div className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
-        <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-          Resolution
-        </span>
-        <select
-          value={projectConfig?.preferredResolution || ""}
-          onChange={(event) => updateProjectConfig({ projectId, preferredResolution: event.target.value || "" })}
-          className="creator-input px-2.5 py-1.5 text-[11px] font-semibold"
-        >
-          <option value="">Provider default</option>
-          <option value="480p">480p (cheapest)</option>
-          <option value="720p">720p</option>
-        </select>
-        <span className="text-[10px] font-medium text-slate-500">
-          Applies to every shot; per-shot override in the prepare-scene panel still wins when set.
-        </span>
+        {ttsModels.length > 0 && (
+          <label className="flex items-center gap-2" title="Which model speaks beat-dubbed dialogue on shots prepared after this change.">
+            <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">TTS model</span>
+            <select
+              value={projectConfig?.preferredTtsModel || ""}
+              onChange={(event) => updateProjectConfig({ projectId, preferredTtsModel: event.target.value || "" })}
+              className="creator-input px-2.5 py-1.5 text-[11px] font-semibold"
+            >
+              <option value="">Default</option>
+              {ttsModels.map((m) => (
+                <option key={m.modelId} value={m.modelId}>{m.modelId}</option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -227,6 +232,7 @@ export default function VideoGenerationSection({ projectId }) {
           <ShotVideoCard
             key={shot.id}
             shot={shot}
+            projectId={projectId}
             isOpen={openShotId === shot.id}
             onToggle={() => setOpenShotId(openShotId === shot.id ? null : shot.id)}
             info={prepared[shot.id]}

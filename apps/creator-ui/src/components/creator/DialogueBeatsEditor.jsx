@@ -9,6 +9,7 @@ import {
   useDeleteShotDialogueBeatMutation,
   useListPreProductionShotImagesQuery,
 } from "../../api/creatorEndpoints.js";
+import { useCachedImageUrl } from "../../utils/cachedImageUrl.js";
 
 /** A "beat" is a dialogue timestamp -- which second within this shot's timeline a line starts and
  * how long it runs. With at least one beat present, video-generation-service turns off the video
@@ -16,7 +17,7 @@ import {
  * -- the line, the character, the shot's planned duration, the actor's voice sample -- is already
  * decided upstream (script -> shot -> cast assignment), so this is a one-click "clone it" against
  * that plan, not a form for typing timestamps by hand. */
-export default function DialogueBeatsEditor({ shot }) {
+export default function DialogueBeatsEditor({ shot, projectId }) {
   const dispatch = useDispatch();
   const shotId = shot?.id;
 
@@ -28,6 +29,9 @@ export default function DialogueBeatsEditor({ shot }) {
   // PRODUCTION (photoreal) is generated on demand and may not exist yet -- STORYBOARD (sketch)
   // is generated eagerly with the rest of the shot list, so it's there from the start as a stand-in.
   const frame = images.find((img) => img.kind === "PRODUCTION") || images.find((img) => img.kind === "STORYBOARD");
+  // Same object as ShotVideoCard's thumbnail -- shares its blob cache slot key so opening this
+  // panel reuses the already-fetched bytes instead of re-downloading a freshly re-signed URL.
+  const frameSrc = useCachedImageUrl(frame && `${shotId}:${frame.kind}`, frame?.signedUrl);
   // shot.voiceOver is the actual line to be spoken. shot.scriptLine is the shot's CREATIVE brief
   // -- for ACTION/B_ROLL/MOTION_GRAPHIC shots that's a visual scene description ("Priya smiling
   // in slow motion"), NOT dialogue; cloning it would produce a voice-over of scene direction,
@@ -43,7 +47,7 @@ export default function DialogueBeatsEditor({ shot }) {
   const handleClone = async () => {
     if (!dialogueText) return;
     try {
-      await createBeat({ shotId, orderIndex: beats.length, startSeconds: 0 }).unwrap();
+      await createBeat({ shotId, projectId, orderIndex: beats.length, startSeconds: 0 }).unwrap();
     } catch (error) {
       dispatch(showFlash({ message: error?.data?.message || "Could not clone this dialogue", type: "error" }));
     }
@@ -51,7 +55,7 @@ export default function DialogueBeatsEditor({ shot }) {
 
   const handleDelete = async (beatId) => {
     try {
-      await deleteBeat({ shotId, beatId }).unwrap();
+      await deleteBeat({ shotId, beatId, projectId }).unwrap();
     } catch (error) {
       dispatch(showFlash({ message: error?.data?.message || "Could not remove this beat", type: "error" }));
     }
@@ -69,9 +73,9 @@ export default function DialogueBeatsEditor({ shot }) {
       </div>
 
       <div className="mb-2.5 flex items-start gap-2.5">
-        {frame?.signedUrl && (
+        {frameSrc && (
           <img
-            src={frame.signedUrl}
+            src={frameSrc}
             alt={frame.kind === "PRODUCTION" ? "Production frame" : "Storyboard sketch"}
             className="h-14 w-14 shrink-0 rounded border border-white/10 object-cover"
           />

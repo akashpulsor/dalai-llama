@@ -12,6 +12,7 @@ import DialogueBeatsEditor from "./DialogueBeatsEditor.jsx";
 import MotionGraphicPanel from "./MotionGraphicPanel.jsx";
 import CritiqueFindingsPanel from "./CritiqueFindingsPanel.jsx";
 import ShotThoughtLog from "./ShotThoughtLog.jsx";
+import { useCachedImageUrl } from "../../utils/cachedImageUrl.js";
 
 /** On-demand only -- never auto-generated as part of dispatch, one track per shot, sourced from
  * the shot's already-planned ambient_bed sound design. */
@@ -72,7 +73,7 @@ const ASPECT_RATIO_CSS = {
 /** One shot as a visual card -- the frame (or the finished clip, once generated) IS the card,
  * not a text row that hides the image behind an accordion toggle. Clicking anywhere opens the
  * full prepare/approve panel below it, spanning the grid so it doesn't stretch its neighbors. */
-export default function ShotVideoCard({ shot, isOpen, onToggle, info, busy, video, onPrepare, onApprove, onReject, onAutoFix }) {
+export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info, busy, video, onPrepare, onApprove, onReject, onAutoFix }) {
   const { data: images = [] } = useListPreProductionShotImagesQuery(shot.id, { skip: !shot.id });
   const isMotionGraphic = shot.shotType === "MOTION_GRAPHIC";
   // MG shots don't have PRODUCTION/STORYBOARD (see ShotImagesPanel's kindsForShotType) -- their
@@ -83,6 +84,10 @@ export default function ShotVideoCard({ shot, isOpen, onToggle, info, busy, vide
     : images.find((img) => img.kind === "PRODUCTION") || images.find((img) => img.kind === "STORYBOARD");
   const aspect = ASPECT_RATIO_CSS[shot.aspectRatio] || "9 / 16";
   const dialogue = shot.voiceOver || shot.scriptLine;
+  // Signed URLs are re-signed (new query string) on every images refetch even when the object
+  // itself hasn't changed, which would otherwise force the browser to re-download the frame on
+  // every open. Cache the bytes locally keyed by shot+kind instead of the ever-changing URL.
+  const frameSrc = useCachedImageUrl(frame && `${shot.id}:${frame.kind}`, frame?.signedUrl);
 
   return (
     <div className={`overflow-hidden rounded-lg border border-white/10 bg-white/[0.02] ${isOpen ? "col-span-full" : ""}`}>
@@ -90,8 +95,8 @@ export default function ShotVideoCard({ shot, isOpen, onToggle, info, busy, vide
         <div className="relative w-full bg-black" style={{ aspectRatio: aspect }}>
           {video?.outputUri ? (
             <video src={video.outputUri} muted loop autoPlay playsInline className="absolute inset-0 h-full w-full object-cover" />
-          ) : frame?.signedUrl ? (
-            <img src={frame.signedUrl} alt={`Shot ${shot.shotNumber}`} className="absolute inset-0 h-full w-full object-cover" />
+          ) : frameSrc ? (
+            <img src={frameSrc} alt={`Shot ${shot.shotNumber}`} className="absolute inset-0 h-full w-full object-cover" />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
               <Sparkles size={22} className="text-slate-700" />
@@ -163,7 +168,7 @@ export default function ShotVideoCard({ shot, isOpen, onToggle, info, busy, vide
             />
           )}
 
-          {!info && <DialogueBeatsEditor shot={shot} />}
+          {!info && <DialogueBeatsEditor shot={shot} projectId={projectId} />}
           {!info && <BackgroundMusicControl shotId={shot.id} />}
           <ShotThoughtLog shotId={shot.id} />
 
@@ -219,9 +224,9 @@ export default function ShotVideoCard({ shot, isOpen, onToggle, info, busy, vide
                       <p className="mb-1.5 text-[10px] font-medium text-slate-500">
                         Reference image{info.prompt.referenceImageUrls.length > 1 ? "s" : ""} sent to the model
                       </p>
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex gap-1.5 overflow-x-auto">
                         {info.prompt.referenceImageUrls.map((url, i) => (
-                          <img key={i} src={url} alt="Reference" className="h-14 w-14 rounded border border-white/10 object-cover" />
+                          <img key={i} src={url} alt="Reference" className="h-14 w-14 shrink-0 rounded border border-white/10 object-cover" />
                         ))}
                       </div>
                     </div>

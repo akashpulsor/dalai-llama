@@ -2328,6 +2328,22 @@ export const creatorApi = apiSlice.injectEndpoints({
       ],
     }),
 
+    // PUT /v1/cast-profiles/{id}/builtin-voice -- alternative to updateCastProfileVoice for a
+    // character with no recorded sample: picks a stock ElevenLabs voice (from listBuiltinVoices,
+    // llm-gateway) instead of uploading one. Clears any previously-uploaded sample server-side.
+    selectCastProfileBuiltinVoice: builder.mutation({
+      query: ({ castProfileId, builtinVoiceId }) => ({
+        url: platformUrl(`/cast-profiles/${castProfileId}/builtin-voice`),
+        method: "PUT",
+        body: { builtinVoiceId },
+      }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorHomeProjects", id: `cast-profiles-${args?.projectId || "library"}-${args?.profileType || "all"}` },
+        { type: "CreatorHomeProjects", id: `cast-profiles-${args?.projectId || "library"}-all` },
+        { type: "CreatorHomeProjects", id: "cast-profiles-library-all" },
+      ],
+    }),
+
     // POST /v1/cast-profiles/media (multipart) -- uploads a raw face image or voice sample to
     // MinIO and hands back {bucket, objectKey}, which the caller then feeds into
     // createCastProfile's faceRef/voiceRef fields.
@@ -2342,6 +2358,14 @@ export const creatorApi = apiSlice.injectEndpoints({
     listCastAssignments: builder.query({
       query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/cast-assignments`) }),
       providesTags: (_result, _error, projectId) => [{ type: "CreatorHomeProjects", id: `cast-assignments-${projectId}` }],
+    }),
+
+    // GET /v1/projects/{projectId}/speaking-characters -- every characterKey with at least one
+    // dialogue beat anywhere in the project, the same ground truth video-generation-service
+    // resolves a voice for at dispatch time. Backs the Cast tab's "needs a voice" marker.
+    listSpeakingCharacters: builder.query({
+      query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/speaking-characters`) }),
+      providesTags: (_result, _error, projectId) => [{ type: "CreatorHomeProjects", id: `speaking-characters-${projectId}` }],
     }),
 
     createCastAssignment: builder.mutation({
@@ -2575,18 +2599,27 @@ export const creatorApi = apiSlice.injectEndpoints({
     }),
 
     createShotDialogueBeat: builder.mutation({
-      query: ({ shotId, ...body }) => ({ url: platformUrl(`/shots/${shotId}/dialogue-beats`), method: "POST", body }),
-      invalidatesTags: (_result, _error, args) => [{ type: "CreatorHomeProjects", id: `dialogue-beats-${args?.shotId}` }],
+      query: ({ shotId, projectId, ...body }) => ({ url: platformUrl(`/shots/${shotId}/dialogue-beats`), method: "POST", body }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorHomeProjects", id: `dialogue-beats-${args?.shotId}` },
+        { type: "CreatorHomeProjects", id: `speaking-characters-${args?.projectId}` },
+      ],
     }),
 
     updateShotDialogueBeat: builder.mutation({
-      query: ({ shotId, beatId, ...body }) => ({ url: platformUrl(`/shots/${shotId}/dialogue-beats/${beatId}`), method: "PUT", body }),
-      invalidatesTags: (_result, _error, args) => [{ type: "CreatorHomeProjects", id: `dialogue-beats-${args?.shotId}` }],
+      query: ({ shotId, beatId, projectId, ...body }) => ({ url: platformUrl(`/shots/${shotId}/dialogue-beats/${beatId}`), method: "PUT", body }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorHomeProjects", id: `dialogue-beats-${args?.shotId}` },
+        { type: "CreatorHomeProjects", id: `speaking-characters-${args?.projectId}` },
+      ],
     }),
 
     deleteShotDialogueBeat: builder.mutation({
       query: ({ shotId, beatId }) => ({ url: platformUrl(`/shots/${shotId}/dialogue-beats/${beatId}`), method: "DELETE" }),
-      invalidatesTags: (_result, _error, args) => [{ type: "CreatorHomeProjects", id: `dialogue-beats-${args?.shotId}` }],
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorHomeProjects", id: `dialogue-beats-${args?.shotId}` },
+        { type: "CreatorHomeProjects", id: `speaking-characters-${args?.projectId}` },
+      ],
     }),
 
     // pre-production-service ProjectController -- idempotent, returns the existing token if one
@@ -2749,6 +2782,25 @@ export const creatorApi = apiSlice.injectEndpoints({
     // ElevenLabs) rather than a UI-only guess at what's available.
     listCloningModels: builder.query({
       query: () => ({ url: platformUrl("/models?type=voice_clone") }),
+    }),
+
+    // llm-gateway GET /v1/voices/builtin -- stock ElevenLabs voices for a cast profile with no
+    // recorded sample to clone (see CastProfile.builtinVoiceId). gender/language are optional
+    // server-side filters; the caller still decides what to do with an empty/mismatched result.
+    listBuiltinVoices: builder.query({
+      query: ({ gender, language } = {}) => {
+        const params = new URLSearchParams();
+        if (gender) params.set("gender", gender);
+        if (language) params.set("language", language);
+        const qs = params.toString();
+        return { url: platformUrl(`/voices/builtin${qs ? `?${qs}` : ""}`) };
+      },
+    }),
+
+    // llm-gateway GET /v1/models -- real master data (model_master, type=tts), not a hardcoded
+    // constant. Which model actually speaks beat-dubbed dialogue (project's preferredTtsModel).
+    listTtsModels: builder.query({
+      query: () => ({ url: platformUrl("/models?type=tts") }),
     }),
 
     // pre-production-service ShotBackgroundMusicController -- on-demand only (never part of the
@@ -3252,6 +3304,7 @@ export const {
   useListCastProfilesQuery,
   useCreateCastProfileMutation,
   useUpdateCastProfileVoiceMutation,
+  useSelectCastProfileBuiltinVoiceMutation,
   useUploadCastMediaMutation,
   useListCastAssignmentsQuery,
   useCreateCastAssignmentMutation,
@@ -3300,6 +3353,8 @@ export const {
   useListProjectReviewCommentsQuery,
   useResolveProjectReviewCommentMutation,
   useListCloningModelsQuery,
+  useListBuiltinVoicesQuery,
+  useListTtsModelsQuery,
   useGetShotBackgroundMusicQuery,
   useGenerateShotBackgroundMusicMutation,
   useDispatchShotMutation,

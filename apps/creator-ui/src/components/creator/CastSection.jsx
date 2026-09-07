@@ -7,10 +7,13 @@ import {
   useCreateCastAssignmentMutation,
   useListCastAssignmentsQuery,
   useListCastProfilesQuery,
+  useListSpeakingCharactersQuery,
+  useSelectCastProfileBuiltinVoiceMutation,
   useUpdateCastProfileVoiceMutation,
   useUpdateScriptCharacterMutation,
   useUploadCastMediaMutation,
 } from "../../api/creatorEndpoints.js";
+import BuiltinVoicePicker from "./BuiltinVoicePicker.jsx";
 import CastProfileQuickCreate from "./CastProfileQuickCreate.jsx";
 import VoiceSampleField from "./VoiceSampleField.jsx";
 
@@ -55,14 +58,18 @@ export default function CastSection({ projectId, characters }) {
   const [editCharacterId, setEditCharacterId] = useState(null);
   const [editFields, setEditFields] = useState({});
   const [voiceEditCharacterId, setVoiceEditCharacterId] = useState(null);
+  const [voiceEditMode, setVoiceEditMode] = useState("upload"); // "upload" | "builtin"
   const [voiceFile, setVoiceFile] = useState(null);
 
   const { data: assignments = [] } = useListCastAssignmentsQuery(projectId, { skip: !projectId });
   const { data: profiles = [] } = useListCastProfilesQuery({ projectId }, { skip: !projectId });
+  const { data: speakingCharacterKeys = [] } = useListSpeakingCharactersQuery(projectId, { skip: !projectId });
+  const speakingCharacterKeySet = useMemo(() => new Set(speakingCharacterKeys), [speakingCharacterKeys]);
   const [createAssignment, { isLoading: assigning }] = useCreateCastAssignmentMutation();
   const [updateCharacter, { isLoading: savingEdit }] = useUpdateScriptCharacterMutation();
   const [uploadMedia, { isLoading: uploadingVoice }] = useUploadCastMediaMutation();
   const [updateVoice, { isLoading: savingVoice }] = useUpdateCastProfileVoiceMutation();
+  const [selectBuiltinVoice, { isLoading: savingBuiltinVoice }] = useSelectCastProfileBuiltinVoiceMutation();
   const savingVoiceFile = uploadingVoice || savingVoice;
 
   const assignmentByCharacter = useMemo(() => {
@@ -134,6 +141,21 @@ export default function CastSection({ projectId, characters }) {
     }
   };
 
+  const handleSelectBuiltinVoice = async (character, profile, voice) => {
+    try {
+      await selectBuiltinVoice({
+        castProfileId: profile.id,
+        builtinVoiceId: voice.providerVoiceId,
+        projectId,
+        profileType: character.characterType,
+      }).unwrap();
+      dispatch(showFlash({ message: `${voice.displayName} set for ${profile.displayName}`, type: "success" }));
+      setVoiceEditCharacterId(null);
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not set this voice", type: "error" }));
+    }
+  };
+
   return (
     <div className="creator-panel mt-6 p-6">
       <p className="text-[11px] font-extrabold uppercase tracking-widest text-purple-300">Characterization</p>
@@ -151,6 +173,11 @@ export default function CastSection({ projectId, characters }) {
           const hasDetail = character.characterType !== "PRODUCT"
             && CHARACTER_DETAIL_FIELDS.some(({ key }) => character[key]);
           const detailOpen = detailCharacterId === character.id;
+          // Ground truth from actual dialogue beats (GET /speaking-characters), not shotType --
+          // a PRODUCT never needs its own voice (its narration, if any, is the narrator talking,
+          // see EffectiveSpeakerResolver on the backend), and a HUMAN/NARRATOR character with no
+          // beat anywhere in the project genuinely doesn't speak yet either.
+          const speaks = character.characterType !== "PRODUCT" && speakingCharacterKeySet.has(character.characterKey);
 
           return (
             <div key={character.id} className="rounded-lg border border-white/10 bg-white/[0.03] p-3.5">
@@ -201,24 +228,38 @@ export default function CastSection({ projectId, characters }) {
                       <Check size={12} />
                       {profile.displayName}
                     </span>
-                    {character.characterType !== "PRODUCT" && (
+                    {speaks ? (
                       <button
                         type="button"
                         onClick={() => {
                           const opening = voiceEditCharacterId !== character.id;
                           setVoiceEditCharacterId(opening ? character.id : null);
+                          setVoiceEditMode(profile.builtinVoiceId ? "builtin" : "upload");
                           setVoiceFile(null);
                         }}
-                        title={profile.voiceRefBucket ? "Replace voice sample" : "No voice sample yet — add one"}
+                        title={
+                          profile.voiceRefBucket ? "Replace voice sample" : profile.builtinVoiceId ? "Change voice" : "No voice yet — add one"
+                        }
                         className={`flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-bold ${
-                          profile.voiceRefBucket
+                          profile.voiceRefBucket || profile.builtinVoiceId
                             ? "border-white/10 bg-white/5 text-slate-300 hover:border-purple-400/30"
                             : "border-amber-400/25 bg-amber-500/10 text-amber-200"
                         }`}
                       >
                         <Mic size={10} />
-                        {profile.voiceRefBucket ? "Voice" : "No voice"}
+                        {profile.voiceRefBucket ? "Voice" : profile.builtinVoiceId ? "Built-in voice" : "No voice"}
                       </button>
+                    ) : (
+                      <span
+                        title={
+                          character.characterType === "PRODUCT"
+                            ? "Products don't speak -- any narration about this product uses the narrator's voice"
+                            : "No dialogue anywhere in this project is attributed to this character yet"
+                        }
+                        className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold text-slate-500"
+                      >
+                        Voice not required
+                      </span>
                     )}
                   </div>
                 ) : (
@@ -238,26 +279,64 @@ export default function CastSection({ projectId, characters }) {
 
               {voiceEditCharacterId === character.id && profile && (
                 <div className="mt-3 space-y-2.5 border-t border-white/10 pt-3">
-                  <VoiceSampleField file={voiceFile} onFileChange={setVoiceFile} />
-                  <div className="flex gap-2">
+                  <div className="flex gap-1 rounded-md border border-white/10 bg-white/5 p-0.5">
                     <button
                       type="button"
-                      onClick={() => { setVoiceEditCharacterId(null); setVoiceFile(null); }}
-                      className="flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-slate-300"
+                      onClick={() => setVoiceEditMode("upload")}
+                      className={`flex-1 rounded px-2 py-1 text-[10px] font-bold ${voiceEditMode === "upload" ? "bg-purple-500/20 text-purple-200" : "text-slate-400"}`}
                     >
-                      <X size={11} />
-                      Cancel
+                      Record/upload a sample
                     </button>
                     <button
                       type="button"
-                      disabled={savingVoiceFile}
-                      onClick={() => handleSaveVoice(character, profile)}
-                      className="creator-primary flex flex-1 items-center justify-center gap-1.5 py-1.5 text-[11px] font-bold text-white disabled:opacity-60"
+                      onClick={() => setVoiceEditMode("builtin")}
+                      className={`flex-1 rounded px-2 py-1 text-[10px] font-bold ${voiceEditMode === "builtin" ? "bg-purple-500/20 text-purple-200" : "text-slate-400"}`}
                     >
-                      {savingVoiceFile ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
-                      {savingVoiceFile ? "Saving…" : "Save voice"}
+                      Use a built-in voice
                     </button>
                   </div>
+
+                  {voiceEditMode === "upload" ? (
+                    <>
+                      <VoiceSampleField file={voiceFile} onFileChange={setVoiceFile} />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { setVoiceEditCharacterId(null); setVoiceFile(null); }}
+                          className="flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-slate-300"
+                        >
+                          <X size={11} />
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          disabled={savingVoiceFile}
+                          onClick={() => handleSaveVoice(character, profile)}
+                          className="creator-primary flex flex-1 items-center justify-center gap-1.5 py-1.5 text-[11px] font-bold text-white disabled:opacity-60"
+                        >
+                          {savingVoiceFile ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
+                          {savingVoiceFile ? "Saving…" : "Save voice"}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <BuiltinVoicePicker
+                        gender={character.gender || profile.gender}
+                        selectedVoiceId={profile.builtinVoiceId}
+                        onSelect={(voice) => handleSelectBuiltinVoice(character, profile, voice)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setVoiceEditCharacterId(null)}
+                        disabled={savingBuiltinVoice}
+                        className="flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-slate-300 disabled:opacity-60"
+                      >
+                        <X size={11} />
+                        Close
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
 
