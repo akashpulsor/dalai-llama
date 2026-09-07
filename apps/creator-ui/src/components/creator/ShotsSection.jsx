@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Film, FileDown, Loader2, Plus, RefreshCw, Save, Sparkles } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
@@ -8,6 +8,7 @@ import {
   useExportShotsPdfMutation,
   useGeneratePreProductionShotListMutation,
   useGetAnimatedPreviewHtmlMutation,
+  useGetPreProductionShotListJobQuery,
   useListPreProductionShotsQuery,
   useListShotAssetCompletionQuery,
   useListShotPlanIssuesQuery,
@@ -88,11 +89,36 @@ export default function ShotsSection({ projectId }) {
   const [openShotId, setOpenShotId] = useState(null);
 
   const [showIssues, setShowIssues] = useState(false);
-  const { data: shots = [], isLoading } = useListPreProductionShotsQuery(projectId, { skip: !projectId });
+  const { data: shots = [], isLoading, refetch: refetchShots } = useListPreProductionShotsQuery(projectId, { skip: !projectId });
   const { data: issues = [] } = useListShotPlanIssuesQuery(projectId, { skip: !projectId });
   const { data: completion = [] } = useListShotAssetCompletionQuery(projectId, { skip: !projectId });
   const completeShotIds = new Set(completion.filter((c) => c.complete).map((c) => c.shotId));
-  const [generateList, { isLoading: generating }] = useGeneratePreProductionShotListMutation();
+  const [generateList, { isLoading: submitting }] = useGeneratePreProductionShotListMutation();
+
+  // Async job pattern: submitting only kicks off the LLM call on llm-gateway's Kafka worker;
+  // we poll this until it reaches SUCCEEDED (then refetch the shot list itself, which is what
+  // the user actually cares about) or FAILED (show the error). Polling is skipped once we have
+  // no active job id or the job is already terminal, so no polling happens at rest.
+  const [activeJobId, setActiveJobId] = useState(null);
+  const { data: shotListJob } = useGetPreProductionShotListJobQuery(
+    { projectId, jobId: activeJobId },
+    { skip: !projectId || !activeJobId, pollingInterval: 3000 },
+  );
+  const generating = submitting || (!!activeJobId && shotListJob?.status === "PENDING");
+
+  useEffect(() => {
+    if (!shotListJob) return;
+    if (shotListJob.status === "SUCCEEDED") {
+      refetchShots();
+      dispatch(showFlash({ message: "Shot list ready", type: "success" }));
+      setActiveJobId(null);
+    } else if (shotListJob.status === "FAILED") {
+      dispatch(showFlash({
+        message: shotListJob.errorMessage || "Shot list generation failed", type: "error",
+      }));
+      setActiveJobId(null);
+    }
+  }, [shotListJob, dispatch, refetchShots]);
   const [exportPdf, { isLoading: exporting }] = useExportShotsPdfMutation();
   const [getAnimatedPreview, { isLoading: loadingPreview }] = useGetAnimatedPreviewHtmlMutation();
   const [createShot, { isLoading: creatingShot }] = useCreatePreProductionShotMutation();
@@ -109,10 +135,14 @@ export default function ShotsSection({ projectId }) {
 
   const handleGenerate = async () => {
     try {
-      await generateList(projectId).unwrap();
-      dispatch(showFlash({ message: shots.length ? "Shot list regenerated" : "Shot list generated", type: "success" }));
+      const job = await generateList(projectId).unwrap();
+      setActiveJobId(job.jobId);
+      dispatch(showFlash({
+        message: shots.length ? "Regenerating shot list…" : "Generating shot list…",
+        type: "info",
+      }));
     } catch (error) {
-      dispatch(showFlash({ message: error?.data?.message || "Could not generate the shot list", type: "error" }));
+      dispatch(showFlash({ message: error?.data?.message || "Could not submit shot list generation", type: "error" }));
     }
   };
 

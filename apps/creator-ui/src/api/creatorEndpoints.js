@@ -2355,11 +2355,27 @@ export const creatorApi = apiSlice.injectEndpoints({
       ],
     }),
 
-    // pre-production-service ShotListController -- destructively replaces the shot list on
-    // regenerate (no versioning yet, same as Script).
+    // pre-production-service ShotListController.generateList -- ASYNC submit. Returns HTTP 202
+    // with {jobId, projectId, status:PENDING, createdAt} immediately. The Gemini call runs on
+    // llm-gateway's Kafka worker (see the backend ShotListGenerationJobService); the shot rows
+    // themselves are written when the completion event lands. The caller must poll
+    // getPreProductionShotListJob until status flips to SUCCEEDED (then listPreProductionShots
+    // will return the new list) or FAILED (surface the errorMessage). Regenerating an existing
+    // list still destructively replaces it -- same as before, just now under the async flow.
     generatePreProductionShotList: builder.mutation({
       query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/shots/generate-list`), method: "POST" }),
-      invalidatesTags: (_result, _error, projectId) => [{ type: "CreatorHomeProjects", id: `shots-${projectId}` }],
+    }),
+
+    // Status endpoint for one submitted shot-list job. Poll with `pollingInterval` and stop
+    // (via `skip`) once status is SUCCEEDED or FAILED. On SUCCEEDED the caller should invalidate
+    // { type: "CreatorHomeProjects", id: `shots-${projectId}` } so listPreProductionShots refetches.
+    getPreProductionShotListJob: builder.query({
+      query: ({ projectId, jobId }) => ({
+        url: platformUrl(`/projects/${projectId}/shots/generate-list/${jobId}`),
+      }),
+      providesTags: (_result, _error, { projectId, jobId }) => [
+        { type: "CreatorHomeProjects", id: `shot-list-job-${projectId}-${jobId}` },
+      ],
     }),
 
     listPreProductionShots: builder.query({
@@ -3208,6 +3224,7 @@ export const {
   useListCastAssignmentsQuery,
   useCreateCastAssignmentMutation,
   useGeneratePreProductionShotListMutation,
+  useGetPreProductionShotListJobQuery,
   useListPreProductionShotsQuery,
   useCreatePreProductionShotMutation,
   useUpdatePreProductionShotMutation,
