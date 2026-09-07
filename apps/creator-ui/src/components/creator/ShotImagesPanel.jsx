@@ -1,11 +1,13 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { Download, ImageIcon, Loader2, RefreshCw, X } from "lucide-react";
+import { Download, ImageIcon, Loader2, RefreshCw, Upload, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useGeneratePreProductionShotImageMutation,
+  useGeneratePreProductionShotImageWithInspirationMutation,
   useListPreProductionShotImagesQuery,
+  useReplacePreProductionShotImageMutation,
 } from "../../api/creatorEndpoints.js";
 
 const KINDS = [
@@ -61,8 +63,14 @@ export default function ShotImagesPanel({ shotId, aspectRatio }) {
   const dispatch = useDispatch();
   const { data: images = [] } = useListPreProductionShotImagesQuery(shotId, { skip: !shotId });
   const [generate, { isLoading: generating }] = useGeneratePreProductionShotImageMutation();
+  const [generateWithInspiration, { isLoading: uploadingInspiration }] = useGeneratePreProductionShotImageWithInspirationMutation();
+  const [replaceImage, { isLoading: replacingImage }] = useReplacePreProductionShotImageMutation();
   const [pendingKind, setPendingKind] = React.useState(null);
   const [zoomedKind, setZoomedKind] = React.useState(null);
+  const [uploadKind, setUploadKind] = React.useState(null); // {kind, label} when upload dialog is open
+  const [uploadMode, setUploadMode] = React.useState("same"); // "same" | "inspired"
+  const [uploadFile, setUploadFile] = React.useState(null);
+  const [uploadNote, setUploadNote] = React.useState("");
 
   const imageByKind = React.useMemo(() => {
     const map = new Map();
@@ -86,6 +94,37 @@ export default function ShotImagesPanel({ shotId, aspectRatio }) {
       await downloadImage(image.signedUrl, kind);
     } catch (error) {
       dispatch(showFlash({ message: error?.message || "Could not download the image", type: "error" }));
+    }
+  };
+
+  const openUploadDialog = (kind) => {
+    setUploadKind(kind);
+    setUploadMode("same");
+    setUploadFile(null);
+    setUploadNote("");
+  };
+
+  const closeUploadDialog = () => {
+    setUploadKind(null);
+    setUploadMode("same");
+    setUploadFile(null);
+    setUploadNote("");
+  };
+
+  const handleUpload = async () => {
+    if (!uploadKind || !uploadFile) return;
+    const kind = uploadKind;
+    try {
+      if (uploadMode === "same") {
+        await replaceImage({ shotId, kind, file: uploadFile }).unwrap();
+        dispatch(showFlash({ message: "Image replaced.", type: "success" }));
+      } else {
+        await generateWithInspiration({ shotId, kind, note: uploadNote || undefined, files: [uploadFile] }).unwrap();
+        dispatch(showFlash({ message: "Regenerating from inspiration…", type: "success" }));
+      }
+      closeUploadDialog();
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Upload failed", type: "error" }));
     }
   };
 
@@ -142,6 +181,14 @@ export default function ShotImagesPanel({ shotId, aspectRatio }) {
                       <Download size={11} />
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => openUploadDialog(kind)}
+                    title="Upload a replacement or reference image"
+                    className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-slate-200 hover:border-purple-400/30"
+                  >
+                    <Upload size={11} />
+                  </button>
                 </div>
               </div>
             </div>
@@ -182,6 +229,90 @@ export default function ShotImagesPanel({ shotId, aspectRatio }) {
           />
         </div>
       )}
+
+      {uploadKind && (() => {
+        const uploading = replacingImage || uploadingInspiration;
+        const label = KINDS.find((k) => k.kind === uploadKind)?.label || uploadKind;
+        return (
+          <div
+            className="fixed inset-0 z-[210] flex items-center justify-center bg-black/80 p-6"
+            onClick={closeUploadDialog}
+          >
+            <div
+              className="w-full max-w-md rounded-xl border border-white/10 bg-slate-950 p-5 shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="mb-3 flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wide text-purple-300">Upload image</p>
+                  <p className="mt-0.5 text-sm font-bold text-slate-100">{label}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeUploadDialog}
+                  className="flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-white/5 text-slate-300 hover:border-purple-300"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              <fieldset className="mb-3 space-y-2">
+                <label className="flex cursor-pointer items-start gap-2 rounded-md border border-white/10 bg-white/5 p-2.5 hover:border-purple-400/30">
+                  <input type="radio" name="upload-mode" value="same" checked={uploadMode === "same"} onChange={() => setUploadMode("same")} className="mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-[11px] font-bold text-slate-100">Same — use this exact image</p>
+                    <p className="mt-0.5 text-[10px] font-medium text-slate-500">No AI regeneration. Your uploaded file becomes the shot image as-is. Best for fixing wrong on-image text.</p>
+                  </div>
+                </label>
+                <label className="flex cursor-pointer items-start gap-2 rounded-md border border-white/10 bg-white/5 p-2.5 hover:border-purple-400/30">
+                  <input type="radio" name="upload-mode" value="inspired" checked={uploadMode === "inspired"} onChange={() => setUploadMode("inspired")} className="mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-[11px] font-bold text-slate-100">Inspired — regenerate with this as reference</p>
+                    <p className="mt-0.5 text-[10px] font-medium text-slate-500">AI analyses the upload and regenerates keeping the shot plan intact. Best for style/lighting/composition inspiration.</p>
+                  </div>
+                </label>
+              </fieldset>
+
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
+                className="mb-3 w-full rounded-md border border-white/10 bg-white/5 p-2 text-[11px] text-slate-200 file:mr-2 file:rounded file:border-0 file:bg-purple-500/20 file:px-2 file:py-1 file:text-[10px] file:font-bold file:text-purple-200"
+              />
+
+              {uploadMode === "inspired" && (
+                <textarea
+                  value={uploadNote}
+                  onChange={(event) => setUploadNote(event.target.value)}
+                  placeholder="Optional note: e.g. 'match this lighting mood' or 'keep the pose but change the setting to a kitchen'"
+                  rows={2}
+                  className="mb-3 w-full resize-y rounded-md border border-white/10 bg-white/5 p-2 text-[11px] text-slate-200 placeholder:text-slate-500"
+                />
+              )}
+
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={closeUploadDialog}
+                  disabled={uploading}
+                  className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-slate-300 hover:border-purple-300 disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUpload}
+                  disabled={!uploadFile || uploading}
+                  className="flex items-center gap-1.5 rounded-md border border-purple-400/40 bg-purple-500/20 px-3 py-1.5 text-[11px] font-black text-purple-100 hover:border-purple-400/60 disabled:opacity-55"
+                >
+                  {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                  {uploadMode === "same" ? "Replace image" : "Regenerate"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }

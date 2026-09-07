@@ -2407,9 +2407,41 @@ export const creatorApi = apiSlice.injectEndpoints({
     }),
 
     // pre-production-service ShotImageController -- one row per (shot, kind); kind is one of
-    // STORYBOARD/PRODUCTION/LIGHTING/CAMERA_PLAN.
+    // STORYBOARD/PRODUCTION/LIGHTING/CAMERA_PLAN/MOTION_GRAPHIC.
     generatePreProductionShotImage: builder.mutation({
       query: ({ shotId, kind }) => ({ url: platformUrl(`/shots/${shotId}/images/${kind}`), method: "POST" }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorHomeProjects", id: `shot-images-${args?.shotId}` },
+        { type: "CreatorHomeProjects", id: "shot-asset-completion" },
+      ],
+    }),
+
+    // "Inspired" upload flow -- POST /v1/shots/{shotId}/images/{kind}/inspiration -- attaches one
+    // or more reference photos as edit inputs for the next Gemini call, keeps the plan's own
+    // context in the prompt. mode="inspired" in ShotImagesPanel's upload dialog.
+    generatePreProductionShotImageWithInspiration: builder.mutation({
+      query: ({ shotId, kind, note, files }) => {
+        const formData = new FormData();
+        if (note) formData.append("note", note);
+        (files || []).forEach((f) => formData.append("files", f));
+        return { url: platformUrl(`/shots/${shotId}/images/${kind}/inspiration`), method: "POST", body: formData };
+      },
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorHomeProjects", id: `shot-images-${args?.shotId}` },
+        { type: "CreatorHomeProjects", id: "shot-asset-completion" },
+      ],
+    }),
+
+    // "Same" upload flow -- POST /v1/shots/{shotId}/images/{kind}/replace -- uploaded bytes ARE
+    // the new image, no LLM call. For hand-corrected images (e.g. Gemini's text rendering was
+    // wrong so creator fixed it in Photoshop and wants THIS exact image saved). mode="same" in
+    // ShotImagesPanel's upload dialog.
+    replacePreProductionShotImage: builder.mutation({
+      query: ({ shotId, kind, file }) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        return { url: platformUrl(`/shots/${shotId}/images/${kind}/replace`), method: "POST", body: formData };
+      },
       invalidatesTags: (_result, _error, args) => [
         { type: "CreatorHomeProjects", id: `shot-images-${args?.shotId}` },
         { type: "CreatorHomeProjects", id: "shot-asset-completion" },
@@ -3229,6 +3261,8 @@ export const {
   useCreatePreProductionShotMutation,
   useUpdatePreProductionShotMutation,
   useGeneratePreProductionShotImageMutation,
+  useGeneratePreProductionShotImageWithInspirationMutation,
+  useReplacePreProductionShotImageMutation,
   useListPreProductionShotImagesQuery,
   useAnalyzePreProductionShotProductReferenceMutation,
   useConfirmPreProductionShotProductReferenceMutation,
