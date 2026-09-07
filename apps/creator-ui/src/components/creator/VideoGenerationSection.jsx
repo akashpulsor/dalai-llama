@@ -106,11 +106,14 @@ export default function VideoGenerationSection({ projectId }) {
   };
 
   const handleGenerateAll = () => {
-    shots
-      .filter((shot) => shot.shotType !== "MOTION_GRAPHIC")
-      .forEach((shot) => {
-        if (!prepared[shot.id]) handlePrepare(shot.id);
-      });
+    // MOTION_GRAPHIC shots dispatch too now -- MotionGraphicShotContextAssemblyStrategy attaches
+    // the shot's own MOTION_GRAPHIC image as the reference frame, so Wan/Seedance treat it as the
+    // input for image-to-video (animating the actual designed graphic rather than making up its
+    // own interpretation of the animation notes). Filtering them out here would leave MG shots
+    // out of "Generate all" and force per-shot manual prepare, defeating the batch action.
+    shots.forEach((shot) => {
+      if (!prepared[shot.id]) handlePrepare(shot.id);
+    });
   };
 
   if (!shots?.length) return null;
