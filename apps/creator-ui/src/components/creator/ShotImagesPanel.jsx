@@ -10,17 +10,28 @@ import {
   useReplacePreProductionShotImageMutation,
 } from "../../api/creatorEndpoints.js";
 
-const KINDS = [
+const LIVE_ACTION_KINDS = [
   { kind: "STORYBOARD", label: "Storyboard" },
   { kind: "PRODUCTION", label: "Production" },
   { kind: "LIGHTING", label: "Lighting sheet" },
   { kind: "CAMERA_PLAN", label: "Camera plan" },
-  // Motion-graphic shots don't have cinematography (no lighting/camera plans by design), so this
-  // is their equivalent visual -- a preview of the finished on-screen graphic driven by the
-  // shot's motion_graphic_plan. Auto-fired by the shot-list generation flow; also regenerable
-  // here per shot like the other kinds.
+];
+
+// A MOTION_GRAPHIC shot has no cinematography by design (see ShotType.MOTION_GRAPHIC's javadoc):
+// no storyboard, no production frame, no lighting/camera plan. Its equivalent visual is a preview
+// of the finished on-screen graphic itself, driven by the shot's motion_graphic_plan (concept +
+// on_screen_text + visual_style). Only THIS kind applies to a motion-graphic shot; showing the
+// other four would offer buttons that either error (no plan to drive them) or produce garbage.
+const MOTION_GRAPHIC_KINDS = [
   { kind: "MOTION_GRAPHIC", label: "Motion graphic" },
 ];
+
+const kindsForShotType = (shotType) =>
+  shotType === "MOTION_GRAPHIC" ? MOTION_GRAPHIC_KINDS : LIVE_ACTION_KINDS;
+
+const ALL_KIND_LABELS = new Map(
+  [...LIVE_ACTION_KINDS, ...MOTION_GRAPHIC_KINDS].map((k) => [k.kind, k.label])
+);
 
 /** These kinds carry rendered text (setup steps, on-screen graphic text, camera-plan callouts)
  * the user often wants to save/share offline; STORYBOARD/PRODUCTION are visual-only so they
@@ -59,7 +70,8 @@ const ASPECT_RATIO_CSS = {
  * cast assignment or a confirmed product reference; nothing here has to know that. Tiles render in
  * the shot's own aspect ratio (the same one the video model actually generates at) instead of a
  * fixed square, so what's shown matches what the project is set up to produce. */
-export default function ShotImagesPanel({ shotId, aspectRatio }) {
+export default function ShotImagesPanel({ shotId, aspectRatio, shotType }) {
+  const kinds = kindsForShotType(shotType);
   const dispatch = useDispatch();
   const { data: images = [] } = useListPreProductionShotImagesQuery(shotId, { skip: !shotId });
   const [generate, { isLoading: generating }] = useGeneratePreProductionShotImageMutation();
@@ -133,7 +145,7 @@ export default function ShotImagesPanel({ shotId, aspectRatio }) {
   return (
     <>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {KINDS.map(({ kind, label }) => {
+        {kinds.map(({ kind, label }) => {
           const image = imageByKind.get(kind);
           const busy = generating && pendingKind === kind;
           return (
@@ -222,7 +234,7 @@ export default function ShotImagesPanel({ shotId, aspectRatio }) {
           </div>
           <img
             src={zoomedImage.signedUrl}
-            alt={KINDS.find((k) => k.kind === zoomedKind)?.label}
+            alt={ALL_KIND_LABELS.get(zoomedKind)}
             className="max-h-[90vh] max-w-full rounded-lg object-contain shadow-2xl"
             style={{ aspectRatio: ASPECT_RATIO_CSS[aspectRatio] || "1 / 1" }}
             onClick={(event) => event.stopPropagation()}
@@ -232,7 +244,7 @@ export default function ShotImagesPanel({ shotId, aspectRatio }) {
 
       {uploadKind && (() => {
         const uploading = replacingImage || uploadingInspiration;
-        const label = KINDS.find((k) => k.kind === uploadKind)?.label || uploadKind;
+        const label = ALL_KIND_LABELS.get(uploadKind) || uploadKind;
         return (
           <div
             className="fixed inset-0 z-[210] flex items-center justify-center bg-black/80 p-6"
