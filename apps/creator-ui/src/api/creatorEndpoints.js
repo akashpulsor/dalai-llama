@@ -3307,6 +3307,7 @@ export const {
   useSelectCastProfileBuiltinVoiceMutation,
   useUploadCastMediaMutation,
   useListCastAssignmentsQuery,
+  useListSpeakingCharactersQuery,
   useCreateCastAssignmentMutation,
   useGeneratePreProductionShotListMutation,
   useGetPreProductionShotListJobQuery,
