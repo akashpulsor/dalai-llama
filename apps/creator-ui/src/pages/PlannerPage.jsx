@@ -1154,6 +1154,7 @@ export default function PlannerPage() {
     skip: !tenantId,
     refetchOnMountOrArgChange: true,
     refetchOnFocus: true,
+    pollingInterval: 15000,
   });
   const walletFromProviderCredits = normalizeProviderCreditsWallet(creatorProviderCredits?.wallet);
   const detectedBillingRegionCode = normalizeRegionCode(firstText(

@@ -33,7 +33,11 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const activeId = useMemo(() => activeIdFor(location.pathname, location.hash), [location.pathname, location.hash]);
   const tenantId = useSelector(selectTenantId);
-  const { data: wallet, isFetching: walletLoading } = useGetWalletBalanceQuery(tenantId, { skip: !tenantId });
+  const { data: wallet, isFetching: walletLoading } = useGetWalletBalanceQuery(tenantId, {
+    skip: !tenantId,
+    pollingInterval: 15000,
+    refetchOnFocus: true,
+  });
 
   useEffect(() => {
     const hashId = location.hash?.replace("#", "");
