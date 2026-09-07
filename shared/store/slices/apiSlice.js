@@ -1565,7 +1565,26 @@ const baseQueryWithMetrics = async (args, api, extra) => {
       try {
         await refreshAuthToken(api);
       } catch {
-        // Let the request proceed so the standard 401 redirect path handles it.
+        // Refresh failed -- the token is dead, no point firing the request just to have it
+        // 401 and then trigger the redirect. Trigger the redirect NOW and short-circuit so
+        // the CTA action doesn't submit a "half-alive" request the user then sees process
+        // (this was reported live: a shot-list generate CTA fired against an expired token
+        // and still queued the job, so the user saw two submissions -- one from the pre-
+        // expiry click that failed-then-retried, one from re-login).
+        clearAuthState();
+        api.dispatch(logout());
+        api.dispatch(showFlash({ message: "Session expired. Redirecting to login…", type: "error" }));
+        if (
+          typeof window !== "undefined" &&
+          !isAuthRedirectInFlight &&
+          !window.location.pathname.includes("/auth/callback")
+        ) {
+          isAuthRedirectInFlight = true;
+          void redirectToKeycloakLogin().catch(() => {
+            isAuthRedirectInFlight = false;
+          });
+        }
+        return { error: { status: 401, data: "Session expired" } };
       }
     }
   }
