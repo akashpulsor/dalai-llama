@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { ImageIcon, Loader2, RefreshCw, X } from "lucide-react";
+import { Download, ImageIcon, Loader2, RefreshCw, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useGeneratePreProductionShotImageMutation,
@@ -13,7 +13,36 @@ const KINDS = [
   { kind: "PRODUCTION", label: "Production" },
   { kind: "LIGHTING", label: "Lighting sheet" },
   { kind: "CAMERA_PLAN", label: "Camera plan" },
+  // Motion-graphic shots don't have cinematography (no lighting/camera plans by design), so this
+  // is their equivalent visual -- a preview of the finished on-screen graphic driven by the
+  // shot's motion_graphic_plan. Auto-fired by the shot-list generation flow; also regenerable
+  // here per shot like the other kinds.
+  { kind: "MOTION_GRAPHIC", label: "Motion graphic" },
 ];
+
+/** These kinds carry rendered text (setup steps, on-screen graphic text, camera-plan callouts)
+ * the user often wants to save/share offline; STORYBOARD/PRODUCTION are visual-only so they
+ * don't need the affordance. Kept as an allowlist rather than showing on every tile because
+ * an always-visible download button crowded the already-small tile UI. */
+const TEXT_BEARING_KINDS = new Set(["LIGHTING", "CAMERA_PLAN", "MOTION_GRAPHIC"]);
+
+/** Signed URLs point at MinIO's own origin, so the plain <a download> attribute is ignored by
+ * browsers cross-origin -- the browser navigates instead of saving. Fetch the bytes and hand
+ * back a same-origin blob URL, which honors download. Kind name becomes the filename so
+ * exports don't all collide. */
+async function downloadImage(url, kind) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Download failed: HTTP ${response.status}`);
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = `${kind.toLowerCase()}.png`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(objectUrl);
+}
 
 const ASPECT_RATIO_CSS = {
   RATIO_16_9: "16 / 9",
@@ -52,6 +81,14 @@ export default function ShotImagesPanel({ shotId, aspectRatio }) {
     }
   };
 
+  const handleDownload = async (image, kind) => {
+    try {
+      await downloadImage(image.signedUrl, kind);
+    } catch (error) {
+      dispatch(showFlash({ message: error?.message || "Could not download the image", type: "error" }));
+    }
+  };
+
   const zoomedImage = zoomedKind ? imageByKind.get(zoomedKind) : null;
 
   return (
@@ -81,19 +118,31 @@ export default function ShotImagesPanel({ shotId, aspectRatio }) {
               </div>
               <div className="p-2.5">
                 <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">{label}</p>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => handleGenerate(kind)}
-                  className={`flex w-full items-center justify-center gap-1 rounded-md border py-1.5 text-[10px] font-bold disabled:opacity-60 ${
-                    image
-                      ? "border-white/10 bg-white/5 text-slate-200 hover:border-purple-400/30"
-                      : "animate-pulse border-purple-400/40 bg-purple-500/10 text-purple-200 hover:border-purple-400/60"
-                  }`}
-                >
-                  {busy ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
-                  {busy ? "Generating…" : image ? "Regenerate" : "Generate"}
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => handleGenerate(kind)}
+                    className={`flex flex-1 items-center justify-center gap-1 rounded-md border py-1.5 text-[10px] font-bold disabled:opacity-60 ${
+                      image
+                        ? "border-white/10 bg-white/5 text-slate-200 hover:border-purple-400/30"
+                        : "animate-pulse border-purple-400/40 bg-purple-500/10 text-purple-200 hover:border-purple-400/60"
+                    }`}
+                  >
+                    {busy ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+                    {busy ? "Generating…" : image ? "Regenerate" : "Generate"}
+                  </button>
+                  {image && TEXT_BEARING_KINDS.has(kind) && (
+                    <button
+                      type="button"
+                      onClick={() => handleDownload(image, kind)}
+                      title="Download image"
+                      className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-slate-200 hover:border-purple-400/30"
+                    >
+                      <Download size={11} />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           );
@@ -105,13 +154,25 @@ export default function ShotImagesPanel({ shotId, aspectRatio }) {
           className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 p-6"
           onClick={() => setZoomedKind(null)}
         >
-          <button
-            type="button"
-            onClick={() => setZoomedKind(null)}
-            className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-md border border-white/15 bg-white/5 text-slate-200 hover:border-purple-300"
-          >
-            <X size={16} />
-          </button>
+          <div className="absolute right-4 top-4 flex items-center gap-2">
+            {TEXT_BEARING_KINDS.has(zoomedKind) && (
+              <button
+                type="button"
+                onClick={(event) => { event.stopPropagation(); handleDownload(zoomedImage, zoomedKind); }}
+                title="Download image"
+                className="flex h-9 items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3 text-xs font-bold text-slate-200 hover:border-purple-300"
+              >
+                <Download size={14} /> Download
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setZoomedKind(null)}
+              className="flex h-9 w-9 items-center justify-center rounded-md border border-white/15 bg-white/5 text-slate-200 hover:border-purple-300"
+            >
+              <X size={16} />
+            </button>
+          </div>
           <img
             src={zoomedImage.signedUrl}
             alt={KINDS.find((k) => k.kind === zoomedKind)?.label}
