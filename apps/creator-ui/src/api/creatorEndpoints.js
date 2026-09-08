@@ -2419,8 +2419,11 @@ export const creatorApi = apiSlice.injectEndpoints({
       invalidatesTags: (_result, _error, args) => [{ type: "CreatorHomeProjects", id: `shots-${args?.projectId}` }],
     }),
 
-    // Hand-edit a shot's script line and/or length -- pre-production-service's
-    // ShotListController.updateShot. Every other field on the shot is left untouched.
+    // Hand-edit the shot's plan (script line, duration, action, voice-over, emotion, location,
+    // time of day, lighting mood, camera size/angle/movement/note, text overlay, sound design,
+    // editing notes) -- pre-production-service's ShotListController.updateShot. Every field on
+    // the request is PATCH-optional; a non-null (including empty-string, to clear a free-text
+    // field) is applied and every other column on the shot is left untouched.
     updatePreProductionShot: builder.mutation({
       query: ({ projectId, shotId, ...body }) => ({
         url: platformUrl(`/shots/${shotId}`),
