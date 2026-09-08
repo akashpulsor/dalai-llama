@@ -2,16 +2,7 @@
 import React, { useMemo, useState } from "react";
 import { AlertTriangle, Check } from "lucide-react";
 import { useListBuiltinVoicesQuery } from "../../api/creatorEndpoints.js";
-
-/** Loose match against the profile's own free-text gender field -- that field isn't an enum (see
- * CastProfile.gender's javadoc), so this is only ever a UI default, never a filter that hides
- * anything. Undetermined input just means no tab is pre-selected. */
-function normalizeGender(freeText) {
-  const value = (freeText || "").trim().toLowerCase();
-  if (["male", "m", "man", "boy"].includes(value)) return "MALE";
-  if (["female", "f", "woman", "girl"].includes(value)) return "FEMALE";
-  return null;
-}
+import { normalizeGender } from "../../utils/gender.js";
 
 // Only the codes language_master actually seeds for this catalog today (see llm-gateway's
 // builtin_voice migration) -- not a general-purpose language-name lookup, just display labels for

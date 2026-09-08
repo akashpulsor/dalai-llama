@@ -2848,6 +2848,12 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: () => ({ url: platformUrl(`/dialogue-languages`) }),
     }),
 
+    // pre-production-service GET /v1/genders -- MALE/FEMALE, matches llm-gateway's
+    // builtin_voice.gender vocabulary since that's the concrete downstream consumer. See V55.
+    listGenders: builder.query({
+      query: () => ({ url: platformUrl(`/genders`) }),
+    }),
+
     // pre-production-service ProjectConfigController -- aspect ratio / target duration / motion-
     // graphics preference, set once and read by script/shot-list/video generation from then on.
     getProjectConfig: builder.query({
@@ -3388,6 +3394,7 @@ export const {
   useListVideoFeatureFlagsQuery,
   useListAspectRatiosQuery,
   useListDialogueLanguagesQuery,
+  useListGendersQuery,
   useGetProjectConfigQuery,
   useUpdateProjectConfigMutation,
   useGenerateMotionGraphicPlanMutation,

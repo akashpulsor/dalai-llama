@@ -444,6 +444,7 @@ export default function CastSection({ projectId, characters }) {
                     <CastProfileQuickCreate
                       profileType={toProfileType(character.characterType)}
                       projectId={projectId}
+                      characterGender={character.gender}
                       onCreated={(profile) => handleCreated(character, profile)}
                       onCancel={() => setCreatingCharacterId(null)}
                     />
