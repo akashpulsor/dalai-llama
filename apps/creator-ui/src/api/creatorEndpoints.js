@@ -2820,6 +2820,19 @@ export const creatorApi = apiSlice.injectEndpoints({
       },
     }),
 
+    // video-generation-service POST /v1/voice-tests -- given a shot, resolves the primary
+    // character's cast identity and returns a short audio sample rendered with the real voice
+    // identity (cloned from the actor's uploaded sample, or direct TTS with the built-in voice
+    // pick). Same clone-then-TTS vs direct-TTS routing BeatDubbingService uses at dispatch time,
+    // just against a caller-supplied line instead of a persisted DialogueBeat.
+    testShotVoice: builder.mutation({
+      query: ({ projectId, shotId, text }) => ({
+        url: platformUrl("/voice-tests"),
+        method: "POST",
+        body: { projectId, shotId, text },
+      }),
+    }),
+
     // llm-gateway POST /v1/voices/sync -- one-shot admin refresh that queries the tenant's actual
     // ElevenLabs account, pulls in voices ElevenLabs itself verifies for Hindi (not the premade
     // English voices trained to speak Hindi with an English accent), and updates builtin_voice +
@@ -3396,6 +3409,7 @@ export const {
   useListCloningModelsQuery,
   useListBuiltinVoicesQuery,
   useSyncBuiltinVoicesMutation,
+  useTestShotVoiceMutation,
   useListTtsModelsQuery,
   useGetShotBackgroundMusicQuery,
   useGenerateShotBackgroundMusicMutation,

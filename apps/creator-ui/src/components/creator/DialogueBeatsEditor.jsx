@@ -1,13 +1,14 @@
 // @ts-nocheck
-import React from "react";
+import React, { useRef, useState } from "react";
 import { useDispatch } from "react-redux";
-import { AudioLines, Loader2, Mic, Trash2 } from "lucide-react";
+import { AudioLines, Loader2, Mic, Play, Square, Trash2 } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useListShotDialogueBeatsQuery,
   useCreateShotDialogueBeatMutation,
   useDeleteShotDialogueBeatMutation,
   useListPreProductionShotImagesQuery,
+  useTestShotVoiceMutation,
 } from "../../api/creatorEndpoints.js";
 import { useCachedImageUrl } from "../../utils/cachedImageUrl.js";
 
@@ -25,6 +26,9 @@ export default function DialogueBeatsEditor({ shot, projectId }) {
   const { data: images = [] } = useListPreProductionShotImagesQuery(shotId, { skip: !shotId });
   const [createBeat, { isLoading: cloning }] = useCreateShotDialogueBeatMutation();
   const [deleteBeat] = useDeleteShotDialogueBeatMutation();
+  const [testVoice, { isLoading: testing }] = useTestShotVoiceMutation();
+  const audioRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
 
   // PRODUCTION (photoreal) is generated on demand and may not exist yet -- STORYBOARD (sketch)
   // is generated eagerly with the rest of the shot list, so it's there from the start as a stand-in.
@@ -50,6 +54,29 @@ export default function DialogueBeatsEditor({ shot, projectId }) {
       await createBeat({ shotId, projectId, orderIndex: beats.length, startSeconds: 0 }).unwrap();
     } catch (error) {
       dispatch(showFlash({ message: error?.data?.message || "Could not clone this dialogue", type: "error" }));
+    }
+  };
+
+  // "Test voice" hits video-generation-service /v1/voice-tests, which resolves the shot's
+  // character identity and returns audio rendered with the real voice -- cloned from the actor's
+  // sample if uploaded, or direct TTS with the built-in voice pick, matching what
+  // BeatDubbingService runs at approve() time. Plays the returned base64 audio inline so the
+  // creator can hear whether the pick is right before spending a full dispatch on it.
+  const handleTest = async () => {
+    if (playing) {
+      audioRef.current?.pause();
+      if (audioRef.current) audioRef.current.currentTime = 0;
+      setPlaying(false);
+      return;
+    }
+    try {
+      const result = await testVoice({ projectId, shotId, text: dialogueText || undefined }).unwrap();
+      if (!result?.audioDataUri || !audioRef.current) return;
+      audioRef.current.src = result.audioDataUri;
+      audioRef.current.play().catch(() => {});
+      setPlaying(true);
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not test this voice", type: "error" }));
     }
   };
 
@@ -120,17 +147,31 @@ export default function DialogueBeatsEditor({ shot, projectId }) {
         </div>
       )}
 
-      {beats.length === 0 && dialogueText && (
-        <button
-          type="button"
-          disabled={cloning || !cast?.hasVoiceSample}
-          onClick={handleClone}
-          title={!cast?.hasVoiceSample ? "Assign a cast member with a voice sample to this character first" : undefined}
-          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/10 py-1.5 text-[11px] font-bold text-purple-200 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {cloning ? <Loader2 size={12} className="animate-spin" /> : <Mic size={12} />}
-          {cloning ? "Cloning…" : `Clone in ${cast?.castDisplayName || "actor"}'s voice`}
-        </button>
+      {dialogueText && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={testing || !cast?.hasVoiceSample}
+            onClick={handleTest}
+            title={!cast?.hasVoiceSample ? "Assign a cast member with a voice sample or built-in voice first" : "Preview this line in the character's voice"}
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-slate-200 hover:border-purple-400/30 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {testing ? <Loader2 size={12} className="animate-spin" /> : playing ? <Square size={12} /> : <Play size={12} />}
+          </button>
+          {beats.length === 0 && (
+            <button
+              type="button"
+              disabled={cloning || !cast?.hasVoiceSample}
+              onClick={handleClone}
+              title={!cast?.hasVoiceSample ? "Assign a cast member with a voice sample or built-in voice first" : undefined}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/10 py-1.5 text-[11px] font-bold text-purple-200 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {cloning ? <Loader2 size={12} className="animate-spin" /> : <Mic size={12} />}
+              {cloning ? "Adding beat…" : `Dub in ${cast?.castDisplayName || "actor"}'s voice`}
+            </button>
+          )}
+          <audio ref={audioRef} onEnded={() => setPlaying(false)} preload="none" className="hidden" />
+        </div>
       )}
     </div>
   );
