@@ -1,26 +1,39 @@
 // @ts-nocheck
-import React, { useMemo, useState } from "react";
-import { AlertTriangle, Check } from "lucide-react";
-import { useListBuiltinVoicesQuery } from "../../api/creatorEndpoints.js";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, Play, Square } from "lucide-react";
+import { useListBuiltinVoicesQuery, useListDialogueLanguagesQuery } from "../../api/creatorEndpoints.js";
 import { normalizeGender } from "../../utils/gender.js";
-
-// Only the codes language_master actually seeds for this catalog today (see llm-gateway's
-// builtin_voice migration) -- not a general-purpose language-name lookup, just display labels for
-// whatever shows up in the fetched voices' own languageCodes.
-const LANGUAGE_LABEL = { "en-US": "English", "hi-IN": "Hindi" };
 
 /** Alternative to VoiceSampleField for a character with no recorded sample: pick a stock
  * ElevenLabs voice instead. Gender is a default/suggestion only -- picking a voice from the other
- * tab is always allowed, just flagged with a warning, since CastProfile.gender is free text and
- * this shouldn't hard-block on it. Dialect/language and gender each narrow the list instead of
- * showing every voice at once. */
+ * tab is always allowed, just flagged with a warning, since CastProfile.gender is free text.
+ *
+ * <p>Rendered as three dropdowns (language, gender, voice) plus one preview player for the
+ * currently-selected voice, deliberately scale-first: today's catalog is ~30 voices across a
+ * couple of languages, but the tenant is expected to keep adding voices and languages -- a chip
+ * strip works for the couple-of-languages case and becomes a wall of buttons at ten. A native
+ * <select> stays compact at any count. */
 export default function BuiltinVoicePicker({ gender, selectedVoiceId, onSelect }) {
   const { data: voices = [], isLoading } = useListBuiltinVoicesQuery();
+  const { data: dialogueLanguages = [] } = useListDialogueLanguagesQuery();
+
   const suggestedGender = normalizeGender(gender);
   const [activeGender, setActiveGender] = useState(suggestedGender || "MALE");
-  const [activeLanguage, setActiveLanguage] = useState(null); // null = any language
+  const [activeLanguage, setActiveLanguage] = useState(""); // "" = any language
+  const audioRef = useRef(null);
+  const [playingVoiceId, setPlayingVoiceId] = useState(null);
 
-  const languages = useMemo(() => {
+  // Real name for each code from language_master (via /v1/dialogue-languages), not a hardcoded
+  // frontend map -- so a language added upstream shows up here with no code change.
+  const languageLabelByCode = useMemo(() => {
+    const map = new Map();
+    dialogueLanguages.forEach((l) => map.set(l.code, l.nativeLabel && l.nativeLabel !== l.label ? `${l.label} (${l.nativeLabel})` : l.label));
+    return map;
+  }, [dialogueLanguages]);
+
+  // Only offer language codes that at least one voice in this catalog actually speaks -- picking
+  // one that has no matching voice would be a dead-end filter.
+  const availableLanguages = useMemo(() => {
     const codes = new Set();
     voices.forEach((v) => (v.languageCodes || []).forEach((c) => codes.add(c)));
     return Array.from(codes).sort();
@@ -36,80 +49,110 @@ export default function BuiltinVoicePicker({ gender, selectedVoiceId, onSelect }
   );
   const mismatch = selected && suggestedGender && selected.gender !== suggestedGender;
 
+  const stopPreview = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setPlayingVoiceId(null);
+  };
+
+  // Stop any playing preview when the user changes gender/language filters so a stale preview
+  // doesn't keep playing after its dropdown option is gone.
+  useEffect(() => {
+    stopPreview();
+  }, [activeGender, activeLanguage]);
+
+  const handleVoiceChange = (event) => {
+    stopPreview();
+    const voice = voices.find((v) => v.voiceId === event.target.value);
+    if (voice) onSelect(voice);
+  };
+
+  const togglePreview = () => {
+    if (!selected?.previewAudioUrl) return;
+    if (playingVoiceId === selected.voiceId) {
+      stopPreview();
+      return;
+    }
+    if (audioRef.current) {
+      audioRef.current.src = selected.previewAudioUrl;
+      audioRef.current.play().catch(() => {});
+      setPlayingVoiceId(selected.voiceId);
+    }
+  };
+
   if (isLoading) {
     return <p className="text-[11px] font-medium text-slate-500">Loading voices…</p>;
   }
   if (!voices.length) {
-    return <p className="text-[11px] font-medium text-slate-500">No built-in voices configured yet.</p>;
+    return (
+      <p className="text-[11px] font-medium text-slate-500">
+        No built-in voices configured yet — add a voice in your ElevenLabs account, then click
+        <span className="mx-1 font-bold text-purple-300">Refresh Hindi voices</span>
+        in Project Settings.
+      </p>
+    );
   }
 
   return (
     <div>
       <label className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Built-in voice</label>
 
-      <div className="mb-2 flex flex-wrap items-center gap-1.5">
-        <div className="flex gap-1 rounded-md border border-white/10 bg-white/5 p-0.5">
-          {["MALE", "FEMALE"].map((g) => (
-            <button
-              key={g}
-              type="button"
-              onClick={() => setActiveGender(g)}
-              className={`rounded px-2 py-1 text-[10px] font-bold ${activeGender === g ? "bg-purple-500/20 text-purple-200" : "text-slate-400"}`}
-            >
-              {g === "MALE" ? "Male" : "Female"}
-            </button>
-          ))}
-        </div>
-        {languages.length > 1 && (
-          <div className="flex gap-1 rounded-md border border-white/10 bg-white/5 p-0.5">
-            <button
-              type="button"
-              onClick={() => setActiveLanguage(null)}
-              className={`rounded px-2 py-1 text-[10px] font-bold ${!activeLanguage ? "bg-purple-500/20 text-purple-200" : "text-slate-400"}`}
-            >
-              Any language
-            </button>
-            {languages.map((code) => (
-              <button
-                key={code}
-                type="button"
-                onClick={() => setActiveLanguage(code)}
-                className={`rounded px-2 py-1 text-[10px] font-bold ${activeLanguage === code ? "bg-purple-500/20 text-purple-200" : "text-slate-400"}`}
-              >
-                {LANGUAGE_LABEL[code] || code}
-              </button>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-[9px] font-bold uppercase tracking-wide text-slate-500">Language</label>
+          <select
+            value={activeLanguage}
+            onChange={(event) => setActiveLanguage(event.target.value)}
+            className="creator-input w-full px-2 py-1.5 text-[11px] font-semibold"
+          >
+            <option value="">Any language</option>
+            {availableLanguages.map((code) => (
+              <option key={code} value={code}>{languageLabelByCode.get(code) || code}</option>
             ))}
-          </div>
-        )}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-[9px] font-bold uppercase tracking-wide text-slate-500">Gender</label>
+          <select
+            value={activeGender}
+            onChange={(event) => setActiveGender(event.target.value)}
+            className="creator-input w-full px-2 py-1.5 text-[11px] font-semibold"
+          >
+            <option value="MALE">Male</option>
+            <option value="FEMALE">Female</option>
+          </select>
+        </div>
       </div>
 
-      <div className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
-        {shown.map((voice) => {
-          const isSelected = voice.providerVoiceId === selectedVoiceId;
-          return (
-            <div
-              key={voice.voiceId}
-              className={`flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 ${
-                isSelected ? "border-purple-400/40 bg-purple-500/10" : "border-white/10 bg-white/5"
-              }`}
-            >
-              <button
-                type="button"
-                onClick={() => onSelect(voice)}
-                className={`flex flex-1 items-center gap-1.5 text-left text-[11px] font-semibold ${
-                  isSelected ? "text-purple-100" : "text-slate-300 hover:text-purple-200"
-                }`}
-              >
-                {isSelected && <Check size={12} className="shrink-0 text-purple-300" />}
-                {voice.displayName}
-              </button>
-              {voice.previewAudioUrl && (
-                <audio controls preload="none" src={voice.previewAudioUrl} className="h-7 w-32 shrink-0" />
-              )}
-            </div>
-          );
-        })}
-        {shown.length === 0 && <p className="text-[11px] font-medium italic text-slate-500">No matching voices.</p>}
+      <div className="mt-2">
+        <label className="mb-1 block text-[9px] font-bold uppercase tracking-wide text-slate-500">
+          Voice ({shown.length} match{shown.length === 1 ? "" : "es"})
+        </label>
+        <div className="flex items-center gap-2">
+          <select
+            value={selected?.voiceId || ""}
+            onChange={handleVoiceChange}
+            disabled={shown.length === 0}
+            className="creator-input flex-1 px-2 py-1.5 text-[11px] font-semibold disabled:opacity-60"
+          >
+            <option value="" disabled>{shown.length === 0 ? "No matching voices" : "Choose a voice…"}</option>
+            {shown.map((voice) => (
+              <option key={voice.voiceId} value={voice.voiceId}>{voice.displayName}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={togglePreview}
+            disabled={!selected?.previewAudioUrl}
+            title={selected?.previewAudioUrl ? "Play preview" : "No preview available for this voice"}
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-slate-200 hover:border-purple-400/30 disabled:opacity-40"
+          >
+            {playingVoiceId === selected?.voiceId ? <Square size={12} /> : <Play size={12} />}
+          </button>
+        </div>
+        <audio ref={audioRef} onEnded={() => setPlayingVoiceId(null)} preload="none" className="hidden" />
       </div>
 
       {mismatch && (
