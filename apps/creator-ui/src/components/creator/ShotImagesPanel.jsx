@@ -1,11 +1,13 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { Download, ImageIcon, Loader2, RefreshCw, Upload, X } from "lucide-react";
+import { Download, ImageIcon, Loader2, RefreshCw, Sparkles, Upload, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
+  useApplyChangeRequestMutation,
   useGeneratePreProductionShotImageMutation,
   useGeneratePreProductionShotImageWithInspirationMutation,
+  useListChangeRequestsQuery,
   useListPreProductionShotImagesQuery,
   useReplacePreProductionShotImageMutation,
 } from "../../api/creatorEndpoints.js";
@@ -33,11 +35,12 @@ const ALL_KIND_LABELS = new Map(
   [...LIVE_ACTION_KINDS, ...MOTION_GRAPHIC_KINDS].map((k) => [k.kind, k.label])
 );
 
-/** These kinds carry rendered text (setup steps, on-screen graphic text, camera-plan callouts)
- * the user often wants to save/share offline; STORYBOARD/PRODUCTION are visual-only so they
- * don't need the affordance. Kept as an allowlist rather than showing on every tile because
- * an always-visible download button crowded the already-small tile UI. */
-const TEXT_BEARING_KINDS = new Set(["LIGHTING", "CAMERA_PLAN", "MOTION_GRAPHIC"]);
+/** "Does this specific image contain rendered text worth downloading/editing" is now driven per-
+ * image by `image.onScreenText` (set from the vision analysis in ShotImageDescriptionService --
+ * populated on generate/replace, not just at lock-time). A shot-type allowlist used to stand in
+ * for this and got both cases wrong: PRODUCTION frames with real signage/packaging didn't get the
+ * affordance, and MOTION_GRAPHIC frames where the text failed to render offered it falsely. */
+const hasRenderedText = (image) => Boolean(image?.onScreenText && image.onScreenText.trim().length > 0);
 
 /** Signed URLs point at MinIO's own origin, so the plain <a download> attribute is ignored by
  * browsers cross-origin -- the browser navigates instead of saving. Fetch the bytes and hand
@@ -70,13 +73,17 @@ const ASPECT_RATIO_CSS = {
  * cast assignment or a confirmed product reference; nothing here has to know that. Tiles render in
  * the shot's own aspect ratio (the same one the video model actually generates at) instead of a
  * fixed square, so what's shown matches what the project is set up to produce. */
-export default function ShotImagesPanel({ shotId, aspectRatio, shotType }) {
+export default function ShotImagesPanel({ shotId, shotRef, projectId, aspectRatio, shotType }) {
   const kinds = kindsForShotType(shotType);
   const dispatch = useDispatch();
   const { data: images = [] } = useListPreProductionShotImagesQuery(shotId, { skip: !shotId });
   const [generate, { isLoading: generating }] = useGeneratePreProductionShotImageMutation();
   const [generateWithInspiration, { isLoading: uploadingInspiration }] = useGeneratePreProductionShotImageWithInspirationMutation();
   const [replaceImage, { isLoading: replacingImage }] = useReplacePreProductionShotImageMutation();
+  // Pending SHOT_IMAGE change requests targeting this shot, indexed by kind -- same data source
+  // the project-level ShotChatPanel polls, so the two surfaces stay in sync automatically.
+  const { data: changeRequests = [] } = useListChangeRequestsQuery(projectId, { skip: !projectId || !shotRef });
+  const [applyChangeRequest, { isLoading: applyingChange }] = useApplyChangeRequestMutation();
   const [pendingKind, setPendingKind] = React.useState(null);
   const [zoomedKind, setZoomedKind] = React.useState(null);
   const [uploadKind, setUploadKind] = React.useState(null); // {kind, label} when upload dialog is open
@@ -89,6 +96,32 @@ export default function ShotImagesPanel({ shotId, aspectRatio, shotType }) {
     images.forEach((img) => map.set(img.kind, img));
     return map;
   }, [images]);
+
+  // Pending SHOT_IMAGE change requests targeting THIS shot, keyed by imageKind so each tile can
+  // render its own Apply pill for the request the chat suggested against it -- most-recent first
+  // in case the creator suggested multiple in a row, so Apply hits the freshest.
+  const pendingChangeRequestByKind = React.useMemo(() => {
+    if (!shotRef) return new Map();
+    const map = new Map();
+    changeRequests
+      .filter((cr) => cr.status === "PENDING" && cr.targetType === "SHOT_IMAGE" && cr.targetRef)
+      .filter((cr) => cr.targetRef.split(":", 2)[0] === shotRef)
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+      .forEach((cr) => {
+        const kind = cr.targetRef.split(":", 2)[1];
+        if (kind && !map.has(kind)) map.set(kind, cr);
+      });
+    return map;
+  }, [changeRequests, shotRef]);
+
+  const handleApplyChangeRequest = async (changeRequest) => {
+    try {
+      await applyChangeRequest({ projectId, changeRequestId: changeRequest.id }).unwrap();
+      dispatch(showFlash({ message: "Applied the suggested change.", type: "success" }));
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not apply this change", type: "error" }));
+    }
+  };
 
   const handleGenerate = async (kind) => {
     setPendingKind(kind);
@@ -148,6 +181,7 @@ export default function ShotImagesPanel({ shotId, aspectRatio, shotType }) {
         {kinds.map(({ kind, label }) => {
           const image = imageByKind.get(kind);
           const busy = generating && pendingKind === kind;
+          const pendingChange = pendingChangeRequestByKind.get(kind);
           return (
             <div key={kind} className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.03]">
               <div
@@ -169,6 +203,18 @@ export default function ShotImagesPanel({ shotId, aspectRatio, shotType }) {
               </div>
               <div className="p-2.5">
                 <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">{label}</p>
+                {pendingChange && (
+                  <button
+                    type="button"
+                    disabled={applyingChange}
+                    onClick={() => handleApplyChangeRequest(pendingChange)}
+                    title={pendingChange.note}
+                    className="mb-1.5 flex w-full items-center justify-center gap-1 rounded-md border border-purple-400/40 bg-purple-500/10 px-2 py-1 text-[10px] font-bold text-purple-200 hover:border-purple-400/60 disabled:opacity-60"
+                  >
+                    {applyingChange ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                    {applyingChange ? "Applying…" : "Apply text change from chat"}
+                  </button>
+                )}
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
@@ -183,7 +229,7 @@ export default function ShotImagesPanel({ shotId, aspectRatio, shotType }) {
                     {busy ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
                     {busy ? "Generating…" : image ? "Regenerate" : "Generate"}
                   </button>
-                  {image && TEXT_BEARING_KINDS.has(kind) && (
+                  {image && hasRenderedText(image) && (
                     <button
                       type="button"
                       onClick={() => handleDownload(image, kind)}
@@ -214,7 +260,7 @@ export default function ShotImagesPanel({ shotId, aspectRatio, shotType }) {
           onClick={() => setZoomedKind(null)}
         >
           <div className="absolute right-4 top-4 flex items-center gap-2">
-            {TEXT_BEARING_KINDS.has(zoomedKind) && (
+            {hasRenderedText(zoomedImage) && (
               <button
                 type="button"
                 onClick={(event) => { event.stopPropagation(); handleDownload(zoomedImage, zoomedKind); }}
