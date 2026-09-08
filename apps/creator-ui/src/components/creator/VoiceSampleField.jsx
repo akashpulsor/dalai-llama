@@ -1,7 +1,6 @@
 // @ts-nocheck
 import React, { useRef, useState } from "react";
 import { Mic, Square, Upload } from "lucide-react";
-import { useListCloningModelsQuery } from "../../api/creatorEndpoints.js";
 
 // A short, phonetically varied paragraph -- enough seconds of clean speech for a usable voice-
 // clone sample without asking the creator to write their own script.
@@ -16,7 +15,6 @@ const VOICE_SAMPLE_SCRIPT =
  * a plain File via {@code onFileChange} either way -- the parent decides what to do with it
  * (stage it for a create-profile submit, or upload it immediately to attach to an existing one). */
 export default function VoiceSampleField({ file, onFileChange }) {
-  const { data: cloningModels = [] } = useListCloningModelsQuery();
   const [voiceMode, setVoiceMode] = useState("upload");
   const [isRecording, setIsRecording] = useState(false);
   const [recordedUrl, setRecordedUrl] = useState("");
@@ -121,11 +119,9 @@ export default function VoiceSampleField({ file, onFileChange }) {
         </div>
       )}
 
-      {cloningModels.length > 0 && (
-        <p className="mt-1.5 text-[10px] font-medium text-slate-500">
-          This sample can be cloned with: {cloningModels.map((m) => m.modelId).join(", ")}
-        </p>
-      )}
+      <p className="mt-1.5 text-[10px] font-medium text-slate-500">
+        Cloned automatically at dub time via ElevenLabs — no model to pick.
+      </p>
     </div>
   );
 }

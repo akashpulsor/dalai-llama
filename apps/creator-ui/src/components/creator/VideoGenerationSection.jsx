@@ -8,9 +8,7 @@ import {
   useDispatchShotMutation,
   useGetProjectConfigQuery,
   useLazyGetVideoGenPromptQuery,
-  useListCloningModelsQuery,
   useListPreProductionShotsQuery,
-  useListTtsModelsQuery,
   useListVideoFeatureFlagsQuery,
   useListVideoModelsQuery,
   useRejectVideoGenJobMutation,
@@ -31,9 +29,7 @@ export default function VideoGenerationSection({ projectId }) {
   const { data: shots = [] } = useListPreProductionShotsQuery(projectId, { skip: !projectId });
   const { data: featureFlags = [] } = useListVideoFeatureFlagsQuery();
   const { data: projectConfig } = useGetProjectConfigQuery(projectId, { skip: !projectId });
-  const { data: cloningModels = [] } = useListCloningModelsQuery();
   const { data: videoModels = [] } = useListVideoModelsQuery();
-  const { data: ttsModels = [] } = useListTtsModelsQuery();
   const [updateProjectConfig] = useUpdateProjectConfigMutation();
   const [openShotId, setOpenShotId] = useState(null);
   const [preparing, setPreparing] = useState({});
@@ -158,29 +154,13 @@ export default function VideoGenerationSection({ projectId }) {
         </div>
       )}
 
-      {/* Voice clone model, video model, and resolution are all "defaults for shots prepared
-       * after this change" -- one row keeps them scannable instead of three near-identical
-       * boxes stacked on top of each other. No 1080p option: no video provider in this
-       * deployment currently supports it, and offering it would silently downgrade the render
-       * (see VideoResolution.java in video-generation-service for the confirmed evidence behind
-       * that decision). */}
+      {/* Voice clone / TTS model dropdowns removed: only one active model per type after V85
+       * (elevenlabs/instant-voice-clone + elevenlabs-tts-v1) and the path between them is
+       * derived from per-character identity flow -- an actor voice sample uploaded means
+       * clone-then-TTS, an AI-generated identity with a built-in voice picked means direct TTS.
+       * BeatDubbingService already routes on that. What's left here is the two real creator
+       * choices: which video model runs the render, and at what resolution. */}
       <div className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
-        {cloningModels.length > 0 && (
-          <label className="flex items-center gap-2" title="Applies to beat-timed auto-dub on shots prepared after this change.">
-            <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Voice clone</span>
-            <select
-              value={projectConfig?.preferredVoiceModel || ""}
-              onChange={(event) => updateProjectConfig({ projectId, preferredVoiceModel: event.target.value || null })}
-              className="creator-input px-2.5 py-1.5 text-[11px] font-semibold"
-            >
-              <option value="">Default</option>
-              {cloningModels.map((m) => (
-                <option key={m.modelId} value={m.modelId}>{m.modelId}</option>
-              ))}
-            </select>
-          </label>
-        )}
-
         {videoModels.length > 0 && (
           <label className="flex items-center gap-2" title="Overrides the auto-recommended model for shots prepared after this change.">
             <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Video model</span>
@@ -210,21 +190,9 @@ export default function VideoGenerationSection({ projectId }) {
           </select>
         </label>
 
-        {ttsModels.length > 0 && (
-          <label className="flex items-center gap-2" title="Which model speaks beat-dubbed dialogue on shots prepared after this change.">
-            <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">TTS model</span>
-            <select
-              value={projectConfig?.preferredTtsModel || ""}
-              onChange={(event) => updateProjectConfig({ projectId, preferredTtsModel: event.target.value || "" })}
-              className="creator-input px-2.5 py-1.5 text-[11px] font-semibold"
-            >
-              <option value="">Default</option>
-              {ttsModels.map((m) => (
-                <option key={m.modelId} value={m.modelId}>{m.modelId}</option>
-              ))}
-            </select>
-          </label>
-        )}
+        <p className="text-[10px] font-medium text-slate-500">
+          Voice: ElevenLabs — cloned automatically when a character has an uploaded actor sample, otherwise direct TTS with the built-in voice you picked in Cast.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
