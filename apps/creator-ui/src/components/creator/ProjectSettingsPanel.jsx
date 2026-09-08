@@ -1,12 +1,13 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { Sparkles } from "lucide-react";
+import { Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useGetProjectConfigQuery,
   useListAspectRatiosQuery,
   useListDialogueLanguagesQuery,
+  useSyncBuiltinVoicesMutation,
   useUpdateProjectConfigMutation,
 } from "../../api/creatorEndpoints.js";
 
@@ -25,6 +26,7 @@ export default function ProjectSettingsPanel({ projectId }) {
   const { data: aspectRatios = [] } = useListAspectRatiosQuery();
   const { data: languages = [] } = useListDialogueLanguagesQuery();
   const [updateConfig, { isLoading: saving }] = useUpdateProjectConfigMutation();
+  const [syncVoices, { isLoading: syncingVoices }] = useSyncBuiltinVoicesMutation();
 
   const handleAspectRatio = async (code) => {
     try {
@@ -56,8 +58,26 @@ export default function ProjectSettingsPanel({ projectId }) {
     const code = event.target.value || null;
     try {
       await updateConfig({ projectId, dialogueLanguage: code }).unwrap();
+      dispatch(showFlash({ message: "Dialogue language saved.", type: "success" }));
     } catch (error) {
       dispatch(showFlash({ message: error?.data?.message || "Could not save the dialogue language", type: "error" }));
+    }
+  };
+
+  const handleSyncVoices = async () => {
+    try {
+      const result = await syncVoices().unwrap();
+      const inserted = result?.insertedCount ?? 0;
+      const updated = result?.updatedCount ?? 0;
+      const total = inserted + updated;
+      dispatch(showFlash({
+        message: total > 0
+          ? `Refreshed ${total} Hindi-verified voice${total === 1 ? "" : "s"} from ElevenLabs.`
+          : "Sync ran but ElevenLabs returned no Hindi-verified voices — add one from the ElevenLabs voice library first.",
+        type: total > 0 ? "success" : "info",
+      }));
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not refresh voices from ElevenLabs", type: "error" }));
     }
   };
 
@@ -123,6 +143,24 @@ export default function ProjectSettingsPanel({ projectId }) {
         <Sparkles size={12} className="text-purple-300" />
         Prefer motion graphics for text/data-driven beats
       </label>
+
+      <div className="mt-4 flex items-start justify-between gap-3 rounded-md border border-white/10 bg-white/[0.02] p-3">
+        <div className="flex-1">
+          <p className="text-[11px] font-bold text-slate-200">Hindi voices sound English?</p>
+          <p className="mt-0.5 text-[10px] font-medium text-slate-500">
+            Refreshes built-in voices from your ElevenLabs account and keeps only voices ElevenLabs itself verifies for Hindi. Do this once after adding a Hindi-native voice from ElevenLabs' voice library.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleSyncVoices}
+          disabled={syncingVoices}
+          className="flex items-center gap-1.5 rounded-md border border-purple-400/40 bg-purple-500/10 px-3 py-1.5 text-[11px] font-bold text-purple-200 hover:border-purple-400/60 disabled:opacity-60"
+        >
+          {syncingVoices ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+          {syncingVoices ? "Syncing…" : "Refresh Hindi voices"}
+        </button>
+      </div>
     </div>
   );
 }

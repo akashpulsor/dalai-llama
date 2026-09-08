@@ -12,6 +12,7 @@ import {
   useListPreProductionShotsQuery,
   useListShotAssetCompletionQuery,
   useListShotPlanIssuesQuery,
+  useReanalyzePreProductionShotImagesForProjectMutation,
   useUpdatePreProductionShotMutation,
 } from "../../api/creatorEndpoints.js";
 import ShotImagesPanel from "./ShotImagesPanel.jsx";
@@ -92,6 +93,23 @@ export default function ShotsSection({ projectId }) {
   const { data: shots = [], isLoading, refetch: refetchShots } = useListPreProductionShotsQuery(projectId, { skip: !projectId });
   const { data: issues = [] } = useListShotPlanIssuesQuery(projectId, { skip: !projectId });
   const { data: completion = [] } = useListShotAssetCompletionQuery(projectId, { skip: !projectId });
+  const [reanalyzeMissing] = useReanalyzePreProductionShotImagesForProjectMutation();
+  // One-shot per project mount: proactively backfill on_screen_text on every legacy image at once,
+  // so a creator visiting a project locked before the on_screen_text feature shipped doesn't have
+  // to open each tile individually to unlock its Download button. Server-side skips any image
+  // whose field is already set, so re-runs are cheap; the sessionStorage guard prevents this
+  // from re-firing on every tab back-and-forth in the same browser session.
+  useEffect(() => {
+    if (!projectId) return;
+    const guardKey = `reanalyze-missing-fired-${projectId}`;
+    if (typeof window !== "undefined") {
+      try {
+        if (sessionStorage.getItem(guardKey)) return;
+        sessionStorage.setItem(guardKey, "1");
+      } catch (_) { /* ignore private-mode / disabled storage */ }
+    }
+    reanalyzeMissing(projectId).unwrap().catch(() => {});
+  }, [projectId, reanalyzeMissing]);
   const completeShotIds = new Set(completion.filter((c) => c.complete).map((c) => c.shotId));
   const [generateList, { isLoading: submitting }] = useGeneratePreProductionShotListMutation();
 

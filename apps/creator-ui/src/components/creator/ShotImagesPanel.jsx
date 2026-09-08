@@ -9,6 +9,7 @@ import {
   useGeneratePreProductionShotImageWithInspirationMutation,
   useListChangeRequestsQuery,
   useListPreProductionShotImagesQuery,
+  useReanalyzePreProductionShotImageMutation,
   useReplacePreProductionShotImageMutation,
 } from "../../api/creatorEndpoints.js";
 
@@ -84,6 +85,11 @@ export default function ShotImagesPanel({ shotId, shotRef, projectId, aspectRati
   // the project-level ShotChatPanel polls, so the two surfaces stay in sync automatically.
   const { data: changeRequests = [] } = useListChangeRequestsQuery(projectId, { skip: !projectId || !shotRef });
   const [applyChangeRequest, { isLoading: applyingChange }] = useApplyChangeRequestMutation();
+  const [reanalyzeImage] = useReanalyzePreProductionShotImageMutation();
+  // Once we've fired reanalyze for an image in this session, don't fire again -- whether the vision
+  // pass found text or not, the answer is now cached on the row and RTK-Query will refetch it. This
+  // keeps a genuinely text-free image from getting re-analyzed on every tile mount.
+  const reanalyzeFiredRef = React.useRef(new Set());
   const [pendingKind, setPendingKind] = React.useState(null);
   const [zoomedKind, setZoomedKind] = React.useState(null);
   const [uploadKind, setUploadKind] = React.useState(null); // {kind, label} when upload dialog is open
@@ -96,6 +102,21 @@ export default function ShotImagesPanel({ shotId, shotRef, projectId, aspectRati
     images.forEach((img) => map.set(img.kind, img));
     return map;
   }, [images]);
+
+  // Backfill for images generated before vision-analysis-on-generate shipped -- fire the reanalyze
+  // call once per image id per session for any row whose onScreenText is still null. New rows
+  // (generated/replaced after this deployment) already carry the field, so this only ever hits
+  // legacy images. Failures are silent -- the panel keeps working, the Download button just stays
+  // hidden if analysis genuinely returns nothing.
+  React.useEffect(() => {
+    images.forEach((img) => {
+      if (!img || !img.id) return;
+      if (img.onScreenText !== null && img.onScreenText !== undefined) return;
+      if (reanalyzeFiredRef.current.has(img.id)) return;
+      reanalyzeFiredRef.current.add(img.id);
+      reanalyzeImage({ shotId, kind: img.kind }).unwrap().catch(() => {});
+    });
+  }, [images, reanalyzeImage, shotId]);
 
   // Pending SHOT_IMAGE change requests targeting THIS shot, keyed by imageKind so each tile can
   // render its own Apply pill for the request the chat suggested against it -- most-recent first

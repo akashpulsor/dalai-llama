@@ -2477,6 +2477,29 @@ export const creatorApi = apiSlice.injectEndpoints({
       providesTags: (_result, _error, shotId) => [{ type: "CreatorHomeProjects", id: `shot-images-${shotId}` }],
     }),
 
+    // Backfill for images generated before the vision-analysis-on-generate change shipped -- those
+    // rows have on_screen_text NULL forever otherwise, so the per-image Download affordance never
+    // shows on text-bearing PRODUCTION frames. Fired lazily per tile by ShotImagesPanel when it
+    // sees a null onScreenText; server just re-runs the same describe() the generate/replace paths
+    // already do, applied to the stored bytes.
+    reanalyzePreProductionShotImage: builder.mutation({
+      query: ({ shotId, kind }) => ({ url: platformUrl(`/shots/${shotId}/images/${kind}/reanalyze`), method: "POST" }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorHomeProjects", id: `shot-images-${args?.shotId}` },
+      ],
+    }),
+
+    // Proactive project-wide legacy backfill: walks every shot_image whose on_screen_text is
+    // still NULL and runs the vision-analysis on each in one shot -- fired once per project per
+    // session on ShotsSection mount so the creator doesn't have to open every tile individually
+    // to unlock its Download button.
+    reanalyzePreProductionShotImagesForProject: builder.mutation({
+      query: (projectId) => ({
+        url: platformUrl(`/projects/${projectId}/shot-images/reanalyze-missing`),
+        method: "POST",
+      }),
+    }),
+
     // pre-production-service ShotAssetBatchController -- the single "Generate all shot assets"
     // CTA that replaces clicking a lighting-plan/camera-plan/4-image button separately per shot
     // (confirmed: 10 shots x ~7 buttons each is genuinely ~70 CTAs on one page). Runs one step at
@@ -2795,6 +2818,15 @@ export const creatorApi = apiSlice.injectEndpoints({
         const qs = params.toString();
         return { url: platformUrl(`/voices/builtin${qs ? `?${qs}` : ""}`) };
       },
+    }),
+
+    // llm-gateway POST /v1/voices/sync -- one-shot admin refresh that queries the tenant's actual
+    // ElevenLabs account, pulls in voices ElevenLabs itself verifies for Hindi (not the premade
+    // English voices trained to speak Hindi with an English accent), and updates builtin_voice +
+    // builtin_voice_language accordingly. Fixes the "same English voice for hi-IN/hi-Latn-IN"
+    // symptom by giving the built-in voice picker real Hindi-native options to filter into.
+    syncBuiltinVoices: builder.mutation({
+      query: () => ({ url: platformUrl("/voices/sync"), method: "POST" }),
     }),
 
     // llm-gateway GET /v1/models -- real master data (model_master, type=tts), not a hardcoded
@@ -3324,6 +3356,8 @@ export const {
   useGeneratePreProductionShotImageWithInspirationMutation,
   useReplacePreProductionShotImageMutation,
   useListPreProductionShotImagesQuery,
+  useReanalyzePreProductionShotImageMutation,
+  useReanalyzePreProductionShotImagesForProjectMutation,
   useAnalyzePreProductionShotProductReferenceMutation,
   useConfirmPreProductionShotProductReferenceMutation,
   useGetPreProductionShotProductReferenceQuery,
@@ -3361,6 +3395,7 @@ export const {
   useResolveProjectReviewCommentMutation,
   useListCloningModelsQuery,
   useListBuiltinVoicesQuery,
+  useSyncBuiltinVoicesMutation,
   useListTtsModelsQuery,
   useGetShotBackgroundMusicQuery,
   useGenerateShotBackgroundMusicMutation,
