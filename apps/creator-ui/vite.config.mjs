@@ -47,22 +47,40 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5181,
       host: "0.0.0.0",
-      proxy: {
-        "/api": {
-          target: proxyTarget,
-          changeOrigin: true,
-          secure: false,
-        },
-        // The 9 real backend services (creative-planning-service, pre-production-service,
-        // trend-intelligence-service, ...) are mounted at the gateway's bare /v1/* -- see
-        // infra-platform/charts/backend-service/values.yaml's apiPaths and the matching
-        // absolute-URL calls in src/api/creatorEndpoints.js.
-        "/v1": {
-          target: proxyTarget,
-          changeOrigin: true,
-          secure: false,
-        },
-      },
+      proxy: (() => {
+        // Local-dev routing overrides: when VITE_LOCAL_VIDEO_GEN_URL /
+        // VITE_LOCAL_POST_PROD_URL are set (e.g. in .env.local), the paths owned by those
+        // services proxy to localhost instead of the cloud gateway. Everything else keeps
+        // going to the cloud. Path prefixes must match apiPaths in infra-platform/charts/
+        // backend-service/values.yaml exactly -- adding a service means listing every prefix
+        // it claims there.
+        const localVideoGen = env.VITE_LOCAL_VIDEO_GEN_URL;   // e.g. http://localhost:8180
+        const localPostProd = env.VITE_LOCAL_POST_PROD_URL;   // e.g. http://localhost:8181
+        const local = (target) => ({ target, changeOrigin: true, secure: false });
+        const cloud = { target: proxyTarget, changeOrigin: true, secure: false };
+        const overrides = {};
+        if (localVideoGen) {
+          // Every prefix video-gen owns at the gateway -- see backend-service values.yaml.
+          for (const p of ["/v1/voice-tests", "/v1/prompts", "/v1/jobs", "/v1/exports", "/v1/scenes", "/v1/final-renders"]) {
+            overrides[p] = local(localVideoGen);
+          }
+        }
+        if (localPostProd) {
+          for (const p of ["/v1/post-production", "/v1/dubbing"]) {
+            overrides[p] = local(localPostProd);
+          }
+        }
+        return {
+          ...overrides,   // longer prefixes first -- Vite/http-proxy matches in insertion order
+          "/api": cloud,
+          // The 9 real backend services (creative-planning-service, pre-production-service,
+          // trend-intelligence-service, ...) are mounted at the gateway's bare /v1/* -- see
+          // infra-platform/charts/backend-service/values.yaml's apiPaths and the matching
+          // absolute-URL calls in src/api/creatorEndpoints.js. This catch-all is the fallback
+          // for any /v1/* prefix not explicitly overridden above.
+          "/v1": cloud,
+        };
+      })(),
     },
     build: {
       outDir: "dist",

@@ -2830,7 +2830,7 @@ export const creatorApi = apiSlice.injectEndpoints({
     // just against a caller-supplied line instead of a persisted DialogueBeat.
     testShotVoice: builder.mutation({
       query: ({ projectId, shotId, text }) => ({
-        url: platformUrl("/voice-tests"),
+        url: platformUrl("/clone"),
         method: "POST",
         body: { projectId, shotId, text },
       }),
