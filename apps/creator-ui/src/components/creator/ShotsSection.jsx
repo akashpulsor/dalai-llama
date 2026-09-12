@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Film, FileDown, Loader2, Plus, RefreshCw, Save, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Film, FileDown, Loader2, Pencil, Plus, RefreshCw, Save, Sparkles, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useCreatePreProductionShotMutation,
@@ -72,11 +72,13 @@ const TIME_OF_DAY_OPTIONS = [
   { value: "NIGHT", label: "Night" },
 ];
 
-/** Hand-edit a shot's plan -- same "generated, then fix by hand" pattern the lighting/camera
- * plan editors already use. Every field is PATCH-optional server-side, so an untouched field is
- * sent as undefined and left alone. Deep cinematography (cine_*) still lives in the Lighting/
- * Camera plan editors below; this covers the practical shot-plan surface a creator reaches for
- * when the AI-generated draft got something wrong. */
+/** Hand-edit a shot's plan -- same click-pencil-to-edit pattern as the Lighting/Camera plan
+ * panels below (LightingCameraPlanPanel): a compact read summary by default, and clicking the
+ * pencil swaps it for the editable form with Cancel/Save inline at the bottom -- no permanent
+ * header/save bar sitting open all the time. Every field is PATCH-optional server-side, so an
+ * untouched field is sent as undefined and left alone. Deep cinematography (cine_*) still lives
+ * in the Lighting/Camera plan editors below; this covers the practical shot-plan surface a
+ * creator reaches for when the AI-generated draft got something wrong. */
 function EditShotFields({ shot, onSave, saving }) {
   const initial = React.useMemo(() => ({
     scriptLine: shot.scriptLine || "",
@@ -96,128 +98,189 @@ function EditShotFields({ shot, onSave, saving }) {
     cameraNote: shot.cameraNote || "",
   }), [shot]);
   const [draft, setDraft] = useState(initial);
+  const [editing, setEditing] = useState(false);
   React.useEffect(() => { setDraft(initial); }, [initial]);
 
   const dirty = Object.keys(initial).some((key) => String(draft[key] ?? "") !== String(initial[key] ?? ""));
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
 
-  const submit = () => {
+  const startEdit = () => {
+    setDraft(initial);
+    setEditing(true);
+  };
+
+  const cancel = () => {
+    setDraft(initial);
+    setEditing(false);
+  };
+
+  const submit = async () => {
     const payload = {};
     Object.keys(initial).forEach((key) => {
       if (String(draft[key] ?? "") !== String(initial[key] ?? "")) {
         if (key === "durationSeconds") {
           payload[key] = draft[key] === "" ? undefined : Number(draft[key]);
         } else {
-          payload[key] = draft[key] === "" ? null : draft[key];
+          // Send the literal string, including "" -- the server's PATCH only applies non-null
+          // fields, and "" is how a free-text field like text overlay gets cleared on purpose.
+          payload[key] = draft[key];
         }
       }
     });
-    onSave(payload);
+    try {
+      await onSave(payload);
+      setEditing(false);
+    } catch (_) {
+      // Keep the form open with the unsaved draft so a failed save doesn't lose the edit.
+    }
   };
 
   const label = "mb-1 block text-[9px] font-bold uppercase tracking-wide text-slate-500";
   const field = "creator-input w-full text-[11px] font-medium";
 
+  const summaryRows = [
+    ["Script line", shot.scriptLine],
+    ["Duration", shot.durationSeconds ? `${shot.durationSeconds}s` : null],
+    ["Shot size", shot.cameraShotSize],
+    ["Action", shot.action],
+    ["Voice-over", shot.voiceOver],
+    ["Emotion / delivery", shot.emotion],
+    ["Text overlay", shot.textOverlay],
+    ["Location", shot.location],
+    ["Time of day", shot.timeOfDay],
+    ["Lighting mood", shot.lightingMood],
+    ["Camera angle", shot.cameraAngle],
+    ["Camera movement", shot.cameraMovement],
+    ["Camera note", shot.cameraNote],
+    ["Sound design", shot.soundDesign],
+    ["Editing notes", shot.editingNotes],
+  ].filter(([, value]) => value !== null && value !== undefined && value !== "");
+
   return (
     <div className="rounded-md border border-purple-400/20 bg-purple-500/[0.04] p-3">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-[9px] font-extrabold uppercase tracking-wide text-purple-300">Shot plan — hand-edit</p>
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!dirty || saving}
-          className="creator-primary flex h-7 items-center gap-1.5 px-2.5 text-[10px] font-black text-white disabled:opacity-55"
-        >
-          {saving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />} Save
-        </button>
+        <p className="text-[9px] font-extrabold uppercase tracking-wide text-purple-300">Shot plan</p>
+        {!editing && (
+          <button
+            type="button"
+            onClick={startEdit}
+            className="rounded border border-white/10 p-1 text-slate-400 hover:border-purple-400/30 hover:text-slate-200"
+          >
+            <Pencil size={10} />
+          </button>
+        )}
       </div>
 
-      <div className="mb-2">
-        <label className={label}>Script line</label>
-        <textarea rows={2} value={draft.scriptLine} onChange={(e) => set({ scriptLine: e.target.value })}
-                  placeholder="What's said or shown in this shot" className={`${field} resize-y`} />
-      </div>
+      {editing ? (
+        <div className="space-y-1.5">
+          <div>
+            <label className={label}>Script line</label>
+            <textarea rows={2} value={draft.scriptLine} onChange={(e) => set({ scriptLine: e.target.value })}
+                      placeholder="What's said or shown in this shot" className={`${field} resize-y`} />
+          </div>
 
-      <div className="mb-2 grid gap-2 sm:grid-cols-4">
-        <div>
-          <label className={label}>Duration (s)</label>
-          <input type="number" min={1} value={draft.durationSeconds}
-                 onChange={(e) => set({ durationSeconds: e.target.value })} className={field} />
-        </div>
-        <div>
-          <label className={label}>Shot size</label>
-          <select value={draft.cameraShotSize} onChange={(e) => set({ cameraShotSize: e.target.value })} className={field}>
-            {SHOT_SIZE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className={label}>Lighting mood</label>
-          <select value={draft.lightingMood} onChange={(e) => set({ lightingMood: e.target.value })} className={field}>
-            {MOOD_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className={label}>Time of day</label>
-          <select value={draft.timeOfDay} onChange={(e) => set({ timeOfDay: e.target.value })} className={field}>
-            {TIME_OF_DAY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </div>
-      </div>
+          <div className="grid gap-2 sm:grid-cols-4">
+            <div>
+              <label className={label}>Duration (s)</label>
+              <input type="number" min={1} value={draft.durationSeconds}
+                     onChange={(e) => set({ durationSeconds: e.target.value })} className={field} />
+            </div>
+            <div>
+              <label className={label}>Shot size</label>
+              <select value={draft.cameraShotSize} onChange={(e) => set({ cameraShotSize: e.target.value })} className={field}>
+                {SHOT_SIZE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={label}>Lighting mood</label>
+              <select value={draft.lightingMood} onChange={(e) => set({ lightingMood: e.target.value })} className={field}>
+                {MOOD_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={label}>Time of day</label>
+              <select value={draft.timeOfDay} onChange={(e) => set({ timeOfDay: e.target.value })} className={field}>
+                {TIME_OF_DAY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+          </div>
 
-      <div className="mb-2 grid gap-2 sm:grid-cols-2">
-        <div>
-          <label className={label}>Action (what happens on screen)</label>
-          <textarea rows={2} value={draft.action} onChange={(e) => set({ action: e.target.value })} className={`${field} resize-y`} />
-        </div>
-        <div>
-          <label className={label}>Voice-over (what's spoken)</label>
-          <textarea rows={2} value={draft.voiceOver} onChange={(e) => set({ voiceOver: e.target.value })} className={`${field} resize-y`} />
-        </div>
-      </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div>
+              <label className={label}>Action (what happens on screen)</label>
+              <textarea rows={2} value={draft.action} onChange={(e) => set({ action: e.target.value })} className={`${field} resize-y`} />
+            </div>
+            <div>
+              <label className={label}>Voice-over (what's spoken)</label>
+              <textarea rows={2} value={draft.voiceOver} onChange={(e) => set({ voiceOver: e.target.value })} className={`${field} resize-y`} />
+            </div>
+          </div>
 
-      <div className="mb-2 grid gap-2 sm:grid-cols-2">
-        <div>
-          <label className={label}>Location</label>
-          <input value={draft.location} onChange={(e) => set({ location: e.target.value })} className={field} />
-        </div>
-        <div>
-          <label className={label}>Emotion / delivery</label>
-          <input value={draft.emotion} onChange={(e) => set({ emotion: e.target.value })}
-                 placeholder="e.g. warm, confident, playful" className={field} />
-        </div>
-      </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div>
+              <label className={label}>Location</label>
+              <input value={draft.location} onChange={(e) => set({ location: e.target.value })} className={field} />
+            </div>
+            <div>
+              <label className={label}>Emotion / delivery</label>
+              <input value={draft.emotion} onChange={(e) => set({ emotion: e.target.value })}
+                     placeholder="e.g. warm, confident, playful" className={field} />
+            </div>
+          </div>
 
-      <div className="mb-2 grid gap-2 sm:grid-cols-3">
-        <div>
-          <label className={label}>Camera angle</label>
-          <input value={draft.cameraAngle} onChange={(e) => set({ cameraAngle: e.target.value })}
-                 placeholder="eye-level, low, high…" className={field} />
-        </div>
-        <div>
-          <label className={label}>Camera movement</label>
-          <input value={draft.cameraMovement} onChange={(e) => set({ cameraMovement: e.target.value })}
-                 placeholder="static, dolly-in, whip pan…" className={field} />
-        </div>
-        <div>
-          <label className={label}>Camera note</label>
-          <input value={draft.cameraNote} onChange={(e) => set({ cameraNote: e.target.value })} className={field} />
-        </div>
-      </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <div>
+              <label className={label}>Camera angle</label>
+              <input value={draft.cameraAngle} onChange={(e) => set({ cameraAngle: e.target.value })}
+                     placeholder="eye-level, low, high…" className={field} />
+            </div>
+            <div>
+              <label className={label}>Camera movement</label>
+              <input value={draft.cameraMovement} onChange={(e) => set({ cameraMovement: e.target.value })}
+                     placeholder="static, dolly-in, whip pan…" className={field} />
+            </div>
+            <div>
+              <label className={label}>Camera note</label>
+              <input value={draft.cameraNote} onChange={(e) => set({ cameraNote: e.target.value })} className={field} />
+            </div>
+          </div>
 
-      <div className="grid gap-2 sm:grid-cols-3">
-        <div>
-          <label className={label}>On-screen text</label>
-          <textarea rows={2} value={draft.textOverlay} onChange={(e) => set({ textOverlay: e.target.value })} className={`${field} resize-y`} />
+          <div className="grid gap-2 sm:grid-cols-3">
+            <div>
+              <label className={label}>On-screen text</label>
+              <textarea rows={2} value={draft.textOverlay} onChange={(e) => set({ textOverlay: e.target.value })} className={`${field} resize-y`} />
+            </div>
+            <div>
+              <label className={label}>Sound design</label>
+              <textarea rows={2} value={draft.soundDesign} onChange={(e) => set({ soundDesign: e.target.value })} className={`${field} resize-y`} />
+            </div>
+            <div>
+              <label className={label}>Editing notes</label>
+              <textarea rows={2} value={draft.editingNotes} onChange={(e) => set({ editingNotes: e.target.value })} className={`${field} resize-y`} />
+            </div>
+          </div>
+
+          <div className="flex gap-1.5 pt-0.5">
+            <button type="button" onClick={cancel} className="flex items-center gap-1 rounded border border-white/10 px-2 py-1 text-[10px] font-bold text-slate-300">
+              <X size={10} /> Cancel
+            </button>
+            <button type="button" disabled={!dirty || saving} onClick={submit} className="creator-primary flex flex-1 items-center justify-center gap-1 py-1 text-[10px] font-bold text-white disabled:opacity-60">
+              {saving ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />}
+              Save
+            </button>
+          </div>
         </div>
-        <div>
-          <label className={label}>Sound design</label>
-          <textarea rows={2} value={draft.soundDesign} onChange={(e) => set({ soundDesign: e.target.value })} className={`${field} resize-y`} />
+      ) : summaryRows.length ? (
+        <div className="grid gap-1 sm:grid-cols-2">
+          {summaryRows.map(([rowLabel, value]) => (
+            <p key={rowLabel} className="text-[11px] font-medium leading-4 text-slate-400">
+              {rowLabel}: <span className="text-slate-200">{String(value)}</span>
+            </p>
+          ))}
         </div>
-        <div>
-          <label className={label}>Editing notes</label>
-          <textarea rows={2} value={draft.editingNotes} onChange={(e) => set({ editingNotes: e.target.value })} className={`${field} resize-y`} />
-        </div>
-      </div>
+      ) : (
+        <p className="text-[11px] font-medium text-slate-500">No shot plan details yet — click the pencil to add some.</p>
+      )}
     </div>
   );
 }
@@ -344,6 +407,7 @@ export default function ShotsSection({ projectId }) {
       dispatch(showFlash({ message: "Shot updated", type: "success" }));
     } catch (error) {
       dispatch(showFlash({ message: error?.data?.message || "Could not update the shot", type: "error" }));
+      throw error;
     }
   };
 
@@ -541,34 +605,24 @@ export default function ShotsSection({ projectId }) {
                   <FieldGroup
                     title="Direction"
                     fields={[
-                      ["Action", shot.action],
                       ["Composition", shot.composition],
                       ["Retention goal", shot.retentionGoal],
                       ["Creator direction", shot.creatorDirection],
                       ["Director's note", shot.directorNote],
-                      ["Editing notes", shot.editingNotes],
                     ]}
                   />
                   <FieldGroup
                     title="Performance"
                     fields={[
                       ["Expression", shot.expression],
-                      ["Emotion", shot.emotion],
                       ["Body language", shot.bodyLanguage],
-                      ["Voice over", shot.voiceOver],
-                      ["Text overlay", shot.textOverlay],
                     ]}
                   />
                   <FieldGroup
                     title="Camera & lighting"
                     fields={[
-                      ["Camera angle", shot.cameraAngle],
-                      ["Camera movement", shot.cameraMovement],
                       ["Lens suggestion", shot.lensSuggestion],
                       ["FPS", shot.fps],
-                      ["Lighting mood", shot.lightingMood],
-                      ["Location", shot.location],
-                      ["Time of day", shot.timeOfDay],
                     ]}
                   />
                   <FieldGroup
@@ -585,7 +639,6 @@ export default function ShotsSection({ projectId }) {
                       ["Cultural references", shot.culturalReferences],
                       ["Safe zone notes", shot.safeZoneNotes],
                       ["Mobile focus area", shot.mobileFocusArea],
-                      ["Sound design", shot.soundDesign],
                       ["Sketch prompt", shot.sketchPrompt],
                     ]}
                   />

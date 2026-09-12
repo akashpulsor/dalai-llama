@@ -74,7 +74,7 @@ const ASPECT_RATIO_CSS = {
 /** One shot as a visual card -- the frame (or the finished clip, once generated) IS the card,
  * not a text row that hides the image behind an accordion toggle. Clicking anywhere opens the
  * full prepare/approve panel below it, spanning the grid so it doesn't stretch its neighbors. */
-export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info, busy, video, onPrepare, onApprove, onReject, onAutoFix }) {
+export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info, busy, video, dubbed, onPrepare, onApprove, onReject, onAutoFix }) {
   const { data: images = [] } = useListPreProductionShotImagesQuery(shot.id, { skip: !shot.id });
   const { data: beats = [] } = useListShotDialogueBeatsQuery(shot.id, { skip: !shot.id });
   const isMotionGraphic = shot.shotType === "MOTION_GRAPHIC";
@@ -91,6 +91,10 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
   // GRAPHIC scene direction. A beat-less shot with real dialogue hasn't had its voice dubbed yet.
   const dialogueVoiceText = (shot.voiceOver || (shot.shotType === "DIALOGUE" ? shot.scriptLine : "") || "").trim();
   const needsVoice = !video && !!dialogueVoiceText && beats.length === 0;
+  // "Prepare all dialogues" already cloned+synthesized this shot's line -- distinguish that from
+  // a shot that hasn't been dubbed at all yet, since the audio is sitting ready for review, not
+  // missing.
+  const dubReady = needsVoice && !!dubbed?.audioDataUri;
   // Signed URLs are re-signed (new query string) on every images refetch even when the object
   // itself hasn't changed, which would otherwise force the browser to re-download the frame on
   // every open. Cache the bytes locally keyed by shot+kind instead of the ever-changing URL.
@@ -121,7 +125,13 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               #{shot.shotNumber} <span className="font-medium text-slate-300">{shot.shotType}</span>
             </span>
             <div className="flex flex-col items-end gap-1">
-              {needsVoice && (
+              {dubReady && (
+                <span className="flex items-center gap-1 rounded-full border border-purple-400/25 bg-purple-500/20 px-2 py-0.5 text-[9px] font-bold text-purple-200">
+                  <AudioLines size={9} />
+                  Dub ready
+                </span>
+              )}
+              {needsVoice && !dubReady && (
                 <span className="flex items-center gap-1 rounded-full border border-sky-400/25 bg-sky-500/20 px-2 py-0.5 text-[9px] font-bold text-sky-200">
                   <AudioLines size={9} />
                   Needs voice
@@ -181,7 +191,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             />
           )}
 
-          {!info && <DialogueBeatsEditor shot={shot} projectId={projectId} />}
+          {!info && <DialogueBeatsEditor shot={shot} projectId={projectId} dubbedPreview={dubbed} />}
           {!info && <BackgroundMusicControl shotId={shot.id} />}
           <ShotThoughtLog shotId={shot.id} />
 

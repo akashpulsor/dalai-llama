@@ -108,7 +108,14 @@ export default function CastLibraryPage() {
           </p>
         ) : (
           <div className="space-y-2.5">
-            {actors.map((actor) => (
+            {actors.map((actor) => {
+              // voiceRefBucket only means a sample was uploaded -- the actual ElevenLabs clone
+              // (clonedVoiceId) is created lazily, on first real use in a project (CloneVoiceService),
+              // and cleared back to null the moment a new sample is saved. voiceIdentityType
+              // distinguishes that real human clone from a builtin/AI voice pick, which also
+              // persists through clonedVoiceId.
+              const isActuallyCloned = Boolean(actor.clonedVoiceId) && actor.voiceIdentityType === "HUMAN";
+              return (
               <div key={actor.id} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                 <div className="flex items-center gap-3">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/5">
@@ -135,15 +142,23 @@ export default function CastLibraryPage() {
                       setVoiceFile(null);
                       setPendingBuiltinVoice(null);
                     }}
-                    title={actor.voiceRefBucket ? "Replace voice sample" : actor.builtinVoiceId ? "Change voice" : "No voice yet — add one"}
+                    title={
+                      isActuallyCloned ? "Replace voice sample"
+                        : actor.voiceRefBucket ? "Sample uploaded — clones on first use in a project"
+                        : actor.builtinVoiceId ? "Change voice"
+                        : "No voice yet — add one"
+                    }
                     className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-bold ${
-                      actor.voiceRefBucket || actor.builtinVoiceId
+                      isActuallyCloned || actor.builtinVoiceId
                         ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-200"
                         : "border-amber-400/25 bg-amber-500/10 text-amber-200"
                     }`}
                   >
                     <Mic size={11} />
-                    {actor.voiceRefBucket ? "Voice cloned" : actor.builtinVoiceId ? "Built-in voice" : "Add voice"}
+                    {isActuallyCloned ? "Voice cloned"
+                      : actor.voiceRefBucket ? "Sample uploaded"
+                      : actor.builtinVoiceId ? "Built-in voice"
+                      : "Add voice"}
                   </button>
                 </div>
 
@@ -218,7 +233,8 @@ export default function CastLibraryPage() {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

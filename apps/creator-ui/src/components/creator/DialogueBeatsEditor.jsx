@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { AudioLines, Loader2, Mic, Play, Square, Trash2 } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
@@ -18,7 +18,7 @@ import { useCachedImageUrl } from "../../utils/cachedImageUrl.js";
  * -- the line, the character, the shot's planned duration, the actor's voice sample -- is already
  * decided upstream (script -> shot -> cast assignment), so this is a one-click "clone it" against
  * that plan, not a form for typing timestamps by hand. */
-export default function DialogueBeatsEditor({ shot, projectId }) {
+export default function DialogueBeatsEditor({ shot, projectId, dubbedPreview }) {
   const dispatch = useDispatch();
   const shotId = shot?.id;
 
@@ -48,6 +48,15 @@ export default function DialogueBeatsEditor({ shot, projectId }) {
   // when it's "Narrator: '...'" -- still the spoken line, not visual direction).
   const dialogueText = (shot?.voiceOver || (shot?.shotType === "DIALOGUE" ? shot?.scriptLine : "") || "").trim();
   const cast = shot?.cast;
+
+  // "Prepare all dialogues" on the video page already cloned+synthesized this exact line via the
+  // same /v1/clone path -- reuse that audio instead of silently ignoring it and forcing another
+  // ElevenLabs call the first time this shot's Test voice button is pressed.
+  useEffect(() => {
+    if (dubbedPreview?.audioDataUri && dialogueText) {
+      setCachedAudio({ text: dialogueText, dataUri: dubbedPreview.audioDataUri });
+    }
+  }, [dubbedPreview, dialogueText]);
 
   // Only orderIndex/startSeconds describe this beat's placement -- everything else (line,
   // character, duration) already lives on the persisted Shot row, so the backend derives it from

@@ -42,6 +42,7 @@ export default function VideoGenerationSection({ projectId }) {
   const [videos, setVideos] = useState({}); // shotId -> VideoGenJobView
   const [flagOverrides, setFlagOverrides] = useState({}); // flagKey -> boolean, undefined = use project default
   const [preparingDialogues, setPreparingDialogues] = useState(false);
+  const [dubbedVoices, setDubbedVoices] = useState({}); // shotId -> CloneVoiceResult
 
   const [dispatchShot] = useDispatchShotMutation();
   const [fetchPrompt] = useLazyGetVideoGenPromptQuery();
@@ -132,6 +133,16 @@ export default function VideoGenerationSection({ projectId }) {
       // number of shots and uses the same clone/TTS path as the per-shot Test voice control.
       const clones = await cloneProjectVoices({ projectId }).unwrap();
       const cloneCount = Array.isArray(clones) ? clones.length : dialogueShots.length;
+      // Keep every dubbed clip around keyed by shot -- without this the audio CloneVoiceService
+      // just generated was thrown away the moment this promise resolved, leaving no way to hear
+      // or even see which shots got dubbed short of hitting Test voice again per shot.
+      if (Array.isArray(clones)) {
+        setDubbedVoices((v) => {
+          const next = { ...v };
+          clones.forEach((clone) => { if (clone.shotId) next[clone.shotId] = clone; });
+          return next;
+        });
+      }
       dispatch(showFlash({
         message: `${cloneCount} dialogue ${cloneCount === 1 ? "clone is" : "clones are"} ready for review.`,
         type: "success",
@@ -250,6 +261,7 @@ export default function VideoGenerationSection({ projectId }) {
             info={prepared[shot.id]}
             busy={preparing[shot.id]}
             video={videos[shot.id]}
+            dubbed={dubbedVoices[shot.id]}
             onPrepare={() => handlePrepare(shot.id)}
             onApprove={() => handleApprove(shot.id)}
             onReject={() => handleReject(shot.id)}
