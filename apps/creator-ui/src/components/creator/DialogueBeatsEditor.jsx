@@ -57,7 +57,7 @@ export default function DialogueBeatsEditor({ shot, projectId }) {
     }
   };
 
-  // "Test voice" hits video-generation-service /v1/voice-tests, which resolves the shot's
+  // "Test voice" hits video-generation-service /v1/clone, which resolves the shot's
   // character identity and returns audio rendered with the real voice -- cloned from the actor's
   // sample if uploaded, or direct TTS with the built-in voice pick, matching what
   // BeatDubbingService runs at approve() time. Plays the returned base64 audio inline so the

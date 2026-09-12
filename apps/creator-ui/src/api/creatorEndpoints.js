@@ -2316,10 +2316,10 @@ export const creatorApi = apiSlice.injectEndpoints({
     // characters (an actor also voicing the narrator). createCastProfile only ever sets this at
     // creation time; this is the only way to change it afterward.
     updateCastProfileVoice: builder.mutation({
-      query: ({ castProfileId, voiceRefBucket, voiceRefObjectKey }) => ({
+      query: ({ castProfileId, projectId, voiceRefBucket, voiceRefObjectKey }) => ({
         url: platformUrl(`/cast-profiles/${castProfileId}/voice`),
         method: "PUT",
-        body: { voiceRefBucket, voiceRefObjectKey },
+        body: { castProfileId, ...(projectId ? { projectId } : {}), voiceIdentityType: "HUMAN", voiceRefBucket, voiceRefObjectKey },
       }),
       invalidatesTags: (_result, _error, args) => [
         { type: "CreatorHomeProjects", id: `cast-profiles-${args?.projectId || "library"}-${args?.profileType || "all"}` },
@@ -2328,13 +2328,19 @@ export const creatorApi = apiSlice.injectEndpoints({
       ],
     }),
 
-    // PUT /v1/cast-profiles/{id}/builtin-voice -- store the provider-qualified identity returned
+    // PUT /v1/cast-profiles/{id}/voice -- store the provider-qualified identity returned
     // by GET /v1/voices/builtin (providerVoiceId + providerId), rather than an unqualified id.
     selectCastProfileBuiltinVoice: builder.mutation({
-      query: ({ castProfileId, clonedVoiceId, providerId }) => ({
-        url: platformUrl(`/cast-profiles/${castProfileId}/builtin-voice`),
+      query: ({ castProfileId, projectId, clonedVoiceId, providerId }) => ({
+        url: platformUrl(`/cast-profiles/${castProfileId}/voice`),
         method: "PUT",
-        body: { clonedVoiceId, providerId },
+        body: {
+          castProfileId,
+          ...(projectId ? { projectId } : {}),
+          voiceIdentityType: "AI",
+          clonedVoiceId,
+          providerId,
+        },
       }),
       invalidatesTags: (_result, _error, args) => [
         { type: "CreatorHomeProjects", id: `cast-profiles-${args?.projectId || "library"}-${args?.profileType || "all"}` },
@@ -2822,7 +2828,7 @@ export const creatorApi = apiSlice.injectEndpoints({
       },
     }),
 
-    // video-generation-service POST /v1/voice-tests -- given a shot, resolves the primary
+    // video-generation-service POST /v1/clone -- given a shot, resolves the primary
     // character's cast identity and returns a short audio sample rendered with the real voice
     // identity (cloned from the actor's uploaded sample, or direct TTS with the built-in voice
     // pick). Same clone-then-TTS vs direct-TTS routing BeatDubbingService uses at dispatch time,

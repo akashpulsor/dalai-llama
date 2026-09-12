@@ -61,7 +61,7 @@ export default defineConfig(({ mode }) => {
         const overrides = {};
         if (localVideoGen) {
           // Every prefix video-gen owns at the gateway -- see backend-service values.yaml.
-          for (const p of ["/v1/voice-tests", "/v1/prompts", "/v1/jobs", "/v1/exports", "/v1/scenes", "/v1/final-renders"]) {
+          for (const p of ["/v1/clone", "/v1/prompts", "/v1/jobs", "/v1/exports", "/v1/scenes", "/v1/final-renders"]) {
             overrides[p] = local(localVideoGen);
           }
         }
