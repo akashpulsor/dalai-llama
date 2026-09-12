@@ -1,10 +1,11 @@
 // @ts-nocheck
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
-import { Clapperboard } from "lucide-react";
+import { AudioLines, Clapperboard, Loader2 } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useApproveVideoGenJobMutation,
+  useCloneProjectVoicesMutation,
   useDispatchShotMutation,
   useGetProjectConfigQuery,
   useLazyGetVideoGenPromptQuery,
@@ -15,6 +16,10 @@ import {
   useUpdateProjectConfigMutation,
 } from "../../api/creatorEndpoints.js";
 import ShotVideoCard from "./ShotVideoCard.jsx";
+
+const dialogueTextForShot = (shot) => (
+  shot?.voiceOver || (shot?.shotType === "DIALOGUE" ? shot?.scriptLine : "") || ""
+).trim();
 
 /**
  * Video generation, the stage after shots/images: per shot, build the prompt (assemble +
@@ -36,9 +41,11 @@ export default function VideoGenerationSection({ projectId }) {
   const [prepared, setPrepared] = useState({}); // shotId -> ShotDispatchResponse
   const [videos, setVideos] = useState({}); // shotId -> VideoGenJobView
   const [flagOverrides, setFlagOverrides] = useState({}); // flagKey -> boolean, undefined = use project default
+  const [preparingDialogues, setPreparingDialogues] = useState(false);
 
   const [dispatchShot] = useDispatchShotMutation();
   const [fetchPrompt] = useLazyGetVideoGenPromptQuery();
+  const [cloneProjectVoices] = useCloneProjectVoicesMutation();
   const [approveJob] = useApproveVideoGenJobMutation();
   const [rejectJob] = useRejectVideoGenJobMutation();
 
@@ -114,6 +121,31 @@ export default function VideoGenerationSection({ projectId }) {
     });
   };
 
+  const dialogueShots = shots.filter((shot) => dialogueTextForShot(shot));
+
+  const handlePrepareAllDialogues = async () => {
+    if (preparingDialogues || !dialogueShots.length) return;
+    setPreparingDialogues(true);
+    try {
+      // CloneVoiceService resolves every shot's cast identity and generates the individual
+      // dialogue clones server-side. One project request keeps the frontend independent of the
+      // number of shots and uses the same clone/TTS path as the per-shot Test voice control.
+      const clones = await cloneProjectVoices({ projectId }).unwrap();
+      const cloneCount = Array.isArray(clones) ? clones.length : dialogueShots.length;
+      dispatch(showFlash({
+        message: `${cloneCount} dialogue ${cloneCount === 1 ? "clone is" : "clones are"} ready for review.`,
+        type: "success",
+      }));
+    } catch (error) {
+      dispatch(showFlash({
+        message: error?.data?.message || "Could not prepare dialogue clones for this project.",
+        type: "error",
+      }));
+    } finally {
+      setPreparingDialogues(false);
+    }
+  };
+
   if (!shots?.length) return null;
 
   return (
@@ -125,14 +157,26 @@ export default function VideoGenerationSection({ projectId }) {
             Prepare each shot to see the suggested model and exact prompt before anything generates — approve to spend and render.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={handleGenerateAll}
-          className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-bold text-slate-200 hover:border-purple-400/30"
-        >
-          <Clapperboard size={13} />
-          Prepare all shots
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleGenerateAll}
+            className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-bold text-slate-200 hover:border-purple-400/30"
+          >
+            <Clapperboard size={13} />
+            Prepare all shots
+          </button>
+          <button
+            type="button"
+            onClick={handlePrepareAllDialogues}
+            disabled={preparingDialogues || !dialogueShots.length}
+            title={!dialogueShots.length ? "Add a spoken line to prepare dialogue." : "Clone every shot's dialogue using its assigned voice; rendering still requires approval."}
+            className="flex items-center gap-1.5 rounded-md border border-purple-400/25 bg-purple-500/10 px-3.5 py-2 text-xs font-bold text-purple-200 hover:border-purple-400/50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {preparingDialogues ? <Loader2 size={13} className="animate-spin" /> : <AudioLines size={13} />}
+            {preparingDialogues ? "Preparing dialogues" : "Prepare all dialogues"}
+          </button>
+        </div>
       </div>
 
       {featureFlags.length > 0 && (

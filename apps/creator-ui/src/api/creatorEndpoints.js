@@ -2328,14 +2328,13 @@ export const creatorApi = apiSlice.injectEndpoints({
       ],
     }),
 
-    // PUT /v1/cast-profiles/{id}/builtin-voice -- alternative to updateCastProfileVoice for a
-    // character with no recorded sample: picks a stock ElevenLabs voice (from listBuiltinVoices,
-    // llm-gateway) instead of uploading one. Clears any previously-uploaded sample server-side.
+    // PUT /v1/cast-profiles/{id}/builtin-voice -- store the provider-qualified identity returned
+    // by GET /v1/voices/builtin (providerVoiceId + providerId), rather than an unqualified id.
     selectCastProfileBuiltinVoice: builder.mutation({
-      query: ({ castProfileId, builtinVoiceId }) => ({
+      query: ({ castProfileId, clonedVoiceId, providerId }) => ({
         url: platformUrl(`/cast-profiles/${castProfileId}/builtin-voice`),
         method: "PUT",
-        body: { builtinVoiceId },
+        body: { clonedVoiceId, providerId },
       }),
       invalidatesTags: (_result, _error, args) => [
         { type: "CreatorHomeProjects", id: `cast-profiles-${args?.projectId || "library"}-${args?.profileType || "all"}` },
@@ -2833,6 +2832,17 @@ export const creatorApi = apiSlice.injectEndpoints({
         url: platformUrl("/clone"),
         method: "POST",
         body: { projectId, shotId, text },
+      }),
+    }),
+
+    // video-generation-service POST /v1/clone/project -- prepares voice clones for every
+    // dialogue-bearing shot in the project, using the same cast identity resolution as
+    // testShotVoice without requiring the frontend to issue a request per shot.
+    cloneProjectVoices: builder.mutation({
+      query: ({ projectId }) => ({
+        url: platformUrl("/clone/project"),
+        method: "POST",
+        body: { projectId },
       }),
     }),
 
@@ -3413,6 +3423,7 @@ export const {
   useListBuiltinVoicesQuery,
   useSyncBuiltinVoicesMutation,
   useTestShotVoiceMutation,
+  useCloneProjectVoicesMutation,
   useListTtsModelsQuery,
   useGetShotBackgroundMusicQuery,
   useGenerateShotBackgroundMusicMutation,

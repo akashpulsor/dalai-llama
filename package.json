@@ -2,6 +2,7 @@
   "name": "dalaillama-ui",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@9.15.9",
   "workspaces": [
     "apps/*",
     "shared/*"

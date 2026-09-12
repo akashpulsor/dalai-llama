@@ -80,7 +80,8 @@ export default function CastProfileQuickCreate({ profileType, projectId, charact
         gender: isActor && fields.gender ? fields.gender : undefined,
         voiceRefBucket: voice?.bucket,
         voiceRefObjectKey: voice?.objectKey,
-        builtinVoiceId: isActor && identityMode === "ai-generated" ? builtinVoice.providerVoiceId : undefined,
+        clonedVoiceId: isActor && identityMode === "ai-generated" ? builtinVoice.providerVoiceId : undefined,
+        clonedVoiceProviderId: isActor && identityMode === "ai-generated" ? builtinVoice.providerId : undefined,
       }).unwrap();
       dispatch(showFlash({ message: `${isActor ? "Actor" : "Product"} added`, type: "success" }));
       setFields(BLANK);

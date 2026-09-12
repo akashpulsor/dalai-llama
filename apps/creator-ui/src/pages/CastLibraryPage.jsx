@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
-import { Mic, Plus, User2, Users } from "lucide-react";
+import { Mic, Plus, Save, User2, Users } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useListCastProfilesQuery,
@@ -29,6 +29,7 @@ export default function CastLibraryPage() {
   const [voiceEditId, setVoiceEditId] = useState(null);
   const [voiceEditMode, setVoiceEditMode] = useState("upload"); // "upload" | "builtin"
   const [voiceFile, setVoiceFile] = useState(null);
+  const [pendingBuiltinVoice, setPendingBuiltinVoice] = useState(null);
   const savingVoiceFile = uploadingVoice || savingVoice;
 
   const actors = profiles.filter((p) => p.profileType === "ACTOR");
@@ -51,9 +52,14 @@ export default function CastLibraryPage() {
 
   const handleSelectBuiltinVoice = async (profile, voice) => {
     try {
-      await selectBuiltinVoice({ castProfileId: profile.id, builtinVoiceId: voice.providerVoiceId }).unwrap();
+      await selectBuiltinVoice({
+        castProfileId: profile.id,
+        clonedVoiceId: voice.providerVoiceId,
+        providerId: voice.providerId,
+      }).unwrap();
       dispatch(showFlash({ message: `${voice.displayName} set for ${profile.displayName}`, type: "success" }));
       setVoiceEditId(null);
+      setPendingBuiltinVoice(null);
     } catch (error) {
       dispatch(showFlash({ message: error?.data?.message || "Could not set this voice", type: "error" }));
     }
@@ -127,6 +133,7 @@ export default function CastLibraryPage() {
                       setVoiceEditId(voiceEditId === actor.id ? null : actor.id);
                       setVoiceEditMode(actor.builtinVoiceId ? "builtin" : "upload");
                       setVoiceFile(null);
+                      setPendingBuiltinVoice(null);
                     }}
                     title={actor.voiceRefBucket ? "Replace voice sample" : actor.builtinVoiceId ? "Change voice" : "No voice yet — add one"}
                     className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-bold ${
@@ -145,14 +152,14 @@ export default function CastLibraryPage() {
                     <div className="flex gap-1 rounded-md border border-white/10 bg-white/5 p-0.5">
                       <button
                         type="button"
-                        onClick={() => setVoiceEditMode("upload")}
+                        onClick={() => { setVoiceEditMode("upload"); setPendingBuiltinVoice(null); }}
                         className={`flex-1 rounded px-2 py-1 text-[10px] font-bold ${voiceEditMode === "upload" ? "bg-purple-500/20 text-purple-200" : "text-slate-400"}`}
                       >
                         Record/upload a sample
                       </button>
                       <button
                         type="button"
-                        onClick={() => setVoiceEditMode("builtin")}
+                        onClick={() => { setVoiceEditMode("builtin"); setPendingBuiltinVoice(null); }}
                         className={`flex-1 rounded px-2 py-1 text-[10px] font-bold ${voiceEditMode === "builtin" ? "bg-purple-500/20 text-purple-200" : "text-slate-400"}`}
                       >
                         Use a built-in voice
@@ -184,17 +191,28 @@ export default function CastLibraryPage() {
                       <>
                         <BuiltinVoicePicker
                           gender={actor.gender}
-                          selectedVoiceId={actor.builtinVoiceId}
-                          onSelect={(voice) => handleSelectBuiltinVoice(actor, voice)}
+                          selectedVoiceId={pendingBuiltinVoice?.providerVoiceId || actor.clonedVoiceId || actor.builtinVoiceId}
+                          onSelect={setPendingBuiltinVoice}
                         />
-                        <button
-                          type="button"
-                          onClick={() => setVoiceEditId(null)}
-                          disabled={savingBuiltinVoice}
-                          className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-slate-300 disabled:opacity-60"
-                        >
-                          Close
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { setVoiceEditId(null); setPendingBuiltinVoice(null); }}
+                            disabled={savingBuiltinVoice}
+                            className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-slate-300 disabled:opacity-60"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!pendingBuiltinVoice || savingBuiltinVoice}
+                            onClick={() => handleSelectBuiltinVoice(actor, pendingBuiltinVoice)}
+                            className="creator-primary flex flex-1 items-center justify-center gap-1.5 py-1.5 text-[11px] font-bold text-white disabled:opacity-60"
+                          >
+                            <Save size={11} />
+                            {savingBuiltinVoice ? "Saving…" : "Save voice"}
+                          </button>
+                        </div>
                       </>
                     )}
                   </div>
