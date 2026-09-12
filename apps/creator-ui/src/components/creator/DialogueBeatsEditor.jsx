@@ -29,6 +29,10 @@ export default function DialogueBeatsEditor({ shot, projectId }) {
   const [testVoice, { isLoading: testing }] = useTestShotVoiceMutation();
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
+  // Keyed by the exact line tested, so editing the dialogue invalidates the cache but replaying
+  // the same line -- which is the common case, checking a pick sounds right -- doesn't spend
+  // another ElevenLabs call for audio already sitting in memory.
+  const [cachedAudio, setCachedAudio] = useState(null); // { text, dataUri }
 
   // PRODUCTION (photoreal) is generated on demand and may not exist yet -- STORYBOARD (sketch)
   // is generated eagerly with the rest of the shot list, so it's there from the start as a stand-in.
@@ -69,9 +73,17 @@ export default function DialogueBeatsEditor({ shot, projectId }) {
       setPlaying(false);
       return;
     }
+    // Already cloned this exact line -- replay it instead of paying for another clone/TTS call.
+    if (cachedAudio?.text === dialogueText && audioRef.current) {
+      audioRef.current.src = cachedAudio.dataUri;
+      audioRef.current.play().catch(() => {});
+      setPlaying(true);
+      return;
+    }
     try {
       const result = await testVoice({ projectId, shotId, text: dialogueText || undefined }).unwrap();
       if (!result?.audioDataUri || !audioRef.current) return;
+      setCachedAudio({ text: dialogueText, dataUri: result.audioDataUri });
       audioRef.current.src = result.audioDataUri;
       audioRef.current.play().catch(() => {});
       setPlaying(true);

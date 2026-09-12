@@ -1,12 +1,13 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { Check, ChevronDown, Loader2, Music, PlayCircle, Sparkles, X } from "lucide-react";
+import { AudioLines, Check, ChevronDown, Loader2, Music, PlayCircle, Sparkles, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useGenerateShotBackgroundMusicMutation,
   useGetShotBackgroundMusicQuery,
   useListPreProductionShotImagesQuery,
+  useListShotDialogueBeatsQuery,
 } from "../../api/creatorEndpoints.js";
 import DialogueBeatsEditor from "./DialogueBeatsEditor.jsx";
 import MotionGraphicPanel from "./MotionGraphicPanel.jsx";
@@ -75,6 +76,7 @@ const ASPECT_RATIO_CSS = {
  * full prepare/approve panel below it, spanning the grid so it doesn't stretch its neighbors. */
 export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info, busy, video, onPrepare, onApprove, onReject, onAutoFix }) {
   const { data: images = [] } = useListPreProductionShotImagesQuery(shot.id, { skip: !shot.id });
+  const { data: beats = [] } = useListShotDialogueBeatsQuery(shot.id, { skip: !shot.id });
   const isMotionGraphic = shot.shotType === "MOTION_GRAPHIC";
   // MG shots don't have PRODUCTION/STORYBOARD (see ShotImagesPanel's kindsForShotType) -- their
   // equivalent frame is the MOTION_GRAPHIC preview. Preferring it first for MG shots means the
@@ -84,6 +86,11 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
     : images.find((img) => img.kind === "PRODUCTION") || images.find((img) => img.kind === "STORYBOARD");
   const aspect = ASPECT_RATIO_CSS[shot.aspectRatio] || "9 / 16";
   const dialogue = shot.voiceOver || shot.scriptLine;
+  // Same rule DialogueBeatsEditor uses to decide whether there's anything to clone -- scriptLine
+  // only counts as spoken dialogue for DIALOGUE shots, not as a stand-in for ACTION/B_ROLL/MOTION_
+  // GRAPHIC scene direction. A beat-less shot with real dialogue hasn't had its voice dubbed yet.
+  const dialogueVoiceText = (shot.voiceOver || (shot.shotType === "DIALOGUE" ? shot.scriptLine : "") || "").trim();
+  const needsVoice = !video && !!dialogueVoiceText && beats.length === 0;
   // Signed URLs are re-signed (new query string) on every images refetch even when the object
   // itself hasn't changed, which would otherwise force the browser to re-download the frame on
   // every open. Cache the bytes locally keyed by shot+kind instead of the ever-changing URL.
@@ -114,6 +121,12 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               #{shot.shotNumber} <span className="font-medium text-slate-300">{shot.shotType}</span>
             </span>
             <div className="flex flex-col items-end gap-1">
+              {needsVoice && (
+                <span className="flex items-center gap-1 rounded-full border border-sky-400/25 bg-sky-500/20 px-2 py-0.5 text-[9px] font-bold text-sky-200">
+                  <AudioLines size={9} />
+                  Needs voice
+                </span>
+              )}
               {video?.status === "COMPLETED" && (
                 <span className="flex items-center gap-1 rounded-full border border-emerald-400/25 bg-emerald-500/20 px-2 py-0.5 text-[9px] font-bold text-emerald-200">
                   <Check size={9} />
