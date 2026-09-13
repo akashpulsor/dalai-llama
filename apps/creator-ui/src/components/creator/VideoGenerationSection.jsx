@@ -9,6 +9,7 @@ import {
   useGetClonedVoiceAudioQuery,
   useGetProjectConfigQuery,
   useListPreProductionShotsQuery,
+  useGetProjectScenePreparationQuery,
   useListProjectShotPromptsQuery,
   useListVideoFeatureFlagsQuery,
   useListVideoModelsQuery,
@@ -39,10 +40,22 @@ export default function VideoGenerationSection({ projectId }) {
   const { data: featureFlags = [] } = useListVideoFeatureFlagsQuery();
   const { data: projectConfig } = useGetProjectConfigQuery(projectId, { skip: !projectId });
   const { data: videoModels = [] } = useListVideoModelsQuery();
+  // True from the moment a batch is accepted until the project's preparation status leaves
+  // PREPARING. Drives the polling below, not just the button label.
+  const [batchRunning, setBatchRunning] = useState(false);
   // Prepared prompts are persisted per shot, so a page reload can show what was already built
   // instead of every card reverting to "not prepared yet" and inviting the creator to pay to
   // rebuild a prompt that is sitting in the database.
-  const { data: savedPrompts = [] } = useListProjectShotPromptsQuery(projectId, { skip: !projectId });
+  // Polled while a batch runs so prompts appear card by card as the server commits them, then
+  // left alone -- there is nothing to watch for once the batch is done.
+  const { data: savedPrompts = [] } = useListProjectShotPromptsQuery(projectId, {
+    skip: !projectId,
+    pollingInterval: batchRunning ? 4000 : 0,
+  });
+  const { data: preparationState } = useGetProjectScenePreparationQuery(projectId, {
+    skip: !projectId || !batchRunning,
+    pollingInterval: batchRunning ? 4000 : 0,
+  });
   const [updateProjectConfig] = useUpdateProjectConfigMutation();
   const [openShotId, setOpenShotId] = useState(null);
   const [preparing, setPreparing] = useState({});
@@ -106,11 +119,42 @@ export default function VideoGenerationSection({ projectId }) {
     setPrepared((p) => {
       const next = { ...p };
       savedPrompts.forEach((view) => {
-        if (view.shotId && !next[view.shotId]) next[view.shotId] = toCardInfo(view);
+        if (!view.shotId) return;
+        // While a batch is running the server's rows ARE the new results, so they overwrite;
+        // otherwise this is page-load seeding and anything prepared in this session is newer.
+        if (batchRunning || !next[view.shotId]) next[view.shotId] = toCardInfo(view);
       });
       return next;
     });
-  }, [savedPrompts]);
+  }, [savedPrompts, batchRunning]);
+
+  // A shot whose prompt has landed is no longer preparing -- clears spinners progressively
+  // instead of all at once when the batch ends.
+  useEffect(() => {
+    if (!batchRunning) return;
+    setPreparing((current) => {
+      const next = { ...current };
+      savedPrompts.forEach((view) => {
+        if (view.shotId) next[view.shotId] = false;
+      });
+      return next;
+    });
+  }, [savedPrompts, batchRunning]);
+
+  // The batch is over when the project's status leaves PREPARING. Drop every remaining spinner:
+  // a shot still marked busy here is one the batch could not prepare.
+  useEffect(() => {
+    if (!batchRunning || !preparationState?.status) return;
+    if (preparationState.status === "PREPARING") return;
+    setBatchRunning(false);
+    setPreparing({});
+    dispatch(showFlash({
+      message: preparationState.status === "FAILED"
+        ? "Preparing shots failed — see the shots that stayed empty"
+        : "Shots prepared",
+      type: preparationState.status === "FAILED" ? "error" : "success",
+    }));
+  }, [batchRunning, preparationState?.status, dispatch]);
 
   const handlePrepare = async (shotId) => {
     setPreparing((s) => ({ ...s, [shotId]: true }));
@@ -199,50 +243,33 @@ export default function VideoGenerationSection({ projectId }) {
     // Nothing ticked -> send [] and let the server expand it to every shot in the project, so the
     // UI never has to hold a list the bundle already carries. Ticked boxes are sent verbatim.
     const shotIds = selectedShotIds;
-    // Which cards show a spinner, and the legacy positional fallback's reference order. `shots` is
-    // already in shotNumber order, the same order the backend walks the bundle in.
+    // Which cards show a spinner while the batch runs. `shots` is already in shotNumber order,
+    // the same order the backend walks the bundle in.
     const busyIds = shotIds.length ? shotIds : shots.map((shot) => shot.id);
     if (!busyIds.length) return;
     busyIds.forEach((id) => setPreparing((s) => ({ ...s, [id]: true })));
     try {
-      // One call for the whole project -- prepareShotsBatch fetches the pre-prod bundle and the
-      // model catalog/config once and reuses them across every shot, instead of N independent
-      // per-shot prepares.
+      // Returns 202 as soon as the batch is queued -- it runs server-side, a shot at a time,
+      // committing each prompt as it completes. Nothing to read from this response; progress
+      // arrives through the poll below.
+      //
       // Send the on-screen choices explicitly rather than relying on the stored project config:
       // the model/resolution dropdowns PUT asynchronously, so a creator who changes one and
       // immediately hits Prepare would otherwise get the previous value baked into every prompt.
-      const result = await prepareShotScenesBatch({
+      const accepted = await prepareShotScenesBatch({
         projectId,
         shotIds,
         featureFlagOverrides: featureFlagOverridesBody(),
         modelPin: projectConfig?.preferredVideoModel || undefined,
         resolutionOverride: projectConfig?.preferredResolution || undefined,
       }).unwrap();
-      // ShotPromptView.shotId only exists from video-generation-service 0.2.21 on. Against an
-      // older build every prompt would key to `undefined` and no card would fill in, so fall
-      // back to position: prepareShotsBatch walks the target shots sequentially, appending to
-      // prepared[] on success and failed[] otherwise, which makes "the requested ids minus the
-      // failed ones, in order" an exact positional match for prepared[].
-      const failedIds = new Set((result.failed || []).map((f) => f.shotId));
-      const preparedOrder = busyIds.filter((id) => !failedIds.has(id));
-      setPrepared((p) => {
-        const next = { ...p };
-        (result.prepared || []).forEach((view, index) => {
-          const shotId = view.shotId || preparedOrder[index];
-          if (shotId) next[shotId] = toCardInfo(view);
-        });
-        return next;
-      });
-      if (result.failed?.length) {
-        dispatch(showFlash({
-          message: `${result.failed.length} shot${result.failed.length === 1 ? "" : "s"} could not be prepared`,
-          type: "error",
-        }));
+      if (accepted?.status === "ALREADY_RUNNING") {
+        dispatch(showFlash({ message: "A prepare is already running for this project.", type: "info" }));
       }
+      setBatchRunning(true);
     } catch (error) {
-      dispatch(showFlash({ message: error?.data?.message || "Could not prepare shots", type: "error" }));
-    } finally {
       busyIds.forEach((id) => setPreparing((s) => ({ ...s, [id]: false })));
+      dispatch(showFlash({ message: error?.data?.message || "Could not start preparing shots", type: "error" }));
     }
   };
 
@@ -301,15 +328,18 @@ export default function VideoGenerationSection({ projectId }) {
           <button
             type="button"
             onClick={handleGenerateAll}
+            disabled={batchRunning}
             title={selectedShotIds.length
               ? "Prepare only the shots you ticked."
               : "Tick shots to prepare just those; with none ticked this prepares every shot in the project."}
-            className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-bold text-slate-200 hover:border-purple-400/30"
+            className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-bold text-slate-200 hover:border-purple-400/30 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Clapperboard size={13} />
-            {selectedShotIds.length
-              ? `Prepare ${selectedShotIds.length} selected shot${selectedShotIds.length === 1 ? "" : "s"}`
-              : "Prepare all shots"}
+            {batchRunning ? <Loader2 size={13} className="animate-spin" /> : <Clapperboard size={13} />}
+            {batchRunning
+              ? "Preparing shots…"
+              : selectedShotIds.length
+                ? `Prepare ${selectedShotIds.length} selected shot${selectedShotIds.length === 1 ? "" : "s"}`
+                : "Prepare all shots"}
           </button>
           <button
             type="button"
