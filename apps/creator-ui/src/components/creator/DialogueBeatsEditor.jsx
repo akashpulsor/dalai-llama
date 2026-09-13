@@ -9,6 +9,7 @@ import {
   useDeleteShotDialogueBeatMutation,
   useListPreProductionShotImagesQuery,
   useTestShotVoiceMutation,
+  useGetClonedVoiceAudioQuery,
 } from "../../api/creatorEndpoints.js";
 import { useCachedImageUrl } from "../../utils/cachedImageUrl.js";
 
@@ -18,7 +19,7 @@ import { useCachedImageUrl } from "../../utils/cachedImageUrl.js";
  * -- the line, the character, the shot's planned duration, the actor's voice sample -- is already
  * decided upstream (script -> shot -> cast assignment), so this is a one-click "clone it" against
  * that plan, not a form for typing timestamps by hand. */
-export default function DialogueBeatsEditor({ shot, projectId, dubbedPreview }) {
+export default function DialogueBeatsEditor({ shot, projectId }) {
   const dispatch = useDispatch();
   const shotId = shot?.id;
 
@@ -27,6 +28,8 @@ export default function DialogueBeatsEditor({ shot, projectId, dubbedPreview }) 
   const [createBeat, { isLoading: cloning }] = useCreateShotDialogueBeatMutation();
   const [deleteBeat] = useDeleteShotDialogueBeatMutation();
   const [testVoice, { isLoading: testing }] = useTestShotVoiceMutation();
+  const { currentData: savedAudio = [], refetch: reloadAudio } = useGetClonedVoiceAudioQuery(projectId, { skip: !projectId });
+  const shotAudio = savedAudio.filter((audio) => audio.shotId === shotId);
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   // Keyed by the exact line tested, so editing the dialogue invalidates the cache but replaying
@@ -49,14 +52,14 @@ export default function DialogueBeatsEditor({ shot, projectId, dubbedPreview }) 
   const dialogueText = (shot?.voiceOver || (shot?.shotType === "DIALOGUE" ? shot?.scriptLine : "") || "").trim();
   const cast = shot?.cast;
 
-  // "Prepare all dialogues" on the video page already cloned+synthesized this exact line via the
-  // same /v1/clone path -- reuse that audio instead of silently ignoring it and forcing another
-  // ElevenLabs call the first time this shot's Test voice button is pressed.
+  const savedPreview = shotAudio.filter((audio) => audio.text?.trim() === dialogueText).at(-1);
+  const savedPreviewUrl = savedPreview?.audioUrl;
+  // Replacing the saved URL also stops an older clip that may still be playing.
   useEffect(() => {
-    if (dubbedPreview?.audioDataUri && dialogueText) {
-      setCachedAudio({ text: dialogueText, dataUri: dubbedPreview.audioDataUri });
-    }
-  }, [dubbedPreview, dialogueText]);
+    audioRef.current?.pause();
+    setPlaying(false);
+    setCachedAudio(savedPreviewUrl ? { text: dialogueText, dataUri: savedPreviewUrl } : null);
+  }, [savedPreviewUrl, dialogueText, shotId]);
 
   // Only orderIndex/startSeconds describe this beat's placement -- everything else (line,
   // character, duration) already lives on the persisted Shot row, so the backend derives it from
@@ -91,9 +94,10 @@ export default function DialogueBeatsEditor({ shot, projectId, dubbedPreview }) 
     }
     try {
       const result = await testVoice({ projectId, shotId, text: dialogueText || undefined }).unwrap();
-      if (!result?.audioDataUri || !audioRef.current) return;
-      setCachedAudio({ text: dialogueText, dataUri: result.audioDataUri });
-      audioRef.current.src = result.audioDataUri;
+      const audioUrl = result?.audioUrl || result?.audioDataUri;
+      if (!audioUrl || !audioRef.current) return;
+      setCachedAudio({ text: dialogueText, dataUri: audioUrl });
+      audioRef.current.src = audioUrl;
       audioRef.current.play().catch(() => {});
       setPlaying(true);
     } catch (error) {
@@ -168,11 +172,23 @@ export default function DialogueBeatsEditor({ shot, projectId, dubbedPreview }) 
         </div>
       )}
 
+      {shotAudio.length > 0 && (
+        <div className="mb-3 space-y-2">
+          {shotAudio.map((audio) => (
+            <div key={audio.beatId || audio.shotId}>
+              <p className="mb-1 text-[11px] text-slate-400">{audio.text}</p>
+              <audio key={audio.audioUrl} controls src={audio.audioUrl} preload="none" className="h-9 w-full" />
+            </div>
+          ))}
+          <button type="button" onClick={reloadAudio} className="text-[10px] text-purple-300 hover:underline">Refresh audio</button>
+        </div>
+      )}
+
       {dialogueText && (
         <div className="flex items-center gap-2">
           <button
             type="button"
-            disabled={testing || !cast?.hasVoiceSample}
+            disabled={testing || (!cachedAudio && !cast?.hasVoiceSample)}
             onClick={handleTest}
             title={!cast?.hasVoiceSample ? "Assign a cast member with a voice sample or built-in voice first" : "Preview this line in the character's voice"}
             className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-slate-200 hover:border-purple-400/30 disabled:cursor-not-allowed disabled:opacity-40"
@@ -191,7 +207,7 @@ export default function DialogueBeatsEditor({ shot, projectId, dubbedPreview }) 
               {cloning ? "Adding beat…" : `Dub in ${cast?.castDisplayName || "actor"}'s voice`}
             </button>
           )}
-          <audio ref={audioRef} onEnded={() => setPlaying(false)} preload="none" className="hidden" />
+          <audio ref={audioRef} onEnded={() => setPlaying(false)} onError={() => { setPlaying(false); }} preload="none" className="hidden" />
         </div>
       )}
     </div>

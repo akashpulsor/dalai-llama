@@ -94,7 +94,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
   // "Prepare all dialogues" already cloned+synthesized this shot's line -- distinguish that from
   // a shot that hasn't been dubbed at all yet, since the audio is sitting ready for review, not
   // missing.
-  const dubReady = needsVoice && !!dubbed?.audioDataUri;
+  const dubReady = !!(dubbed?.audioUrl || dubbed?.audioDataUri);
   // Signed URLs are re-signed (new query string) on every images refetch even when the object
   // itself hasn't changed, which would otherwise force the browser to re-download the frame on
   // every open. Cache the bytes locally keyed by shot+kind instead of the ever-changing URL.
@@ -191,7 +191,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             />
           )}
 
-          {!info && <DialogueBeatsEditor shot={shot} projectId={projectId} dubbedPreview={dubbed} />}
+          {!info && <DialogueBeatsEditor shot={shot} projectId={projectId} />}
           {!info && <BackgroundMusicControl shotId={shot.id} />}
           <ShotThoughtLog shotId={shot.id} />
 

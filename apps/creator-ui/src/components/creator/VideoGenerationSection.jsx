@@ -6,6 +6,7 @@ import { showFlash } from "@dalaillama/shared-store";
 import {
   useApproveVideoGenJobMutation,
   useCloneProjectVoicesMutation,
+  useGetClonedVoiceAudioQuery,
   useDispatchShotMutation,
   useGetProjectConfigQuery,
   useLazyGetVideoGenPromptQuery,
@@ -42,7 +43,13 @@ export default function VideoGenerationSection({ projectId }) {
   const [videos, setVideos] = useState({}); // shotId -> VideoGenJobView
   const [flagOverrides, setFlagOverrides] = useState({}); // flagKey -> boolean, undefined = use project default
   const [preparingDialogues, setPreparingDialogues] = useState(false);
-  const [dubbedVoices, setDubbedVoices] = useState({}); // shotId -> CloneVoiceResult
+  const { currentData: savedAudio = [], isError: audioLoadFailed, refetch: reloadAudio } = useGetClonedVoiceAudioQuery(projectId, {
+    skip: !projectId,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
+    pollingInterval: 45 * 60 * 1000,
+  });
+  const dubbedVoices = Object.fromEntries(savedAudio.map((audio) => [audio.shotId, audio]));
 
   const [dispatchShot] = useDispatchShotMutation();
   const [fetchPrompt] = useLazyGetVideoGenPromptQuery();
@@ -133,16 +140,7 @@ export default function VideoGenerationSection({ projectId }) {
       // number of shots and uses the same clone/TTS path as the per-shot Test voice control.
       const clones = await cloneProjectVoices({ projectId }).unwrap();
       const cloneCount = Array.isArray(clones) ? clones.length : dialogueShots.length;
-      // Keep every dubbed clip around keyed by shot -- without this the audio CloneVoiceService
-      // just generated was thrown away the moment this promise resolved, leaving no way to hear
-      // or even see which shots got dubbed short of hitting Test voice again per shot.
-      if (Array.isArray(clones)) {
-        setDubbedVoices((v) => {
-          const next = { ...v };
-          clones.forEach((clone) => { if (clone.shotId) next[clone.shotId] = clone; });
-          return next;
-        });
-      }
+      // Invalidating saved audio reloads fresh URLs for every generated clip.
       dispatch(showFlash({
         message: `${cloneCount} dialogue ${cloneCount === 1 ? "clone is" : "clones are"} ready for review.`,
         type: "success",
@@ -161,6 +159,11 @@ export default function VideoGenerationSection({ projectId }) {
 
   return (
     <div className="creator-panel mt-6 p-6">
+      {audioLoadFailed && (
+        <p className="mb-3 text-xs text-rose-300">
+          Could not load saved dialogue audio. <button type="button" onClick={reloadAudio} className="underline">Retry</button>
+        </p>
+      )}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[11px] font-extrabold uppercase tracking-widest text-purple-300">Video generation</p>

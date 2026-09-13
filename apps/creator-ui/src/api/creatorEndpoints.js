@@ -2690,6 +2690,7 @@ export const creatorApi = apiSlice.injectEndpoints({
       invalidatesTags: (_result, _error, args) => [
         { type: "CreatorHomeProjects", id: `dialogue-beats-${args?.shotId}` },
         { type: "CreatorHomeProjects", id: `speaking-characters-${args?.projectId}` },
+        { type: "CreatorHomeProjects", id: `clone-audio-${args?.projectId}` },
       ],
     }),
 
@@ -2698,6 +2699,7 @@ export const creatorApi = apiSlice.injectEndpoints({
       invalidatesTags: (_result, _error, args) => [
         { type: "CreatorHomeProjects", id: `dialogue-beats-${args?.shotId}` },
         { type: "CreatorHomeProjects", id: `speaking-characters-${args?.projectId}` },
+        { type: "CreatorHomeProjects", id: `clone-audio-${args?.projectId}` },
       ],
     }),
 
@@ -2881,12 +2883,23 @@ export const creatorApi = apiSlice.injectEndpoints({
     // identity (cloned from the actor's uploaded sample, or direct TTS with the built-in voice
     // pick). Same clone-then-TTS vs direct-TTS routing BeatDubbingService uses at dispatch time,
     // just against a caller-supplied line instead of a persisted DialogueBeat.
+    getClonedVoiceAudio: builder.query({
+      query: (projectId) => ({ url: platformUrl(`/clone/projects/${projectId}/audio`) }),
+      providesTags: (_result, _error, projectId) => [
+        { type: "CreatorHomeProjects", id: `clone-audio-${projectId}` },
+      ],
+    }),
+
     testShotVoice: builder.mutation({
       query: ({ projectId, shotId, text }) => ({
         url: platformUrl("/clone"),
         method: "POST",
         body: { projectId, shotId, text },
       }),
+      invalidatesTags: (_result, _error, { shotId, projectId }) => [
+        { type: "CreatorHomeProjects", id: `dialogue-beats-${shotId}` },
+        { type: "CreatorHomeProjects", id: `clone-audio-${projectId}` },
+      ],
     }),
 
     // video-generation-service POST /v1/clone/project -- prepares voice clones for every
@@ -2898,6 +2911,12 @@ export const creatorApi = apiSlice.injectEndpoints({
         method: "POST",
         body: { projectId },
       }),
+      invalidatesTags: (result, _error, { projectId }) => [
+        { type: "CreatorHomeProjects", id: `clone-audio-${projectId}` },
+        ...[...new Set((result || []).map((voice) => voice.shotId))].map((shotId) => (
+          { type: "CreatorHomeProjects", id: `dialogue-beats-${shotId}` }
+        )),
+      ],
     }),
 
     // llm-gateway POST /v1/voices/sync -- one-shot admin refresh that queries the tenant's actual
@@ -3485,6 +3504,7 @@ export const {
   useSyncBuiltinVoicesMutation,
   useTestShotVoiceMutation,
   useCloneProjectVoicesMutation,
+  useGetClonedVoiceAudioQuery,
   useListTtsModelsQuery,
   useGetShotBackgroundMusicQuery,
   useGenerateShotBackgroundMusicMutation,
