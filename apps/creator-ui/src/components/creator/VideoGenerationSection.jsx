@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import { AudioLines, Clapperboard, Loader2 } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
@@ -9,12 +9,14 @@ import {
   useGetClonedVoiceAudioQuery,
   useGetProjectConfigQuery,
   useListPreProductionShotsQuery,
+  useListProjectShotPromptsQuery,
   useListVideoFeatureFlagsQuery,
   useListVideoModelsQuery,
   usePrepareShotSceneMutation,
   usePrepareShotScenesBatchMutation,
   useRejectVideoGenJobMutation,
   useUpdateProjectConfigMutation,
+  useUpdateShotScenePromptMutation,
 } from "../../api/creatorEndpoints.js";
 import ShotVideoCard from "./ShotVideoCard.jsx";
 
@@ -37,6 +39,10 @@ export default function VideoGenerationSection({ projectId }) {
   const { data: featureFlags = [] } = useListVideoFeatureFlagsQuery();
   const { data: projectConfig } = useGetProjectConfigQuery(projectId, { skip: !projectId });
   const { data: videoModels = [] } = useListVideoModelsQuery();
+  // Prepared prompts are persisted per shot, so a page reload can show what was already built
+  // instead of every card reverting to "not prepared yet" and inviting the creator to pay to
+  // rebuild a prompt that is sitting in the database.
+  const { data: savedPrompts = [] } = useListProjectShotPromptsQuery(projectId, { skip: !projectId });
   const [updateProjectConfig] = useUpdateProjectConfigMutation();
   const [openShotId, setOpenShotId] = useState(null);
   const [preparing, setPreparing] = useState({});
@@ -44,6 +50,9 @@ export default function VideoGenerationSection({ projectId }) {
   const [videos, setVideos] = useState({}); // shotId -> VideoGenJobView
   const [flagOverrides, setFlagOverrides] = useState({}); // flagKey -> boolean, undefined = use project default
   const [preparingDialogues, setPreparingDialogues] = useState(false);
+  // Empty = "every shot", which is exactly what the batch endpoint does with an empty shotIds --
+  // no need to enumerate ids the server already has in its bundle. Ticking boxes narrows it.
+  const [selectedShotIds, setSelectedShotIds] = useState([]);
   const { currentData: savedAudio = [], isError: audioLoadFailed, refetch: reloadAudio } = useGetClonedVoiceAudioQuery(projectId, {
     skip: !projectId,
     refetchOnMountOrArgChange: true,
@@ -54,6 +63,7 @@ export default function VideoGenerationSection({ projectId }) {
 
   const [prepareShotScene] = usePrepareShotSceneMutation();
   const [prepareShotScenesBatch] = usePrepareShotScenesBatchMutation();
+  const [updateShotPrompt] = useUpdateShotScenePromptMutation();
   const [cloneProjectVoices] = useCloneProjectVoicesMutation();
   const [approveJob] = useApproveVideoGenJobMutation();
   const [rejectJob] = useRejectVideoGenJobMutation();
@@ -78,6 +88,9 @@ export default function VideoGenerationSection({ projectId }) {
     externalPromptId: view.promptId,
     recommendedModel: view.recommendedModelId,
     estimatedCost: view.estimatedCost,
+    // Every asset this prompt pulled in (frames, character faces, voice sample, music bed), each
+    // tagged with its kind so the card can thumbnail the images and play the audio.
+    references: view.references,
     prompt: {
       promptOriginal: view.promptOriginal,
       promptCompressed: view.promptCompressed,
@@ -85,6 +98,19 @@ export default function VideoGenerationSection({ projectId }) {
       referenceImageUrls: view.referenceImageUrls,
     },
   });
+
+  // Server rows seed the cards; anything prepared in this session wins, since it is newer than
+  // whatever the query last fetched.
+  useEffect(() => {
+    if (!savedPrompts.length) return;
+    setPrepared((p) => {
+      const next = { ...p };
+      savedPrompts.forEach((view) => {
+        if (view.shotId && !next[view.shotId]) next[view.shotId] = toCardInfo(view);
+      });
+      return next;
+    });
+  }, [savedPrompts]);
 
   const handlePrepare = async (shotId) => {
     setPreparing((s) => ({ ...s, [shotId]: true }));
@@ -100,6 +126,28 @@ export default function VideoGenerationSection({ projectId }) {
       dispatch(showFlash({ message: error?.data?.message || "Could not prepare this shot", type: "error" }));
     } finally {
       setPreparing((s) => ({ ...s, [shotId]: false }));
+    }
+  };
+
+  /** Save an edited prompt. Returns true so the card can leave edit mode only on success --
+   * dropping the creator's text back to the old version on a failed save would lose their work. */
+  const handleSavePrompt = async (shotId, positive) => {
+    const info = prepared[shotId];
+    if (!info?.externalPromptId) return false;
+    try {
+      const view = await updateShotPrompt({
+        projectId,
+        promptId: info.externalPromptId,
+        positive,
+      }).unwrap();
+      // The save created a new prompt version -- adopt its id so a later edit branches from the
+      // edit, not from the original.
+      setPrepared((p) => ({ ...p, [shotId]: toCardInfo(view) }));
+      dispatch(showFlash({ message: "Prompt saved — approve to generate with it", type: "success" }));
+      return true;
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not save this prompt", type: "error" }));
+      return false;
     }
   };
 
@@ -137,27 +185,46 @@ export default function VideoGenerationSection({ projectId }) {
     }
   };
 
+  const toggleShotSelected = (shotId) => {
+    setSelectedShotIds((ids) => (ids.includes(shotId) ? ids.filter((id) => id !== shotId) : [...ids, shotId]));
+  };
+
   const handleGenerateAll = async () => {
     // MOTION_GRAPHIC shots prepare too now -- MotionGraphicShotContextAssemblyStrategy attaches
     // the shot's own MOTION_GRAPHIC image as the reference frame, so Wan/Seedance treat it as the
     // input for image-to-video (animating the actual designed graphic rather than making up its
     // own interpretation of the animation notes). Filtering them out here would leave MG shots
     // out of "Prepare all" and force per-shot manual prepare, defeating the batch action.
-    const shotIds = shots.filter((shot) => !prepared[shot.id]).map((shot) => shot.id);
-    if (!shotIds.length) return;
-    shotIds.forEach((id) => setPreparing((s) => ({ ...s, [id]: true })));
+    //
+    // Nothing ticked -> send [] and let the server expand it to every shot in the project, so the
+    // UI never has to hold a list the bundle already carries. Ticked boxes are sent verbatim.
+    const shotIds = selectedShotIds;
+    // Which cards show a spinner, and the legacy positional fallback's reference order. `shots` is
+    // already in shotNumber order, the same order the backend walks the bundle in.
+    const busyIds = shotIds.length ? shotIds : shots.map((shot) => shot.id);
+    if (!busyIds.length) return;
+    busyIds.forEach((id) => setPreparing((s) => ({ ...s, [id]: true })));
     try {
       // One call for the whole project -- prepareShotsBatch fetches the pre-prod bundle and the
       // model catalog/config once and reuses them across every shot, instead of N independent
       // per-shot prepares.
-      const result = await prepareShotScenesBatch({ projectId, shotIds }).unwrap();
+      // Send the on-screen choices explicitly rather than relying on the stored project config:
+      // the model/resolution dropdowns PUT asynchronously, so a creator who changes one and
+      // immediately hits Prepare would otherwise get the previous value baked into every prompt.
+      const result = await prepareShotScenesBatch({
+        projectId,
+        shotIds,
+        featureFlagOverrides: featureFlagOverridesBody(),
+        modelPin: projectConfig?.preferredVideoModel || undefined,
+        resolutionOverride: projectConfig?.preferredResolution || undefined,
+      }).unwrap();
       // ShotPromptView.shotId only exists from video-generation-service 0.2.21 on. Against an
       // older build every prompt would key to `undefined` and no card would fill in, so fall
-      // back to position: prepareShotsBatch walks shotIds sequentially, appending to prepared[]
-      // on success and failed[] otherwise, which makes "the requested ids minus the failed ones,
-      // in order" an exact positional match for prepared[].
+      // back to position: prepareShotsBatch walks the target shots sequentially, appending to
+      // prepared[] on success and failed[] otherwise, which makes "the requested ids minus the
+      // failed ones, in order" an exact positional match for prepared[].
       const failedIds = new Set((result.failed || []).map((f) => f.shotId));
-      const preparedOrder = shotIds.filter((id) => !failedIds.has(id));
+      const preparedOrder = busyIds.filter((id) => !failedIds.has(id));
       setPrepared((p) => {
         const next = { ...p };
         (result.prepared || []).forEach((view, index) => {
@@ -175,7 +242,7 @@ export default function VideoGenerationSection({ projectId }) {
     } catch (error) {
       dispatch(showFlash({ message: error?.data?.message || "Could not prepare shots", type: "error" }));
     } finally {
-      shotIds.forEach((id) => setPreparing((s) => ({ ...s, [id]: false })));
+      busyIds.forEach((id) => setPreparing((s) => ({ ...s, [id]: false })));
     }
   };
 
@@ -222,13 +289,27 @@ export default function VideoGenerationSection({ projectId }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {selectedShotIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedShotIds([])}
+              className="text-[11px] font-bold text-slate-400 underline hover:text-slate-200"
+            >
+              Clear selection
+            </button>
+          )}
           <button
             type="button"
             onClick={handleGenerateAll}
+            title={selectedShotIds.length
+              ? "Prepare only the shots you ticked."
+              : "Tick shots to prepare just those; with none ticked this prepares every shot in the project."}
             className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-bold text-slate-200 hover:border-purple-400/30"
           >
             <Clapperboard size={13} />
-            Prepare all shots
+            {selectedShotIds.length
+              ? `Prepare ${selectedShotIds.length} selected shot${selectedShotIds.length === 1 ? "" : "s"}`
+              : "Prepare all shots"}
           </button>
           <button
             type="button"
@@ -315,7 +396,10 @@ export default function VideoGenerationSection({ projectId }) {
             busy={preparing[shot.id]}
             video={videos[shot.id]}
             dubbed={dubbedVoices[shot.id]}
+            selected={selectedShotIds.includes(shot.id)}
+            onSelectToggle={() => toggleShotSelected(shot.id)}
             onPrepare={() => handlePrepare(shot.id)}
+            onSavePrompt={(positive) => handleSavePrompt(shot.id, positive)}
             onApprove={() => handleApprove(shot.id)}
             onReject={() => handleReject(shot.id)}
           />

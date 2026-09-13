@@ -3109,6 +3109,9 @@ export const creatorApi = apiSlice.injectEndpoints({
         method: "POST",
         body: overrides,
       }),
+      invalidatesTags: (_result, _error, { projectId }) => [
+        { type: "CreatorHomeProjects", id: `shot-prompts-${projectId}` },
+      ],
     }),
 
     // Bulk shot-prepare. Sequential inside video-gen, one HTTP call from the UI so the DB
@@ -3116,18 +3119,28 @@ export const creatorApi = apiSlice.injectEndpoints({
     // per-shot fan-out was exhausting Hikari and timing out mid-batch). Response includes
     // every prepared prompt inline so the UI can render editable rows without a follow-up
     // per-shot GET; per-shot failures come back in `failed` rather than aborting the batch.
+    //
+    // An empty/omitted shotIds means "every shot in the project" -- the server expands it from the
+    // prepare bundle it already fetched, so the UI doesn't enumerate ids just to hand them back.
+    // The remaining fields are the project-wide prepare choices (dialogue/captions flags, pinned
+    // video model, resolution) and apply to every shot in the batch.
     prepareShotScenesBatch: builder.mutation({
-      query: ({ projectId, shotIds }) => ({
+      query: ({ projectId, shotIds, featureFlagOverrides, modelPin, resolutionOverride }) => ({
         url: platformUrl(`/scenes/projects/${projectId}/shots/prepare-batch`),
         method: "POST",
-        body: { shotIds },
+        body: { shotIds, featureFlagOverrides, modelPin, resolutionOverride },
       }),
+      invalidatesTags: (_result, _error, { projectId }) => [
+        { type: "CreatorHomeProjects", id: `shot-prompts-${projectId}` },
+      ],
     }),
 
     // All prepared shot prompts for a project, one row per shot (latest version wins). Video
-    // workspace calls this once on page load to render the full editable list.
+    // workspace calls this once on page load to render the full editable list -- this is what
+    // makes a prepared prompt survive a refresh instead of living only in component state.
     listProjectShotPrompts: builder.query({
       query: (projectId) => ({ url: platformUrl(`/scenes/projects/${projectId}/shot-prompts`) }),
+      providesTags: (_result, _error, projectId) => [{ type: "CreatorHomeProjects", id: `shot-prompts-${projectId}` }],
     }),
 
     // Model catalog for the video-workspace "generate with" dropdown. Proxied through video-gen
@@ -3141,12 +3154,19 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: (promptId) => ({ url: platformUrl(`/scenes/${promptId}`) }),
     }),
 
+    // Save a creator's edit of a prepared prompt. The backend writes a NEW prompt version (parent
+    // pointing at the one edited) under the SAME job, copying across the attachments and source
+    // ids, and approve() dispatches a job's newest prompt -- so the returned promptId is what
+    // "Approve & generate" will render. Nothing is re-derived and nothing is charged for a save.
+    // projectId is optional and only used to refresh the project's prompt list.
     updateShotScenePrompt: builder.mutation({
       query: ({ promptId, positive }) => ({
         url: platformUrl(`/scenes/${promptId}`),
         method: "PUT",
         body: { positive },
       }),
+      invalidatesTags: (_result, _error, { projectId }) =>
+        projectId ? [{ type: "CreatorHomeProjects", id: `shot-prompts-${projectId}` }] : [],
     }),
 
     // video-generation-service FinalRenderController -- concatenates every completed shot
