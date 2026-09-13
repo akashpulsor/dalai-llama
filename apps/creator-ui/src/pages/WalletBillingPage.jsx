@@ -49,7 +49,9 @@ export default function WalletBillingPage() {
     let spent = 0;
     let earned = 0;
     for (const tx of transactions) {
-      const amt = Number(tx.amount) || 0;
+      // billing-service stores a debit's amount already negated (see WalletServiceImpl.debit) --
+      // these are magnitudes for display, the sign is conveyed by which bucket a row falls into.
+      const amt = Math.abs(Number(tx.amount) || 0);
       if (isClientEarning(tx)) earned += amt;
       else if (tx.type === "RECHARGE") paidIn += amt;
       else if (OUT_TYPES.has(tx.type)) spent += amt;
@@ -111,7 +113,9 @@ export default function WalletBillingPage() {
             {transactions.map((tx) => {
               const out = OUT_TYPES.has(tx.type);
               const earned = isClientEarning(tx);
-              const amt = Number(tx.amount) || 0;
+              // Same magnitude-only reasoning as the summary above -- avoids a doubled sign
+              // ("−-₹0") when tx.amount is already negative for a debit.
+              const amt = Math.abs(Number(tx.amount) || 0);
               return (
                 <div key={tx.id} className="flex items-center gap-3 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2.5">
                   <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${

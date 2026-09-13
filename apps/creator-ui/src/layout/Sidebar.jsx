@@ -6,6 +6,7 @@ import { selectTenantId, useGetWalletBalanceQuery } from "@dalaillama/shared-sto
 import {
   BarChart3,
   CreditCard,
+  Crown,
   FolderOpen,
   Home,
   Sparkles,
@@ -18,7 +19,9 @@ import UserChip from "./UserChip.jsx";
 
 /** Matches the Figma nav spec: Home, Projects, Plans & Brand, Cast Library, AI Editor,
  * Wallet & Billing. "Plans & Brand" is BrandPage.jsx -- brand context version history plus the
- * product library for that brand. Wallet & Billing has its own page (WalletBillingPage.jsx). */
+ * product library for that brand. Wallet & Billing has its own page (WalletBillingPage.jsx).
+ * Subscription is a later addition (creator-video plan management, not in the original spec) --
+ * its own nav entry since it's a distinct destination from the wallet ledger, not a tab inside it. */
 const navItems = [
   { id: "home", label: "Home", icon: Home, path: "/" },
   { id: "projects", label: "Projects", icon: FolderOpen, path: "/", modal: "projects" },
@@ -26,6 +29,7 @@ const navItems = [
   { id: "cast", label: "Cast Library", icon: Users, path: "/cast-library" },
   { id: "ai-editor", label: "AI Editor", icon: Wand2, path: "/editor" },
   { id: "wallet-billing", label: "Wallet & Billing", icon: CreditCard, path: "/wallet-billing" },
+  { id: "subscription", label: "Subscription", icon: Crown, path: "/subscription" },
 ];
 
 export default function Sidebar() {
