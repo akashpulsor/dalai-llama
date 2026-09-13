@@ -151,10 +151,18 @@ export default function VideoGenerationSection({ projectId }) {
       // model catalog/config once and reuses them across every shot, instead of N independent
       // per-shot prepares.
       const result = await prepareShotScenesBatch({ projectId, shotIds }).unwrap();
+      // ShotPromptView.shotId only exists from video-generation-service 0.2.21 on. Against an
+      // older build every prompt would key to `undefined` and no card would fill in, so fall
+      // back to position: prepareShotsBatch walks shotIds sequentially, appending to prepared[]
+      // on success and failed[] otherwise, which makes "the requested ids minus the failed ones,
+      // in order" an exact positional match for prepared[].
+      const failedIds = new Set((result.failed || []).map((f) => f.shotId));
+      const preparedOrder = shotIds.filter((id) => !failedIds.has(id));
       setPrepared((p) => {
         const next = { ...p };
-        (result.prepared || []).forEach((view) => {
-          next[view.shotId] = toCardInfo(view);
+        (result.prepared || []).forEach((view, index) => {
+          const shotId = view.shotId || preparedOrder[index];
+          if (shotId) next[shotId] = toCardInfo(view);
         });
         return next;
       });
