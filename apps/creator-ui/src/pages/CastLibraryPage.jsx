@@ -12,6 +12,8 @@ import {
 import BuiltinVoicePicker from "../components/creator/BuiltinVoicePicker.jsx";
 import CastProfileQuickCreate from "../components/creator/CastProfileQuickCreate.jsx";
 import VoiceSampleField from "../components/creator/VoiceSampleField.jsx";
+import FeatureLock from "../components/billing/FeatureLock.jsx";
+import useCreatorVideoEntitlements from "../hooks/useCreatorVideoEntitlements.js";
 
 /** Cast Library, sidebar-level: the tenant's reusable actors (project_id IS NULL), independent of
  * any one project. "Product" cast profiles (a product cast as an on-screen character) live here
@@ -25,6 +27,7 @@ export default function CastLibraryPage() {
   const [uploadMedia, { isLoading: uploadingVoice }] = useUploadCastMediaMutation();
   const [updateVoice, { isLoading: savingVoice }] = useUpdateCastProfileVoiceMutation();
   const [selectBuiltinVoice, { isLoading: savingBuiltinVoice }] = useSelectCastProfileBuiltinVoiceMutation();
+  const { entitlements } = useCreatorVideoEntitlements();
   const [creating, setCreating] = useState(false);
   const [voiceEditId, setVoiceEditId] = useState(null);
   const [voiceEditMode, setVoiceEditMode] = useState("upload"); // "upload" | "builtin"
@@ -182,9 +185,9 @@ export default function CastLibraryPage() {
                     </div>
 
                     {voiceEditMode === "upload" ? (
-                      <>
+                      <FeatureLock unlocked={entitlements.characterVoiceUploadEnabled} feature="Character voice sample upload">
                         <VoiceSampleField file={voiceFile} onFileChange={setVoiceFile} />
-                        <div className="flex gap-2">
+                        <div className="mt-2.5 flex gap-2">
                           <button
                             type="button"
                             onClick={() => { setVoiceEditId(null); setVoiceFile(null); }}
@@ -201,7 +204,7 @@ export default function CastLibraryPage() {
                             {savingVoiceFile ? "Saving…" : "Save voice"}
                           </button>
                         </div>
-                      </>
+                      </FeatureLock>
                     ) : (
                       <>
                         <BuiltinVoicePicker

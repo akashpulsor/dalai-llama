@@ -8,6 +8,7 @@ import BrandPage from "./pages/BrandPage.jsx";
 import ProjectRequirementPage from "./pages/ProjectRequirementPage.jsx";
 import ProjectPage from "./pages/ProjectPage.jsx";
 import WalletBillingPage from "./pages/WalletBillingPage.jsx";
+import SubscriptionPage from "./pages/SubscriptionPage.jsx";
 import CastLibraryPage from "./pages/CastLibraryPage.jsx";
 
 const routes = [
@@ -15,6 +16,7 @@ const routes = [
   { path: "planner", element: <PlannerPage /> },
   { path: "brand", element: <BrandPage /> },
   { path: "wallet-billing", element: <WalletBillingPage /> },
+  { path: "subscription", element: <SubscriptionPage /> },
   { path: "cast-library", element: <CastLibraryPage /> },
   { path: "home", element: <Navigate to="/" replace /> },
   { path: "requirements/:requirementId", element: <ProjectRequirementPage /> },

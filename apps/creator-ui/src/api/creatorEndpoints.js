@@ -1779,6 +1779,54 @@ export const creatorApi = apiSlice.injectEndpoints({
       invalidatesTags: ["CreatorSubscription"],
     }),
 
+    // product-service CreatorVideoSubscriptionController -- the real creator-video subscription
+    // (edits/upload/upscaling/voice-clone/share gating), separate from the CREATOR/CREATOR_PRO
+    // stub above (that one is wired to the PBX tenant-app system and isn't this feature).
+    listCreatorVideoPlans: builder.query({
+      query: () => "/products/creator-video/plans",
+      providesTags: ["CreatorVideoSubscription"],
+    }),
+    // Primary lookup by subscriptionId (matches how billing-service/product-service key
+    // everything else in this flow) -- getCreatorVideoEntitlementsByTenant below is the
+    // convenience form for a page load that only has tenantId so far.
+    getCreatorVideoEntitlementsBySubscription: builder.query({
+      query: (subscriptionId) => `/products/creator-video/subscriptions/${subscriptionId}/entitlements`,
+      providesTags: ["CreatorVideoSubscription"],
+    }),
+    getCreatorVideoEntitlementsByTenant: builder.query({
+      query: (tenantId) => `/products/creator-video/tenants/${tenantId}/entitlements`,
+      providesTags: ["CreatorVideoSubscription"],
+    }),
+    subscribeCreatorVideo: builder.mutation({
+      query: ({ tenantId, planCode }) => ({
+        url: "/products/creator-video/subscriptions",
+        method: "POST",
+        body: { tenantId, planCode },
+      }),
+      invalidatesTags: ["CreatorVideoSubscription", "CreatorWallet"],
+    }),
+    cancelCreatorVideoSubscription: builder.mutation({
+      query: (subscriptionId) => ({
+        url: `/products/creator-video/subscriptions/${subscriptionId}/cancel`,
+        method: "POST",
+      }),
+      invalidatesTags: ["CreatorVideoSubscription"],
+    }),
+    pauseCreatorVideoSubscription: builder.mutation({
+      query: (subscriptionId) => ({
+        url: `/products/creator-video/subscriptions/${subscriptionId}/pause`,
+        method: "POST",
+      }),
+      invalidatesTags: ["CreatorVideoSubscription"],
+    }),
+    resumeCreatorVideoSubscription: builder.mutation({
+      query: (subscriptionId) => ({
+        url: `/products/creator-video/subscriptions/${subscriptionId}/resume`,
+        method: "POST",
+      }),
+      invalidatesTags: ["CreatorVideoSubscription", "CreatorWallet"],
+    }),
+
     /* ------------------------------------------------------------------ */
     /*  Home page: recent projects (pre-production-service), trend tags   */
     /*  (trend-intelligence-service), and the standalone "new idea" brief */
@@ -3327,6 +3375,13 @@ export const {
   useListUsageRecordsQuery,
   useGetCreatorSubscriptionQuery,
   useStartSubscriptionUpgradeMutation,
+  useListCreatorVideoPlansQuery,
+  useGetCreatorVideoEntitlementsBySubscriptionQuery,
+  useGetCreatorVideoEntitlementsByTenantQuery,
+  useSubscribeCreatorVideoMutation,
+  useCancelCreatorVideoSubscriptionMutation,
+  usePauseCreatorVideoSubscriptionMutation,
+  useResumeCreatorVideoSubscriptionMutation,
   useListPreProductionProjectsQuery,
   useListShotDesignReadyProjectsQuery,
   useListTrendReportsQuery,

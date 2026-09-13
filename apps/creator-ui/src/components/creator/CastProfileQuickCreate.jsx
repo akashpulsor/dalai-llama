@@ -11,6 +11,8 @@ import {
 import BuiltinVoicePicker from "./BuiltinVoicePicker.jsx";
 import VoiceSampleField from "./VoiceSampleField.jsx";
 import { normalizeGender } from "../../utils/gender.js";
+import FeatureLock from "../billing/FeatureLock.jsx";
+import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
 
 const BLANK = { displayName: "", description: "", age: "", gender: "" };
 
@@ -29,6 +31,7 @@ export default function CastProfileQuickCreate({ profileType, projectId, charact
   const [uploadMedia, { isLoading: uploading }] = useUploadCastMediaMutation();
   const [createProfile, { isLoading: creating }] = useCreateCastProfileMutation();
   const busy = uploading || creating;
+  const { entitlements } = useCreatorVideoEntitlements();
   const isActor = profileType === "ACTOR";
 
   const { data: genderOptions = [] } = useListGendersQuery(undefined, { skip: !isActor });
@@ -176,19 +179,25 @@ export default function CastProfileQuickCreate({ profileType, projectId, charact
         </div>
 
         {(!isActor || identityMode === "real-person") && (
-          <div>
-            <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-              {isActor ? "Face reference photo" : "Product photo"}
-            </label>
-            <label className="flex cursor-pointer items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2.5 py-2 text-xs font-semibold text-slate-300 hover:border-purple-400/30">
-              <Upload size={12} />
-              {faceFile ? faceFile.name : "Choose a file"}
-              <input type="file" accept="image/*" className="hidden" onChange={(event) => setFaceFile(event.target.files?.[0] || null)} />
-            </label>
-          </div>
+          <FeatureLock unlocked={!isActor || entitlements.imageUploadEnabled} feature="Character reference image upload" compact>
+            <div>
+              <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                {isActor ? "Face reference photo" : "Product photo"}
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2.5 py-2 text-xs font-semibold text-slate-300 hover:border-purple-400/30">
+                <Upload size={12} />
+                {faceFile ? faceFile.name : "Choose a file"}
+                <input type="file" accept="image/*" className="hidden" onChange={(event) => setFaceFile(event.target.files?.[0] || null)} />
+              </label>
+            </div>
+          </FeatureLock>
         )}
 
-        {isActor && identityMode === "real-person" && <VoiceSampleField file={voiceFile} onFileChange={setVoiceFile} />}
+        {isActor && identityMode === "real-person" && (
+          <FeatureLock unlocked={entitlements.characterVoiceUploadEnabled} feature="Character voice sample upload" compact>
+            <VoiceSampleField file={voiceFile} onFileChange={setVoiceFile} />
+          </FeatureLock>
+        )}
 
         {isActor && identityMode === "ai-generated" && (
           <BuiltinVoicePicker

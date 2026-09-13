@@ -1,10 +1,12 @@
 // @ts-nocheck
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { ArrowDownLeft, ArrowUpRight, Percent, Save, TrendingUp } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Crown, Percent, Save, TrendingUp } from "lucide-react";
+import { Link } from "react-router-dom";
 import { selectTenantId, showFlash, useGetWalletBalanceQuery } from "@dalaillama/shared-store";
 import { useGetOrganizationQuery, useListWalletTransactionsQuery, useUpdateOrganizationMutation } from "../api/creatorEndpoints.js";
 import WalletBalanceButton from "../components/billing/WalletBalanceButton.jsx";
+import useCreatorVideoEntitlements from "../hooks/useCreatorVideoEntitlements.js";
 
 const rupee = (n, code = "INR") =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: code || "INR", maximumFractionDigits: 0 }).format(Number(n) || 0);
@@ -40,6 +42,7 @@ export default function WalletBillingPage() {
   const [updateOrganization, { isLoading: saving }] = useUpdateOrganizationMutation();
   const [marginInput, setMarginInput] = useState("");
   const currencyCode = wallet?.currency || "INR";
+  const { planName, status: subscriptionStatus } = useCreatorVideoEntitlements();
 
   const summary = useMemo(() => {
     let paidIn = 0;
@@ -77,8 +80,12 @@ export default function WalletBillingPage() {
       <h1 className="text-2xl font-bold text-white">Wallet & Billing</h1>
       <p className="mt-1 text-sm font-medium text-slate-400">Your wallet, and how client-facing pricing is set.</p>
 
-      <div className="mt-6">
+      <div className="mt-6 flex flex-wrap items-center gap-3">
         <WalletBalanceButton wallet={wallet} isLoading={walletLoading} onRecharge={() => window.dispatchEvent(new CustomEvent("creator:open-recharge"))} />
+        <Link to="/subscription" className="creator-control flex items-center gap-2 px-3.5 py-2.5 text-xs font-bold text-amber-100">
+          <Crown size={15} className="text-amber-300" />
+          {subscriptionStatus === "ACTIVE" ? `${planName} plan` : "Subscribe for edits, uploads & sharing"}
+        </Link>
       </div>
 
       {/* SUMMARY */}

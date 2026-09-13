@@ -22,6 +22,8 @@ import {
   useUpdateProjectRequirementQuoteMutation,
 } from "../api/creatorEndpoints.js";
 import { runRazorpayCheckout } from "../utils/walletRecharge.js";
+import FeatureLock from "../components/billing/FeatureLock.jsx";
+import useCreatorVideoEntitlements from "../hooks/useCreatorVideoEntitlements.js";
 
 const IDEA_EDIT_FIELDS = [
   { key: "title", label: "Title" },
@@ -159,6 +161,7 @@ export default function ProjectRequirementPage() {
   const tenantId = useSelector(selectTenantId);
   const { data: organization } = useGetOrganizationQuery();
   const isCreator = organization?.accountType === "CREATOR";
+  const { entitlements } = useCreatorVideoEntitlements();
 
   const [lockedResult, setLockedResult] = useState(null);
   const [paying, setPaying] = useState(false);
@@ -371,12 +374,16 @@ export default function ProjectRequirementPage() {
         </div>
 
         {shareUrl && (
-          <div className="mb-5 flex items-center gap-2.5 rounded-lg border border-white/10 bg-black/40 px-3 py-2.5">
-            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-purple-300">{shareUrl}</span>
-            <button type="button" onClick={copyLink} className="flex flex-shrink-0 items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-bold text-slate-100 hover:border-purple-400/40">
-              <Copy size={13} />
-              Copy link
-            </button>
+          <div className="mb-5">
+            <FeatureLock unlocked={entitlements.briefUrlShareEnabled} feature="Sharing a brief link with clients" compact>
+              <div className="flex items-center gap-2.5 rounded-lg border border-white/10 bg-black/40 px-3 py-2.5">
+                <span className="min-w-0 flex-1 truncate text-xs font-semibold text-purple-300">{shareUrl}</span>
+                <button type="button" onClick={copyLink} className="flex flex-shrink-0 items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-bold text-slate-100 hover:border-purple-400/40">
+                  <Copy size={13} />
+                  Copy link
+                </button>
+              </div>
+            </FeatureLock>
           </div>
         )}
 

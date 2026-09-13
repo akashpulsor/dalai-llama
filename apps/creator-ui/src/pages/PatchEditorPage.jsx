@@ -15,6 +15,8 @@ import PatchList from "../features/patchEditor/components/PatchList.jsx";
 import UploadDropzone from "../features/patchEditor/components/UploadDropzone.jsx";
 import ProjectPickerPanel from "../features/patchEditor/components/ProjectPickerPanel.jsx";
 import { clamp } from "../features/patchEditor/utils/time.js";
+import FeatureLock from "../components/billing/FeatureLock.jsx";
+import useCreatorVideoEntitlements from "../hooks/useCreatorVideoEntitlements.js";
 
 const FRAME_STEP = 1 / 30;
 
@@ -22,6 +24,7 @@ function PatchEditorWorkspace() {
   const { state, actions } = usePatchEditor();
   const location = useLocation();
   const hasVideo = state.status === "ready" && state.sourceFile;
+  const { entitlements } = useCreatorVideoEntitlements();
 
   useEffect(() => {
     const incomingAssetUrl = location.state?.assetUrl;
@@ -72,34 +75,38 @@ function PatchEditorWorkspace() {
           </p>
         </div>
 
-        {!hasVideo ? (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
-            <UploadDropzone />
-            <ProjectPickerPanel />
-          </div>
-        ) : (
-          <section className="creator-panel overflow-hidden p-4 sm:p-5">
-            <Toolbar />
+        <FeatureLock unlocked={entitlements.editsEnabled} feature="The AI editor">
+          {!hasVideo ? (
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
+              <UploadDropzone />
+              <ProjectPickerPanel />
+            </div>
+          ) : (
+            <section className="creator-panel overflow-hidden p-4 sm:p-5">
+              <Toolbar />
 
-            <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
-              <div className="min-h-[22rem] overflow-hidden rounded-lg border border-white/10 bg-black">
-                {state.viewMode === "patched" ? <PatchedPreviewPlayer /> : <VideoPlayer />}
+              <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+                <div className="min-h-[22rem] overflow-hidden rounded-lg border border-white/10 bg-black">
+                  {state.viewMode === "patched" ? <PatchedPreviewPlayer /> : <VideoPlayer />}
+                </div>
+                <aside className="space-y-3">
+                  <VideoMetadataPanel />
+                  <SelectionPanel />
+                  <AiEditPanel />
+                  <DubPanel />
+                  <FeatureLock unlocked={entitlements.upscalingEnabled} feature="Upscaling" compact>
+                    <UpscalePanel />
+                  </FeatureLock>
+                  <PatchList />
+                </aside>
               </div>
-              <aside className="space-y-3">
-                <VideoMetadataPanel />
-                <SelectionPanel />
-                <AiEditPanel />
-                <DubPanel />
-                <UpscalePanel />
-                <PatchList />
-              </aside>
-            </div>
 
-            <div className="mt-4">
-              <Timeline />
-            </div>
-          </section>
-        )}
+              <div className="mt-4">
+                <Timeline />
+              </div>
+            </section>
+          )}
+        </FeatureLock>
       </section>
     </div>
   );
