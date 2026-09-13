@@ -7,7 +7,6 @@ import {
   useGenerateShotBackgroundMusicMutation,
   useGetShotBackgroundMusicQuery,
   useListPreProductionShotImagesQuery,
-  useListShotDialogueBeatsQuery,
 } from "../../api/creatorEndpoints.js";
 import DialogueBeatsEditor from "./DialogueBeatsEditor.jsx";
 import MotionGraphicPanel from "./MotionGraphicPanel.jsx";
@@ -76,7 +75,6 @@ const ASPECT_RATIO_CSS = {
  * full prepare/approve panel below it, spanning the grid so it doesn't stretch its neighbors. */
 export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info, busy, video, dubbed, onPrepare, onApprove, onReject, onAutoFix }) {
   const { data: images = [] } = useListPreProductionShotImagesQuery(shot.id, { skip: !shot.id });
-  const { data: beats = [] } = useListShotDialogueBeatsQuery(shot.id, { skip: !shot.id });
   const isMotionGraphic = shot.shotType === "MOTION_GRAPHIC";
   // MG shots don't have PRODUCTION/STORYBOARD (see ShotImagesPanel's kindsForShotType) -- their
   // equivalent frame is the MOTION_GRAPHIC preview. Preferring it first for MG shots means the
@@ -90,11 +88,16 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
   // only counts as spoken dialogue for DIALOGUE shots, not as a stand-in for ACTION/B_ROLL/MOTION_
   // GRAPHIC scene direction. A beat-less shot with real dialogue hasn't had its voice dubbed yet.
   const dialogueVoiceText = (shot.voiceOver || (shot.shotType === "DIALOGUE" ? shot.scriptLine : "") || "").trim();
-  const needsVoice = !video && !!dialogueVoiceText && beats.length === 0;
   // "Prepare all dialogues" already cloned+synthesized this shot's line -- distinguish that from
   // a shot that hasn't been dubbed at all yet, since the audio is sitting ready for review, not
   // missing.
   const dubReady = !!(dubbed?.audioUrl || dubbed?.audioDataUri);
+  // Both dub badges resolve from `shot` plus the project-wide cloned-audio query the parent
+  // already loads, so the grid paints its real dub state immediately. This deliberately does NOT
+  // read `beats`: that is a per-shot request fired once per card, so gating the badge on it left
+  // every card blank until N round-trips landed (and briefly showed "Needs voice" on shots that
+  // in fact had beats, since an unresolved query reads as an empty list).
+  const needsVoice = !video && !!dialogueVoiceText && !dubReady;
   // Signed URLs are re-signed (new query string) on every images refetch even when the object
   // itself hasn't changed, which would otherwise force the browser to re-download the frame on
   // every open. Cache the bytes locally keyed by shot+kind instead of the ever-changing URL.

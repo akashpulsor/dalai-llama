@@ -1,8 +1,14 @@
 // @ts-nocheck
-import React from "react";
+import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Check, Crown, Loader2, Pause, Play, X } from "lucide-react";
-import { selectTenantId, showFlash } from "@dalaillama/shared-store";
+import {
+  selectTenantId,
+  showFlash,
+  useAddWalletBalanceMutation,
+  useGetWalletBalanceQuery,
+  useVerifyWalletPaymentMutation,
+} from "@dalaillama/shared-store";
 import {
   useCancelCreatorVideoSubscriptionMutation,
   useListCreatorVideoPlansQuery,
@@ -11,6 +17,7 @@ import {
   useSubscribeCreatorVideoMutation,
 } from "../api/creatorEndpoints.js";
 import useCreatorVideoEntitlements from "../hooks/useCreatorVideoEntitlements.js";
+import { runWalletRecharge, walletRechargeErrorMessage } from "../utils/walletRecharge.js";
 
 const rupee = (n, code = "INR") =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: code || "INR", maximumFractionDigits: 0 }).format(Number(n) || 0);
@@ -39,24 +46,69 @@ export default function SubscriptionPage() {
   const [cancel, { isLoading: cancelling }] = useCancelCreatorVideoSubscriptionMutation();
   const [pause, { isLoading: pausing }] = usePauseCreatorVideoSubscriptionMutation();
   const [resume, { isLoading: resuming }] = useResumeCreatorVideoSubscriptionMutation();
+  const { data: wallet, refetch: refetchWallet } = useGetWalletBalanceQuery(tenantId, { skip: !tenantId });
+  const [createWalletRecharge] = useAddWalletBalanceMutation();
+  const [verifyWalletPayment] = useVerifyWalletPaymentMutation();
+  const [toppingUp, setToppingUp] = useState(false);
 
   const proPlans = plans.filter((p) => p.tier !== "FREE");
-  const busy = subscribing || cancelling || pausing || resuming;
+  const busy = subscribing || cancelling || pausing || resuming || toppingUp;
+
+  /** product-service answers an unaffordable subscribe with HTTP 402 carrying the full
+   * CreatorVideoSubscriptionResponse (status=INSUFFICIENT_BALANCE + shortFallAmount), so RTK
+   * Query rejects rather than resolving -- the shortfall is only reachable from the error body. */
+  const insufficientBalancePayload = (error) => {
+    const payload = error?.data;
+    return error?.status === 402 && payload?.status === "INSUFFICIENT_BALANCE" ? payload : null;
+  };
+
+  /** Razorpay rejects anything under 1 rupee, and a fractional shortfall would still leave the
+   * wallet a paisa short on retry -- round the gap up to the next whole rupee. */
+  const topUpAmountFor = (shortFall) => Math.max(1, Math.ceil(Number(shortFall) || 0));
 
   const handleSubscribe = async (plan) => {
     try {
-      const result = await subscribe({ tenantId, planCode: plan.planCode }).unwrap();
-      if (result.status === "INSUFFICIENT_BALANCE") {
-        dispatch(showFlash({
-          message: `Recharge your wallet — you need ${rupee(result.shortFallAmount, result.currency)} more to subscribe.`,
-          type: "error",
-        }));
-        window.dispatchEvent(new CustomEvent("creator:open-recharge"));
+      await subscribe({ tenantId, planCode: plan.planCode }).unwrap();
+      dispatch(showFlash({ message: `Subscribed to ${plan.planName}`, type: "success" }));
+      return;
+    } catch (error) {
+      const shortfall = insufficientBalancePayload(error);
+      if (!shortfall) {
+        dispatch(showFlash({ message: error?.data?.message || "Could not subscribe", type: "error" }));
         return;
       }
+      await topUpThenSubscribe(plan, shortfall);
+    }
+  };
+
+  /** Wallet top-up and subscribe are two separate server calls, so this cannot be atomic: the
+   * recharge is verified and credited first, then the subscribe is retried. If that retry fails
+   * the money is already in the wallet (not lost) and the user can subscribe again. */
+  const topUpThenSubscribe = async (plan, shortfall) => {
+    const amount = topUpAmountFor(shortfall.shortFallAmount);
+    setToppingUp(true);
+    try {
+      dispatch(showFlash({
+        message: `You're ${rupee(shortfall.shortFallAmount, shortfall.currency)} short — opening payment for ${rupee(amount, shortfall.currency)}.`,
+        type: "info",
+      }));
+      await runWalletRecharge({
+        tenantId,
+        body: { amount, currency: shortfall.currency || wallet?.currency },
+        currencyFallback: wallet?.currency,
+        createWalletRecharge,
+        verifyWalletPayment,
+      });
+      await refetchWallet?.();
+      await subscribe({ tenantId, planCode: plan.planCode }).unwrap();
       dispatch(showFlash({ message: `Subscribed to ${plan.planName}`, type: "success" }));
     } catch (error) {
-      dispatch(showFlash({ message: error?.data?.message || "Could not subscribe", type: "error" }));
+      dispatch(showFlash({
+        message: error?.data?.message || error?.message || walletRechargeErrorMessage(error),
+        type: error?.paymentCancelled ? "warning" : "error",
+      }));
+    } finally {
+      setToppingUp(false);
     }
   };
 
