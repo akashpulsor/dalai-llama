@@ -7,12 +7,12 @@ import {
   useApproveVideoGenJobMutation,
   useCloneProjectVoicesMutation,
   useGetClonedVoiceAudioQuery,
-  useDispatchShotMutation,
   useGetProjectConfigQuery,
-  useLazyGetVideoGenPromptQuery,
   useListPreProductionShotsQuery,
   useListVideoFeatureFlagsQuery,
   useListVideoModelsQuery,
+  usePrepareShotSceneMutation,
+  usePrepareShotScenesBatchMutation,
   useRejectVideoGenJobMutation,
   useUpdateProjectConfigMutation,
 } from "../../api/creatorEndpoints.js";
@@ -24,11 +24,12 @@ const dialogueTextForShot = (shot) => (
 
 /**
  * Video generation, the stage after shots/images: per shot, build the prompt (assemble +
- * mandatory pre-flight critique on pre-production-service's side, autoApprove=false so nothing
- * spends yet), show the model video-generation-service recommended + why + the exact prompt text,
- * then approve (dispatches for real, blocks until the clip is ready) or reject. "Generate all"
- * just loops this per shot -- video-generation-service has no real multi-shot stitching yet, so
- * the result is a gallery of independently playable clips, not one combined video.
+ * recommend/resolve a model, no spend yet) via video-generation-service's own prepare-scene
+ * flow, show the model + estimated cost + the exact prompt text, then approve (dispatches for
+ * real, blocks until the clip is ready) or reject. Pre-production-service's old per-shot dispatch
+ * path (with its own mandatory pre-flight critique) is retired -- video-generation-service now
+ * owns prepare end to end, same as CloneVoiceService owns the voice-clone path. "Prepare all
+ * shots" calls the batch endpoint once for the whole project instead of looping per shot.
  */
 export default function VideoGenerationSection({ projectId }) {
   const dispatch = useDispatch();
@@ -39,7 +40,7 @@ export default function VideoGenerationSection({ projectId }) {
   const [updateProjectConfig] = useUpdateProjectConfigMutation();
   const [openShotId, setOpenShotId] = useState(null);
   const [preparing, setPreparing] = useState({});
-  const [prepared, setPrepared] = useState({}); // shotId -> ShotDispatchResponse
+  const [prepared, setPrepared] = useState({}); // shotId -> toCardInfo(ShotPromptView)
   const [videos, setVideos] = useState({}); // shotId -> VideoGenJobView
   const [flagOverrides, setFlagOverrides] = useState({}); // flagKey -> boolean, undefined = use project default
   const [preparingDialogues, setPreparingDialogues] = useState(false);
@@ -51,32 +52,50 @@ export default function VideoGenerationSection({ projectId }) {
   });
   const dubbedVoices = Object.fromEntries(savedAudio.map((audio) => [audio.shotId, audio]));
 
-  const [dispatchShot] = useDispatchShotMutation();
-  const [fetchPrompt] = useLazyGetVideoGenPromptQuery();
+  const [prepareShotScene] = usePrepareShotSceneMutation();
+  const [prepareShotScenesBatch] = usePrepareShotScenesBatchMutation();
   const [cloneProjectVoices] = useCloneProjectVoicesMutation();
   const [approveJob] = useApproveVideoGenJobMutation();
   const [rejectJob] = useRejectVideoGenJobMutation();
+
+  // FeatureFlags on the wire is FlagState ("ON"/"OFF") per field, not a boolean map -- undefined
+  // stays undefined so the backend falls back to the project/effective default instead of forcing
+  // a value.
+  const featureFlagOverridesBody = () => {
+    const { dialogue, captions } = flagOverrides;
+    if (dialogue === undefined && captions === undefined) return undefined;
+    return {
+      dialogue: dialogue === undefined ? undefined : dialogue ? "ON" : "OFF",
+      captions: captions === undefined ? undefined : captions ? "ON" : "OFF",
+    };
+  };
+
+  // ShotPromptView -> the shape ShotVideoCard already renders (externalJobId/recommendedModel/
+  // prompt.*) so the card stays untouched by this move from pre-prod's dispatch() to video-gen's
+  // own prepare-scene endpoints.
+  const toCardInfo = (view) => ({
+    externalJobId: view.jobId,
+    externalPromptId: view.promptId,
+    recommendedModel: view.recommendedModelId,
+    estimatedCost: view.estimatedCost,
+    prompt: {
+      promptOriginal: view.promptOriginal,
+      promptCompressed: view.promptCompressed,
+      negativePrompt: view.negativePrompt,
+      referenceImageUrls: view.referenceImageUrls,
+    },
+  });
 
   const handlePrepare = async (shotId) => {
     setPreparing((s) => ({ ...s, [shotId]: true }));
     setOpenShotId(shotId);
     try {
-      const response = await dispatchShot({
+      const view = await prepareShotScene({
+        projectId,
         shotId,
-        autoApprove: false,
-        dialogue: flagOverrides.dialogue,
-        captions: flagOverrides.captions,
+        featureFlagOverrides: featureFlagOverridesBody(),
       }).unwrap();
-      if (response.critiqueVerdict === "NEEDS_HUMAN_REVIEW") {
-        dispatch(showFlash({ message: "Pre-flight critique flagged issues with this shot's plan — see findings below", type: "error" }));
-        setPrepared((p) => ({ ...p, [shotId]: response }));
-        return;
-      }
-      let promptView = null;
-      if (response.externalPromptId) {
-        promptView = await fetchPrompt(response.externalPromptId).unwrap();
-      }
-      setPrepared((p) => ({ ...p, [shotId]: { ...response, prompt: promptView } }));
+      setPrepared((p) => ({ ...p, [shotId]: toCardInfo(view) }));
     } catch (error) {
       dispatch(showFlash({ message: error?.data?.message || "Could not prepare this shot", type: "error" }));
     } finally {
@@ -118,15 +137,38 @@ export default function VideoGenerationSection({ projectId }) {
     }
   };
 
-  const handleGenerateAll = () => {
-    // MOTION_GRAPHIC shots dispatch too now -- MotionGraphicShotContextAssemblyStrategy attaches
+  const handleGenerateAll = async () => {
+    // MOTION_GRAPHIC shots prepare too now -- MotionGraphicShotContextAssemblyStrategy attaches
     // the shot's own MOTION_GRAPHIC image as the reference frame, so Wan/Seedance treat it as the
     // input for image-to-video (animating the actual designed graphic rather than making up its
     // own interpretation of the animation notes). Filtering them out here would leave MG shots
-    // out of "Generate all" and force per-shot manual prepare, defeating the batch action.
-    shots.forEach((shot) => {
-      if (!prepared[shot.id]) handlePrepare(shot.id);
-    });
+    // out of "Prepare all" and force per-shot manual prepare, defeating the batch action.
+    const shotIds = shots.filter((shot) => !prepared[shot.id]).map((shot) => shot.id);
+    if (!shotIds.length) return;
+    shotIds.forEach((id) => setPreparing((s) => ({ ...s, [id]: true })));
+    try {
+      // One call for the whole project -- prepareShotsBatch fetches the pre-prod bundle and the
+      // model catalog/config once and reuses them across every shot, instead of N independent
+      // per-shot prepares.
+      const result = await prepareShotScenesBatch({ projectId, shotIds }).unwrap();
+      setPrepared((p) => {
+        const next = { ...p };
+        (result.prepared || []).forEach((view) => {
+          next[view.shotId] = toCardInfo(view);
+        });
+        return next;
+      });
+      if (result.failed?.length) {
+        dispatch(showFlash({
+          message: `${result.failed.length} shot${result.failed.length === 1 ? "" : "s"} could not be prepared`,
+          type: "error",
+        }));
+      }
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not prepare shots", type: "error" }));
+    } finally {
+      shotIds.forEach((id) => setPreparing((s) => ({ ...s, [id]: false })));
+    }
   };
 
   const dialogueShots = shots.filter((shot) => dialogueTextForShot(shot));
