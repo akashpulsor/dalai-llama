@@ -43,6 +43,11 @@ export default function VideoGenerationSection({ projectId }) {
   // True from the moment a batch is accepted until the project's preparation status leaves
   // PREPARING. Drives the polling below, not just the button label.
   const [batchRunning, setBatchRunning] = useState(false);
+  // Which batch the progress UI is following. Without it, the status already cached from the
+  // PREVIOUS batch (SUCCEEDED) is what the terminal-status effect sees the instant a new batch
+  // starts, so it ends the run before the first poll of the new one has even returned -- the
+  // progress count never appears and the spinners clear immediately.
+  const [activeBatchJobId, setActiveBatchJobId] = useState(null);
   // Prepared prompts are persisted per shot, so a page reload can show what was already built
   // instead of every card reverting to "not prepared yet" and inviting the creator to pay to
   // rebuild a prompt that is sitting in the database.
@@ -157,8 +162,13 @@ export default function VideoGenerationSection({ projectId }) {
   // work is still happening.
   useEffect(() => {
     if (!batchRunning || !batchStatus?.status) return;
+    // Ignore a status that belongs to an earlier batch: right after starting one, the cached
+    // status is still the previous run's terminal state, and acting on it would end this run
+    // before it began.
+    if (activeBatchJobId && batchStatus.jobId !== activeBatchJobId) return;
     if (batchStatus.status === "PENDING" || batchStatus.status === "RUNNING") return;
     setBatchRunning(false);
+    setActiveBatchJobId(null);
     setPreparing({});
     const failed = batchStatus.failedCount || 0;
     if (batchStatus.status === "FAILED") {
@@ -179,14 +189,15 @@ export default function VideoGenerationSection({ projectId }) {
         type: "success",
       }));
     }
-  }, [batchRunning, batchStatus, dispatch]);
+  }, [batchRunning, batchStatus, activeBatchJobId, dispatch]);
 
   // Adopt a batch that was already running when this view loaded.
   useEffect(() => {
     if (batchRunning || !batchStatus?.status) return;
     if (batchStatus.status !== "PENDING" && batchStatus.status !== "RUNNING") return;
+    setActiveBatchJobId(batchStatus.jobId || null);
     setBatchRunning(true);
-  }, [batchStatus?.status, batchRunning]);
+  }, [batchStatus?.status, batchStatus?.jobId, batchRunning]);
 
   const handlePrepare = async (shotId) => {
     setPreparing((s) => ({ ...s, [shotId]: true }));
@@ -297,6 +308,7 @@ export default function VideoGenerationSection({ projectId }) {
       }).unwrap();
       // Either this call queued the batch or it joined one already live for the project -- both
       // come back as a job to watch, so either way the UI starts polling.
+      setActiveBatchJobId(accepted?.jobId || null);
       setBatchRunning(true);
     } catch (error) {
       busyIds.forEach((id) => setPreparing((s) => ({ ...s, [id]: false })));
@@ -367,7 +379,7 @@ export default function VideoGenerationSection({ projectId }) {
           >
             {batchRunning ? <Loader2 size={13} className="animate-spin" /> : <Clapperboard size={13} />}
             {batchRunning
-              ? batchStatus?.totalCount
+              ? batchStatus?.totalCount && (!activeBatchJobId || batchStatus.jobId === activeBatchJobId)
                 ? `Preparing ${(batchStatus.preparedCount || 0) + (batchStatus.failedCount || 0)} of ${batchStatus.totalCount}…`
                 : "Preparing shots…"
               : selectedShotIds.length
