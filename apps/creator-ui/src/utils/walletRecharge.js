@@ -150,6 +150,82 @@ export async function runRazorpayCheckout(order, onVerify) {
  * {@code error.paymentCancelled} / {@code error.paymentFailed} where applicable so a caller can
  * choose a "warning" vs "error" flash). Callers own all UI side effects (flashing, closing the
  * modal, refetching the wallet) -- this only runs the payment itself. */
+/** Opens Razorpay for an order some OTHER service already created -- product-service's subscribe
+ * now returns a live order rather than an error saying the wallet is short, so the browser only
+ * has to present it. Deliberately separate from runWalletRecharge, which creates its own order:
+ * the caller here must not create a second one.
+ *
+ * Verification goes through the same wallet-payment endpoint, because that is what credits the
+ * wallet the subscription is then charged from. */
+export async function runCheckoutForExistingOrder({
+  tenantId,
+  paymentId,
+  gatewayOrderId,
+  keyId,
+  amount,
+  currency,
+  description,
+  verifyWalletPayment,
+}) {
+  const normalizedCurrency = normalizeCurrencyCode(currency);
+  const amountPaise = Math.round((Number(amount) || 0) * 100);
+  if (!gatewayOrderId) throw new Error("Subscription order is missing its Razorpay order id.");
+  if (!paymentId) throw new Error("Subscription order is missing its payment tracking id.");
+  if (!keyId) throw new Error("Razorpay public key is not configured for checkout.");
+  if (amountPaise < 100) throw new Error("Amount is below the Razorpay minimum.");
+
+  await loadRazorpayCheckoutScript();
+  await new Promise((resolve, reject) => {
+    let settled = false;
+    const rejectOnce = (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+
+    const checkout = new window.Razorpay({
+      key: keyId,
+      amount: amountPaise,
+      currency: normalizedCurrency,
+      name: "Dalai Llama Platform",
+      description: description || "Subscription",
+      order_id: gatewayOrderId,
+      handler: async (response) => {
+        if (settled) return;
+        settled = true;
+        try {
+          await verifyWalletPayment({
+            tenantId,
+            paymentId,
+            gatewayOrderId: response.razorpay_order_id,
+            gatewayPaymentId: response.razorpay_payment_id,
+            gatewaySignature: response.razorpay_signature,
+          }).unwrap();
+          resolve(response);
+        } catch (error) {
+          reject(new Error(walletRechargeErrorMessage(error, "Payment verification failed.")));
+        }
+      },
+      modal: {
+        ondismiss: () => {
+          const error = new Error("Payment cancelled — you have not been subscribed.");
+          error.paymentCancelled = true;
+          rejectOnce(error);
+        },
+      },
+      theme: { color: "#8b5cf6" },
+    });
+
+    checkout.on("payment.failed", (response) => {
+      const error = new Error(response?.error?.description || "Payment failed — you have not been subscribed.");
+      error.paymentFailed = true;
+      rejectOnce(error);
+    });
+
+    checkout.open();
+  });
+}
+
 export async function runWalletRecharge({ tenantId, body, currencyFallback, createWalletRecharge, verifyWalletPayment }) {
   const requestedCurrency = normalizeCurrencyCode(body?.currency || currencyFallback);
   const order = await createWalletRecharge({ tenantId, ...body, currency: requestedCurrency }).unwrap();

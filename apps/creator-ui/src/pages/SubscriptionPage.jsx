@@ -17,7 +17,7 @@ import {
   useSubscribeCreatorVideoMutation,
 } from "../api/creatorEndpoints.js";
 import useCreatorVideoEntitlements from "../hooks/useCreatorVideoEntitlements.js";
-import { runWalletRecharge, walletRechargeErrorMessage } from "../utils/walletRecharge.js";
+import { runCheckoutForExistingOrder, runWalletRecharge, walletRechargeErrorMessage } from "../utils/walletRecharge.js";
 
 const rupee = (n, code = "INR") =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: code || "INR", maximumFractionDigits: 0 }).format(Number(n) || 0);
@@ -93,16 +93,54 @@ export default function SubscriptionPage() {
 
   const handleSubscribe = async (plan) => {
     try {
-      await subscribe({ tenantId, planCode: plan.planCode }).unwrap();
+      const result = await subscribe({ tenantId, planCode: plan.planCode }).unwrap();
+      // The server creates the Razorpay order itself now and hands it back with the plan it could
+      // not afford, so the browser's only job is to present it. No shortfall arithmetic, no order
+      // creation, no guessing which of two error shapes came back -- all of which this page used
+      // to do, and any one of which failing looked like a subscribe button that did nothing.
+      if (result?.status === "PAYMENT_REQUIRED") {
+        await payThenSubscribe(plan, result);
+        return;
+      }
       dispatch(showFlash({ message: `Subscribed to ${plan.planName}`, type: "success" }));
-      return;
     } catch (error) {
       const shortfall = insufficientBalancePayload(error, plan);
       if (!shortfall) {
         dispatch(showFlash({ message: error?.data?.message || "Could not subscribe", type: "error" }));
         return;
       }
+      // Only reached when billing could not create an order (it is down, or Razorpay is) and the
+      // server fell back to the old shape. Top up by hand and retry.
       await topUpThenSubscribe(plan, shortfall);
+    }
+  };
+
+  /** Opens the order the server already created, then completes the subscription. Two calls, so
+   * not atomic: if the retry fails the money is in the wallet, not lost, and subscribing again
+   * works. */
+  const payThenSubscribe = async (plan, order) => {
+    setToppingUp(true);
+    try {
+      await runCheckoutForExistingOrder({
+        tenantId,
+        paymentId: order.paymentId,
+        gatewayOrderId: order.gatewayOrderId,
+        keyId: order.razorpayKeyId,
+        amount: order.amountDue ?? order.shortFallAmount,
+        currency: order.currency,
+        description: `${plan.planName} subscription`,
+        verifyWalletPayment,
+      });
+      await refetchWallet?.();
+      await subscribe({ tenantId, planCode: plan.planCode }).unwrap();
+      dispatch(showFlash({ message: `Subscribed to ${plan.planName}`, type: "success" }));
+    } catch (error) {
+      dispatch(showFlash({
+        message: error?.data?.message || error?.message || "Could not complete the subscription",
+        type: error?.paymentCancelled ? "warning" : "error",
+      }));
+    } finally {
+      setToppingUp(false);
     }
   };
 
