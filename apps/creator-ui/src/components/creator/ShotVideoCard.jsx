@@ -75,6 +75,15 @@ const REFERENCE_KIND_LABELS = {
   BACKGROUND_MUSIC: "Music bed",
 };
 
+/** Where an audio attachment came from. The voice sample is the actor's own recording, uploaded
+ * in Cast; the music bed was generated for this shot from its sound design. Worth saying on the
+ * card: they look identical as two audio players, and a creator deciding whether to regenerate
+ * one needs to know which is their material and which is the machine's. */
+const REFERENCE_KIND_ORIGIN = {
+  CHARACTER_VOICE: "uploaded",
+  BACKGROUND_MUSIC: "generated",
+};
+
 /** What this prompt was actually built from -- the frames, the face crops, the voice sample, the
  * music bed -- so the creator can see at a glance that the right assets were picked up instead of
  * inferring it from the prompt text. `references` (kind-tagged, images + audio) comes from
@@ -114,15 +123,35 @@ function PromptAttachments({ info }) {
         </div>
       )}
       {audio.length > 0 && (
-        <div className="space-y-1">
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-medium text-slate-500">Audio attached to this shot</p>
           {audio.map((ref) => (
             <div key={`${ref.kind}-${ref.slotIndex}`} className="flex items-center gap-2">
-              <span className="w-20 shrink-0 text-[9px] font-semibold text-slate-500">
-                {REFERENCE_KIND_LABELS[ref.kind] || ref.kind}
+              <span className="flex w-24 shrink-0 flex-col">
+                <span className="text-[9px] font-semibold text-slate-400">
+                  {REFERENCE_KIND_LABELS[ref.kind] || ref.kind}
+                </span>
+                {REFERENCE_KIND_ORIGIN[ref.kind] && (
+                  <span
+                    className={`text-[8px] font-bold uppercase tracking-wide ${
+                      REFERENCE_KIND_ORIGIN[ref.kind] === "generated" ? "text-purple-300" : "text-slate-500"
+                    }`}
+                  >
+                    {REFERENCE_KIND_ORIGIN[ref.kind]}
+                  </span>
+                )}
               </span>
               <audio controls src={ref.url} className="h-7 flex-1" />
             </div>
           ))}
+          {/* Honest about what these do today: they are attached to the prompt and playable
+            * here, but the music bed is not yet mixed into the rendered video. Saying so beats
+            * a creator assuming a silent result is a bug. */}
+          {audio.some((ref) => ref.kind === "BACKGROUND_MUSIC") && (
+            <p className="text-[9px] font-medium italic text-amber-300/80">
+              Music bed is generated and stored, but not yet mixed into the rendered video.
+            </p>
+          )}
         </div>
       )}
     </div>

@@ -118,21 +118,24 @@ export default function VideoGenerationSection({ projectId }) {
     },
   });
 
-  // Server rows seed the cards; anything prepared in this session wins, since it is newer than
-  // whatever the query last fetched.
+  // The server row is the truth for a prepared prompt, so it always wins. This used to only
+  // overwrite while a batch was running, which meant a re-prepare left the old prompt on screen:
+  // the batch-status poll and this one are independent, so the batch could report SUCCEEDED
+  // before the last prompts arrived, and from then on every fetch was ignored. That is why
+  // editing a shot's dialogue and re-preparing still showed the previous text.
+  //
+  // Nothing is lost by always taking it: the only local writes are handleSavePrompt, which sets
+  // state from the server's own response and invalidates this query anyway.
   useEffect(() => {
     if (!savedPrompts.length) return;
     setPrepared((p) => {
       const next = { ...p };
       savedPrompts.forEach((view) => {
-        if (!view.shotId) return;
-        // While a batch is running the server's rows ARE the new results, so they overwrite;
-        // otherwise this is page-load seeding and anything prepared in this session is newer.
-        if (batchRunning || !next[view.shotId]) next[view.shotId] = toCardInfo(view);
+        if (view.shotId) next[view.shotId] = toCardInfo(view);
       });
       return next;
     });
-  }, [savedPrompts, batchRunning]);
+  }, [savedPrompts]);
 
   // A shot whose prompt has landed is no longer preparing -- clears spinners progressively
   // instead of all at once when the batch ends.
@@ -363,7 +366,9 @@ export default function VideoGenerationSection({ projectId }) {
           >
             {batchRunning ? <Loader2 size={13} className="animate-spin" /> : <Clapperboard size={13} />}
             {batchRunning
-              ? "Preparing shots…"
+              ? batchStatus?.totalCount
+                ? `Preparing ${(batchStatus.preparedCount || 0) + (batchStatus.failedCount || 0)} of ${batchStatus.totalCount}…`
+                : "Preparing shots…"
               : selectedShotIds.length
                 ? `Prepare ${selectedShotIds.length} selected shot${selectedShotIds.length === 1 ? "" : "s"}`
                 : "Prepare all shots"}
