@@ -1,8 +1,11 @@
 // @ts-nocheck
 import React, { useState } from "react";
 import { Loader2, Upload, User, X } from "lucide-react";
+import FeatureLock from "../billing/FeatureLock.jsx";
+import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
 
 export default function CastReferenceUploadModal({ character, isUploading = false, error = "", onUpload, onClose }) {
+  const { entitlements } = useCreatorVideoEntitlements();
   const [localPreviewUrl, setLocalPreviewUrl] = useState("");
   const [localError, setLocalError] = useState("");
 
@@ -68,15 +71,17 @@ export default function CastReferenceUploadModal({ character, isUploading = fals
             </p>
           )}
 
-          <label
-            className={`creator-primary flex w-full cursor-pointer items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white ${
-              isUploading ? "pointer-events-none opacity-60" : ""
-            }`}
-          >
-            {isUploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-            {isUploading ? "Uploading..." : previewSrc ? "Replace photo" : "Upload photo"}
-            <input type="file" accept="image/*" className="hidden" disabled={isUploading} onChange={handleFileChange} />
-          </label>
+          <FeatureLock unlocked={entitlements.imageUploadEnabled} feature="Character reference image upload" compact>
+            <label
+              className={`creator-primary flex w-full cursor-pointer items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white ${
+                isUploading ? "pointer-events-none opacity-60" : ""
+              }`}
+            >
+              {isUploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+              {isUploading ? "Uploading..." : previewSrc ? "Replace photo" : "Upload photo"}
+              <input type="file" accept="image/*" className="hidden" disabled={isUploading} onChange={handleFileChange} />
+            </label>
+          </FeatureLock>
 
           <button
             type="button"

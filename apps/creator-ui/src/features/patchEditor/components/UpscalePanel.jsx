@@ -1,17 +1,21 @@
 // @ts-nocheck
 import React, { useState } from "react";
-import { AlertTriangle, Loader2, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
+import { AlertTriangle, Loader2, Lock, Sparkles } from "lucide-react";
 import { usePatchEditor } from "../state/PatchEditorProvider.jsx";
 import { useListUpscaleModelsQuery } from "../../../api/creatorEndpoints.js";
 
-export default function UpscalePanel() {
+/** `locked` renders the panel in full -- blurb, model list and all -- with the action swapped
+  * for a subscribe CTA, rather than hiding it behind a lock elsewhere. A creator who cannot
+  * upscale yet can still see what upscaling is and which models it would run. */
+export default function UpscalePanel({ locked = false }) {
   const { state, actions } = usePatchEditor();
   const { upscale, sourceHostedUrl } = state;
   const { data: models = [], isLoading: modelsLoading } = useListUpscaleModelsQuery();
   const [selectedModel, setSelectedModel] = useState("");
 
   const processing = upscale.status === "processing";
-  const canUpscale = !!sourceHostedUrl && !processing;
+  const canUpscale = !locked && !!sourceHostedUrl && !processing;
   const selectedLabel = selectedModel;
 
   const handleUpscale = () => {
@@ -31,7 +35,7 @@ export default function UpscalePanel() {
         Runs the whole clip through a chosen upscale model, then replaces it here with the result.
       </p>
 
-      {!sourceHostedUrl && (
+      {!sourceHostedUrl && !locked && (
         <p className="mt-2 flex items-start gap-1.5 text-[11px] font-semibold text-amber-300">
           <AlertTriangle size={12} className="mt-0.5 shrink-0" />
           Only available for a video pulled from a project (not a raw local upload).
@@ -57,15 +61,25 @@ export default function UpscalePanel() {
         </select>
       </label>
 
-      <button
-        type="button"
-        onClick={handleUpscale}
-        disabled={!canUpscale}
-        className="creator-primary mt-3 flex min-h-9 w-full items-center justify-center gap-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-55"
-      >
-        {processing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-        {processing ? "Upscaling…" : selectedLabel ? `Upscale with ${selectedLabel}` : "Upscale"}
-      </button>
+      {locked ? (
+        <Link
+          to="/subscription"
+          className="mt-3 flex min-h-9 w-full items-center justify-center gap-2 rounded-md border border-amber-400/30 bg-amber-500/10 px-3 text-xs font-black text-amber-200 hover:border-amber-400/50 hover:bg-amber-500/15"
+        >
+          <Lock size={13} />
+          Subscribe to unlock upscaling
+        </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={handleUpscale}
+          disabled={!canUpscale}
+          className="creator-primary mt-3 flex min-h-9 w-full items-center justify-center gap-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-55"
+        >
+          {processing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+          {processing ? "Upscaling…" : selectedLabel ? `Upscale with ${selectedLabel}` : "Upscale"}
+        </button>
+      )}
 
       {upscale.status === "error" && (
         <p className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-rose-300">
@@ -73,7 +87,9 @@ export default function UpscalePanel() {
         </p>
       )}
       <p className="mt-2 text-[11px] font-semibold text-slate-600">
-        Upscaling runs on the full video and can take a few minutes. The result loads back onto the timeline.
+        {locked
+          ? "Upscaling is part of the Pro plan."
+          : "Upscaling runs on the full video and can take a few minutes. The result loads back onto the timeline."}
       </p>
     </div>
   );

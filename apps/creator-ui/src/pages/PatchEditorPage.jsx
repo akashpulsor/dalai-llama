@@ -1,7 +1,6 @@
 // @ts-nocheck
 import React, { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import FeatureLock from "../components/billing/FeatureLock.jsx";
 import { Crown } from "lucide-react";
 import { PatchEditorProvider, usePatchEditor } from "../features/patchEditor/state/PatchEditorProvider.jsx";
 import Toolbar from "../features/patchEditor/components/Toolbar.jsx";
@@ -13,6 +12,7 @@ import SelectionPanel from "../features/patchEditor/components/SelectionPanel.js
 import AiEditPanel from "../features/patchEditor/components/AiEditPanel.jsx";
 import DubPanel from "../features/patchEditor/components/DubPanel.jsx";
 import UpscalePanel from "../features/patchEditor/components/UpscalePanel.jsx";
+import ComingSoon from "../features/patchEditor/components/ComingSoon.jsx";
 import PatchList from "../features/patchEditor/components/PatchList.jsx";
 import UploadDropzone from "../features/patchEditor/components/UploadDropzone.jsx";
 import ProjectPickerPanel from "../features/patchEditor/components/ProjectPickerPanel.jsx";
@@ -113,11 +113,17 @@ function PatchEditorWorkspace() {
                 <aside className="space-y-3">
                   <VideoMetadataPanel />
                   <SelectionPanel />
-                  <AiEditPanel />
-                  <DubPanel />
-                  <FeatureLock unlocked={entitlements.upscalingEnabled} feature="Upscaling" compact>
-                    <UpscalePanel />
-                  </FeatureLock>
+                  {/* Neither is wired to a working backend yet. Shown rather than hidden so the
+                      editor reads as complete and the creator can see what is coming. */}
+                  <ComingSoon>
+                    <AiEditPanel />
+                  </ComingSoon>
+                  <ComingSoon>
+                    <DubPanel />
+                  </ComingSoon>
+                  {/* Upscaling does work, so it is not hidden behind FeatureLock: the panel and its
+                      model list stay visible and the action itself carries the subscribe CTA. */}
+                  <UpscalePanel locked={!entitlements.upscalingEnabled} />
                   <PatchList />
                 </aside>
               </div>

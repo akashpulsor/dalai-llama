@@ -16,6 +16,8 @@ import {
 import BuiltinVoicePicker from "./BuiltinVoicePicker.jsx";
 import CastProfileQuickCreate from "./CastProfileQuickCreate.jsx";
 import VoiceSampleField from "./VoiceSampleField.jsx";
+import FeatureLock from "../billing/FeatureLock.jsx";
+import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
 
 const CHARACTER_DETAIL_FIELDS = [
   { key: "gender", label: "Gender" },
@@ -52,6 +54,7 @@ const toProfileType = (characterType) => (characterType === "PRODUCT" ? "PRODUCT
  * (and, for a human, voice) reference when it's dispatched for video generation. */
 export default function CastSection({ projectId, characters }) {
   const dispatch = useDispatch();
+  const { entitlements } = useCreatorVideoEntitlements();
   const [openCharacterId, setOpenCharacterId] = useState(null);
   const [creatingCharacterId, setCreatingCharacterId] = useState(null);
   const [detailCharacterId, setDetailCharacterId] = useState(null);
@@ -302,7 +305,9 @@ export default function CastSection({ projectId, characters }) {
 
                   {voiceEditMode === "upload" ? (
                     <>
-                      <VoiceSampleField file={voiceFile} onFileChange={setVoiceFile} />
+                      <FeatureLock unlocked={entitlements.characterVoiceUploadEnabled} feature="Character voice sample upload" compact>
+                        <VoiceSampleField file={voiceFile} onFileChange={setVoiceFile} />
+                      </FeatureLock>
                       <div className="flex gap-2">
                         <button
                           type="button"
