@@ -2,8 +2,9 @@
 import React, { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { CheckCircle2, Circle, CreditCard, Download, ImageIcon, ImagePlus, Loader2, Lock, PlayCircle, Send, Sparkles, User2, X } from "lucide-react";
+import { CheckCircle2, Circle, CreditCard, ImageIcon, ImagePlus, Loader2, Lock, PlayCircle, Send, Sparkles, User2, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
+import CanvasVideoPlayer from "../components/review/CanvasVideoPlayer.jsx";
 import {
   useAddPublicReviewCommentMutation,
   useEndReviewMutation,
@@ -138,25 +139,17 @@ export default function ClientReviewPage() {
               <div className="creator-panel mb-4 p-6">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <p className="text-[11px] font-extrabold uppercase tracking-widest text-purple-300">Final video</p>
-                  {finalVideo.downloadUnlocked ? (
-                    <a
-                      href={finalVideo.videoUrl}
-                      download
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-purple-500 px-3 py-1.5 text-[11px] font-black text-white hover:bg-purple-400"
-                    >
-                      <Download size={13} /> Download
-                    </a>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-400/25 bg-slate-500/10 px-2.5 py-1 text-[10.5px] font-bold text-slate-300">
-                      <Lock size={11} /> Contact your creator to unlock download
-                    </span>
-                  )}
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-400/25 bg-slate-500/10 px-2.5 py-1 text-[10.5px] font-bold text-slate-300">
+                    <Lock size={11} /> Preview only
+                  </span>
                 </div>
-                <video
+                {/* Drawn to a canvas rather than given as a <video>: the cut is here to be
+                    watched and commented on, not taken away. Shaped by the project's own aspect
+                    ratio so a vertical cut is not letterboxed into a landscape frame. */}
+                <CanvasVideoPlayer
                   key={finalVideo.videoUrl}
                   src={finalVideo.videoUrl}
-                  controls
-                  className="w-full rounded-lg border border-white/10 bg-black"
+                  aspectRatio={finalVideo.aspectRatio}
                 />
               </div>
             )}
@@ -165,7 +158,7 @@ export default function ClientReviewPage() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-extrabold uppercase tracking-widest text-purple-300">Final video</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-400">Your creator will unlock preview and download shortly.</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-400">Your creator will publish the cut here shortly.</p>
                   </div>
                   <Lock size={16} className="text-slate-500" />
                 </div>

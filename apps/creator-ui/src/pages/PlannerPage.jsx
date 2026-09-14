@@ -9605,7 +9605,7 @@ export default function PlannerPage() {
                       * nothing -- the cut was invisible, not merely undownloadable. */}
                     <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
                       {activeProjectDetail?.finalVideoDownloadUnlocked
-                        ? "Your client can watch and download this cut on their review page."
+                        ? "Your client can watch this cut on their review page. Preview only -- the page offers no download."
                         : "Publish when you're ready for the client to see it. Until then their review page shows no video."}
                     </p>
                   </div>
