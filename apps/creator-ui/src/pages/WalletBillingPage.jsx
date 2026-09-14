@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { ArrowDownLeft, ArrowUpRight, Crown, Percent, Save, TrendingUp } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ChevronDown, Crown, Percent, Save, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { selectTenantId, showFlash, useGetWalletBalanceQuery } from "@dalaillama/shared-store";
 import WalletStatementPanel from "../components/billing/WalletStatementPanel.jsx";
@@ -42,6 +42,9 @@ export default function WalletBillingPage() {
   const { data: transactions = [], isLoading: txLoading } = useListWalletTransactionsQuery(tenantId, { skip: !tenantId });
   const [updateOrganization, { isLoading: saving }] = useUpdateOrganizationMutation();
   const [marginInput, setMarginInput] = useState("");
+  // Collapsed by default: the point of grouping is that the page opens as a short summary, and
+  // you open the one group you actually want to inspect.
+  const [expandedTag, setExpandedTag] = useState(null);
   const currencyCode = wallet?.currency || "INR";
   const { planName, status: subscriptionStatus } = useCreatorVideoEntitlements();
 
@@ -105,7 +108,9 @@ export default function WalletBillingPage() {
       {/* LEDGER */}
       <div className="creator-panel mt-6 p-5">
         <p className="text-[11px] font-extrabold uppercase tracking-widest text-purple-300">Transaction history</p>
-        <p className="mt-0.5 text-xs font-medium text-slate-400">Every credit and debit, grouped by day, newest first.</p>
+        <p className="mt-0.5 text-xs font-medium text-slate-400">
+          Grouped by what was charged, biggest spend first. Open a group to see its individual charges.
+        </p>
 
         {txLoading ? (
           <p className="py-8 text-center text-xs font-medium text-slate-500">Loading…</p>
@@ -114,49 +119,60 @@ export default function WalletBillingPage() {
             No transactions yet. Recharge your wallet or generate a video to see activity here.
           </p>
         ) : (
-          <div className="mt-4 space-y-4">
-            {groupByDay(transactions).map(({ key, label, rows, dayTotal }) => (
-              <div key={key}>
-                <div className="mb-1.5 flex items-baseline justify-between gap-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</p>
-                  <p className="text-[10px] font-bold tabular-nums text-slate-500">
-                    {dayTotal < 0 ? "−" : "+"}{rupee(Math.abs(dayTotal), currencyCode)} net
-                  </p>
-                </div>
-                <div className="space-y-1.5">
-            {rows.map((tx) => {
-              const out = OUT_TYPES.has(tx.type);
-              const earned = isClientEarning(tx);
-              // Same magnitude-only reasoning as the summary above -- avoids a doubled sign
-              // ("−-₹0") when tx.amount is already negative for a debit.
-              const amt = Math.abs(Number(tx.amount) || 0);
+          <div className="mt-4 space-y-1.5">
+            {groupByTag(transactions).map((group) => {
+              const open = expandedTag === group.key;
               return (
-                <div key={tx.id} className="flex items-center gap-3 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2.5">
-                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                    earned ? "bg-emerald-400/10 text-emerald-300" : out ? "bg-rose-400/10 text-rose-300" : "bg-sky-400/10 text-sky-300"
-                  }`}>
-                    {out ? <ArrowUpRight size={15} /> : <ArrowDownLeft size={15} />}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold text-white">{earned ? "Client payment" : (TYPE_LABEL[tx.type] || tx.type)}</p>
-                    <p className="line-clamp-1 text-[10px] font-medium text-slate-500">
-                      {tx.description || tx.reference || "—"} · {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : ""}
+                <div key={group.key} className="overflow-hidden rounded-md border border-white/10 bg-white/[0.02]">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedTag(open ? null : group.key)}
+                    className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-white/[0.03]"
+                  >
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                      group.out ? "bg-rose-400/10 text-rose-300" : "bg-sky-400/10 text-sky-300"
+                    }`}>
+                      {group.out ? <ArrowUpRight size={15} /> : <ArrowDownLeft size={15} />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-bold text-white">{group.label}</p>
+                      <p className="text-[10px] font-medium text-slate-500">
+                        {group.rows.length} charge{group.rows.length === 1 ? "" : "s"}
+                        {group.lastAt ? ` · last ${new Date(group.lastAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}
+                      </p>
+                    </div>
+                    <p className={`text-sm font-bold tabular-nums ${group.out ? "text-rose-200" : "text-emerald-200"}`}>
+                      {group.out ? "−" : "+"}{rupee(group.total, currencyCode)}
                     </p>
-                  </div>
-                  <div className="text-right">
-                    <p className={`text-sm font-bold tabular-nums ${out ? "text-rose-200" : "text-emerald-200"}`}>
-                      {out ? "−" : "+"}{rupee(amt, currencyCode)}
-                    </p>
-                    {tx.balanceAfter != null && (
-                      <p className="text-[10px] font-medium text-slate-500 tabular-nums">bal {rupee(tx.balanceAfter, currencyCode)}</p>
-                    )}
-                  </div>
+                    <ChevronDown size={14} className={`shrink-0 text-slate-500 transition-transform ${open ? "rotate-180" : ""}`} />
+                  </button>
+
+                  {open && (
+                    <div className="space-y-1 border-t border-white/10 bg-black/20 px-3 py-2">
+                      {group.rows.map((tx) => {
+                        const amt = Math.abs(Number(tx.amount) || 0);
+                        return (
+                          <div key={tx.id} className="flex items-center gap-3 py-1">
+                            <p className="min-w-0 flex-1 truncate text-[10px] font-medium text-slate-500">
+                              {tx.createdAt ? new Date(tx.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}
+                              {tx.reference ? ` · ${tx.reference}` : ""}
+                            </p>
+                            <p className={`shrink-0 text-[11px] font-bold tabular-nums ${group.out ? "text-rose-200/80" : "text-emerald-200/80"}`}>
+                              {group.out ? "−" : "+"}{rupee(amt, currencyCode)}
+                            </p>
+                            {tx.balanceAfter != null && (
+                              <p className="w-24 shrink-0 text-right text-[10px] font-medium text-slate-500 tabular-nums">
+                                bal {rupee(tx.balanceAfter, currencyCode)}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
-                </div>
-              </div>
-            ))}
           </div>
         )}
       </div>
@@ -214,29 +230,58 @@ const TONE = {
   * ledger read as one flat column tells you nothing about when anything happened; a day
   * header and a net figure make a spending day visible at a glance. Rows with no timestamp
   * fall into their own bucket rather than being dropped or dated to the epoch. */
-function groupByDay(transactions) {
+/** Turns "AI usage: gemini-2.5-flash" and "Usage charge: USAGE:AI_LLM_TOKENS:LLM_GATEWAY" into
+  * something worth grouping on: the model or metric that was actually charged.
+  *
+  * This wallet carries ~870 usage rows against 2 recharges, so the flat feed was a wall of
+  * near-identical lines. Tagged, the same data is a handful of rows, and the one that matters --
+  * which model is eating the balance -- sits at the top. */
+function tagOf(tx) {
+  const description = String(tx.description || "").trim();
+
+  const aiUsage = description.match(/^AI usage:\s*(.+)$/i);
+  if (aiUsage) return { key: "model:" + aiUsage[1].trim(), label: aiUsage[1].trim() };
+
+  // "USAGE:AI_LLM_TOKENS:LLM_GATEWAY" -- the metric is the useful half, the source just repeats it.
+  const usageCharge = description.match(/^Usage charge:\s*USAGE:([A-Z0-9_]+)/i);
+  if (usageCharge) return { key: "metric:" + usageCharge[1], label: humaniseToken(usageCharge[1]) };
+
+  if (description) return { key: "desc:" + description, label: description };
+  return { key: "type:" + (tx.type || "OTHER"), label: TYPE_LABEL[tx.type] || tx.type || "Other" };
+}
+
+/** AI_LLM_TOKENS -> "AI LLM tokens": keep known initialisms upper-case, lower the rest. */
+function humaniseToken(token) {
+  const words = String(token).split("_").filter(Boolean);
+  if (!words.length) return token;
+  return words
+    .map((word, index) => {
+      if (["AI", "LLM", "TTS", "API"].includes(word)) return word;
+      const lower = word.toLowerCase();
+      return index === 0 ? lower.charAt(0).toUpperCase() + lower.slice(1) : lower;
+    })
+    .join(" ");
+}
+
+/** Groups the feed by tag, heaviest spend first. The question this page gets asked is "where is my
+  * money going", and that ordering answers it without scrolling. */
+function groupByTag(transactions) {
   const buckets = new Map();
   transactions.forEach((tx) => {
-    const when = tx.createdAt ? new Date(tx.createdAt) : null;
-    const key = when && !Number.isNaN(when.getTime()) ? when.toISOString().slice(0, 10) : "undated";
+    const { key, label } = tagOf(tx);
     if (!buckets.has(key)) {
-      buckets.set(key, {
-        key,
-        label: when && key !== "undated"
-          ? when.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })
-          : "Undated",
-        rows: [],
-        dayTotal: 0,
-      });
+      buckets.set(key, { key, label, rows: [], total: 0, out: OUT_TYPES.has(tx.type), lastAt: null });
     }
     const bucket = buckets.get(key);
     bucket.rows.push(tx);
-    // Magnitude plus an explicit direction -- tx.amount is already negative for some debit
-    // types and positive for others, so summing it raw double-counts the sign.
-    const amount = Math.abs(Number(tx.amount) || 0);
-    bucket.dayTotal += OUT_TYPES.has(tx.type) ? -amount : amount;
+    // Magnitude only: tx.amount is already negative for some debit types and positive for others,
+    // so summing it raw double-counts the sign. Direction comes from the type instead.
+    bucket.total += Math.abs(Number(tx.amount) || 0);
+    if (tx.createdAt && (!bucket.lastAt || new Date(tx.createdAt) > new Date(bucket.lastAt))) {
+      bucket.lastAt = tx.createdAt;
+    }
   });
-  return Array.from(buckets.values());
+  return Array.from(buckets.values()).sort((a, b) => b.total - a.total);
 }
 
 function SummaryCard({ icon: Icon, tone, label, value, sub }) {
