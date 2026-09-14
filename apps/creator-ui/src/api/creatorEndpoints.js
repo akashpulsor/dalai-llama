@@ -3168,6 +3168,17 @@ export const creatorApi = apiSlice.injectEndpoints({
       providesTags: (_result, _error, projectId) => [{ type: "CreatorHomeProjects", id: `shot-prompts-${projectId}` }],
     }),
 
+    // Every generated shot clip in a project, each with a PRESIGNED videoUrl -- fetchable with
+    // no Authorization header, which is what the patch editor needs (it loads a source with a
+    // plain fetch()). On /scenes rather than /projects/{id}/jobs because that prefix belongs to
+    // pre-production-service at the gateway; /jobs/{id}/video reaches video-gen but 302s behind
+    // JWT auth, which a credential-less fetch cannot follow. videoUrl is null until a shot has a
+    // persisted output.
+    listProjectShotVideos: builder.query({
+      query: (projectId) => ({ url: platformUrl(`/scenes/projects/${projectId}/shot-videos`) }),
+      providesTags: (_result, _error, projectId) => [{ type: "CreatorHomeProjects", id: `shot-videos-${projectId}` }],
+    }),
+
     // Model catalog for the video-workspace "generate with" dropdown. Proxied through video-gen
     // (UI never calls llm-gateway directly -- llm-gateway is cluster-internal). type=video
     // filters to registered video-generation models (Seedance, Wan, ...).
@@ -3575,6 +3586,7 @@ export const {
   useUpdateShotScenePromptMutation,
   useCreateFinalRenderMutation,
   useGetLatestFinalRenderQuery,
+  useListProjectShotVideosQuery,
   useLazyGetLatestFinalRenderQuery,
   useGetFinalRenderQuery,
   useLazyGetFinalRenderQuery,
