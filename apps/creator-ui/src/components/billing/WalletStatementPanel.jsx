@@ -13,6 +13,15 @@ const rupee = (n, code = "INR") =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: code || "INR", maximumFractionDigits: 2 })
     .format(Number(n) || 0);
 
+/** Billed units: tokens for LLM work, seconds for renders. Compact because a stage can run to
+ * hundreds of thousands and the exact figure is not what anyone is scanning for. */
+const units = (n) => {
+  const value = Number(n) || 0;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return String(Math.round(value));
+};
+
 const dateTime = (value) =>
   value ? new Date(value).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
 
@@ -84,7 +93,10 @@ export default function WalletStatementPanel() {
           <p className="mt-4 text-3xl font-black tracking-tight text-white tabular-nums">
             {rupee(spent, currency)}
           </p>
-          <p className="text-[11px] font-semibold text-slate-500">spent since that top-up</p>
+          <p className="text-[11px] font-semibold text-slate-500">
+            spent since that top-up
+            {Number(statement?.unitsSince) > 0 && ` · ${units(statement.unitsSince)} units billed`}
+          </p>
 
           {stages.length === 0 ? (
             <p className="mt-4 text-xs font-medium text-slate-500">Nothing charged in this period.</p>
@@ -98,14 +110,18 @@ export default function WalletStatementPanel() {
                   <div key={stage.stage}>
                     <div className="flex items-baseline justify-between gap-3">
                       <p className="text-xs font-bold text-slate-200">{stage.label}</p>
-                      <p className="text-xs font-bold text-slate-100 tabular-nums">
+                      <p className="shrink-0 text-xs font-bold text-slate-100 tabular-nums">
                         {rupee(stage.amount, currency)}
                         <span className="ml-1.5 font-semibold text-slate-500">
                           {stage.calls} call{stage.calls === 1 ? "" : "s"}
+                          {Number(stage.units) > 0 && ` · ${units(stage.units)}`}
                         </span>
                       </p>
                     </div>
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                    {stage.description && (
+                      <p className="mt-0.5 text-[10px] font-medium leading-snug text-slate-500">{stage.description}</p>
+                    )}
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
                       <div className="h-full rounded-full bg-purple-400/70" style={{ width: `${share}%` }} />
                     </div>
                   </div>
@@ -132,7 +148,8 @@ export default function WalletStatementPanel() {
                     <tr className="border-b border-white/10 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
                       <th className="px-3 py-2">When</th>
                       <th className="px-3 py-2">Stage</th>
-                      <th className="px-3 py-2">What</th>
+                      <th className="px-3 py-2">What happened</th>
+                      <th className="px-3 py-2 text-right">Units</th>
                       <th className="px-3 py-2 text-right">Amount</th>
                     </tr>
                   </thead>
@@ -143,8 +160,16 @@ export default function WalletStatementPanel() {
                           {dateTime(line.recordedAt)}
                         </td>
                         <td className="px-3 py-2 text-[11px] font-semibold text-slate-300">{line.stage}</td>
-                        <td className="px-3 py-2 text-[11px] font-medium text-slate-400">
-                          {line.taskKey || line.description || "—"}
+                        <td className="px-3 py-2 text-[11px] font-medium text-slate-300">
+                          {line.description || "—"}
+                          {line.taskKey && (
+                            <span className="ml-1.5 text-[9px] font-semibold uppercase tracking-wide text-slate-600">
+                              {line.taskKey}
+                            </span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right text-[11px] font-medium text-slate-400 tabular-nums">
+                          {Number(line.quantity) > 0 ? units(line.quantity) : "—"}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right text-[11px] font-bold text-slate-200 tabular-nums">
                           {rupee(line.amount, currency)}
@@ -153,7 +178,7 @@ export default function WalletStatementPanel() {
                     ))}
                     {lines.length === 0 && (
                       <tr>
-                        <td colSpan={4} className="px-3 py-4 text-center text-[11px] font-medium text-slate-500">
+                        <td colSpan={5} className="px-3 py-4 text-center text-[11px] font-medium text-slate-500">
                           No charges recorded.
                         </td>
                       </tr>
