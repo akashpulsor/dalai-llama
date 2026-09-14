@@ -54,12 +54,33 @@ export default function SubscriptionPage() {
   const proPlans = plans.filter((p) => p.tier !== "FREE");
   const busy = subscribing || cancelling || pausing || resuming || toppingUp;
 
-  /** product-service answers an unaffordable subscribe with HTTP 402 carrying the full
-   * CreatorVideoSubscriptionResponse (status=INSUFFICIENT_BALANCE + shortFallAmount), so RTK
-   * Query rejects rather than resolving -- the shortfall is only reachable from the error body. */
-  const insufficientBalancePayload = (error) => {
-    const payload = error?.data;
-    return error?.status === 402 && payload?.status === "INSUFFICIENT_BALANCE" ? payload : null;
+  /** A 402 from subscribe means "pay for this", and paying is what the button is for -- so every
+   * shape of it has to route to checkout.
+   *
+   * product-service answers in two different ways and only one was being recognised. Its
+   * pre-flight check returns the full CreatorVideoSubscriptionResponse
+   * (status=INSUFFICIENT_BALANCE, with shortFallAmount); an InsufficientBalanceException thrown
+   * later goes through GlobalExceptionHandler instead and returns {error, message} with no
+   * shortfall at all. The second shape fell through to "Could not subscribe", which is how a
+   * subscribe button ends up showing a balance error instead of opening Razorpay.
+   *
+   * RTK Query rejects on non-2xx, so either shape is only reachable from the error object. When
+   * the body carries no shortfall, it is derived from the plan price against the current wallet
+   * balance -- both of which this page already has. */
+  const insufficientBalancePayload = (error, plan) => {
+    if (error?.status !== 402) return null;
+    const payload = error?.data || {};
+    const flagged = payload.status === "INSUFFICIENT_BALANCE" || payload.error === "INSUFFICIENT_BALANCE";
+    if (!flagged) return null;
+    if (payload.shortFallAmount != null) return payload;
+    const price = Number(plan?.monthlyPrice ?? plan?.price ?? 0);
+    const balance = Number(wallet?.balance ?? 0);
+    return {
+      ...payload,
+      currency: payload.currency || wallet?.currency || "INR",
+      currentWalletBalance: balance,
+      shortFallAmount: Math.max(0, price - balance),
+    };
   };
 
   /** Razorpay rejects anything under 1 rupee, and a fractional shortfall would still leave the
@@ -72,7 +93,7 @@ export default function SubscriptionPage() {
       dispatch(showFlash({ message: `Subscribed to ${plan.planName}`, type: "success" }));
       return;
     } catch (error) {
-      const shortfall = insufficientBalancePayload(error);
+      const shortfall = insufficientBalancePayload(error, plan);
       if (!shortfall) {
         dispatch(showFlash({ message: error?.data?.message || "Could not subscribe", type: "error" }));
         return;
