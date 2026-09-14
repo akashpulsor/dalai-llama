@@ -3135,6 +3135,15 @@ export const creatorApi = apiSlice.injectEndpoints({
       ],
     }),
 
+    // Progress of the project's latest prepare batch. video-generation-service runs the batch on
+    // its Kafka worker side and this row is the durable record of it, so this is what the UI
+    // polls: PENDING/RUNNING while live, SUCCEEDED/FAILED with counts once done. 404 means the
+    // project has never had a batch.
+    getPrepareBatchStatus: builder.query({
+      query: (projectId) => ({ url: platformUrl(`/scenes/projects/${projectId}/prepare-batch`) }),
+      providesTags: (_result, _error, projectId) => [{ type: "CreatorHomeProjects", id: `prepare-batch-${projectId}` }],
+    }),
+
     // All prepared shot prompts for a project, one row per shot (latest version wins). Video
     // workspace calls this once on page load to render the full editable list -- this is what
     // makes a prepared prompt survive a refresh instead of living only in component state.
@@ -3539,6 +3548,7 @@ export const {
   useLazyGetProjectScenePreparationQuery,
   usePrepareShotSceneMutation,
   usePrepareShotScenesBatchMutation,
+  useGetPrepareBatchStatusQuery,
   useListProjectShotPromptsQuery,
   useLazyListProjectShotPromptsQuery,
   useListVideoModelsQuery,

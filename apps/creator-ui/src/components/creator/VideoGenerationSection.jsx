@@ -9,7 +9,7 @@ import {
   useGetClonedVoiceAudioQuery,
   useGetProjectConfigQuery,
   useListPreProductionShotsQuery,
-  useGetProjectScenePreparationQuery,
+  useGetPrepareBatchStatusQuery,
   useListProjectShotPromptsQuery,
   useListVideoFeatureFlagsQuery,
   useListVideoModelsQuery,
@@ -52,8 +52,14 @@ export default function VideoGenerationSection({ projectId }) {
     skip: !projectId,
     pollingInterval: batchRunning ? 4000 : 0,
   });
-  const { data: preparationState } = useGetProjectScenePreparationQuery(projectId, {
-    skip: !projectId || !batchRunning,
+  // The batch's own job row, not the project's scene-preparation flag: it distinguishes "never
+  // run" from "finished", and carries the prepared/failed counts to report at the end.
+  // Queried on load, not just while this tab started a batch: the job is durable server-side, so
+  // reloading the page (or opening it elsewhere) mid-batch should pick the run back up rather
+  // than show a project that looks idle while shots are still being prepared. 404 -- the project
+  // has never had a batch -- reads as undefined, which is the idle case anyway.
+  const { data: batchStatus } = useGetPrepareBatchStatusQuery(projectId, {
+    skip: !projectId,
     pollingInterval: batchRunning ? 4000 : 0,
   });
   const [updateProjectConfig] = useUpdateProjectConfigMutation();
@@ -141,20 +147,42 @@ export default function VideoGenerationSection({ projectId }) {
     });
   }, [savedPrompts, batchRunning]);
 
-  // The batch is over when the project's status leaves PREPARING. Drop every remaining spinner:
-  // a shot still marked busy here is one the batch could not prepare.
+  // PENDING (queued, not yet picked up) and RUNNING both mean live. Anything else is terminal.
+  // Dropping every remaining spinner is deliberate: a shot still marked busy once the batch has
+  // finished is one the batch could not prepare, and leaving it spinning forever would suggest
+  // work is still happening.
   useEffect(() => {
-    if (!batchRunning || !preparationState?.status) return;
-    if (preparationState.status === "PREPARING") return;
+    if (!batchRunning || !batchStatus?.status) return;
+    if (batchStatus.status === "PENDING" || batchStatus.status === "RUNNING") return;
     setBatchRunning(false);
     setPreparing({});
-    dispatch(showFlash({
-      message: preparationState.status === "FAILED"
-        ? "Preparing shots failed — see the shots that stayed empty"
-        : "Shots prepared",
-      type: preparationState.status === "FAILED" ? "error" : "success",
-    }));
-  }, [batchRunning, preparationState?.status, dispatch]);
+    const failed = batchStatus.failedCount || 0;
+    if (batchStatus.status === "FAILED") {
+      dispatch(showFlash({
+        message: batchStatus.errorMessage
+          ? `Preparing shots failed: ${batchStatus.errorMessage}`
+          : "Preparing shots failed",
+        type: "error",
+      }));
+    } else if (failed > 0) {
+      dispatch(showFlash({
+        message: `${batchStatus.preparedCount || 0} prepared, ${failed} could not be prepared`,
+        type: "error",
+      }));
+    } else {
+      dispatch(showFlash({
+        message: `${batchStatus.preparedCount || 0} shot${batchStatus.preparedCount === 1 ? "" : "s"} prepared`,
+        type: "success",
+      }));
+    }
+  }, [batchRunning, batchStatus, dispatch]);
+
+  // Adopt a batch that was already running when this view loaded.
+  useEffect(() => {
+    if (batchRunning || !batchStatus?.status) return;
+    if (batchStatus.status !== "PENDING" && batchStatus.status !== "RUNNING") return;
+    setBatchRunning(true);
+  }, [batchStatus?.status, batchRunning]);
 
   const handlePrepare = async (shotId) => {
     setPreparing((s) => ({ ...s, [shotId]: true }));
@@ -263,9 +291,8 @@ export default function VideoGenerationSection({ projectId }) {
         modelPin: projectConfig?.preferredVideoModel || undefined,
         resolutionOverride: projectConfig?.preferredResolution || undefined,
       }).unwrap();
-      if (accepted?.status === "ALREADY_RUNNING") {
-        dispatch(showFlash({ message: "A prepare is already running for this project.", type: "info" }));
-      }
+      // Either this call queued the batch or it joined one already live for the project -- both
+      // come back as a job to watch, so either way the UI starts polling.
       setBatchRunning(true);
     } catch (error) {
       busyIds.forEach((id) => setPreparing((s) => ({ ...s, [id]: false })));
