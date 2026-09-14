@@ -1,6 +1,8 @@
 // @ts-nocheck
 import React, { useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import FeatureLock from "../components/billing/FeatureLock.jsx";
+import { Crown } from "lucide-react";
 import { PatchEditorProvider, usePatchEditor } from "../features/patchEditor/state/PatchEditorProvider.jsx";
 import Toolbar from "../features/patchEditor/components/Toolbar.jsx";
 import Timeline from "../features/patchEditor/components/Timeline.jsx";
@@ -15,7 +17,6 @@ import PatchList from "../features/patchEditor/components/PatchList.jsx";
 import UploadDropzone from "../features/patchEditor/components/UploadDropzone.jsx";
 import ProjectPickerPanel from "../features/patchEditor/components/ProjectPickerPanel.jsx";
 import { clamp } from "../features/patchEditor/utils/time.js";
-import FeatureLock from "../components/billing/FeatureLock.jsx";
 import useCreatorVideoEntitlements from "../hooks/useCreatorVideoEntitlements.js";
 
 const FRAME_STEP = 1 / 30;
@@ -75,7 +76,27 @@ function PatchEditorWorkspace() {
           </p>
         </div>
 
-        <FeatureLock unlocked={entitlements.editsEnabled} feature="The AI editor">
+        {/* The editor itself stays visible and usable up to the point of spending. Blocking the
+          * whole page behind FeatureLock meant someone could not load a video, scrub it, or see
+          * what the tool does before being asked to pay for it -- which is a poor way to sell
+          * anything. The gate lives on the actions that actually cost money (AiEditPanel's
+          * generate), where a ProCta shows the crown and routes to the plans page. */}
+        {!entitlements.editsEnabled && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-400/25 bg-amber-500/[0.06] px-4 py-3">
+            <Crown size={16} className="shrink-0 text-amber-300" />
+            <p className="min-w-0 flex-1 text-xs font-semibold text-amber-100">
+              Look around freely — loading a video and marking a section are free. Generating the repair is a Pro
+              feature.
+            </p>
+            <Link
+              to="/subscription"
+              className="creator-primary shrink-0 rounded-md px-3.5 py-2 text-xs font-black text-white"
+            >
+              See plans
+            </Link>
+          </div>
+        )}
+        <>
           {!hasVideo ? (
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
               <UploadDropzone />
@@ -106,7 +127,7 @@ function PatchEditorWorkspace() {
               </div>
             </section>
           )}
-        </FeatureLock>
+        </>
       </section>
     </div>
   );
