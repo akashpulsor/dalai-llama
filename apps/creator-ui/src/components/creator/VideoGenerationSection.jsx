@@ -107,6 +107,7 @@ export default function VideoGenerationSection({ projectId }) {
     externalPromptId: view.promptId,
     recommendedModel: view.recommendedModelId,
     estimatedCost: view.estimatedCost,
+    costCurrency: view.costCurrency,
     // Every asset this prompt pulled in (frames, character faces, voice sample, music bed), each
     // tagged with its kind so the card can thumbnail the images and play the audio.
     references: view.references,

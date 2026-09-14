@@ -62,6 +62,20 @@ function BackgroundMusicControl({ shotId }) {
   );
 }
 
+/** A bare number is not a price. The backend quotes in the wallet's own currency (billing
+ * converts the provider's USD before it reaches here), so show the symbol that matches -- a
+ * creator reading "0.66" next to a rupee balance cannot tell what they are agreeing to. */
+const CURRENCY_SYMBOLS = { INR: "₹", USD: "$", EUR: "€", GBP: "£" };
+
+function formatCost(amount, currency) {
+  if (amount == null) return null;
+  const code = (currency || "INR").toUpperCase();
+  const value = Number(amount);
+  const shown = Number.isFinite(value) ? value.toFixed(2) : amount;
+  const symbol = CURRENCY_SYMBOLS[code];
+  return symbol ? `${symbol}${shown}` : `${shown} ${code}`;
+}
+
 const REFERENCE_KIND_LABELS = {
   STORYBOARD: "Shot frame",
   CHARACTER_FACE: "Character",
@@ -357,7 +371,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
                 )}
                 {info.estimatedCost != null && (
                   <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-bold text-slate-300">
-                    Est. cost: {info.estimatedCost}
+                    Est. cost: {formatCost(info.estimatedCost, info.costCurrency)}
                   </span>
                 )}
               </div>
