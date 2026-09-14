@@ -3179,6 +3179,16 @@ export const creatorApi = apiSlice.injectEndpoints({
       providesTags: (_result, _error, projectId) => [{ type: "CreatorHomeProjects", id: `shot-videos-${projectId}` }],
     }),
 
+    // Every prompt version written for a shot, newest first, each carrying the approval/job
+    // status it produced. Editing never overwrites -- a save writes a new row parented to the
+    // one it came from -- so this is the shot's history and a rejected prompt is still readable.
+    // On /scenes rather than /v1/shots/{ref}/prompts, which video-gen also serves but the
+    // browser cannot reach: /v1/shots belongs to pre-production-service at the gateway.
+    listShotPromptVersions: builder.query({
+      query: (shotRef) => ({ url: platformUrl(`/scenes/shots/${shotRef}/prompts`) }),
+      providesTags: (_result, _error, shotRef) => [{ type: "CreatorHomeProjects", id: `prompt-versions-${shotRef}` }],
+    }),
+
 
     // Model catalog for the video-workspace "generate with" dropdown. Proxied through video-gen
     // (UI never calls llm-gateway directly -- llm-gateway is cluster-internal). type=video
@@ -3588,6 +3598,7 @@ export const {
   useCreateFinalRenderMutation,
   useGetLatestFinalRenderQuery,
   useListProjectShotVideosQuery,
+  useListShotPromptVersionsQuery,
   useLazyGetLatestFinalRenderQuery,
   useGetFinalRenderQuery,
   useLazyGetFinalRenderQuery,

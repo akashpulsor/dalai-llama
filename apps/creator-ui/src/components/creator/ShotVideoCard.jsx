@@ -1,12 +1,13 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { AudioLines, Check, ChevronDown, Loader2, Music, Pencil, PlayCircle, Save, Sparkles, X } from "lucide-react";
+import { AudioLines, Check, ChevronDown, History, Loader2, Music, Pencil, PlayCircle, Save, Sparkles, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useGenerateShotBackgroundMusicMutation,
   useGetShotBackgroundMusicQuery,
   useListPreProductionShotImagesQuery,
+  useListShotPromptVersionsQuery,
 } from "../../api/creatorEndpoints.js";
 import DialogueBeatsEditor from "./DialogueBeatsEditor.jsx";
 import MotionGraphicPanel from "./MotionGraphicPanel.jsx";
@@ -182,6 +183,84 @@ const ASPECT_RATIO_CSS = {
 /** One shot as a visual card -- the frame (or the finished clip, once generated) IS the card,
  * not a text row that hides the image behind an accordion toggle. Clicking anywhere opens the
  * full prepare/approve panel below it, spanning the grid so it doesn't stretch its neighbors. */
+/** Every prompt this shot has had, newest first.
+ *
+ * Editing never overwrites -- video-generation-service writes a new row parented to the one it
+ * came from -- so a rejected prompt is still here to read, and "Use this" seeds the editor with an
+ * older version to save forward as a new one. Nothing is mutated in place and nothing is deleted,
+ * which is the whole point: a rewrite that turns out worse than what it replaced is recoverable.
+ *
+ * Collapsed by default. A shot with one prompt has no history worth the space.
+ */
+function PromptVersionHistory({ shotId, onUse, canEdit }) {
+  const [open, setOpen] = React.useState(false);
+  const { data: versions = [], isFetching } = useListShotPromptVersionsQuery(shotId, { skip: !shotId || !open });
+
+  return (
+    <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <div className="flex items-center gap-1.5">
+          <History size={12} className="text-slate-400" />
+          <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Prompt history</p>
+        </div>
+        <ChevronDown size={12} className={`text-slate-500 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="mt-2 space-y-1.5">
+          {isFetching ? (
+            <p className="flex items-center gap-1.5 py-2 text-[11px] font-semibold text-slate-500">
+              <Loader2 size={11} className="animate-spin" /> Loading versions…
+            </p>
+          ) : versions.length === 0 ? (
+            <p className="py-2 text-[11px] font-semibold text-slate-600">No earlier versions for this shot.</p>
+          ) : (
+            versions.map((version, index) => {
+              const text = version.promptCompressed || version.promptOriginal || "";
+              const rejected = version.approvalStatus === "REJECTED";
+              return (
+                <div key={version.promptId} className="rounded border border-white/10 bg-black/20 p-2">
+                  <div className="mb-1 flex items-center gap-1.5">
+                    <span className="text-[9px] font-black uppercase tracking-wide text-slate-500">
+                      {index === 0 ? "Current" : `v${versions.length - index}`}
+                    </span>
+                    {version.approvalStatus && (
+                      <span className={`rounded px-1.5 py-0.5 text-[9px] font-black uppercase ${
+                        rejected ? "bg-rose-400/10 text-rose-300" : "bg-white/10 text-slate-400"
+                      }`}>
+                        {version.approvalStatus}
+                      </span>
+                    )}
+                    {version.shipped && (
+                      <span className="rounded bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-black uppercase text-emerald-300">
+                        Shipped
+                      </span>
+                    )}
+                  </div>
+                  <p className="line-clamp-3 text-[11px] font-medium leading-relaxed text-slate-400">{text || "—"}</p>
+                  {index > 0 && canEdit && onUse && (
+                    <button
+                      type="button"
+                      onClick={() => onUse(text)}
+                      className="mt-1.5 text-[10px] font-bold text-purple-300 hover:text-purple-200"
+                    >
+                      Use this
+                    </button>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info, busy, video, dubbed, selected, onSelectToggle, onPrepare, onSavePrompt, onApprove, onReject, onAutoFix }) {
   // Prompt editing is local to the open card: the draft only leaves here on an explicit Save, so
   // collapsing the card or wandering off never silently rewrites what will be generated.
@@ -456,6 +535,14 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
                     <p className="mt-2 text-[10px] font-medium text-slate-500">Negative: {info.prompt.negativePrompt}</p>
                   )}
                   <PromptAttachments info={info} />
+                  <PromptVersionHistory
+                    shotId={shot.id}
+                    canEdit={entitlements.editsEnabled && !!onSavePrompt}
+                    onUse={(text) => {
+                      setDraft(text);
+                      setEditing(true);
+                    }}
+                  />
                 </div>
               )}
               <div className="flex gap-2">
