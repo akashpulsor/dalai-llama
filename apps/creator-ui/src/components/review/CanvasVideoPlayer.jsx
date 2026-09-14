@@ -94,12 +94,15 @@ export default function CanvasVideoPlayer({ src, aspectRatio, className = "" }) 
             <Loader2 size={20} className="animate-spin" />
           </div>
         )}
-        {/* Never rendered to the page: no controls, no context menu, nothing to save. */}
+        {/* Never rendered to the page: no controls, no context menu, nothing to save.
+            No crossOrigin on purpose -- setting it would make playback depend on the media
+            host sending CORS headers, and the video would fail to load outright if they were
+            ever missing. Without it the media always loads and the canvas is merely tainted,
+            which only blocks pixel read-back; this player only ever draws. */}
         <video
           ref={videoRef}
           src={src}
           playsInline
-          crossOrigin="anonymous"
           className="hidden"
           onLoadedData={() => {
             setReady(true);
