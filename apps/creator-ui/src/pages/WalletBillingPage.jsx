@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { ArrowDownLeft, ArrowUpRight, Crown, Percent, Save, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { selectTenantId, showFlash, useGetWalletBalanceQuery } from "@dalaillama/shared-store";
+import WalletStatementPanel from "../components/billing/WalletStatementPanel.jsx";
 import { useGetOrganizationQuery, useListWalletTransactionsQuery, useUpdateOrganizationMutation } from "../api/creatorEndpoints.js";
 import WalletBalanceButton from "../components/billing/WalletBalanceButton.jsx";
 import useCreatorVideoEntitlements from "../hooks/useCreatorVideoEntitlements.js";
@@ -143,6 +144,8 @@ export default function WalletBillingPage() {
           </div>
         )}
       </div>
+
+      <WalletStatementPanel />
 
       <div className="creator-panel mt-6 p-5">
         <div className="mb-2 flex items-center gap-2 text-purple-200">
