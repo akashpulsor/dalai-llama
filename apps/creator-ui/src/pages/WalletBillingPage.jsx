@@ -98,10 +98,14 @@ export default function WalletBillingPage() {
         <SummaryCard icon={TrendingUp} tone="emerald" label="You earned" value={rupee(summary.earned, currencyCode)} sub="From client payments" />
       </div>
 
+      {/* The statement first: what you last added, what has gone out since, and on what. The
+          raw feed below is for looking something up, not for understanding the wallet. */}
+      <WalletStatementPanel />
+
       {/* LEDGER */}
       <div className="creator-panel mt-6 p-5">
         <p className="text-[11px] font-extrabold uppercase tracking-widest text-purple-300">Transaction history</p>
-        <p className="mt-0.5 text-xs font-medium text-slate-400">Every credit and debit on your wallet, newest first.</p>
+        <p className="mt-0.5 text-xs font-medium text-slate-400">Every credit and debit, grouped by day, newest first.</p>
 
         {txLoading ? (
           <p className="py-8 text-center text-xs font-medium text-slate-500">Loading…</p>
@@ -110,8 +114,17 @@ export default function WalletBillingPage() {
             No transactions yet. Recharge your wallet or generate a video to see activity here.
           </p>
         ) : (
-          <div className="mt-4 space-y-1.5">
-            {transactions.map((tx) => {
+          <div className="mt-4 space-y-4">
+            {groupByDay(transactions).map(({ key, label, rows, dayTotal }) => (
+              <div key={key}>
+                <div className="mb-1.5 flex items-baseline justify-between gap-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</p>
+                  <p className="text-[10px] font-bold tabular-nums text-slate-500">
+                    {dayTotal < 0 ? "−" : "+"}{rupee(Math.abs(dayTotal), currencyCode)} net
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+            {rows.map((tx) => {
               const out = OUT_TYPES.has(tx.type);
               const earned = isClientEarning(tx);
               // Same magnitude-only reasoning as the summary above -- avoids a doubled sign
@@ -141,11 +154,12 @@ export default function WalletBillingPage() {
                 </div>
               );
             })}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
-
-      <WalletStatementPanel />
 
       <div className="creator-panel mt-6 p-5">
         <div className="mb-2 flex items-center gap-2 text-purple-200">
@@ -195,6 +209,35 @@ const TONE = {
   rose: "border-rose-400/20 text-rose-300",
   emerald: "border-emerald-400/20 text-emerald-300",
 };
+
+/** Buckets the feed by calendar day, newest first, with each day's net movement. A wallet
+  * ledger read as one flat column tells you nothing about when anything happened; a day
+  * header and a net figure make a spending day visible at a glance. Rows with no timestamp
+  * fall into their own bucket rather than being dropped or dated to the epoch. */
+function groupByDay(transactions) {
+  const buckets = new Map();
+  transactions.forEach((tx) => {
+    const when = tx.createdAt ? new Date(tx.createdAt) : null;
+    const key = when && !Number.isNaN(when.getTime()) ? when.toISOString().slice(0, 10) : "undated";
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        key,
+        label: when && key !== "undated"
+          ? when.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })
+          : "Undated",
+        rows: [],
+        dayTotal: 0,
+      });
+    }
+    const bucket = buckets.get(key);
+    bucket.rows.push(tx);
+    // Magnitude plus an explicit direction -- tx.amount is already negative for some debit
+    // types and positive for others, so summing it raw double-counts the sign.
+    const amount = Math.abs(Number(tx.amount) || 0);
+    bucket.dayTotal += OUT_TYPES.has(tx.type) ? -amount : amount;
+  });
+  return Array.from(buckets.values());
+}
 
 function SummaryCard({ icon: Icon, tone, label, value, sub }) {
   return (
