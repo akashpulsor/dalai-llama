@@ -3074,6 +3074,13 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: (promptId) => ({ url: platformUrl(`/prompts/${promptId}`) }),
     }),
 
+    // What actually happened to a job, lastError included. approve() blocks for the length of a
+    // render, so a request can easily end before the shot does -- and the render carries on. This
+    // is how to find out, instead of approving again and paying for the same shot twice.
+    getVideoGenJob: builder.query({
+      query: (jobId) => ({ url: platformUrl(`/jobs/${jobId}`) }),
+    }),
+
     approveVideoGenJob: builder.mutation({
       query: (jobId) => ({ url: platformUrl(`/jobs/${jobId}/approve`), method: "POST" }),
     }),
@@ -3578,6 +3585,7 @@ export const {
   useDispatchShotMutation,
   useGetVideoGenPromptQuery,
   useLazyGetVideoGenPromptQuery,
+  useLazyGetVideoGenJobQuery,
   useApproveVideoGenJobMutation,
   useRejectVideoGenJobMutation,
   useCancelVideoGenJobMutation,
