@@ -24,6 +24,10 @@ const rupee = (n, code = "INR") =>
 
 const CYCLE_LABEL = { MONTHLY: "Monthly", QUARTERLY: "Quarterly", YEARLY: "Yearly" };
 
+/** Months each cycle bills for. Used to show a per-month figure beside the headline price, which
+ * is the only way a creator can compare a quarterly plan against a monthly one at a glance. */
+const CYCLE_MONTHS = { MONTHLY: 1, QUARTERLY: 3, YEARLY: 12 };
+
 const FEATURE_ROWS = [
   ["editsEnabled", "AI edits & repairs"],
   ["imageUploadEnabled", "Upload a reference image for a character"],
@@ -212,28 +216,96 @@ export default function SubscriptionPage() {
       </div>
 
       {status !== "ACTIVE" && (
-        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <>
+          <div className="mt-8 flex items-end justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-white">Choose a billing cycle</h2>
+              <p className="mt-0.5 text-xs font-medium text-slate-400">
+                Same Pro features on every cycle — longer cycles cost less per month.
+              </p>
+            </div>
+          </div>
+
           {plansLoading ? (
-            <p className="text-xs font-medium text-slate-500">Loading plans…</p>
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="creator-panel h-64 animate-pulse p-5" />
+              ))}
+            </div>
           ) : (
-            proPlans.map((plan) => (
-              <div key={plan.planCode} className="creator-panel flex flex-col p-4">
-                <p className="text-[10px] font-extrabold uppercase tracking-wide text-purple-300">{CYCLE_LABEL[plan.billingCycle] || plan.billingCycle}</p>
-                <p className="mt-1 text-2xl font-bold text-white">{rupee(plan.price, plan.currency)}</p>
-                <p className="text-[11px] font-medium text-slate-500">per {(CYCLE_LABEL[plan.billingCycle] || "cycle").toLowerCase()}</p>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => handleSubscribe(plan)}
-                  className="creator-primary mt-4 flex items-center justify-center gap-1.5 py-2 text-xs font-bold text-white disabled:opacity-60"
-                >
-                  {subscribing ? <Loader2 size={13} className="animate-spin" /> : null}
-                  Subscribe
-                </button>
-              </div>
-            ))
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {proPlans.map((plan) => {
+                const months = CYCLE_MONTHS[plan.billingCycle] || 1;
+                const perMonth = Number(plan.price || 0) / months;
+                // Cheapest per month, not cheapest sticker price -- the yearly plan has the
+                // biggest number on it and is usually the best value, so ranking by sticker
+                // price would recommend exactly the wrong one.
+                const bestValue =
+                  proPlans.length > 1 &&
+                  proPlans.every((other) => {
+                    const otherMonths = CYCLE_MONTHS[other.billingCycle] || 1;
+                    return perMonth <= Number(other.price || 0) / otherMonths;
+                  });
+                return (
+                  <div
+                    key={plan.planCode}
+                    className={`creator-panel relative flex flex-col p-5 ${
+                      bestValue ? "border-purple-400/40 ring-1 ring-purple-400/30" : ""
+                    }`}
+                  >
+                    {bestValue && (
+                      <span className="absolute -top-2.5 left-5 rounded-full bg-purple-500 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white">
+                        Best value
+                      </span>
+                    )}
+                    <p className="text-[10px] font-extrabold uppercase tracking-wide text-purple-300">
+                      {CYCLE_LABEL[plan.billingCycle] || plan.billingCycle}
+                    </p>
+                    <div className="mt-2 flex items-baseline gap-1.5">
+                      <span className="text-3xl font-black tracking-tight text-white">{rupee(plan.price, plan.currency)}</span>
+                      <span className="text-[11px] font-semibold text-slate-500">
+                        /{(CYCLE_LABEL[plan.billingCycle] || "cycle").toLowerCase()}
+                      </span>
+                    </div>
+                    {months > 1 && (
+                      <p className="mt-0.5 text-[11px] font-semibold text-emerald-300">
+                        {rupee(perMonth, plan.currency)} per month
+                      </p>
+                    )}
+
+                    <div className="mt-4 space-y-1.5 border-t border-white/10 pt-4">
+                      {FEATURE_ROWS.map(([key, label]) => (
+                        <p key={key} className="flex items-start gap-1.5 text-[11px] font-semibold text-slate-300">
+                          <Check size={12} className="mt-0.5 shrink-0 text-emerald-400" />
+                          {label}
+                        </p>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => handleSubscribe(plan)}
+                      className={`mt-5 flex items-center justify-center gap-1.5 rounded-md py-2.5 text-xs font-black disabled:opacity-60 ${
+                        bestValue
+                          ? "creator-primary text-white"
+                          : "border border-white/10 bg-white/5 text-slate-100 hover:border-purple-400/30"
+                      }`}
+                    >
+                      {busy ? <Loader2 size={13} className="animate-spin" /> : null}
+                      {toppingUp ? "Opening payment…" : `Subscribe ${(CYCLE_LABEL[plan.billingCycle] || "").toLowerCase()}`}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           )}
-        </div>
+
+          <p className="mt-4 text-center text-[11px] font-medium text-slate-500">
+            Charged from your wallet. If it's short, we'll open a secure Razorpay payment for the difference and
+            subscribe you straight after. Cancel or pause any time.
+          </p>
+        </>
       )}
     </div>
   );

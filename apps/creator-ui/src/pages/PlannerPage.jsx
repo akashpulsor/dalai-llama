@@ -9596,9 +9596,17 @@ export default function PlannerPage() {
               <>
                 <div className="flex flex-col gap-3 rounded-md border border-white/10 bg-black/25 p-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-xs font-black text-white">Client download</p>
+                    <p className="text-xs font-black text-white">
+                      {activeProjectDetail?.finalVideoDownloadUnlocked ? "Published to your client" : "Not published yet"}
+                    </p>
+                    {/* Says what the flag actually does. It used to read "they can preview the
+                      * video regardless", which was not true: PublicProjectService returns no
+                      * videoUrl at all while this is off, so the client's review page showed
+                      * nothing -- the cut was invisible, not merely undownloadable. */}
                     <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
-                      Flip this once the client has paid you. They can preview the video regardless; this only gates the download link on their review page.
+                      {activeProjectDetail?.finalVideoDownloadUnlocked
+                        ? "Your client can watch and download this cut on their review page."
+                        : "Publish when you're ready for the client to see it. Until then their review page shows no video."}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
@@ -9609,16 +9617,19 @@ export default function PlannerPage() {
                     >
                       <Download size={14} /> Download
                     </a>
-                    <label className="flex items-center gap-2 text-xs font-black text-slate-200">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(activeProjectDetail?.finalVideoDownloadUnlocked)}
-                        onChange={(event) => handleToggleFinalVideoLock(event.target.checked)}
-                        disabled={updateFinalVideoLockState.isLoading}
-                        className="h-4 w-4 accent-purple-400"
-                      />
-                      Unlocked for client
-                    </label>
+                    <button
+                      type="button"
+                      disabled={updateFinalVideoLockState.isLoading}
+                      onClick={() => handleToggleFinalVideoLock(!activeProjectDetail?.finalVideoDownloadUnlocked)}
+                      className={`flex items-center gap-1.5 rounded-md px-4 py-2 text-xs font-black disabled:opacity-60 ${
+                        activeProjectDetail?.finalVideoDownloadUnlocked
+                          ? "border border-white/10 bg-white/5 text-slate-200"
+                          : "creator-primary text-white"
+                      }`}
+                    >
+                      {updateFinalVideoLockState.isLoading && <Loader2 size={13} className="animate-spin" />}
+                      {activeProjectDetail?.finalVideoDownloadUnlocked ? "Unpublish" : "Publish to review page"}
+                    </button>
                   </div>
                 </div>
               <video
