@@ -1,4 +1,6 @@
 // @ts-nocheck
+import ProCta from "../common/ProCta.jsx";
+import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
 import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Film, FileDown, Loader2, Pencil, Plus, RefreshCw, Save, Sparkles, X } from "lucide-react";
@@ -97,6 +99,7 @@ function EditShotFields({ shot, onSave, saving }) {
     cameraMovement: shot.cameraMovement || "",
     cameraNote: shot.cameraNote || "",
   }), [shot]);
+  const { entitlements } = useCreatorVideoEntitlements();
   const [draft, setDraft] = useState(initial);
   const [editing, setEditing] = useState(false);
   React.useEffect(() => { setDraft(initial); }, [initial]);
@@ -161,13 +164,14 @@ function EditShotFields({ shot, onSave, saving }) {
       <div className="mb-2 flex items-center justify-between">
         <p className="text-[9px] font-extrabold uppercase tracking-wide text-purple-300">Shot plan</p>
         {!editing && (
-          <button
-            type="button"
+          <ProCta
+            unlocked={entitlements.editsEnabled}
+            feature="Editing the shot plan"
             onClick={startEdit}
-            className="rounded border border-white/10 p-1 text-slate-400 hover:border-purple-400/30 hover:text-slate-200"
+            className="flex items-center rounded border border-white/10 p-1 text-slate-400 hover:border-purple-400/30 hover:text-slate-200"
           >
             <Pencil size={10} />
-          </button>
+          </ProCta>
         )}
       </div>
 

@@ -12,6 +12,8 @@ import DialogueBeatsEditor from "./DialogueBeatsEditor.jsx";
 import MotionGraphicPanel from "./MotionGraphicPanel.jsx";
 import CritiqueFindingsPanel from "./CritiqueFindingsPanel.jsx";
 import ShotThoughtLog from "./ShotThoughtLog.jsx";
+import ProCta from "../common/ProCta.jsx";
+import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
 import { useCachedImageUrl } from "../../utils/cachedImageUrl.js";
 
 /** On-demand only -- never auto-generated as part of dispatch, one track per shot, sourced from
@@ -186,6 +188,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState("");
   const [saving, setSaving] = React.useState(false);
+  const { entitlements } = useCreatorVideoEntitlements();
 
   const handleSave = async () => {
     setSaving(true);
@@ -380,8 +383,9 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
                   <div className="mb-1 flex items-center justify-between gap-2">
                     <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Prompt</p>
                     {!editing && onSavePrompt && (
-                      <button
-                        type="button"
+                      <ProCta
+                        unlocked={entitlements.editsEnabled}
+                        feature="Editing the prompt"
                         onClick={() => {
                           setDraft(info.prompt.promptCompressed || info.prompt.promptOriginal || "");
                           setEditing(true);
@@ -390,7 +394,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
                       >
                         <Pencil size={10} />
                         Edit
-                      </button>
+                      </ProCta>
                     )}
                   </div>
                   {editing ? (

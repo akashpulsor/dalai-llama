@@ -1,4 +1,6 @@
 // @ts-nocheck
+import ProCta from "../common/ProCta.jsx";
+import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil, Plus, RefreshCw, Save, Sparkles, Trash2, X } from "lucide-react";
@@ -24,6 +26,7 @@ const BLANK_SCENE = { slug: "", location: "", timeOfDay: null, summary: "", char
  * through older ones, and lets them either regenerate via the LLM (a new GENERATED version) or
  * hand-edit scenes and save (a new EDITED version, no LLM call). */
 export default function ScreenplaySection({ projectId }) {
+  const { entitlements } = useCreatorVideoEntitlements();
   const dispatch = useDispatch();
   const [viewedVersion, setViewedVersion] = useState(null); // null = latest
   const [editing, setEditing] = useState(false);
@@ -217,10 +220,10 @@ export default function ScreenplaySection({ projectId }) {
             })}
           </div>
           <div className="mt-4 flex gap-2.5">
-            <button type="button" onClick={startEdit} className="flex items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs font-bold text-slate-200 hover:border-purple-400/30">
+            <ProCta unlocked={entitlements.editsEnabled} feature="Editing the screenplay" onClick={startEdit} className="flex items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs font-bold text-slate-200 hover:border-purple-400/30">
               <Pencil size={12} />
               Edit scenes
-            </button>
+            </ProCta>
             <button
               type="button"
               disabled={generating}

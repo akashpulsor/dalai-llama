@@ -1,6 +1,8 @@
 // @ts-nocheck
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ProCta from "../components/common/ProCta.jsx";
+import useCreatorVideoEntitlements from "../hooks/useCreatorVideoEntitlements.js";
 import { useDispatch, useSelector } from "react-redux";
 import {
   selectTenantId,
@@ -10,7 +12,7 @@ import {
   useGetWalletBalanceQuery,
   useVerifyWalletPaymentMutation,
 } from "@dalaillama/shared-store";
-import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle, Clapperboard, Download, FolderOpen, GripVertical, HelpCircle, History, Image as ImageIcon, ListChecks, Loader2, LockKeyhole, MessageSquareText, Plus, RefreshCw, Sparkles, WalletCards, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle, Clapperboard, Download, FolderOpen, GripVertical, HelpCircle, History, Image as ImageIcon, ListChecks, Loader2, LockKeyhole, MessageSquareText, Plus, RefreshCw, Sparkles, WalletCards, X, Wand2} from "lucide-react";
 import {
   useConfirmAudienceMutation,
   useCreateCreatorMutation,
@@ -980,6 +982,7 @@ const fallbackScenes = [
 export default function PlannerPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { entitlements: creatorEntitlements } = useCreatorVideoEntitlements();
   const planner = useSelector(selectCreatorPlanner);
   const preview = useSelector(selectCreatorPreview);
   const storyboardLocal = useSelector(selectCreatorStoryboardLocal);
@@ -9624,6 +9627,28 @@ export default function PlannerPage() {
                 controls
                 className="mt-2 w-full rounded-lg border border-white/10 bg-black"
               />
+              {/* The assembled cut is where post-production begins, so the way through to the AI
+                * editor belongs here rather than only in the nav -- this is the moment a creator
+                * has something worth editing. Shown to everyone: a locked CTA carries a crown and
+                * routes to the plans page, because hiding the editor from the people who have not
+                * bought it yet is hiding the reason to buy it. */}
+              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-md border border-purple-400/20 bg-purple-500/[0.05] p-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-black text-white">Polish it in the AI editor</p>
+                  <p className="mt-0.5 text-[11px] font-semibold text-slate-400">
+                    Repair a shot, adjust timing, or patch a moment without re-rendering the whole video.
+                  </p>
+                </div>
+                <ProCta
+                  unlocked={creatorEntitlements.editsEnabled}
+                  feature="The AI editor"
+                  onClick={() => navigate("/editor")}
+                  className="creator-primary flex shrink-0 items-center gap-1.5 px-4 py-2 text-xs font-black text-white"
+                >
+                  <Wand2 size={14} />
+                  Open AI editor
+                </ProCta>
+              </div>
               </>
             )}
             {latestFinalRender?.status === "FAILED" && latestFinalRender?.lastError && (

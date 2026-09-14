@@ -1,4 +1,6 @@
 // @ts-nocheck
+import ProCta from "../common/ProCta.jsx";
+import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil, Save, Sparkles, X } from "lucide-react";
@@ -34,6 +36,7 @@ const SOURCE_BADGE = {
  * Unlike Screenplay, the live `script` row (what every other stage reads) is a separate,
  * unversioned table this always keeps in sync -- see V41__script_version.sql for why. */
 export default function ScriptSection({ projectId }) {
+  const { entitlements } = useCreatorVideoEntitlements();
   const dispatch = useDispatch();
   const [viewedVersion, setViewedVersion] = useState(null); // null = latest
   const [editing, setEditing] = useState(false);
@@ -241,14 +244,15 @@ export default function ScriptSection({ projectId }) {
           )}
 
           <div className="mt-5">
-            <button
-              type="button"
+            <ProCta
+              unlocked={entitlements.editsEnabled}
+              feature="Editing the script"
               onClick={startEdit}
               className="flex items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs font-bold text-slate-200 hover:border-purple-400/30"
             >
               <Pencil size={12} />
               Edit script
-            </button>
+            </ProCta>
           </div>
         </>
       )}

@@ -3,6 +3,8 @@ import React, { useState } from "react";
 import { useDispatch } from "react-redux";
 import { Check, CheckCircle2, Copy, Loader2, Save, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
+import ProCta from "../common/ProCta.jsx";
+import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
 import {
   useApplyChangeRequestMutation,
   useDismissChangeRequestMutation,
@@ -103,6 +105,8 @@ export default function ClientReviewPanel({ projectId }) {
     }
   };
 
+  const { entitlements } = useCreatorVideoEntitlements();
+
   const openComments = reviewComments.filter((c) => !c.resolved);
 
   return (
@@ -113,15 +117,16 @@ export default function ClientReviewPanel({ projectId }) {
       </p>
 
       {!link ? (
-        <button
-          type="button"
+        <ProCta
+          unlocked={entitlements.briefUrlShareEnabled}
+          feature="Sharing a review link with clients"
           disabled={creatingLink}
           onClick={handleGetLink}
           className="creator-primary flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
         >
           {creatingLink && <Loader2 size={12} className="animate-spin" />}
           Get client review link
-        </button>
+        </ProCta>
       ) : (
         <div className="mb-4 flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2">
           <input readOnly value={link} className="flex-1 bg-transparent text-xs font-medium text-slate-300 outline-none" />
