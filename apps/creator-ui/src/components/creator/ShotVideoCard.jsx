@@ -158,12 +158,9 @@ function PromptAttachments({ info }) {
               <audio controls src={ref.url} className="h-7 flex-1" />
             </div>
           ))}
-          {/* Honest about what these do today: they are attached to the prompt and playable
-            * here, but the music bed is not yet mixed into the rendered video. Saying so beats
-            * a creator assuming a silent result is a bug. */}
           {audio.some((ref) => ref.kind === "BACKGROUND_MUSIC") && (
-            <p className="text-[9px] font-medium italic text-amber-300/80">
-              Music bed is generated and stored, but not yet mixed into the rendered video.
+            <p className="text-[9px] font-medium text-slate-500">
+              Mixed under the dialogue when this shot is generated.
             </p>
           )}
         </div>
