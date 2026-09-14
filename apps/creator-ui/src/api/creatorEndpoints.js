@@ -3179,6 +3179,7 @@ export const creatorApi = apiSlice.injectEndpoints({
       providesTags: (_result, _error, projectId) => [{ type: "CreatorHomeProjects", id: `shot-videos-${projectId}` }],
     }),
 
+
     // Model catalog for the video-workspace "generate with" dropdown. Proxied through video-gen
     // (UI never calls llm-gateway directly -- llm-gateway is cluster-internal). type=video
     // filters to registered video-generation models (Seedance, Wan, ...).

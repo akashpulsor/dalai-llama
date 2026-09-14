@@ -190,6 +190,19 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
   const [saving, setSaving] = React.useState(false);
   const { entitlements } = useCreatorVideoEntitlements();
 
+  /** Rejecting is the start of a rewrite, not the end of the shot. Mark it rejected, then drop
+   * straight into the prompt so the creator can say what was wrong with it -- saving writes a
+   * new version and leaves the rejected prompt intact as its parent. The card used to vanish
+   * on reject, which threw away the one thing they needed to edit. */
+  const handleReject = async () => {
+    if (!onReject) return;
+    const rejected = await onReject();
+    if (rejected === false) return;
+    if (!onSavePrompt || !info?.prompt) return;
+    setDraft(info.prompt.promptCompressed || info.prompt.promptOriginal || "");
+    setEditing(true);
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -337,7 +350,12 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
           )}
 
           {!info && <DialogueBeatsEditor shot={shot} projectId={projectId} />}
-          {!info && <BackgroundMusicControl shotId={shot.id} />}
+          {/* Not gated on !info. video-generation-service was changed specifically so a bed
+              generated after a shot was prepared still gets mixed in -- when the prompt carries
+              no music reference it reads the shot's current track from pre-production. Hiding
+              the control once prepared took away the case that fix exists to serve, and left
+              no way to add or replace music on a shot you had already prepared. */}
+          <BackgroundMusicControl shotId={shot.id} />
           <ShotThoughtLog shotId={shot.id} />
 
           {!info && (
@@ -443,11 +461,11 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={onReject}
+                  onClick={handleReject}
                   className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-bold text-slate-300"
                 >
                   <X size={13} />
-                  Reject
+                  Reject & rewrite
                 </button>
                 <button
                   type="button"

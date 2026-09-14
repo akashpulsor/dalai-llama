@@ -259,16 +259,17 @@ export default function VideoGenerationSection({ projectId }) {
 
   const handleReject = async (shotId) => {
     const info = prepared[shotId];
-    if (!info?.externalJobId) return;
+    if (!info?.externalJobId) return false;
     try {
       await rejectJob({ jobId: info.externalJobId }).unwrap();
-      setPrepared((p) => {
-        const next = { ...p };
-        delete next[shotId];
-        return next;
-      });
+      // Deliberately keep the prepared info. It used to be deleted, which removed the prompt
+      // from the card -- so the moment a creator said "this is wrong" they lost the text they
+      // needed to fix. The job is rejected on the server either way; the prompt stays here to
+      // be rewritten, and saving it creates a new version off the rejected one.
+      return true;
     } catch (error) {
       dispatch(showFlash({ message: error?.data?.message || "Could not reject this", type: "error" }));
+      return false;
     }
   };
 
