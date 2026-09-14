@@ -3138,14 +3138,14 @@ export const creatorApi = apiSlice.injectEndpoints({
     // The wallet as a statement: what went in last, what has been spent since, and which stage of
     // production spent it. Replaces reading a flat transaction list and trying to infer all three.
     getWalletStatement: builder.query({
-      query: (tenantId) => ({ url: `/tenants/${tenantId}/wallet/statement` }),
+      query: (tenantId) => ({ url: `/billing/${tenantId}/wallet/statement` }),
       providesTags: ["CreatorWallet"],
     }),
 
     // One row per billable call, for the detail behind a stage total.
     getWalletStatementLines: builder.query({
       query: ({ tenantId, from, to }) => ({
-        url: `/tenants/${tenantId}/wallet/statement/lines`,
+        url: `/billing/${tenantId}/wallet/statement/lines`,
         params: { from: from || undefined, to: to || undefined },
       }),
       providesTags: ["CreatorWallet"],

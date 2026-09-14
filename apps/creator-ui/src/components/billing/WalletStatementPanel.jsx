@@ -48,7 +48,7 @@ export default function WalletStatementPanel() {
   const stages = statement?.stages || [];
   const spent = Number(statement?.spentSince || 0);
   const exportHref = tenantId
-    ? `${appConfig.API_BASE_URL}/tenants/${tenantId}/wallet/statement/export`
+    ? `${appConfig.API_BASE_URL}/billing/${tenantId}/wallet/statement/export`
     : null;
 
   return (
