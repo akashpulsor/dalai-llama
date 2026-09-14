@@ -109,8 +109,10 @@ export default function SubscriptionPage() {
         dispatch(showFlash({ message: error?.data?.message || "Could not subscribe", type: "error" }));
         return;
       }
-      // Only reached when billing could not create an order (it is down, or Razorpay is) and the
-      // server fell back to the old shape. Top up by hand and retry.
+      // A real shortfall raised during the wallet debit itself (GlobalExceptionHandler answers
+      // 402/INSUFFICIENT_BALANCE for it). Topping up by hand and retrying is the right move --
+      // unlike a gateway outage, which now arrives as 503/PAYMENT_UNAVAILABLE and falls to the
+      // branch above, because retrying a top-up through the gateway that just failed cannot work.
       await topUpThenSubscribe(plan, shortfall);
     }
   };
