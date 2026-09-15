@@ -9,6 +9,7 @@ import {
   useListPreProductionShotImagesQuery,
   useListShotPromptVersionsQuery,
   useTestShotVoiceMutation,
+  useUpdatePreProductionShotMutation,
 } from "../../api/creatorEndpoints.js";
 import DialogueBeatsEditor from "./DialogueBeatsEditor.jsx";
 import DialogueFitPanel from "./DialogueFitPanel.jsx";
@@ -84,13 +85,60 @@ function BackgroundMusicControl({ shotId }) {
 function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
   const dispatch = useDispatch();
   const [redub, { isLoading }] = useTestShotVoiceMutation();
+  const [saveLine, saveState] = useUpdatePreProductionShotMutation();
+  const [draft, setDraft] = React.useState("");
   const audioUrl = dubbed?.audioUrl || dubbed?.audioDataUri;
   // The take on file was made from these words; the shot now says those. When they differ the
   // recording is of a line that no longer exists, which is exactly what the fit report stops
   // treating as a measurement -- so say it here too, next to the button that fixes it.
   const stale = !!audioUrl && !!dubbed?.text && !!line && dubbed.text.trim() !== line.trim();
 
-  if (!line) return null;
+  // A shot with no line written for it used to render nothing at all, which left no way to give one
+  // narration from this page: the beats editor hides once a shot is prepared, so a finished shot
+  // with no voice-over was silent with no route out of it. A motion graphic is the usual case --
+  // its script_line describes what appears on screen, which is direction, not words anyone speaks.
+  if (!line) {
+    const handleAddLine = async () => {
+      const text = draft.trim();
+      if (!text) return;
+      try {
+        await saveLine({ projectId, shotId, voiceOver: text }).unwrap();
+        await redub({ projectId, shotId, text }).unwrap();
+        setDraft("");
+        dispatch(showFlash({ message: "Line saved and dubbed. Prepare again so the shot is built around it.", type: "success" }));
+      } catch (error) {
+        dispatch(showFlash({ message: error?.data?.message || "Could not save that line", type: "error" }));
+      }
+    };
+    return (
+      <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+        <div className="mb-2 flex items-center gap-1.5">
+          <AudioLines size={13} className="text-slate-400" />
+          <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Spoken take</p>
+        </div>
+        <p className="mb-2 text-[10px] font-medium text-slate-500">
+          Nothing is spoken in this shot, so it generates silent. Write the narration here to give it
+          a voice — it is recorded first, then the shot is generated around it.
+        </p>
+        <textarea
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          rows={2}
+          placeholder="What should be said over this shot?"
+          className="creator-input w-full text-[11px] font-medium leading-relaxed"
+        />
+        <button
+          type="button"
+          disabled={saveState.isLoading || isLoading || !draft.trim()}
+          onClick={handleAddLine}
+          className="mt-2 flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/15 px-2.5 py-1.5 text-[10px] font-bold text-purple-200 disabled:opacity-50"
+        >
+          {(saveState.isLoading || isLoading) ? <Loader2 size={11} className="animate-spin" /> : <AudioLines size={11} />}
+          {(saveState.isLoading || isLoading) ? "Saving…" : "Save line and dub it"}
+        </button>
+      </div>
+    );
+  }
 
   const handleRedub = async () => {
     try {
