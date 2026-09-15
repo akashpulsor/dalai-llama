@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { Download, Loader2, Scissors, Upload, Volume2, Wand2 } from "lucide-react";
+import { Download, Loader2, Scissors, Upload, Volume2, VolumeX, Wand2 } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useExtendShotTailMutation,
@@ -42,10 +42,11 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
   // Shown whenever there is a clip and a dubbed take. It used to require the dub to OVERRUN, which
   // hid the simplest repair of all: a dub that fits a clip still carrying the video model's own
   // audio, where swapping the sound is the whole fix and costs nothing.
-  if (!sources?.clipUrl || !sources?.audioUrl || shortfall == null) return null;
+  if (!sources?.clipUrl) return null;
 
-  const overruns = shortfall > 0.05;
-  const needed = Math.max(1, Math.ceil(shortfall));
+  const hasDub = !!sources.audioUrl && audio != null;
+  const overruns = hasDub && shortfall != null && shortfall > 0.05;
+  const needed = hasDub && shortfall != null ? Math.max(1, Math.ceil(shortfall)) : 1;
 
   const runExtend = async (mode) => {
     try {
@@ -83,11 +84,19 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
       <div className="mb-1 flex items-center gap-1.5">
         <Scissors size={13} className="text-amber-300" />
         <p className="text-[10px] font-extrabold uppercase tracking-wide text-amber-200">
-          {overruns ? "The line does not fit this clip" : "Put the dubbed voice on this clip"}
+          {overruns
+            ? "The line does not fit this clip"
+            : hasDub ? "Put the dubbed voice on this clip" : "This clip's audio was invented"}
         </p>
       </div>
       <p className="text-[11px] font-medium leading-relaxed text-slate-300">
-        {overruns ? (
+        {!hasDub ? (
+          <>
+            Nothing is spoken in this shot, but it was generated with the video model&apos;s own
+            audio — so whatever you hear, nobody wrote it. Silencing keeps the picture exactly as it
+            is and replaces the sound with silence, which is what this shot was meant to have.
+          </>
+        ) : overruns ? (
           <>
             The dubbed take runs <strong>{seconds(audio)}</strong> but the clip is{" "}
             <strong>{seconds(clip)}</strong> — the last <strong>{seconds(shortfall)}</strong> of the
@@ -105,6 +114,18 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
       <div className="mt-2 flex flex-wrap gap-2">
         {/* Always offered: it drops the model's own audio and lays the dub on instead, which on a
             shot generated with native audio is usually the entire fix. */}
+        {/* Silence is for a shot with no line: the film is concatenated with a filter that needs an
+            audio stream on every clip, so this writes a SILENT track rather than removing it. */}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => runExtend("SILENCE")}
+          className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 py-1.5 text-[10px] font-bold text-slate-200 hover:border-white/30 disabled:opacity-50"
+        >
+          {extendState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <VolumeX size={11} />}
+          Make it silent (free)
+        </button>
+        {hasDub && (
         <button
           type="button"
           disabled={busy}
@@ -114,6 +135,7 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
           {extendState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Volume2 size={11} />}
           Use dubbed voice (free)
         </button>
+        )}
         {overruns && (
         <>
         <button
@@ -150,7 +172,7 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
           >
             <Download size={11} /> Video
           </a>
-          {sources.audioUrl && (
+          {hasDub && (
             <a
               href={sources.audioUrl}
               download={`${shot.shotRef || "shot"}-dialogue.mp3`}
