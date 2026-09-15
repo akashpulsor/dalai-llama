@@ -518,20 +518,22 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             onKeepOriginal={info?.externalJobId && !video ? () => onApprove?.({ dialogueFit: "KEEP_PLANNED" }) : undefined}
           />
 
-          {!info && !isMotionGraphic && <DialogueBeatsEditor shot={shot} projectId={projectId} />}
+          {!info && <DialogueBeatsEditor shot={shot} projectId={projectId} />}
           {/* Not gated on !info. video-generation-service was changed specifically so a bed
               generated after a shot was prepared still gets mixed in -- when the prompt carries
               no music reference it reads the shot's current track from pre-production. Hiding
               the control once prepared took away the case that fix exists to serve, and left
               no way to add or replace music on a shot you had already prepared. */}
-          {!isMotionGraphic && (
-            <DubbedVoiceControl
-              shotId={shot.id}
-              projectId={projectId}
-              line={dialogueVoiceText}
-              dubbed={dubbed}
-            />
-          )}
+          {/* Not gated on shot type: a motion graphic is as likely as any other shot to carry a
+              narrator over it, and the control already renders nothing when the shot has no line.
+              Deciding by type would hide the dub -- and with it the dialogue-fit remedy -- from a
+              graphic that does have one. */}
+          <DubbedVoiceControl
+            shotId={shot.id}
+            projectId={projectId}
+            line={dialogueVoiceText}
+            dubbed={dubbed}
+          />
           <BackgroundMusicControl shotId={shot.id} />
           <ShotThoughtLog shotId={shot.id} />
 
