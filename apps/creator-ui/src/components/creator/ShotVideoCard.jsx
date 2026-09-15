@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { AudioLines, Check, ChevronDown, History, Loader2, Music, Pencil, PlayCircle, Save, Sparkles, X } from "lucide-react";
+import { AudioLines, Check, ChevronDown, History, Loader2, Music, Pencil, PlayCircle, RefreshCw, Save, Sparkles, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useGenerateShotBackgroundMusicMutation,
@@ -262,7 +262,7 @@ function PromptVersionHistory({ shotId, onUse, canEdit }) {
   );
 }
 
-export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info, busy, video, dubbed, selected, onSelectToggle, onPrepare, onSavePrompt, onApprove, onReject, onAutoFix }) {
+export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info, busy, video, dubbed, selected, onSelectToggle, onPrepare, onSavePrompt, onApprove, onReject, onAutoFix, onRegenerate, regenerating }) {
   // Prompt editing is local to the open card: the draft only leaves here on an explicit Save, so
   // collapsing the card or wandering off never silently rewrites what will be generated.
   const [editing, setEditing] = React.useState(false);
@@ -429,18 +429,19 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             />
           )}
 
-          {/* Before the prompt is even built: the mismatch between a line and its shot is knowable
-              from the plan alone, and this is the cheapest possible moment to find it. */}
-          {!video && (
-            <DialogueFitPanel
-              shot={shot}
-              projectId={projectId}
-              onResized={onPrepare}
-              // Only offered once there is a job to approve -- "go with the original" is a way of
-              // generating, so before prepare there is nothing for it to act on.
-              onKeepOriginal={info?.externalJobId ? () => onApprove?.({ dialogueFit: "KEEP_PLANNED" }) : undefined}
-            />
-          )}
+          {/* Shown before the prompt is built -- the mismatch is knowable from the plan and the
+              dubbed audio alone, and that is the cheapest moment to find it -- and shown again on a
+              shot that has ALREADY been generated, which is the case this most needs to cover: a
+              clip that shipped with its line cut looks finished, and without this there is nothing
+              on the card saying why it is wrong or offering to put it right. */}
+          <DialogueFitPanel
+            shot={shot}
+            projectId={projectId}
+            onResized={onPrepare}
+            // Only offered once there is a job to approve -- "go with the original" is a way of
+            // generating, so before prepare there is nothing for it to act on.
+            onKeepOriginal={info?.externalJobId && !video ? () => onApprove?.({ dialogueFit: "KEEP_PLANNED" }) : undefined}
+          />
 
           {!info && <DialogueBeatsEditor shot={shot} projectId={projectId} />}
           {/* Not gated on !info. video-generation-service was changed specifically so a bed
@@ -451,7 +452,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
           <BackgroundMusicControl shotId={shot.id} />
           <ShotThoughtLog shotId={shot.id} />
 
-          {!info && (
+          {!info && !video && (
             <button
               type="button"
               disabled={busy}
@@ -463,6 +464,32 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             </button>
           )}
 
+          {/* A generated shot was a dead end: the card showed the clip and nothing else, so a shot
+              that came back wrong -- the line cut off, the wrong duration, a rewritten line since
+              saved -- could only be fixed by never having generated it. Regenerating builds a fresh
+              prompt from the shot as it stands now, then goes through the same approve step, so the
+              new clip is costed and confirmed exactly like the first one. */}
+          {video && !regenerating && onRegenerate && (
+            <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+              <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                Not right?
+              </p>
+              <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-400">
+                Regenerating rebuilds the prompt from this shot as it stands now — including any
+                change to its length or its line — and asks you to approve before spending again.
+              </p>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onRegenerate}
+                className="mt-2 flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-slate-200 hover:border-purple-400/40 hover:text-purple-200 disabled:opacity-50"
+              >
+                {busy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                {busy ? "Preparing…" : "Regenerate this shot"}
+              </button>
+            </div>
+          )}
+
           {info && info.critiqueVerdict === "NEEDS_HUMAN_REVIEW" && (
             <CritiqueFindingsPanel
               findings={info.findings}
@@ -472,7 +499,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             />
           )}
 
-          {info && info.externalJobId && !video && (
+          {info && info.externalJobId && (
             <>
               <div className="flex flex-wrap gap-2">
                 {info.recommendedModel && (
@@ -482,7 +509,10 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
                 )}
                 {info.estimatedCost != null && (
                   <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-bold text-slate-300">
-                    Est. cost: {formatCost(info.estimatedCost, info.costCurrency)}
+                    {/* On a shot already rendered this is what generating it AGAIN would cost, not
+                        what was spent -- saying "Est. cost" there would read as a bill already paid. */}
+                    {video && !regenerating ? "Regenerating costs: " : "Est. cost: "}
+                    {formatCost(info.estimatedCost, info.costCurrency)}
                   </span>
                 )}
               </div>
@@ -559,26 +589,31 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
                   />
                 </div>
               )}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleReject}
-                  className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-bold text-slate-300"
-                >
-                  <X size={13} />
-                  Reject & rewrite
-                </button>
-                <button
-                  type="button"
-                  disabled={busy || editing}
-                  title={editing ? "Save or cancel your prompt edit first." : undefined}
-                  onClick={() => onApprove?.()}
-                  className="creator-primary flex flex-1 items-center justify-center gap-2 py-2 text-xs font-bold text-white disabled:opacity-60"
-                >
-                  {busy && <Loader2 size={13} className="animate-spin" />}
-                  {busy ? "Generating… (can take a few minutes)" : "Approve & generate"}
-                </button>
-              </div>
+              {/* Approve and reject belong to a shot that has not been rendered yet. Once a clip
+                  exists the prompt above it is a record of what produced it, and the action that
+                  makes sense is to generate again -- which is the Regenerate control below. */}
+              {(!video || regenerating) && (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleReject}
+                    className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-bold text-slate-300"
+                  >
+                    <X size={13} />
+                    Reject & rewrite
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || editing}
+                    title={editing ? "Save or cancel your prompt edit first." : undefined}
+                    onClick={() => onApprove?.()}
+                    className="creator-primary flex flex-1 items-center justify-center gap-2 py-2 text-xs font-bold text-white disabled:opacity-60"
+                  >
+                    {busy && <Loader2 size={13} className="animate-spin" />}
+                    {busy ? "Generating… (can take a few minutes)" : "Approve & generate"}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>

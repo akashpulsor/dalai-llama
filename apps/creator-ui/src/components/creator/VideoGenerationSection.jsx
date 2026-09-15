@@ -73,6 +73,10 @@ export default function VideoGenerationSection({ projectId }) {
   const [openShotId, setOpenShotId] = useState(null);
   const [preparing, setPreparing] = useState({});
   const [prepared, setPrepared] = useState({}); // shotId -> toCardInfo(ShotPromptView)
+  // Shots the creator has asked to generate again. A shot with a finished clip normally offers no
+  // Approve -- there is nothing to approve -- but one being regenerated has a fresh prompt that has
+  // not been rendered yet, and that does.
+  const [regenerating, setRegenerating] = useState({});
   const [videos, setVideos] = useState({}); // shotId -> VideoGenJobView
 
   // Seed from what the server already has. This used to start empty and fill only when you
@@ -245,6 +249,29 @@ export default function VideoGenerationSection({ projectId }) {
     }
   };
 
+  /**
+   * Generate this shot again, from the shot as it stands now.
+   *
+   * <p>A generated shot used to be a dead end: the card showed the clip and offered nothing else, so
+   * a shot that came back wrong -- the line cut off at the end, the duration since changed, the
+   * dialogue since rewritten -- could only be fixed by never having generated it in the first place.
+   * That is exactly the shot the dialogue-fit check is for, and it was the one shot the check could
+   * not reach.
+   *
+   * <p>Clears the finished clip from view and prepares afresh, which builds a new prompt from the
+   * shot's CURRENT duration and line rather than reusing the prepared one. The existing job and its
+   * prompt history are untouched server-side; this adds a version rather than overwriting one. The
+   * usual approve step follows, so the new render is costed and confirmed exactly like the first.
+   */
+  const handleRegenerate = async (shotId) => {
+    // Marked rather than deleted. Dropping the clip from state would fight the server's own view --
+    // the project's shot-videos query would put it straight back on the next refetch, and the old
+    // clip is worth keeping on screen anyway so the new one can be compared against it. The flag is
+    // what tells the card to offer Approve again despite a rendered clip already existing.
+    setRegenerating((r) => ({ ...r, [shotId]: true }));
+    await handlePrepare(shotId);
+  };
+
   /** Save an edited prompt. Returns true so the card can leave edit mode only on success --
    * dropping the creator's text back to the old version on a failed save would lose their work. */
   const handleSavePrompt = async (shotId, positive) => {
@@ -293,6 +320,7 @@ export default function VideoGenerationSection({ projectId }) {
         dialogueFit: options?.dialogueFit,
       }).unwrap();
       setVideos((v) => ({ ...v, [shotId]: job }));
+      setRegenerating((r) => ({ ...r, [shotId]: false }));
       reportJobOutcome(job);
     } catch (error) {
       // A gateway timeout (504) or a dropped connection means we stopped waiting, not that the
@@ -564,6 +592,8 @@ export default function VideoGenerationSection({ projectId }) {
             selected={selectedShotIds.includes(shot.id)}
             onSelectToggle={() => toggleShotSelected(shot.id)}
             onPrepare={() => handlePrepare(shot.id)}
+            onRegenerate={() => handleRegenerate(shot.id)}
+            regenerating={!!regenerating[shot.id]}
             onSavePrompt={(positive) => handleSavePrompt(shot.id, positive)}
             onApprove={(options) => handleApprove(shot.id, options)}
             onReject={() => handleReject(shot.id)}
