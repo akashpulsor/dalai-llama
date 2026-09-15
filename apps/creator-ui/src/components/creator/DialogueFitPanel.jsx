@@ -143,7 +143,7 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
   // with no dialogue planned came back with a voice over it, and how a nine-second line got crammed
   // into four seconds. The audio has to exist before the picture is made around it.
   const style = fit && (fit.needsDubbing ? NEEDS_DUBBING_STYLE : VERDICT_STYLES[fit.verdict]);
-  const needsDecision = !!style && !fit?.needsDubbing;
+  const needsDecision = !!style;
 
   // Asked once per flagged shot, and never for one that fits: the arithmetic upstream is free, the
   // judgement is a prompt call. It answers which remedy suits THIS shot -- whether the extra seconds
@@ -209,6 +209,15 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
           text: retimed.rewritten,
           characterKey: lastBeat.characterKey ?? undefined,
         }).unwrap();
+        // The shot's own voice-over is the same line when the beat was written from it, and it is
+        // what the re-dub button records -- it posts the SHOT's line, not the beat's. Left behind,
+        // the next dub faithfully re-records the words that were just replaced, the new take
+        // matches no beat, and the shot lands back where it started with a recording nothing can
+        // find. Only touched when the two genuinely held the same line; a voice-over that says
+        // something else is not this rewrite's business.
+        if (fit.dialogue && fit.dialogue.trim() === original.trim()) {
+          await updateShot({ projectId, shotId: shot.id, voiceOver: retimed.rewritten }).unwrap();
+        }
       } else {
         await updateShot({ projectId, shotId: shot.id, voiceOver: retimed.rewritten }).unwrap();
       }
@@ -275,7 +284,8 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
               This shot has a spoken line but no recording of it. Generate it now and the video model
               invents the delivery — it will speak words nobody wrote, or rush the real line into
               whatever seconds are left. Dub it first, in <strong>Spoken take</strong> below, then
-              the shot is built around audio that actually exists.
+              the shot is built around audio that actually exists. Rephrasing works either way — it
+              changes the words, not the recording.
             </p>
           ) : (
             <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-300">
@@ -333,7 +343,13 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
           {/* Three options, stated as three. Only the first two change anything; "go with the
               original" is a real choice rather than the absence of one, so it is a button like the
               others -- and for a line too long for any clip it is the only way past the block. */}
-          <div className={`mt-2 flex flex-wrap gap-2 ${fit.needsDubbing ? "hidden" : ""}`}>
+          {/* Never hidden. These used to disappear whenever the line had no recording, on the
+              reasoning that the audio must exist before the picture is built around it -- which is
+              true of GENERATING and true of nothing else here. Rephrasing is a text operation; it
+              is the one remedy that needs no take at all, and it is the remedy a creator reaches
+              for first. Hiding it left a shot with a line too long for it and no way to shorten
+              the line. */}
+          <div className="mt-2 flex flex-wrap gap-2">
             {canExtend && (
               <button
                 type="button"
