@@ -47,11 +47,26 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
 
   const hasDub = !!sources.audioUrl && audio != null;
   const overruns = hasDub && shortfall != null && shortfall > 0.05;
-  const needed = hasDub && shortfall != null ? Math.max(1, Math.ceil(shortfall)) : 1;
+  // Sized to whichever is longer: what the dialogue needs, or what the shot is now planned for.
+  // The plan was ignored, so a creator who lengthened a 4s shot to 5s and came here got a tail cut
+  // to the audio -- a clip that no longer matched the length they had just set, with nothing saying
+  // why. The shot's length is a decision someone made; the audio is a measurement. Honour both.
+  const plannedShortfall = shot?.durationSeconds != null && clip != null
+    ? shot.durationSeconds - clip : null;
+  const audioNeeded = hasDub && shortfall != null ? Math.ceil(shortfall) : 0;
+  const needed = Math.max(1, audioNeeded, plannedShortfall != null ? Math.ceil(plannedShortfall) : 0);
+  const forPlan = plannedShortfall != null && Math.ceil(plannedShortfall) > audioNeeded;
 
   const runExtend = async (mode) => {
     try {
-      const result = await extendTail({ projectId, shotId: shot.id, mode }).unwrap();
+      const result = await extendTail({
+        projectId,
+        shotId: shot.id,
+        mode,
+        // Stated rather than left to the server, which sizes from the audio alone and knows
+        // nothing about a length the creator has since changed.
+        tailSeconds: mode === "GENERATE" || mode === "HOLD" ? needed : undefined,
+      }).unwrap();
       dispatch(showFlash({
         message: `Clip is now ${seconds(result.seconds)} and carries the whole line.`,
         type: "success",
@@ -86,7 +101,7 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
   // else lives behind "other ways" for the cases where the obvious answer is not the right one.
   const plan = !hasDub
     ? { mode: "SILENCE", label: `Remove the invented voice → ${seconds(clip)} silent clip`, cost: "no model cost" }
-    : !overruns
+    : !overruns && !forPlan
       ? { mode: "REPLACE_AUDIO", label: `Use the dubbed voice → ${seconds(clip)} clip`, cost: "no model cost" }
       : { mode: "GENERATE", label: `Extend to ${seconds((clip ?? 0) + needed)} and use the dubbed voice`, cost: `${needed}s billed` };
 
@@ -95,7 +110,11 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
       <div className="mb-1 flex items-center gap-1.5">
         <Scissors size={13} className="text-amber-300" />
         <p className="text-[10px] font-extrabold uppercase tracking-wide text-amber-200">
-          {overruns ? "The voice is longer than the picture" : hasDub ? "The dubbed voice is not on this clip" : "This clip's audio was invented"}
+          {overruns
+            ? "The voice is longer than the picture"
+            : forPlan
+              ? "The clip is shorter than the shot is now planned for"
+              : hasDub ? "The dubbed voice is not on this clip" : "This clip's audio was invented"}
         </p>
       </div>
       <p className="text-[11px] font-medium leading-relaxed text-slate-300">
@@ -103,7 +122,9 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
           ? `Nothing is spoken in this shot, but it was generated with the video model's own audio — so whatever you hear, nobody wrote it.`
           : overruns
             ? `The dubbed take runs ${seconds(audio)} and the clip is ${seconds(clip)}. The shot needs ${needed}s more picture to carry the whole line.`
-            : `The dubbed take runs ${seconds(audio)} and fits this ${seconds(clip)} clip — it just is not on it yet.`}
+            : forPlan
+              ? `The dubbed take fits, but this shot is now planned for ${shot.durationSeconds}s and the clip is only ${seconds(clip)}. Extending adds the missing seconds to the clip you already have, then lays the dubbed voice over the whole thing — the clip's own audio is dropped, not mixed under it.`
+              : `The dubbed take runs ${seconds(audio)} and fits this ${seconds(clip)} clip — it just is not on it yet.`}
       </p>
 
       <button
@@ -126,7 +147,7 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
 
       {showMore && (
         <div className="mt-1.5 space-y-2 border-t border-white/10 pt-2">
-          {overruns && (
+          {(overruns || forPlan) && (
             <button
               type="button"
               disabled={busy}

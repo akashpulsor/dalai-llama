@@ -24,6 +24,16 @@ const RENDER_POLL_MAX_ATTEMPTS = 240; // ~10 minutes, an ffmpeg concat of a long
 // Both URL sources are presigned, which is the constraint that decided them: the editor loads a
 // source with a plain fetch() that sends no Authorization header, so a 302-behind-JWT endpoint
 // (like /v1/jobs/{id}/video) could not be used here.
+/** What a shot sounds like in this cut. "Clip" is whatever audio the video model produced -- which
+ * on a shot generated with native audio is a delivery nobody wrote. "Dubbed" swaps that for the
+ * recorded take rather than mixing the two, since the invented one underneath is noise. None of it
+ * touches the clips: the same shots can be assembled differently tomorrow. */
+const AUDIO_CHOICES = [
+  { value: "CLIP", label: "clip", hint: "Keep the audio the video model generated with this shot" },
+  { value: "DUBBED", label: "dubbed", hint: "Use the recorded take, dropping the clip's own audio" },
+  { value: "SILENT", label: "silent", hint: "No voice at all in this cut" },
+];
+
 export default function ProjectPickerPanel() {
   const { actions } = usePatchEditor();
   const location = useLocation();
@@ -62,9 +72,15 @@ export default function ProjectPickerPanel() {
   // Which shots play without their voice in THIS cut. A render-time choice, like muting a track on a
   // timeline: nothing is written back to the clip, so the next assembly starts with every voice in
   // again. Keyed by shotRef because that is what the assembly matches on.
-  const [silentShotRefs, setSilentShotRefs] = useState([]);
-  const toggleSilent = (shotRef) => setSilentShotRefs((current) =>
-    current.includes(shotRef) ? current.filter((r) => r !== shotRef) : [...current, shotRef]);
+  // Three answers, not two. A shot can keep the sound the video model gave it, take the dubbed
+  // recording with that sound dropped, or play silent -- and the middle one is the one that was
+  // missing. A clip generated with native audio carries a delivery nobody wrote; the dubbed take is
+  // the real performance, and until now the only way to get it into the cut was to repair the clip
+  // itself, which rewrites a file for a decision that belongs to this cut alone.
+  const [shotAudio, setShotAudio] = useState({});
+  const audioFor = (shotRef) => shotAudio[shotRef] || "CLIP";
+  const setAudioFor = (shotRef, choice) => setShotAudio((current) => ({ ...current, [shotRef]: choice }));
+  const changedCount = Object.entries(shotAudio).filter(([, v]) => v && v !== "CLIP").length;
 
   const fullVideoUrl = finalRender?.videoUrl || "";
   const renderStatus = finalRender?.status || "";
@@ -89,7 +105,7 @@ export default function ProjectPickerPanel() {
     setRenderError(null);
     setRendering(true);
     try {
-      await createFinalRender({ projectId, silentShotRefs }).unwrap();
+      await createFinalRender({ projectId, shotAudio }).unwrap();
       let url = "";
       for (let attempt = 0; attempt < RENDER_POLL_MAX_ATTEMPTS && !url; attempt += 1) {
         // eslint-disable-next-line no-await-in-loop
@@ -174,29 +190,35 @@ export default function ProjectPickerPanel() {
                     one is untouched for the next. */}
                 <div className="mb-2 max-h-44 overflow-y-auto rounded-md border border-white/10 bg-white/[0.02] p-2">
                   <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-                    Voice in this cut
+                    Sound in this cut
                   </p>
                   {playableShots.map((shot) => {
                     const ref = shot.shotRef;
-                    const silent = silentShotRefs.includes(ref);
+                    const choice = audioFor(ref);
                     return (
-                      <label
+                      <div
                         key={shot.jobId || ref}
-                        className="flex cursor-pointer items-center justify-between gap-2 py-0.5 text-[11px] font-medium text-slate-300"
+                        className="flex items-center justify-between gap-2 py-0.5 text-[11px] font-medium text-slate-300"
                       >
                         <span className="truncate">{ref || "shot"}</span>
-                        <span className="flex items-center gap-1.5">
-                          <span className={silent ? "text-slate-500" : "text-purple-300"}>
-                            {silent ? "silent" : "with voice"}
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={!silent}
-                            onChange={() => toggleSilent(ref)}
-                            className="h-3.5 w-3.5 cursor-pointer accent-purple-500"
-                          />
-                        </span>
-                      </label>
+                        <div className="flex shrink-0 overflow-hidden rounded-md border border-white/10">
+                          {AUDIO_CHOICES.map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              title={option.hint}
+                              onClick={() => setAudioFor(ref, option.value)}
+                              className={`px-1.5 py-0.5 text-[10px] font-bold ${
+                                choice === option.value
+                                  ? "bg-purple-500/25 text-purple-200"
+                                  : "text-slate-500 hover:text-slate-300"
+                              }`}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
@@ -209,8 +231,8 @@ export default function ProjectPickerPanel() {
                   {rendering ? <Loader2 size={14} className="animate-spin" /> : <Layers size={14} />}
                   {rendering
                     ? "Assembling…"
-                    : silentShotRefs.length
-                      ? `Assemble (${silentShotRefs.length} silent)`
+                    : changedCount
+                      ? `Assemble (${changedCount} shot${changedCount === 1 ? "" : "s"} re-sounded)`
                       : "Assemble the full video"}
                 </button>
               </div>

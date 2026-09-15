@@ -3338,11 +3338,14 @@ export const creatorApi = apiSlice.injectEndpoints({
     // bare projectId (all voices kept) or {projectId, silentShotRefs}.
     createFinalRender: builder.mutation({
       query: (arg) => {
-        const { projectId, silentShotRefs } = typeof arg === "object" && arg !== null ? arg : { projectId: arg };
+        const { projectId, silentShotRefs, shotAudio } = typeof arg === "object" && arg !== null
+          ? arg : { projectId: arg };
         return {
           url: platformUrl(`/final-renders`),
           method: "POST",
-          body: { projectId, silentShotRefs },
+          // shotAudio: per shotRef, CLIP / DUBBED / SILENT. silentShotRefs is the older, narrower
+          // way of saying the same thing and is still accepted by the server.
+          body: { projectId, silentShotRefs, shotAudio },
         };
       },
       invalidatesTags: (_result, _error, arg) => {

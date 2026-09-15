@@ -36,6 +36,18 @@ const dialogueTextForShot = (shot) => (
  * owns prepare end to end, same as CloneVoiceService owns the voice-clone path. "Prepare all
  * shots" calls the batch endpoint once for the whole project instead of looping per shot.
  */
+/** A presigned URL without its signature, which is the part that changes on every fetch. Two URLs
+ * with the same path are the same stored clip however differently they are signed. Falls back to
+ * the whole string for anything unparseable -- a URL we cannot read is one we should not claim is
+ * unchanged. */
+function objectPath(url) {
+  try {
+    return new URL(url, window.location.origin).pathname;
+  } catch {
+    return url;
+  }
+}
+
 export default function VideoGenerationSection({ projectId }) {
   const dispatch = useDispatch();
   const { data: shots = [] } = useListPreProductionShotsQuery(projectId, { skip: !projectId });
@@ -91,14 +103,29 @@ export default function VideoGenerationSection({ projectId }) {
       const next = { ...current };
       existingShotVideos.forEach((clip) => {
         if (!clip?.shotId || !clip?.videoUrl) return;
-        // Never clobber a job this session is actively tracking -- that one is fresher.
-        if (next[clip.shotId]) return;
+        const local = next[clip.shotId];
+        // Once a shot had a clip, this list could never update it again. The guard was there to
+        // stop a list fetched mid-render from clobbering a job this session was watching, but it
+        // also froze the player on whatever URL it first saw -- and a repair rewrites the output
+        // behind the SAME job id. Silencing a clip reported success and went on playing the voice
+        // it had just removed; replacing the audio, extending the tail and uploading a finished
+        // clip all did the same, until a full page reload.
+        //
+        // What actually needs protecting is only the first case, so protect only that: a locally
+        // tracked shot with no output yet is a render in flight and the list knows nothing about
+        // it. Anything else, the server is authoritative.
+        if (local && !local.outputUri) return;
+        // Presigned URLs are re-signed on every fetch, so the same clip comes back under a new
+        // query string each time and swapping it in would make the player reload on every poll.
+        // The object path is what actually identifies the clip, and a repair always writes a new
+        // object -- so compare paths, and keep the URL already in hand when they match.
+        const sameClip = local?.outputUri && objectPath(local.outputUri) === objectPath(clip.videoUrl);
         next[clip.shotId] = {
           jobId: clip.jobId,
           shotRef: clip.shotRef,
           status: clip.status,
           approvalStatus: clip.approvalStatus,
-          outputUri: clip.videoUrl,
+          outputUri: sameClip ? local.outputUri : clip.videoUrl,
         };
       });
       return next;

@@ -867,7 +867,22 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               {info.prompt && (
                 <div className="rounded-md border border-white/10 bg-white/[0.03] p-3">
                   <div className="mb-1 flex items-center justify-between gap-2">
-                    <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Prompt</p>
+                    <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                      Prompt
+                      {/* The length this prompt will actually be generated at. Editing a shot's
+                          length changes the plan immediately, but the prepared prompt keeps the
+                          length it was built with until the shot is prepared again -- and it is the
+                          prompt that gets sent. Without this there was no way to tell from the page
+                          whether a change to 8s had reached the thing about to be generated. */}
+                      {info.prompt.durationSeconds != null && (
+                        <span className="ml-1.5 font-bold normal-case tracking-normal text-slate-400">
+                          · will generate {info.prompt.durationSeconds}s
+                          {shot.durationSeconds != null && shot.durationSeconds !== info.prompt.durationSeconds
+                            ? `, but the shot is now ${shot.durationSeconds}s — prepare again`
+                            : ""}
+                        </span>
+                      )}
+                    </p>
                     {!editing && onSavePrompt && (
                       <ProCta
                         unlocked={entitlements.editsEnabled}
