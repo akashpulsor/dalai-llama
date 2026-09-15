@@ -5,9 +5,19 @@ import { Loader2, Sparkles } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import { useGenerateMotionGraphicPlanMutation, useGetMotionGraphicPlanQuery } from "../../api/creatorEndpoints.js";
 
-/** MOTION_GRAPHIC shots don't go through video-generation-service (no motion-graphics rendering
- * engine exists in this backend) -- this plans what the graphic should contain for a human
- * designer to build, instead of the video-gen prepare/approve flow. */
+/** What a MOTION_GRAPHIC shot should contain -- the concept, the on-screen text, the style and the
+ * animation notes -- as a brief a human designer can build from.
+ *
+ * <p>It used to be ALL a motion-graphic shot got: the card showed this and stopped, on the reasoning
+ * that there is no motion-graphics rendering engine in this backend. But the backend never behaved
+ * that way. prepare-batch builds prompts for these shots like any other, so they accumulated
+ * video_gen_jobs stuck on PENDING_APPROVAL that the page offered no way to approve, and they were
+ * silently absent from the final render.
+ *
+ * <p>So this now sits ABOVE the ordinary prepare/approve flow rather than in place of it. The plan
+ * is the brief; the video model animates the shot's MOTION_GRAPHIC still into a clip. A designer
+ * replacing that clip with a properly built graphic is still the better outcome where there is time
+ * for one -- this is what the film uses when there is not. */
 export default function MotionGraphicPanel({ shotId }) {
   const dispatch = useDispatch();
   const { data: plan, error, refetch } = useGetMotionGraphicPlanQuery(shotId, { skip: !shotId });

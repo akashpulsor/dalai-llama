@@ -412,14 +412,15 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
         </div>
       </button>
 
-      {isOpen && isMotionGraphic && (
-        <div className="border-t border-white/10 px-4 py-3.5">
-          <MotionGraphicPanel shotId={shot.id} />
-        </div>
-      )}
-
-      {isOpen && !isMotionGraphic && (
+      {/* Motion-graphic shots used to stop here: the plan, and nothing else. The backend never
+          agreed -- prepare-batch builds prompts for them like any other shot, so both of this
+          project's motion graphics have been sitting on PENDING_APPROVAL jobs that the page gave no
+          way to approve. They also have a MOTION_GRAPHIC still, which is what image-to-video
+          animates from. So the plan stays, as the brief the prompt was built from, and the ordinary
+          prepare/approve/regenerate flow runs underneath it. */}
+      {isOpen && (
         <div className="space-y-3 border-t border-white/10 px-4 py-3.5">
+          {isMotionGraphic && <MotionGraphicPanel shotId={shot.id} />}
           {video?.outputUri && (
             <video
               src={video.outputUri}
@@ -443,7 +444,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             onKeepOriginal={info?.externalJobId && !video ? () => onApprove?.({ dialogueFit: "KEEP_PLANNED" }) : undefined}
           />
 
-          {!info && <DialogueBeatsEditor shot={shot} projectId={projectId} />}
+          {!info && !isMotionGraphic && <DialogueBeatsEditor shot={shot} projectId={projectId} />}
           {/* Not gated on !info. video-generation-service was changed specifically so a bed
               generated after a shot was prepared still gets mixed in -- when the prompt carries
               no music reference it reads the shot's current track from pre-production. Hiding
