@@ -19,8 +19,8 @@ import {
  * -- on the native-audio path, a line it had no room for, so a fragment at the end over ambience --
  * and swapping that for the dubbed take is the whole repair. That one is always offered.
  *
- * <p>The costs are stated on the buttons because they are the whole point of offering this. Holding
- * the last frame bills nothing. Generating a tail bills only the seconds added, with a cheaper model
+ * <p>The costs are stated on the buttons because they are the whole point of offering this. Freezing
+ * the last frame debits nothing -- it is ffmpeg on infrastructure already paid for, not free. Generating a tail bills only the seconds added, with a cheaper model
  * than the shot itself used. Downloading to fix by hand bills nothing and is the way out when
  * neither automatic repair produces something worth shipping.
  */
@@ -127,7 +127,7 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
           className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 py-1.5 text-[10px] font-bold text-slate-200 hover:border-white/30 disabled:opacity-50"
         >
           {extendState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <VolumeX size={11} />}
-          {`Make it silent → ${seconds(clip)} clip, no voice`}
+          {`Make it silent → ${seconds(clip)} clip, no voice, no model cost`}
         </button>
         {hasDub && (
         <button
@@ -137,7 +137,7 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
           className="flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/15 px-2.5 py-1.5 text-[10px] font-bold text-purple-200 hover:border-purple-400/50 disabled:opacity-50"
         >
           {extendState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Volume2 size={11} />}
-          {`Use dubbed voice → ${seconds(clip)} clip, free`}
+          {`Use dubbed voice → ${seconds(clip)} clip, no model cost`}
         </button>
         )}
         {overruns && (
@@ -149,7 +149,7 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
           className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 py-1.5 text-[10px] font-bold text-slate-200 hover:border-white/30 disabled:opacity-50"
         >
           {extendState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Scissors size={11} />}
-          {`Hold last frame → ${seconds((clip ?? 0) + needed)} clip, free`}
+          {`Freeze last frame → ${seconds((clip ?? 0) + needed)} clip, no model cost`}
         </button>
         <button
           type="button"
@@ -168,6 +168,17 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
         <p className="mt-1.5 text-[10px] font-medium text-slate-500">
           Either way the whole {seconds(audio)} line is laid across the finished clip afterwards —
           the only difference is whether the extra {needed}s holds still or moves.
+          {clip != null && needed > clip && (
+            <>
+              {" "}
+              <span className="text-amber-200/90">
+                {seconds(needed)} of freeze on a {seconds(clip)} clip leaves most of this shot as a
+                still image. That suits a graphic or a held cutaway; on a shot with movement,
+                generating the extra seconds — or regenerating at {Math.ceil((clip ?? 0) + needed)}s
+                — will look considerably better.
+              </span>
+            </>
+          )}
         </p>
       )}
 
