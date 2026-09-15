@@ -35,6 +35,7 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
   const [extendTail, extendState] = useExtendShotTailMutation();
   const [uploadClip, uploadState] = useUploadShotClipMutation();
   const fileRef = React.useRef(null);
+  const [showMore, setShowMore] = React.useState(false);
 
   const clip = sources?.clipSeconds;
   const audio = sources?.audioSeconds;
@@ -79,148 +80,93 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
 
   const busy = extendState.isLoading || uploadState.isLoading;
 
+  // One action, not a menu. The creator's goal is always the same -- the voice and the picture
+  // should match -- and which ffmpeg call gets them there is not a decision worth making. So the
+  // situation picks the action, the button says what it will do and what it costs, and everything
+  // else lives behind "other ways" for the cases where the obvious answer is not the right one.
+  const plan = !hasDub
+    ? { mode: "SILENCE", label: `Remove the invented voice → ${seconds(clip)} silent clip`, cost: "no model cost" }
+    : !overruns
+      ? { mode: "REPLACE_AUDIO", label: `Use the dubbed voice → ${seconds(clip)} clip`, cost: "no model cost" }
+      : { mode: "GENERATE", label: `Extend to ${seconds((clip ?? 0) + needed)} and use the dubbed voice`, cost: `${needed}s billed` };
+
   return (
     <div className="rounded-md border border-amber-400/25 bg-amber-500/[0.05] p-3">
       <div className="mb-1 flex items-center gap-1.5">
         <Scissors size={13} className="text-amber-300" />
         <p className="text-[10px] font-extrabold uppercase tracking-wide text-amber-200">
-          {overruns
-            ? "The line does not fit this clip"
-            : hasDub ? "Put the dubbed voice on this clip" : "This clip's audio was invented"}
+          {overruns ? "The voice is longer than the picture" : hasDub ? "The dubbed voice is not on this clip" : "This clip's audio was invented"}
         </p>
       </div>
-      {/* One sentence of arithmetic, then the outcome of each option spelled out on its own button.
-          The decision is only ever "does the voice fit the picture" -- everything after that is a
-          choice between free and better-looking, and the creator should not have to work out what
-          each button leaves them with. */}
       <p className="text-[11px] font-medium leading-relaxed text-slate-300">
-        {!hasDub ? (
-          <>
-            Nothing is spoken in this shot, but it was generated with the video model&apos;s own
-            audio — so whatever you hear, nobody wrote it. Silencing keeps the picture exactly as it
-            is and replaces the sound with silence, which is what this shot was meant to have.
-          </>
-        ) : overruns ? (
-          <>
-            The dubbed take runs <strong>{seconds(audio)}</strong> but the clip is{" "}
-            <strong>{seconds(clip)}</strong> — the last <strong>{seconds(shortfall)}</strong> of the
-            line is cut off. Regenerating bills the whole shot again; these keep the clip you have.
-          </>
-        ) : (
-          <>
-            The dubbed take runs <strong>{seconds(audio)}</strong> and fits this{" "}
-            <strong>{seconds(clip)}</strong> clip. Putting it on replaces whatever audio the video
-            model produced — no regeneration, nothing billed.
-          </>
-        )}
+        {!hasDub
+          ? `Nothing is spoken in this shot, but it was generated with the video model's own audio — so whatever you hear, nobody wrote it.`
+          : overruns
+            ? `The dubbed take runs ${seconds(audio)} and the clip is ${seconds(clip)}. The shot needs ${needed}s more picture to carry the whole line.`
+            : `The dubbed take runs ${seconds(audio)} and fits this ${seconds(clip)} clip — it just is not on it yet.`}
       </p>
 
-      <div className="mt-2 flex flex-wrap gap-2">
-        {/* Always offered: it drops the model's own audio and lays the dub on instead, which on a
-            shot generated with native audio is usually the entire fix. */}
-        {/* Silence is for a shot with no line: the film is concatenated with a filter that needs an
-            audio stream on every clip, so this writes a SILENT track rather than removing it. */}
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => runExtend("SILENCE")}
-          className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 py-1.5 text-[10px] font-bold text-slate-200 hover:border-white/30 disabled:opacity-50"
-        >
-          {extendState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <VolumeX size={11} />}
-          {`Make it silent → ${seconds(clip)} clip, no voice, no model cost`}
-        </button>
-        {hasDub && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => runExtend("REPLACE_AUDIO")}
-          className="flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/15 px-2.5 py-1.5 text-[10px] font-bold text-purple-200 hover:border-purple-400/50 disabled:opacity-50"
-        >
-          {extendState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Volume2 size={11} />}
-          {`Use dubbed voice → ${seconds(clip)} clip, no model cost`}
-        </button>
-        )}
-        {overruns && (
-        <>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => runExtend("HOLD")}
-          className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 py-1.5 text-[10px] font-bold text-slate-200 hover:border-white/30 disabled:opacity-50"
-        >
-          {extendState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Scissors size={11} />}
-          {`Freeze last frame → ${seconds((clip ?? 0) + needed)} clip, no model cost`}
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => runExtend("GENERATE")}
-          className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 py-1.5 text-[10px] font-bold text-slate-200 hover:border-white/30 disabled:opacity-50"
-        >
-          {extendState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
-          {`Generate ${needed}s of motion → ${seconds((clip ?? 0) + needed)} clip, ${needed}s billed`}
-        </button>
-        </>
-        )}
-      </div>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => runExtend(plan.mode)}
+        className="creator-primary mt-2 flex w-full items-center justify-center gap-2 py-2 text-[11px] font-bold text-white disabled:opacity-60"
+      >
+        {busy ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+        {busy ? "Fixing…" : `${plan.label} (${plan.cost})`}
+      </button>
 
-      {overruns && (
-        <p className="mt-1.5 text-[10px] font-medium text-slate-500">
-          Either way the whole {seconds(audio)} line is laid across the finished clip afterwards —
-          the only difference is whether the extra {needed}s holds still or moves.
-          {clip != null && needed > clip && (
-            <>
-              {" "}
-              <span className="text-amber-200/90">
-                {seconds(needed)} of freeze on a {seconds(clip)} clip leaves most of this shot as a
-                still image. That suits a graphic or a held cutaway; on a shot with movement,
-                generating the extra seconds — or regenerating at {Math.ceil((clip ?? 0) + needed)}s
-                — will look considerably better.
-              </span>
-            </>
-          )}
-        </p>
-      )}
+      <button
+        type="button"
+        onClick={() => setShowMore((v) => !v)}
+        className="mt-1.5 text-[10px] font-bold text-slate-500 hover:text-slate-300"
+      >
+        {showMore ? "Fewer options" : "Other ways"}
+      </button>
 
-      {/* The manual route. Deliberately plain links rather than a flow: the point is to get the two
-          files out of the system and let the creator use whatever they already work in. */}
-      <div className="mt-2.5 border-t border-white/10 pt-2">
-        <p className="text-[10px] font-medium text-slate-500">Or fix it yourself:</p>
-        <div className="mt-1.5 flex flex-wrap items-center gap-2">
-          <a
-            href={sources.clipUrl}
-            download={`${shot.shotRef || "shot"}.mp4`}
-            className="flex items-center gap-1.5 text-[10px] font-bold text-purple-300 hover:text-purple-200"
-          >
-            <Download size={11} /> Video
-          </a>
-          {hasDub && (
-            <a
-              href={sources.audioUrl}
-              download={`${shot.shotRef || "shot"}-dialogue.mp3`}
-              className="flex items-center gap-1.5 text-[10px] font-bold text-purple-300 hover:text-purple-200"
+      {showMore && (
+        <div className="mt-1.5 space-y-2 border-t border-white/10 pt-2">
+          {overruns && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => runExtend("HOLD")}
+              className="flex items-center gap-1.5 text-[10px] font-bold text-slate-300 hover:text-slate-100 disabled:opacity-50"
             >
-              <Download size={11} /> Dialogue
-            </a>
+              <Scissors size={11} />
+              {`Freeze the last frame instead → ${seconds((clip ?? 0) + needed)}, no model cost`}
+            </button>
           )}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => fileRef.current?.click()}
-            className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 py-1 text-[10px] font-bold text-slate-200 hover:border-purple-400/40 disabled:opacity-50"
-          >
-            {uploadState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
-            {uploadState.isLoading ? "Uploading…" : "Upload finished clip"}
-          </button>
-          <input ref={fileRef} type="file" accept="video/*" onChange={handleUpload} className="hidden" />
+          {hasDub && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => runExtend("SILENCE")}
+              className="flex items-center gap-1.5 text-[10px] font-bold text-slate-300 hover:text-slate-100 disabled:opacity-50"
+            >
+              <VolumeX size={11} /> Drop the voice and leave it silent
+            </button>
+          )}
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <span className="text-[10px] font-medium text-slate-500">Do it yourself:</span>
+            <a href={sources.clipUrl} download={`${shot.shotRef || "shot"}.mp4`}
+               className="flex items-center gap-1 text-[10px] font-bold text-purple-300 hover:text-purple-200">
+              <Download size={11} /> Video
+            </a>
+            {hasDub && (
+              <a href={sources.audioUrl} download={`${shot.shotRef || "shot"}-dialogue.mp3`}
+                 className="flex items-center gap-1 text-[10px] font-bold text-purple-300 hover:text-purple-200">
+                <Download size={11} /> Dialogue
+              </a>
+            )}
+            <button type="button" disabled={busy} onClick={() => fileRef.current?.click()}
+                    className="flex items-center gap-1 text-[10px] font-bold text-purple-300 hover:text-purple-200 disabled:opacity-50">
+              {uploadState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
+              {uploadState.isLoading ? "Uploading…" : "Upload finished clip"}
+            </button>
+            <input ref={fileRef} type="file" accept="video/*" onChange={handleUpload} className="hidden" />
+          </div>
         </div>
-      </div>
-
-      {sources.outputOrigin && sources.outputOrigin !== "GENERATED" && (
-        <p className="mt-2 text-[10px] font-medium italic text-slate-400">
-          This clip was already repaired ({sources.outputOrigin.toLowerCase().replace("_", " ")}).
-          Regenerating the shot would replace it.
-        </p>
       )}
     </div>
   );
