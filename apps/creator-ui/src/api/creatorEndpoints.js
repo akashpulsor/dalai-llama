@@ -3081,8 +3081,19 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: (jobId) => ({ url: platformUrl(`/jobs/${jobId}`) }),
     }),
 
+    // acceptDialogueOverrun: generate even though the shot's line cannot be said in ANY clip this
+    // model produces, so it will be cut off mid-word. The backend refuses without it, deliberately:
+    // the alternative is a render that is paid for and then unusable. Only send it from the
+    // "generate it cut off anyway" action, where the creator has read the numbers and both remedies.
     approveVideoGenJob: builder.mutation({
-      query: (jobId) => ({ url: platformUrl(`/jobs/${jobId}/approve`), method: "POST" }),
+      query: (arg) => {
+        const { jobId, acceptDialogueOverrun } = typeof arg === "object" && arg !== null ? arg : { jobId: arg };
+        return {
+          url: platformUrl(`/jobs/${jobId}/approve`),
+          method: "POST",
+          params: acceptDialogueOverrun ? { acceptDialogueOverrun: true } : undefined,
+        };
+      },
     }),
 
     rejectVideoGenJob: builder.mutation({
@@ -3165,6 +3176,42 @@ export const creatorApi = apiSlice.injectEndpoints({
     getPrepareBatchStatus: builder.query({
       query: (projectId) => ({ url: platformUrl(`/scenes/projects/${projectId}/prepare-batch`) }),
       providesTags: (_result, _error, projectId) => [{ type: "CreatorHomeProjects", id: `prepare-batch-${projectId}` }],
+    }),
+
+    // Whether each shot's spoken audio fits the clip it is planned for -- read BEFORE generating,
+    // which is the only point at which it is still free to fix. Covers both mismatches: a line too
+    // long for its shot (comes back cut off mid-word) and a line too SHORT for it (the character
+    // stops talking and the shot runs on in silence, which nothing downstream can detect because as
+    // far as the pipeline is concerned it fits). Cheap and side-effect-free -- no LLM call, nothing
+    // written -- so it is safe to refetch after every remedy to see what changed.
+    getProjectDialogueFit: builder.query({
+      query: (projectId) => ({ url: platformUrl(`/scenes/projects/${projectId}/dialogue-fit`) }),
+      providesTags: (_result, _error, projectId) => [{ type: "CreatorHomeProjects", id: `dialogue-fit-${projectId}` }],
+    }),
+
+    // The same check for a single shot, for after a remedy lands.
+    getShotDialogueFit: builder.query({
+      query: ({ projectId, shotId }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/dialogue-fit`),
+      }),
+      providesTags: (_result, _error, args) => [{ type: "CreatorHomeProjects", id: `dialogue-fit-${args?.projectId}` }],
+    }),
+
+    // Rewrite a line to take a given number of seconds to say, keeping its meaning. Both
+    // directions: shorter when it overruns the shot, longer when the shot runs on in silence after
+    // it. Returns the rewrite and saves NOTHING -- the line is the creator's writing, so it is shown
+    // against the original and applied only if they accept, via updatePreProductionShot (voice-over)
+    // or updateShotDialogueBeat (a single beat's text). targetSeconds comes from the fit report,
+    // already snapped to the shot's frame grid; don't compute one here.
+    retimeShotDialogue: builder.mutation({
+      query: ({ projectId, dialogue, targetSeconds, shotId, beatId, languageCode }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/dialogue-retime`),
+        method: "POST",
+        // shotId/beatId rather than any timing numbers: the server looks up how long this exact line
+        // takes to say from its synthesized take, and sizes the rewrite from that. A duration sent
+        // from here would be a second opinion on a measurement the server already holds.
+        body: { dialogue, targetSeconds, shotId, beatId, languageCode },
+      }),
     }),
 
     // All prepared shot prompts for a project, one row per shot (latest version wins). Video
@@ -3598,6 +3645,9 @@ export const {
   useGetWalletStatementQuery,
   useGetWalletStatementLinesQuery,
   useListProjectShotPromptsQuery,
+  useGetProjectDialogueFitQuery,
+  useGetShotDialogueFitQuery,
+  useRetimeShotDialogueMutation,
   useLazyListProjectShotPromptsQuery,
   useListVideoModelsQuery,
   useGetShotScenePromptQuery,

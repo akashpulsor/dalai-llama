@@ -10,6 +10,7 @@ import {
   useListShotPromptVersionsQuery,
 } from "../../api/creatorEndpoints.js";
 import DialogueBeatsEditor from "./DialogueBeatsEditor.jsx";
+import DialogueFitPanel from "./DialogueFitPanel.jsx";
 import MotionGraphicPanel from "./MotionGraphicPanel.jsx";
 import CritiqueFindingsPanel from "./CritiqueFindingsPanel.jsx";
 import ShotThoughtLog from "./ShotThoughtLog.jsx";
@@ -428,6 +429,19 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             />
           )}
 
+          {/* Before the prompt is even built: the mismatch between a line and its shot is knowable
+              from the plan alone, and this is the cheapest possible moment to find it. */}
+          {!video && (
+            <DialogueFitPanel
+              shot={shot}
+              projectId={projectId}
+              onResized={onPrepare}
+              // Only offered once there is a job to approve -- "go with the original" is a way of
+              // generating, so before prepare there is nothing for it to act on.
+              onKeepOriginal={info?.externalJobId ? () => onApprove?.({ dialogueFit: "KEEP_PLANNED" }) : undefined}
+            />
+          )}
+
           {!info && <DialogueBeatsEditor shot={shot} projectId={projectId} />}
           {/* Not gated on !info. video-generation-service was changed specifically so a bed
               generated after a shot was prepared still gets mixed in -- when the prompt carries
@@ -558,7 +572,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
                   type="button"
                   disabled={busy || editing}
                   title={editing ? "Save or cancel your prompt edit first." : undefined}
-                  onClick={onApprove}
+                  onClick={() => onApprove?.()}
                   className="creator-primary flex flex-1 items-center justify-center gap-2 py-2 text-xs font-bold text-white disabled:opacity-60"
                 >
                   {busy && <Loader2 size={13} className="animate-spin" />}

@@ -279,12 +279,19 @@ export default function VideoGenerationSection({ projectId }) {
    * rather than telling the creator it failed (and inviting a re-approve that would dispatch and
    * bill the same shot twice), this asks the server what actually happened to the job.
    */
-  const handleApprove = async (shotId) => {
+  /** {@code options.dialogueFit}: KEEP_PLANNED when the creator chose "go with the original" over
+   * extending the shot to fit its line, from the dialogue-fit panel. Omitted otherwise, which lets
+   * the server extend rather than let a line be cut -- and, for a line too long for any clip the
+   * model makes, refuse instead of spending on a render that comes back severed. */
+  const handleApprove = async (shotId, options) => {
     const info = prepared[shotId];
     if (!info?.externalJobId) return;
     setPreparing((s) => ({ ...s, [shotId]: true }));
     try {
-      const job = await approveJob(info.externalJobId).unwrap();
+      const job = await approveJob({
+        jobId: info.externalJobId,
+        dialogueFit: options?.dialogueFit,
+      }).unwrap();
       setVideos((v) => ({ ...v, [shotId]: job }));
       reportJobOutcome(job);
     } catch (error) {
@@ -558,7 +565,7 @@ export default function VideoGenerationSection({ projectId }) {
             onSelectToggle={() => toggleShotSelected(shot.id)}
             onPrepare={() => handlePrepare(shot.id)}
             onSavePrompt={(positive) => handleSavePrompt(shot.id, positive)}
-            onApprove={() => handleApprove(shot.id)}
+            onApprove={(options) => handleApprove(shot.id, options)}
             onReject={() => handleReject(shot.id)}
           />
         ))}
