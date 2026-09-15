@@ -35,6 +35,13 @@ import {
  * against the original and replaces it only on an explicit "Use this line".
  */
 
+const NEEDS_DUBBING_STYLE = {
+  tone: "border-amber-400/30 bg-amber-500/10",
+  text: "text-amber-200",
+  icon: AlertTriangle,
+  label: "This line has not been recorded yet",
+};
+
 const VERDICT_STYLES = {
   AUDIO_LONGER: {
     tone: "border-amber-400/30 bg-amber-500/10",
@@ -131,8 +138,12 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
   // whose line is SHORTER than the clip, renders nothing at all: every word is heard, the shot just
   // runs on afterwards, and that is ordinary filmmaking -- so it is simply generated. A panel on
   // every shot would bury the few that need a decision.
-  const style = fit && VERDICT_STYLES[fit.verdict];
-  const needsDecision = !!style;
+  // needsDubbing outranks the verdict. Whatever the estimated lengths say, a shot generated before
+  // its line is recorded has the video model inventing the delivery -- which is how a motion graphic
+  // with no dialogue planned came back with a voice over it, and how a nine-second line got crammed
+  // into four seconds. The audio has to exist before the picture is made around it.
+  const style = fit && (fit.needsDubbing ? NEEDS_DUBBING_STYLE : VERDICT_STYLES[fit.verdict]);
+  const needsDecision = !!style && !fit?.needsDubbing;
 
   // Asked once per flagged shot, and never for one that fits: the arithmetic upstream is free, the
   // judgement is a prompt call. It answers which remedy suits THIS shot -- whether the extra seconds
@@ -259,11 +270,20 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
         <Icon size={14} className={`mt-0.5 shrink-0 ${style.text}`} />
         <div className="min-w-0 flex-1">
           <p className={`text-[11px] font-extrabold ${style.text}`}>{style.label}</p>
-          <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-300">
-            The line needs <strong>{seconds(fit.requiredSeconds)}</strong> in a shot planned for{" "}
-            <strong>{fit.plannedDurationSeconds}s</strong>. <Misfit fit={fit} />.
-          </p>
-          {!fit.measured && (
+          {fit.needsDubbing ? (
+            <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-300">
+              This shot has a spoken line but no recording of it. Generate it now and the video model
+              invents the delivery — it will speak words nobody wrote, or rush the real line into
+              whatever seconds are left. Dub it first, in <strong>Spoken take</strong> below, then
+              the shot is built around audio that actually exists.
+            </p>
+          ) : (
+            <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-300">
+              The line needs <strong>{seconds(fit.requiredSeconds)}</strong> in a shot planned for{" "}
+              <strong>{fit.plannedDurationSeconds}s</strong>. <Misfit fit={fit} />.
+            </p>
+          )}
+          {!fit.measured && !fit.needsDubbing && (
             <p className="mt-1 text-[10px] font-medium italic text-slate-400">
               Estimated from the text — this shot has not been dubbed yet, and speaking rate varies by
               language and voice. Dub it for a real measurement.
@@ -313,7 +333,7 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
           {/* Three options, stated as three. Only the first two change anything; "go with the
               original" is a real choice rather than the absence of one, so it is a button like the
               others -- and for a line too long for any clip it is the only way past the block. */}
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className={`mt-2 flex flex-wrap gap-2 ${fit.needsDubbing ? "hidden" : ""}`}>
             {canExtend && (
               <button
                 type="button"
