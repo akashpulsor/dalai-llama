@@ -3363,9 +3363,11 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: (renderId) => ({ url: platformUrl(`/final-renders/${renderId}`) }),
     }),
 
-    // pre-production-service ProjectController -- creator's manual toggle for whether the
-    // client can download the assembled final video from their public review page. Preview is
-    // always allowed regardless; this gates the download link only. Per-tenant, JWT-auth.
+    // pre-production-service ProjectController -- creator's manual toggle for whether the client
+    // can see the assembled final video on their public review page. The name is narrower than
+    // what it does: PublicProjectService returns no videoUrl at all while this is off, so the
+    // client's page shows nothing -- the cut is invisible, not merely undownloadable. Per-tenant,
+    // JWT-auth.
     updateFinalVideoLock: builder.mutation({
       query: ({ projectId, unlocked }) => ({
         url: platformUrl(`/projects/${projectId}/final-video-lock`),

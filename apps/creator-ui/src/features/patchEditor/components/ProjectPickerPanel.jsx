@@ -7,12 +7,24 @@ import { sleep } from "../utils/jobStatus.js";
 import {
   useCreateFinalRenderMutation,
   useGetLatestFinalRenderQuery,
+  useGetPreProductionProjectQuery,
   useListPreProductionProjectsQuery,
   useListProjectShotVideosQuery,
+  useUpdateFinalVideoLockMutation,
 } from "../../../api/creatorEndpoints.js";
 
 const RENDER_POLL_INTERVAL_MS = 2500;
 const RENDER_POLL_MAX_ATTEMPTS = 240; // ~10 minutes, an ffmpeg concat of a long project
+
+/** What a shot sounds like in this cut. "Clip" is whatever audio the video model produced -- which
+ * on a shot generated with native audio is a delivery nobody wrote. "Dubbed" swaps that for the
+ * recorded take rather than mixing the two, since the invented one underneath is noise. None of it
+ * touches the clips: the same shots can be assembled differently tomorrow. */
+const AUDIO_CHOICES = [
+  { value: "CLIP", label: "clip", hint: "Keep the audio the video model generated with this shot" },
+  { value: "DUBBED", label: "dubbed", hint: "Use the recorded take, dropping the clip's own audio" },
+  { value: "SILENT", label: "silent", hint: "No voice at all in this cut" },
+];
 
 // The second entry point into the editor (besides uploading a file): pull a project that already
 // has generated video. Everything here runs against the live pipeline -- pre-production-service
@@ -24,16 +36,6 @@ const RENDER_POLL_MAX_ATTEMPTS = 240; // ~10 minutes, an ffmpeg concat of a long
 // Both URL sources are presigned, which is the constraint that decided them: the editor loads a
 // source with a plain fetch() that sends no Authorization header, so a 302-behind-JWT endpoint
 // (like /v1/jobs/{id}/video) could not be used here.
-/** What a shot sounds like in this cut. "Clip" is whatever audio the video model produced -- which
- * on a shot generated with native audio is a delivery nobody wrote. "Dubbed" swaps that for the
- * recorded take rather than mixing the two, since the invented one underneath is noise. None of it
- * touches the clips: the same shots can be assembled differently tomorrow. */
-const AUDIO_CHOICES = [
-  { value: "CLIP", label: "clip", hint: "Keep the audio the video model generated with this shot" },
-  { value: "DUBBED", label: "dubbed", hint: "Use the recorded take, dropping the clip's own audio" },
-  { value: "SILENT", label: "silent", hint: "No voice at all in this cut" },
-];
-
 export default function ProjectPickerPanel() {
   const { actions } = usePatchEditor();
   const location = useLocation();
@@ -69,6 +71,23 @@ export default function ProjectPickerPanel() {
   const { data: shotVideos = [], isFetching: shotsLoading } =
     useListProjectShotVideosQuery(projectId, { skip: !projectId });
   const [createFinalRender] = useCreateFinalRenderMutation();
+  // Publishing lives on the planner page too, but that is a different screen from the one where the
+  // cut is actually made -- a creator who has just assembled a film has to go and find it. The
+  // decision belongs next to the thing it is about.
+  const { data: preProdProject } = useGetPreProductionProjectQuery(projectId, { skip: !projectId });
+  const [updateFinalVideoLock, publishState] = useUpdateFinalVideoLockMutation();
+  const published = preProdProject?.finalVideoDownloadUnlocked === true;
+  const [publishError, setPublishError] = useState(null);
+
+  const togglePublished = async () => {
+    setPublishError(null);
+    try {
+      await updateFinalVideoLock({ projectId, unlocked: !published }).unwrap();
+    } catch (error) {
+      setPublishError(error?.data?.error || error?.data?.message
+        || "Could not change whether the client can see this cut.");
+    }
+  };
   // Which shots play without their voice in THIS cut. A render-time choice, like muting a track on a
   // timeline: nothing is written back to the clip, so the next assembly starts with every voice in
   // again. Keyed by shotRef because that is what the assembly matches on.
@@ -235,6 +254,39 @@ export default function ProjectPickerPanel() {
                       ? `Assemble (${changedCount} shot${changedCount === 1 ? "" : "s"} re-sounded)`
                       : "Assemble the full video"}
                 </button>
+
+                {/* Whether the client can watch this cut. The review page shows no video at all
+                    until this is on -- not merely no download -- so it is the step between having
+                    a film and having shown it to anyone. Offered here because this is where the
+                    cut gets made; the same switch is on the planner page. */}
+                {fullVideoUrl && (
+                  <div className="mt-2 rounded-md border border-white/10 bg-white/[0.02] p-2">
+                    <p className="text-[11px] font-bold text-slate-300">
+                      {published ? "Your client can watch this cut" : "Not published to your client yet"}
+                    </p>
+                    <p className="mt-0.5 text-[10px] font-medium leading-relaxed text-slate-500">
+                      {published
+                        ? "It is on their review page now. Watching only — the page offers no download."
+                        : "Their review page shows no video until you publish. Assembling again replaces what they see."}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={publishState.isLoading}
+                      onClick={togglePublished}
+                      className={`mt-1.5 flex min-h-8 w-full items-center justify-center gap-1.5 rounded-md text-[11px] font-black disabled:opacity-60 ${
+                        published
+                          ? "border border-white/10 bg-white/5 text-slate-200"
+                          : "creator-primary text-white"
+                      }`}
+                    >
+                      {publishState.isLoading && <Loader2 size={12} className="animate-spin" />}
+                      {published ? "Unpublish" : "Publish to review page"}
+                    </button>
+                    {publishError && (
+                      <p className="mt-1.5 text-[10px] font-semibold text-rose-300">{publishError}</p>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <p className="mt-2 text-[11px] font-semibold text-slate-600">
