@@ -87,6 +87,7 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
   const [redub, { isLoading }] = useTestShotVoiceMutation();
   const [saveLine, saveState] = useUpdatePreProductionShotMutation();
   const [draft, setDraft] = React.useState("");
+  const [editing, setEditing] = React.useState(false);
   const audioUrl = dubbed?.audioUrl || dubbed?.audioDataUri;
   // The take on file was made from these words; the shot now says those. When they differ the
   // recording is of a line that no longer exists, which is exactly what the fit report stops
@@ -97,13 +98,21 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
   // narration from this page: the beats editor hides once a shot is prepared, so a finished shot
   // with no voice-over was silent with no route out of it. A motion graphic is the usual case --
   // its script_line describes what appears on screen, which is direction, not words anyone speaks.
+  // Writing the words and hearing them is one action. A line that exists on the shot but has never
+  // been spoken is the state everything downstream mishandles -- the video model invents a delivery
+  // for it, and every fit figure falls back to a character count -- so saving without recording is
+  // not a step worth offering on its own.
+  const saveAndDub = async (text) => {
+    await saveLine({ projectId, shotId, voiceOver: text }).unwrap();
+    await redub({ projectId, shotId, text }).unwrap();
+  };
+
   if (!line) {
     const handleAddLine = async () => {
       const text = draft.trim();
       if (!text) return;
       try {
-        await saveLine({ projectId, shotId, voiceOver: text }).unwrap();
-        await redub({ projectId, shotId, text }).unwrap();
+        await saveAndDub(text);
         setDraft("");
         dispatch(showFlash({ message: "Line saved and dubbed. Prepare again so the shot is built around it.", type: "success" }));
       } catch (error) {
@@ -149,6 +158,28 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
     }
   };
 
+  // Changing the words was only ever possible through the fit panel's rewrite, which appears when a
+  // line overruns its shot and offers a model's phrasing rather than the creator's own. A line can
+  // be wrong for reasons arithmetic knows nothing about -- the wrong name, the wrong tone, a take
+  // that reads badly out loud -- and there was nowhere to simply say it differently and hear it.
+  const handleSaveEdit = async () => {
+    const text = draft.trim();
+    if (!text || text === line.trim()) {
+      setEditing(false);
+      return;
+    }
+    try {
+      await saveAndDub(text);
+      setEditing(false);
+      dispatch(showFlash({
+        message: "Line changed and re-dubbed. Size the shot to the new take before generating.",
+        type: "success",
+      }));
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not save that line", type: "error" }));
+    }
+  };
+
   return (
     <div className={`rounded-md border p-3 ${stale ? "border-amber-400/30 bg-amber-500/[0.06]" : "border-white/10 bg-white/[0.02]"}`}>
       <div className="mb-2 flex items-center gap-1.5">
@@ -171,7 +202,7 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
           )}
           <button
             type="button"
-            disabled={isLoading}
+            disabled={isLoading || editing}
             onClick={handleRedub}
             className="flex items-center gap-1.5 text-[10px] font-bold text-purple-300 hover:text-purple-200 disabled:opacity-60"
           >
@@ -182,13 +213,62 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
       ) : (
         <button
           type="button"
-          disabled={isLoading}
+          disabled={isLoading || editing}
           onClick={handleRedub}
           className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-white/15 py-1.5 text-[11px] font-bold text-slate-300 hover:border-purple-400/40 hover:text-purple-200 disabled:opacity-60"
         >
           {isLoading ? <Loader2 size={12} className="animate-spin" /> : <AudioLines size={12} />}
           {isLoading ? "Dubbing…" : "Dub this shot to hear it"}
         </button>
+      )}
+
+      {/* The words themselves, which this panel never showed -- it offered to re-record a line
+          without ever saying what the line was. */}
+      {editing ? (
+        <div className="mt-2.5 border-t border-white/10 pt-2.5">
+          <textarea
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            rows={3}
+            placeholder="What should be said over this shot?"
+            className="creator-input w-full text-[11px] font-medium leading-relaxed"
+          />
+          <p className="mt-1 text-[10px] font-medium text-slate-500">
+            Saving records the new words straight away, so the take on file is always of the line as
+            it stands.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              disabled={saveState.isLoading || isLoading || !draft.trim()}
+              onClick={handleSaveEdit}
+              className="flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/15 px-2.5 py-1.5 text-[10px] font-bold text-purple-200 disabled:opacity-50"
+            >
+              {(saveState.isLoading || isLoading) ? <Loader2 size={11} className="animate-spin" /> : <AudioLines size={11} />}
+              {(saveState.isLoading || isLoading) ? "Saving…" : "Save and dub it"}
+            </button>
+            <button
+              type="button"
+              disabled={saveState.isLoading || isLoading}
+              onClick={() => setEditing(false)}
+              className="rounded-md border border-white/10 px-2.5 py-1.5 text-[10px] font-bold text-slate-400 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-2.5 border-t border-white/10 pt-2.5">
+          <p className="text-[11px] font-medium leading-relaxed text-slate-300">{line}</p>
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={() => { setDraft(line); setEditing(true); }}
+            className="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-slate-200 disabled:opacity-60"
+          >
+            <Pencil size={11} /> Change the words and dub again
+          </button>
+        </div>
       )}
     </div>
   );
