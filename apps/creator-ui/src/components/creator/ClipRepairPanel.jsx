@@ -26,6 +26,39 @@ import {
  */
 const seconds = (v) => `${Number(v ?? 0).toFixed(1)}s`;
 
+/**
+ * Saves a remote file under a chosen name.
+ *
+ * <p>A plain {@code <a download>} does not do this. The download attribute is honoured only for
+ * same-origin URLs; these are presigned MinIO links on another origin, so the browser ignored both
+ * the attribute and the filename and simply opened the video in a tab. Which looks like the button
+ * not working -- and this is the escape hatch the whole panel depends on, the one route out when no
+ * automatic repair gives something worth shipping.
+ *
+ * <p>So the bytes are fetched and handed over as a blob: URL, which IS same-origin. Falls back to
+ * opening the URL if the fetch is refused, because a file in a tab can still be saved by hand and
+ * is better than a button that does nothing.
+ */
+async function saveAs(url, filename) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(String(response.status));
+    const blobUrl = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement("a");
+    anchor.href = blobUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    // Revoked on a later tick: revoking immediately races the browser's own read of the blob.
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+    return true;
+  } catch {
+    window.open(url, "_blank", "noopener");
+    return false;
+  }
+}
+
 export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
   const dispatch = useDispatch();
   const { data: sources, refetch } = useGetShotClipSourcesQuery(
@@ -168,24 +201,40 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
               <VolumeX size={11} /> Drop the voice and leave it silent
             </button>
           )}
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <span className="text-[10px] font-medium text-slate-500">Do it yourself:</span>
-            <a href={sources.clipUrl} download={`${shot.shotRef || "shot"}.mp4`}
-               className="flex items-center gap-1 text-[10px] font-bold text-purple-300 hover:text-purple-200">
-              <Download size={11} /> Video
-            </a>
-            {hasDub && (
-              <a href={sources.audioUrl} download={`${shot.shotRef || "shot"}-dialogue.mp3`}
-                 className="flex items-center gap-1 text-[10px] font-bold text-purple-300 hover:text-purple-200">
-                <Download size={11} /> Dialogue
-              </a>
-            )}
-            <button type="button" disabled={busy} onClick={() => fileRef.current?.click()}
-                    className="flex items-center gap-1 text-[10px] font-bold text-purple-300 hover:text-purple-200 disabled:opacity-50">
-              {uploadState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
-              {uploadState.isLoading ? "Uploading…" : "Upload finished clip"}
-            </button>
-            <input ref={fileRef} type="file" accept="video/*" onChange={handleUpload} className="hidden" />
+          {/* Take it away, fix it, bring it back. Buttons rather than links because the download
+              attribute is ignored cross-origin -- see saveAs. */}
+          <div className="rounded-md border border-white/10 bg-black/20 p-2">
+            <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+              Or fix it yourself
+            </p>
+            <p className="mt-0.5 text-[10px] font-medium leading-relaxed text-slate-400">
+              Take the clip and the voice into your own editor, cut it however it needs cutting, and
+              put the result back. The uploaded file replaces this shot in the film.
+            </p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => saveAs(sources.clipUrl, `${shot.shotRef || "shot"}.mp4`)}
+                className="flex items-center gap-1 text-[10px] font-bold text-purple-300 hover:text-purple-200"
+              >
+                <Download size={11} /> Video
+              </button>
+              {hasDub && (
+                <button
+                  type="button"
+                  onClick={() => saveAs(sources.audioUrl, `${shot.shotRef || "shot"}-dialogue.mp3`)}
+                  className="flex items-center gap-1 text-[10px] font-bold text-purple-300 hover:text-purple-200"
+                >
+                  <Download size={11} /> Dialogue
+                </button>
+              )}
+              <button type="button" disabled={busy} onClick={() => fileRef.current?.click()}
+                      className="flex items-center gap-1 text-[10px] font-bold text-purple-300 hover:text-purple-200 disabled:opacity-50">
+                {uploadState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
+                {uploadState.isLoading ? "Uploading…" : "Upload finished clip"}
+              </button>
+              <input ref={fileRef} type="file" accept="video/*" onChange={handleUpload} className="hidden" />
+            </div>
           </div>
         </div>
       )}
