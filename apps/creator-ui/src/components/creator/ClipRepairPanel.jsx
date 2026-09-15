@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { Download, Loader2, Scissors, Upload, Wand2 } from "lucide-react";
+import { Download, Loader2, Scissors, Upload, Volume2, Wand2 } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useExtendShotTailMutation,
@@ -12,9 +12,12 @@ import {
 /**
  * Repairing a finished clip whose dialogue does not fit it, without paying to generate it again.
  *
- * <p>Shown only on a shot that already has a clip AND a dubbed take longer than it. Regenerating
- * that shot bills the whole clip a second time and returns a different-looking one; these three
- * keep what was already made and accepted.
+ * <p>Shown on any shot that has a clip and a dubbed take. Regenerating bills the whole clip a second
+ * time and returns a different-looking one; everything here keeps what was already made and paid for.
+ *
+ * <p>The simplest case is a dub that FITS: the clip carries whatever audio the video model produced
+ * -- on the native-audio path, a line it had no room for, so a fragment at the end over ambience --
+ * and swapping that for the dubbed take is the whole repair. That one is always offered.
  *
  * <p>The costs are stated on the buttons because they are the whole point of offering this. Holding
  * the last frame bills nothing. Generating a tail bills only the seconds added, with a cheaper model
@@ -33,14 +36,16 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
   const [uploadClip, uploadState] = useUploadShotClipMutation();
   const fileRef = React.useRef(null);
 
-  // Only when there is something to repair: a clip, a dubbed take, and the take running past the
-  // clip. A shot whose audio already fits needs none of this and should not be offered it.
   const clip = sources?.clipSeconds;
   const audio = sources?.audioSeconds;
   const shortfall = clip != null && audio != null ? audio - clip : null;
-  if (!sources?.clipUrl || shortfall == null || shortfall <= 0.05) return null;
+  // Shown whenever there is a clip and a dubbed take. It used to require the dub to OVERRUN, which
+  // hid the simplest repair of all: a dub that fits a clip still carrying the video model's own
+  // audio, where swapping the sound is the whole fix and costs nothing.
+  if (!sources?.clipUrl || !sources?.audioUrl || shortfall == null) return null;
 
-  const needed = Math.ceil(shortfall);
+  const overruns = shortfall > 0.05;
+  const needed = Math.max(1, Math.ceil(shortfall));
 
   const runExtend = async (mode) => {
     try {
@@ -78,16 +83,39 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
       <div className="mb-1 flex items-center gap-1.5">
         <Scissors size={13} className="text-amber-300" />
         <p className="text-[10px] font-extrabold uppercase tracking-wide text-amber-200">
-          The line does not fit this clip
+          {overruns ? "The line does not fit this clip" : "Put the dubbed voice on this clip"}
         </p>
       </div>
       <p className="text-[11px] font-medium leading-relaxed text-slate-300">
-        The dubbed take runs <strong>{seconds(audio)}</strong> but the clip is{" "}
-        <strong>{seconds(clip)}</strong> — the last <strong>{seconds(shortfall)}</strong> of the line
-        is cut off. Regenerating bills the whole shot again; these keep the clip you have.
+        {overruns ? (
+          <>
+            The dubbed take runs <strong>{seconds(audio)}</strong> but the clip is{" "}
+            <strong>{seconds(clip)}</strong> — the last <strong>{seconds(shortfall)}</strong> of the
+            line is cut off. Regenerating bills the whole shot again; these keep the clip you have.
+          </>
+        ) : (
+          <>
+            The dubbed take runs <strong>{seconds(audio)}</strong> and fits this{" "}
+            <strong>{seconds(clip)}</strong> clip. Putting it on replaces whatever audio the video
+            model produced — no regeneration, nothing billed.
+          </>
+        )}
       </p>
 
       <div className="mt-2 flex flex-wrap gap-2">
+        {/* Always offered: it drops the model's own audio and lays the dub on instead, which on a
+            shot generated with native audio is usually the entire fix. */}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => runExtend("REPLACE_AUDIO")}
+          className="flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/15 px-2.5 py-1.5 text-[10px] font-bold text-purple-200 hover:border-purple-400/50 disabled:opacity-50"
+        >
+          {extendState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Volume2 size={11} />}
+          Use dubbed voice (free)
+        </button>
+        {overruns && (
+        <>
         <button
           type="button"
           disabled={busy}
@@ -106,6 +134,8 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
           {extendState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
           {`Generate +${needed}s tail (${needed}s billed)`}
         </button>
+        </>
+        )}
       </div>
 
       {/* The manual route. Deliberately plain links rather than a flow: the point is to get the two
