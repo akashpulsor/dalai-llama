@@ -158,6 +158,11 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
       {audioUrl ? (
         <div className="space-y-2">
           <audio controls src={audioUrl} className="h-9 w-full" />
+          {dubbed?.durationMs > 0 && (
+            <p className="text-[10px] font-medium text-slate-500">
+              This take runs {(dubbed.durationMs / 1000).toFixed(1)}s.
+            </p>
+          )}
           {stale && (
             <p className="text-[10px] font-medium text-amber-200/90">
               This recording is of the previous line. Dub again to hear the line as it stands now —
@@ -435,6 +440,13 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
   // a shot that hasn't been dubbed at all yet, since the audio is sitting ready for review, not
   // missing.
   const dubReady = !!(dubbed?.audioUrl || dubbed?.audioDataUri);
+  // Compared against the shot's planned length with the same 0.4s breath the backend reserves, so
+  // the card and the fit report cannot disagree about whether a line fits.
+  const dubSeconds = dubbed?.durationMs > 0 ? dubbed.durationMs / 1000 : null;
+  const dubOverruns = dubSeconds != null && shot.durationSeconds
+    ? dubSeconds + 0.4 > shot.durationSeconds : false;
+  const dubMismatch = dubSeconds != null && shot.durationSeconds
+    ? Math.abs(shot.durationSeconds - dubSeconds) > 0.5 : false;
   // Both dub badges resolve from `shot` plus the project-wide cloned-audio query the parent
   // already loads, so the grid paints its real dub state immediately. This deliberately does NOT
   // read `beats`: that is a per-shot request fired once per card, so gating the badge on it left
@@ -544,6 +556,26 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
       {isOpen && (
         <div className="space-y-3 border-t border-white/10 px-4 py-3.5">
           {isMotionGraphic && <MotionGraphicPanel shotId={shot.id} />}
+          {/* The one comparison that decides whether this shot is right, stated before any panel is
+              opened: how long the shot is meant to run against how long the voice actually takes.
+              It was only visible inside the fit panel, which appears when something is already
+              wrong -- so a shot could look fine and not be. */}
+          {(shot.durationSeconds || dubbed?.durationMs > 0) && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-medium">
+              {shot.durationSeconds ? (
+                <span className="text-slate-400">
+                  Shot <strong className="text-slate-200">{shot.durationSeconds}s</strong>
+                </span>
+              ) : null}
+              {dubbed?.durationMs > 0 && (
+                <span className={dubMismatch ? "text-amber-300" : "text-slate-400"}>
+                  Voice <strong>{(dubbed.durationMs / 1000).toFixed(1)}s</strong>
+                  {dubMismatch ? ` — ${dubOverruns ? "longer than" : "shorter than"} the shot` : " — fits"}
+                </span>
+              )}
+            </div>
+          )}
+
           {video?.outputUri && (
             <video
               src={video.outputUri}
