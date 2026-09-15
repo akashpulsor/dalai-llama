@@ -2899,6 +2899,9 @@ export const creatorApi = apiSlice.injectEndpoints({
       invalidatesTags: (_result, _error, { shotId, projectId }) => [
         { type: "CreatorHomeProjects", id: `dialogue-beats-${shotId}` },
         { type: "CreatorHomeProjects", id: `clone-audio-${projectId}` },
+        // A fresh take is what turns the fit report's estimate back into a measurement -- without
+        // this the panel goes on showing the estimate it fell back to when the line changed.
+        { type: "CreatorHomeProjects", id: `dialogue-fit-${projectId}` },
       ],
     }),
 

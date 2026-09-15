@@ -8,6 +8,7 @@ import {
   useGetShotBackgroundMusicQuery,
   useListPreProductionShotImagesQuery,
   useListShotPromptVersionsQuery,
+  useTestShotVoiceMutation,
 } from "../../api/creatorEndpoints.js";
 import DialogueBeatsEditor from "./DialogueBeatsEditor.jsx";
 import DialogueFitPanel from "./DialogueFitPanel.jsx";
@@ -60,6 +61,79 @@ function BackgroundMusicControl({ shotId }) {
         >
           {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Music size={12} />}
           {isLoading ? "Generating…" : "Generate background music"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The shot's spoken take: hear it, and record it again.
+ *
+ * <p>There was no way to listen. A dubbed shot got a badge saying so and nothing else, which is a
+ * poor trade for audio that is about to be baked into a paid render -- and it left the one step the
+ * dialogue-fit flow depends on with no button. Accepting a rewrite changes the words, which makes
+ * the stored take a recording of something else; only dubbing again turns the report's estimate back
+ * into a measurement.
+ *
+ * <p>Re-dubbing replaces the take rather than versioning it (one row per beat, a fresh object each
+ * time), so the previous recording is gone once this runs. That is worth knowing before pressing it,
+ * and worth hearing the current one first.
+ */
+function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
+  const dispatch = useDispatch();
+  const [redub, { isLoading }] = useTestShotVoiceMutation();
+  const audioUrl = dubbed?.audioUrl || dubbed?.audioDataUri;
+  // The take on file was made from these words; the shot now says those. When they differ the
+  // recording is of a line that no longer exists, which is exactly what the fit report stops
+  // treating as a measurement -- so say it here too, next to the button that fixes it.
+  const stale = !!audioUrl && !!dubbed?.text && !!line && dubbed.text.trim() !== line.trim();
+
+  if (!line) return null;
+
+  const handleRedub = async () => {
+    try {
+      await redub({ projectId, shotId, text: line }).unwrap();
+      dispatch(showFlash({ message: "Re-dubbed with the current line.", type: "success" }));
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not dub this shot", type: "error" }));
+    }
+  };
+
+  return (
+    <div className={`rounded-md border p-3 ${stale ? "border-amber-400/30 bg-amber-500/[0.06]" : "border-white/10 bg-white/[0.02]"}`}>
+      <div className="mb-2 flex items-center gap-1.5">
+        <AudioLines size={13} className={stale ? "text-amber-300" : "text-purple-300"} />
+        <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Spoken take</p>
+      </div>
+      {audioUrl ? (
+        <div className="space-y-2">
+          <audio controls src={audioUrl} className="h-9 w-full" />
+          {stale && (
+            <p className="text-[10px] font-medium text-amber-200/90">
+              This recording is of the previous line. Dub again to hear the line as it stands now —
+              until then the fit figures are an estimate.
+            </p>
+          )}
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={handleRedub}
+            className="flex items-center gap-1.5 text-[10px] font-bold text-purple-300 hover:text-purple-200 disabled:opacity-60"
+          >
+            {isLoading ? <Loader2 size={11} className="animate-spin" /> : <AudioLines size={11} />}
+            {isLoading ? "Dubbing…" : "Dub again with the current line"}
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={isLoading}
+          onClick={handleRedub}
+          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-white/15 py-1.5 text-[11px] font-bold text-slate-300 hover:border-purple-400/40 hover:text-purple-200 disabled:opacity-60"
+        >
+          {isLoading ? <Loader2 size={12} className="animate-spin" /> : <AudioLines size={12} />}
+          {isLoading ? "Dubbing…" : "Dub this shot to hear it"}
         </button>
       )}
     </div>
@@ -450,6 +524,14 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               no music reference it reads the shot's current track from pre-production. Hiding
               the control once prepared took away the case that fix exists to serve, and left
               no way to add or replace music on a shot you had already prepared. */}
+          {!isMotionGraphic && (
+            <DubbedVoiceControl
+              shotId={shot.id}
+              projectId={projectId}
+              line={dialogueVoiceText}
+              dubbed={dubbed}
+            />
+          )}
           <BackgroundMusicControl shotId={shot.id} />
           <ShotThoughtLog shotId={shot.id} />
 

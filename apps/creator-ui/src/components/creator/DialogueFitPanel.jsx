@@ -201,12 +201,17 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
         await updateShot({ projectId, shotId: shot.id, voiceOver: retimed.rewritten }).unwrap();
       }
       setRetimed(null);
-      // The stored length is now a measurement of the OLD line, so the fit figures are stale until
-      // the shot is re-dubbed. Refetching says so honestly (the report falls back to an estimate)
-      // rather than leaving the previous take's numbers on screen looking current.
+      // The stored take was synthesized from the OLD words, so its length no longer describes this
+      // line. The server now refuses to call that a measurement (it compares the take's text against
+      // the shot's), so refetching swaps the confident number for a labelled estimate rather than
+      // leaving the previous take's figures on screen looking current.
       refetch();
+      // And the prompt still holds the old line until the shot is prepared again -- saving the text
+      // changes the SHOT, not the prompt built from it. Without this the creator accepts a rewrite,
+      // sees the panel update, generates, and gets the line they just replaced.
+      onResized?.();
       dispatch(showFlash({
-        message: "Line updated. Re-dub this shot to hear the new timing before generating.",
+        message: "Line updated and the prompt rebuilt. Re-dub this shot to hear the new timing before generating.",
         type: "success",
       }));
     } catch (error) {
