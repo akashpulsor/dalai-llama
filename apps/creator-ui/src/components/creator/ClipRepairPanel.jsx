@@ -89,6 +89,10 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
             : hasDub ? "Put the dubbed voice on this clip" : "This clip's audio was invented"}
         </p>
       </div>
+      {/* One sentence of arithmetic, then the outcome of each option spelled out on its own button.
+          The decision is only ever "does the voice fit the picture" -- everything after that is a
+          choice between free and better-looking, and the creator should not have to work out what
+          each button leaves them with. */}
       <p className="text-[11px] font-medium leading-relaxed text-slate-300">
         {!hasDub ? (
           <>
@@ -123,7 +127,7 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
           className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 py-1.5 text-[10px] font-bold text-slate-200 hover:border-white/30 disabled:opacity-50"
         >
           {extendState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <VolumeX size={11} />}
-          Make it silent (free)
+          {`Make it silent → ${seconds(clip)} clip, no voice`}
         </button>
         {hasDub && (
         <button
@@ -133,7 +137,7 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
           className="flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/15 px-2.5 py-1.5 text-[10px] font-bold text-purple-200 hover:border-purple-400/50 disabled:opacity-50"
         >
           {extendState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Volume2 size={11} />}
-          Use dubbed voice (free)
+          {`Use dubbed voice → ${seconds(clip)} clip, free`}
         </button>
         )}
         {overruns && (
@@ -145,7 +149,7 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
           className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 py-1.5 text-[10px] font-bold text-slate-200 hover:border-white/30 disabled:opacity-50"
         >
           {extendState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Scissors size={11} />}
-          {`Hold last frame +${needed}s (free)`}
+          {`Hold last frame → ${seconds((clip ?? 0) + needed)} clip, free`}
         </button>
         <button
           type="button"
@@ -154,11 +158,18 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
           className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 py-1.5 text-[10px] font-bold text-slate-200 hover:border-white/30 disabled:opacity-50"
         >
           {extendState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
-          {`Generate +${needed}s tail (${needed}s billed)`}
+          {`Generate ${needed}s of motion → ${seconds((clip ?? 0) + needed)} clip, ${needed}s billed`}
         </button>
         </>
         )}
       </div>
+
+      {overruns && (
+        <p className="mt-1.5 text-[10px] font-medium text-slate-500">
+          Either way the whole {seconds(audio)} line is laid across the finished clip afterwards —
+          the only difference is whether the extra {needed}s holds still or moves.
+        </p>
+      )}
 
       {/* The manual route. Deliberately plain links rather than a flow: the point is to get the two
           files out of the system and let the creator use whatever they already work in. */}
