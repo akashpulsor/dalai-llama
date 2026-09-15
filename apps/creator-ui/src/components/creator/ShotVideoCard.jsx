@@ -194,6 +194,79 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
   );
 }
 
+/**
+ * The shot's length, editable, next to how long its voice actually takes.
+ *
+ * <p>The simplest way through, and the one that avoids every repair: record the line first, then
+ * make the shot long enough to hold it, then generate. A clip sized to its audio before it exists
+ * needs no tail, no freeze and no remux -- those are all ways of fixing a shot that was generated at
+ * the wrong length, and none of them is as good as not doing that.
+ *
+ * <p>The suggestion is a second longer than the take rather than exactly its length. A second is
+ * comfortably more than the breath the fit maths reserves, and generous is the right direction to be
+ * wrong in: a clip slightly longer than its line ends in silence, a clip slightly shorter ends
+ * mid-word.
+ */
+function ShotLengthRow({ shot, projectId, dubSeconds, mismatch, overruns, onChanged }) {
+  const dispatch = useDispatch();
+  const [saveShot, saveState] = useUpdatePreProductionShotMutation();
+  const [draft, setDraft] = React.useState("");
+  const suggested = dubSeconds != null ? Math.ceil(dubSeconds) + 1 : null;
+  const current = shot.durationSeconds ?? "";
+
+  const commit = async (value) => {
+    const seconds = Number(value);
+    if (!Number.isFinite(seconds) || seconds <= 0 || seconds === shot.durationSeconds) return;
+    try {
+      await saveShot({ projectId, shotId: shot.id, durationSeconds: Math.round(seconds) }).unwrap();
+      setDraft("");
+      dispatch(showFlash({
+        message: `Shot is now ${Math.round(seconds)}s.${onChanged ? " Rebuilding the prompt." : ""}`,
+        type: "success",
+      }));
+      onChanged?.();
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not change the shot's length", type: "error" }));
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-medium">
+      <span className="flex items-center gap-1.5 text-slate-400">
+        Shot
+        <input
+          type="number"
+          min="1"
+          value={draft === "" ? current : draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={(event) => commit(event.target.value)}
+          onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
+          disabled={saveState.isLoading}
+          className="w-12 rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-center text-[11px] font-bold text-slate-100 disabled:opacity-50"
+        />
+        s
+      </span>
+      {dubSeconds != null && (
+        <span className={mismatch ? "text-amber-300" : "text-slate-400"}>
+          Voice <strong>{dubSeconds.toFixed(1)}s</strong>
+          {mismatch ? ` — ${overruns ? "longer than" : "shorter than"} the shot` : " — fits"}
+        </span>
+      )}
+      {suggested != null && suggested !== shot.durationSeconds && (
+        <button
+          type="button"
+          disabled={saveState.isLoading}
+          onClick={() => commit(suggested)}
+          className="flex items-center gap-1 rounded-md border border-purple-400/30 bg-purple-500/15 px-2 py-0.5 text-[10px] font-bold text-purple-200 disabled:opacity-50"
+        >
+          {saveState.isLoading ? <Loader2 size={10} className="animate-spin" /> : null}
+          {`Fit to voice: ${suggested}s`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** A bare number is not a price. The backend quotes in the wallet's own currency (billing
  * converts the provider's USD before it reaches here), so show the symbol that matches -- a
  * creator reading "0.66" next to a rupee balance cannot tell what they are agreeing to. */
@@ -560,20 +633,15 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               opened: how long the shot is meant to run against how long the voice actually takes.
               It was only visible inside the fit panel, which appears when something is already
               wrong -- so a shot could look fine and not be. */}
-          {(shot.durationSeconds || dubbed?.durationMs > 0) && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-medium">
-              {shot.durationSeconds ? (
-                <span className="text-slate-400">
-                  Shot <strong className="text-slate-200">{shot.durationSeconds}s</strong>
-                </span>
-              ) : null}
-              {dubbed?.durationMs > 0 && (
-                <span className={dubMismatch ? "text-amber-300" : "text-slate-400"}>
-                  Voice <strong>{(dubbed.durationMs / 1000).toFixed(1)}s</strong>
-                  {dubMismatch ? ` — ${dubOverruns ? "longer than" : "shorter than"} the shot` : " — fits"}
-                </span>
-              )}
-            </div>
+          {(shot.durationSeconds || dubSeconds != null) && (
+            <ShotLengthRow
+              shot={shot}
+              projectId={projectId}
+              dubSeconds={dubSeconds}
+              mismatch={dubMismatch}
+              overruns={dubOverruns}
+              onChanged={!video ? onPrepare : undefined}
+            />
           )}
 
           {video?.outputUri && (

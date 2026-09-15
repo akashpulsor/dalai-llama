@@ -117,6 +117,17 @@ export default function VideoGenerationSection({ projectId }) {
   });
   const dubbedVoices = Object.fromEntries(savedAudio.map((audio) => [audio.shotId, audio]));
 
+  // The film's running length against what the client agreed. Every per-shot decision to give a shot
+  // more seconds is individually reasonable and collectively how a sixty second ad becomes ninety --
+  // which the client did not buy. Shown once, above the grid, where the accumulation is visible.
+  const plannedTotal = shots.reduce((sum, shot) => sum + (Number(shot?.durationSeconds) || 0), 0);
+  const targetTotal = Number(projectConfig?.targetDurationSeconds) || 0;
+  // Two seconds of drift is rounding, not a problem -- shot lengths are whole seconds and the breath
+  // after a line pushes several of them up by one. Past that it is the film getting longer than the
+  // one that was sold, a second at a time, each step individually reasonable.
+  const RUNNING_LENGTH_TOLERANCE_SECONDS = 2;
+  const overBudget = targetTotal > 0 && plannedTotal > targetTotal + RUNNING_LENGTH_TOLERANCE_SECONDS;
+
   const [prepareShotScene] = usePrepareShotSceneMutation();
   const [prepareShotScenesBatch] = usePrepareShotScenesBatchMutation();
   const [updateShotPrompt] = useUpdateShotScenePromptMutation();
@@ -485,6 +496,14 @@ export default function VideoGenerationSection({ projectId }) {
             >
               Clear selection
             </button>
+          )}
+          {overBudget && (
+            <p className="flex w-full items-center gap-1.5 rounded-md border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-[11px] font-bold text-amber-200">
+              <Clapperboard size={13} />
+              This cut now runs {plannedTotal}s against the {targetTotal}s planned —{" "}
+              {plannedTotal - targetTotal}s over. Lengthening shots to fit their dialogue is how that
+              happens; rephrasing a line instead keeps the running time where it was agreed.
+            </p>
           )}
           <button
             type="button"
