@@ -113,7 +113,7 @@ function RewritePreview({ retimed, onUse, onDismiss, applying }) {
   );
 }
 
-export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOriginal }) {
+export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOriginal, onDialogueReplaced }) {
   const dispatch = useDispatch();
   const { data: fit, isLoading, refetch } = useGetShotDialogueFitQuery(
     { projectId, shotId: shot?.id },
@@ -183,6 +183,7 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
 
   const handleUseRewrite = async () => {
     setApplying(true);
+    const original = retimed.original;
     try {
       if (lastBeat?.beatId) {
         // Beats carry their own placement, so the PUT has to restate it -- sending only the text
@@ -202,16 +203,19 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
       }
       setRetimed(null);
       // The stored take was synthesized from the OLD words, so its length no longer describes this
-      // line. The server now refuses to call that a measurement (it compares the take's text against
+      // line. The server refuses to call that a measurement (it compares the take's text against
       // the shot's), so refetching swaps the confident number for a labelled estimate rather than
       // leaving the previous take's figures on screen looking current.
       refetch();
-      // And the prompt still holds the old line until the shot is prepared again -- saving the text
-      // changes the SHOT, not the prompt built from it. Without this the creator accepts a rewrite,
-      // sees the panel update, generates, and gets the line they just replaced.
-      onResized?.();
+      // The prompt still holds the old line -- saving the text changes the SHOT, not the prompt
+      // built from it. Swap just that line inside the existing prompt and save it as a new version,
+      // rather than re-preparing: re-preparing rebuilds the model choice, the cost estimate and the
+      // compression too, when all that changed was the words.
+      const swapped = onDialogueReplaced ? await onDialogueReplaced(original, retimed.rewritten) : false;
       dispatch(showFlash({
-        message: "Line updated and the prompt rebuilt. Re-dub this shot to hear the new timing before generating.",
+        message: swapped
+          ? "Line updated in the shot and in the prompt. Re-dub to hear the new timing before generating."
+          : "Line updated on the shot. Prepare again so the prompt picks it up, then re-dub.",
         type: "success",
       }));
     } catch (error) {

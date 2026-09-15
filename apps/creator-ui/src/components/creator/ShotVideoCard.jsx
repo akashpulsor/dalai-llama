@@ -12,6 +12,7 @@ import {
 } from "../../api/creatorEndpoints.js";
 import DialogueBeatsEditor from "./DialogueBeatsEditor.jsx";
 import DialogueFitPanel from "./DialogueFitPanel.jsx";
+import ClipRepairPanel from "./ClipRepairPanel.jsx";
 import MotionGraphicPanel from "./MotionGraphicPanel.jsx";
 import CritiqueFindingsPanel from "./CritiqueFindingsPanel.jsx";
 import ShotThoughtLog from "./ShotThoughtLog.jsx";
@@ -513,6 +514,15 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             shot={shot}
             projectId={projectId}
             onResized={onPrepare}
+            // Swaps the spoken line inside the prompt that already exists and saves it as a new
+            // version. Accepting a rewrite used to trigger a full re-prepare, which rebuilds
+            // everything -- model recommendation, cost estimate, compression -- when the only thing
+            // that changed was the words. Changing the dialogue should change the dialogue.
+            onDialogueReplaced={info?.prompt && onSavePrompt ? async (oldLine, newLine) => {
+              const current = info.prompt.promptCompressed || info.prompt.promptOriginal || "";
+              if (!current || !oldLine || !current.includes(oldLine)) return false;
+              return onSavePrompt(current.split(oldLine).join(newLine));
+            } : undefined}
             // Only offered once there is a job to approve -- "go with the original" is a way of
             // generating, so before prepare there is nothing for it to act on.
             onKeepOriginal={info?.externalJobId && !video ? () => onApprove?.({ dialogueFit: "KEEP_PLANNED" }) : undefined}
@@ -549,11 +559,33 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             </button>
           )}
 
+          {/* A shot that is prepared but not yet generated had no way to rebuild its prompt: the
+              Prepare button only appeared when there was no prompt at all, so changing the shot's
+              line, its length or its plan left the old prompt sitting there with only Approve and
+              Reject. That is how both motion graphics ended up stuck showing prompts built before
+              they could be generated at all. Preparing again writes a new version; the old one
+              stays in history. */}
+          {info && !video && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onPrepare}
+              className="flex items-center gap-1.5 self-start rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-slate-200 hover:border-purple-400/40 hover:text-purple-200 disabled:opacity-50"
+            >
+              {busy ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+              {busy ? "Preparing…" : "Prepare again (rebuild the prompt)"}
+            </button>
+          )}
+
           {/* A generated shot was a dead end: the card showed the clip and nothing else, so a shot
               that came back wrong -- the line cut off, the wrong duration, a rewritten line since
               saved -- could only be fixed by never having generated it. Regenerating builds a fresh
               prompt from the shot as it stands now, then goes through the same approve step, so the
               new clip is costed and confirmed exactly like the first one. */}
+          {video && (
+            <ClipRepairPanel shot={shot} projectId={projectId} />
+          )}
+
           {video && !regenerating && onRegenerate && (
             <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
               <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">

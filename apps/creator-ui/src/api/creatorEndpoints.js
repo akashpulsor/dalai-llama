@@ -3212,6 +3212,49 @@ export const creatorApi = apiSlice.injectEndpoints({
       }),
     }),
 
+    // The clip and the dialogue take for a finished shot, so it can be repaired by hand: download
+    // both, fix it in your own editor, upload the result. The escape hatch that stops the flow
+    // being a dead end when neither automatic repair gives something worth shipping.
+    getShotClipSources: builder.query({
+      query: ({ projectId, shotId }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/clip-sources`),
+      }),
+      providesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `clip-sources-${a?.shotId}` }],
+    }),
+
+    // Give a finished clip the seconds its dialogue needs without regenerating it. mode HOLD
+    // freezes the last frame (nothing billed); mode GENERATE animates on from it with a cheaper
+    // model, billing only the added seconds. tailSeconds omitted asks for exactly what the measured
+    // audio needs.
+    extendShotTail: builder.mutation({
+      query: ({ projectId, shotId, tailSeconds, mode, continuationPrompt }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/extend-tail`),
+        method: "POST",
+        body: { tailSeconds, mode, continuationPrompt },
+      }),
+      invalidatesTags: (_r, _e, a) => [
+        { type: "CreatorHomeProjects", id: `shot-videos-${a?.projectId}` },
+        { type: "CreatorHomeProjects", id: `clip-sources-${a?.shotId}` },
+      ],
+    }),
+
+    // The creator's own finished clip, replacing what the model produced for this shot.
+    uploadShotClip: builder.mutation({
+      query: ({ projectId, shotId, file }) => {
+        const body = new FormData();
+        body.append("file", file);
+        return {
+          url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/upload-clip`),
+          method: "POST",
+          body,
+        };
+      },
+      invalidatesTags: (_r, _e, a) => [
+        { type: "CreatorHomeProjects", id: `shot-videos-${a?.projectId}` },
+        { type: "CreatorHomeProjects", id: `clip-sources-${a?.shotId}` },
+      ],
+    }),
+
     // Rewrite a line to take a given number of seconds to say, keeping its meaning. Both
     // directions: shorter when it overruns the shot, longer when the shot runs on in silence after
     // it. Returns the rewrite and saves NOTHING -- the line is the creator's writing, so it is shown
@@ -3664,6 +3707,9 @@ export const {
   useGetShotDialogueFitQuery,
   useRetimeShotDialogueMutation,
   useAdviseShotDialogueFitMutation,
+  useGetShotClipSourcesQuery,
+  useExtendShotTailMutation,
+  useUploadShotClipMutation,
   useLazyListProjectShotPromptsQuery,
   useListVideoModelsQuery,
   useGetShotScenePromptQuery,
