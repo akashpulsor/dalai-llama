@@ -59,6 +59,12 @@ export default function ProjectPickerPanel() {
   const { data: shotVideos = [], isFetching: shotsLoading } =
     useListProjectShotVideosQuery(projectId, { skip: !projectId });
   const [createFinalRender] = useCreateFinalRenderMutation();
+  // Which shots play without their voice in THIS cut. A render-time choice, like muting a track on a
+  // timeline: nothing is written back to the clip, so the next assembly starts with every voice in
+  // again. Keyed by shotRef because that is what the assembly matches on.
+  const [silentShotRefs, setSilentShotRefs] = useState([]);
+  const toggleSilent = (shotRef) => setSilentShotRefs((current) =>
+    current.includes(shotRef) ? current.filter((r) => r !== shotRef) : [...current, shotRef]);
 
   const fullVideoUrl = finalRender?.videoUrl || "";
   const renderStatus = finalRender?.status || "";
@@ -83,7 +89,7 @@ export default function ProjectPickerPanel() {
     setRenderError(null);
     setRendering(true);
     try {
-      await createFinalRender(projectId).unwrap();
+      await createFinalRender({ projectId, silentShotRefs }).unwrap();
       let url = "";
       for (let attempt = 0; attempt < RENDER_POLL_MAX_ATTEMPTS && !url; attempt += 1) {
         // eslint-disable-next-line no-await-in-loop
@@ -163,6 +169,37 @@ export default function ProjectPickerPanel() {
                   {playableShots.length} generated shot{playableShots.length === 1 ? "" : "s"}
                   {renderStatus === "RUNNING" ? " — assembling…" : " — assemble them into one video."}
                 </p>
+                {/* Which shots keep their voice. Decided here rather than burned into a clip: the
+                    answer can differ between two cuts of the same film, and a shot muted for this
+                    one is untouched for the next. */}
+                <div className="mb-2 max-h-44 overflow-y-auto rounded-md border border-white/10 bg-white/[0.02] p-2">
+                  <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                    Voice in this cut
+                  </p>
+                  {playableShots.map((shot) => {
+                    const ref = shot.shotRef;
+                    const silent = silentShotRefs.includes(ref);
+                    return (
+                      <label
+                        key={shot.jobId || ref}
+                        className="flex cursor-pointer items-center justify-between gap-2 py-0.5 text-[11px] font-medium text-slate-300"
+                      >
+                        <span className="truncate">{ref || "shot"}</span>
+                        <span className="flex items-center gap-1.5">
+                          <span className={silent ? "text-slate-500" : "text-purple-300"}>
+                            {silent ? "silent" : "with voice"}
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={!silent}
+                            onChange={() => toggleSilent(ref)}
+                            className="h-3.5 w-3.5 cursor-pointer accent-purple-500"
+                          />
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
                 <button
                   type="button"
                   onClick={handleRender}
@@ -170,7 +207,11 @@ export default function ProjectPickerPanel() {
                   className="creator-primary flex min-h-9 w-full items-center justify-center gap-2 text-xs font-black text-white disabled:opacity-55"
                 >
                   {rendering ? <Loader2 size={14} className="animate-spin" /> : <Layers size={14} />}
-                  {rendering ? "Assembling…" : "Assemble the full video"}
+                  {rendering
+                    ? "Assembling…"
+                    : silentShotRefs.length
+                      ? `Assemble (${silentShotRefs.length} silent)`
+                      : "Assemble the full video"}
                 </button>
               </div>
             ) : (

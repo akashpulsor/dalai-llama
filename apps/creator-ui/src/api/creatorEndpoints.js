@@ -3333,13 +3333,22 @@ export const creatorApi = apiSlice.injectEndpoints({
     // the whole render; poll getLatestFinalRender or getFinalRender for a UI that would
     // rather fire-and-poll. Endpoints live under /v1/final-renders -- deliberately not
     // /v1/projects or /v1/shots (both claimed by pre-production-service too).
+    // silentShotRefs: shots whose voice is left out of THIS cut. A render-time choice -- the clips
+    // themselves are untouched, so the next assembly can include every voice again. Accepts either a
+    // bare projectId (all voices kept) or {projectId, silentShotRefs}.
     createFinalRender: builder.mutation({
-      query: (projectId) => ({
-        url: platformUrl(`/final-renders`),
-        method: "POST",
-        body: { projectId },
-      }),
-      invalidatesTags: (_result, _error, projectId) => [{ type: "CreatorHomeProjects", id: `final-render-${projectId}` }],
+      query: (arg) => {
+        const { projectId, silentShotRefs } = typeof arg === "object" && arg !== null ? arg : { projectId: arg };
+        return {
+          url: platformUrl(`/final-renders`),
+          method: "POST",
+          body: { projectId, silentShotRefs },
+        };
+      },
+      invalidatesTags: (_result, _error, arg) => {
+        const id = typeof arg === "object" && arg !== null ? arg.projectId : arg;
+        return [{ type: "CreatorHomeProjects", id: `final-render-${id}` }];
+      },
     }),
 
     getLatestFinalRender: builder.query({
