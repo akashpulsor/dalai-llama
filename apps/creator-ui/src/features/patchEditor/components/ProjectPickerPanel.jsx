@@ -43,6 +43,9 @@ export default function ProjectPickerPanel() {
   const [projectId, setProjectId] = useState("");
   const [rendering, setRendering] = useState(false);
   const [renderError, setRenderError] = useState(null);
+  // The server's own list of what is not finished yet, kept apart from real errors: it is a
+  // question to answer, not a failure to report.
+  const [incompleteMessage, setIncompleteMessage] = useState(null);
   const [loadingUrl, setLoadingUrl] = useState(null);
 
   // Only a project that finished generating video has anything to edit, so the dropdown is the
@@ -119,12 +122,13 @@ export default function ProjectPickerPanel() {
   /** Assembles every completed shot into one cut, then loads it. Fire-and-poll: createFinalRender
    * hands back a job straight away, so this watches the latest render until it carries a videoUrl
    * rather than holding a request open for the length of an ffmpeg concat. */
-  const handleRender = async () => {
+  const handleRender = async (allowPartial = false) => {
     if (!projectId || rendering) return;
     setRenderError(null);
+    setIncompleteMessage(null);
     setRendering(true);
     try {
-      await createFinalRender({ projectId, shotAudio }).unwrap();
+      await createFinalRender({ projectId, shotAudio, allowPartial }).unwrap();
       let url = "";
       for (let attempt = 0; attempt < RENDER_POLL_MAX_ATTEMPTS && !url; attempt += 1) {
         // eslint-disable-next-line no-await-in-loop
@@ -137,7 +141,18 @@ export default function ProjectPickerPanel() {
       if (!url) throw new Error("Still assembling — check back in a moment.");
       await load(url, `${projectLabel}-full.mp4`);
     } catch (error) {
-      setRenderError(error.message || "Could not assemble the full video.");
+      // The server refuses a cut with unfinished shots in it and names them, which is the right
+      // default -- a film missing three of its shots is not the film. But it is also the message a
+      // creator sees every time they want to watch what they have so far, which is the cheapest
+      // moment to find out a shot is wrong. So the refusal is shown with its list, and the way past
+      // it is offered rather than requiring every remaining shot to be paid for first.
+      const conflict = error?.status === 409 || error?.originalStatus === 409;
+      const message = error?.data?.message || error?.data?.error || error.message;
+      if (conflict && message) {
+        setIncompleteMessage(message);
+      } else {
+        setRenderError(message || "Could not assemble the full video.");
+      }
     } finally {
       setRendering(false);
     }
@@ -243,7 +258,7 @@ export default function ProjectPickerPanel() {
                 </div>
                 <button
                   type="button"
-                  onClick={handleRender}
+                  onClick={() => handleRender(false)}
                   disabled={rendering}
                   className="creator-primary flex min-h-9 w-full items-center justify-center gap-2 text-xs font-black text-white disabled:opacity-55"
                 >
@@ -254,6 +269,28 @@ export default function ProjectPickerPanel() {
                       ? `Assemble (${changedCount} shot${changedCount === 1 ? "" : "s"} re-sounded)`
                       : "Assemble the full video"}
                 </button>
+
+                {incompleteMessage && (
+                  <div className="mt-2 rounded-md border border-amber-400/25 bg-amber-500/[0.06] p-2">
+                    <p className="text-[11px] font-bold text-amber-200">Some shots are not finished</p>
+                    <p className="mt-0.5 text-[10px] font-medium leading-relaxed text-slate-300">
+                      {incompleteMessage}
+                    </p>
+                    <p className="mt-1 text-[10px] font-medium leading-relaxed text-slate-500">
+                      You can watch what you have. The cut will simply skip them — the rest stay in
+                      the order they were written — so it is a work print, not the film.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleRender(true)}
+                      disabled={rendering}
+                      className="mt-1.5 flex min-h-8 w-full items-center justify-center gap-1.5 rounded-md border border-white/15 bg-white/5 text-[11px] font-black text-slate-100 disabled:opacity-60"
+                    >
+                      {rendering ? <Loader2 size={12} className="animate-spin" /> : <Layers size={12} />}
+                      Assemble without them
+                    </button>
+                  </div>
+                )}
 
                 {/* Whether the client can watch this cut. The review page shows no video at all
                     until this is on -- not merely no download -- so it is the step between having

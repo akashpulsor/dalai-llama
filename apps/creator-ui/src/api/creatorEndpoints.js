@@ -3338,14 +3338,16 @@ export const creatorApi = apiSlice.injectEndpoints({
     // bare projectId (all voices kept) or {projectId, silentShotRefs}.
     createFinalRender: builder.mutation({
       query: (arg) => {
-        const { projectId, silentShotRefs, shotAudio } = typeof arg === "object" && arg !== null
+        const { projectId, silentShotRefs, shotAudio, allowPartial } = typeof arg === "object" && arg !== null
           ? arg : { projectId: arg };
         return {
           url: platformUrl(`/final-renders`),
           method: "POST",
           // shotAudio: per shotRef, CLIP / DUBBED / SILENT. silentShotRefs is the older, narrower
           // way of saying the same thing and is still accepted by the server.
-          body: { projectId, silentShotRefs, shotAudio },
+          // allowPartial: assemble the ready shots and leave out the unfinished ones. The server
+          // refuses by default and names what is missing; this is the creator overruling that.
+          body: { projectId, silentShotRefs, shotAudio, allowPartial },
         };
       },
       invalidatesTags: (_result, _error, arg) => {

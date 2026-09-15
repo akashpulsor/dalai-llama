@@ -39,8 +39,16 @@ export default function CanvasVideoPlayer({ src, aspectRatio, className = "" }) 
   const [ready, setReady] = useState(false);
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
+  const [naturalRatio, setNaturalRatio] = useState(null);
 
-  const ratio = RATIOS[aspectRatio] || "16 / 9";
+  // The project's shape first, the cut's own shape second, 16:9 only when neither is known.
+  //
+  // It used to fall straight to 16:9, which the server had been written not to expect: it returns
+  // a null aspect ratio for a project with no config yet, documented as "the player can fall back
+  // to the video's own dimensions, which is better than forcing the wrong shape". The player did
+  // not do that -- so a vertical cut on a project whose config had not been written landed in a
+  // landscape box with bars down both sides, which is the one outcome the canvas exists to avoid.
+  const ratio = RATIOS[aspectRatio] || naturalRatio || "16 / 9";
 
   /** One painted frame. Runs on rAF while playing, and once on demand after a seek or load so a
    * paused canvas still shows the current frame rather than going blank. */
@@ -107,6 +115,9 @@ export default function CanvasVideoPlayer({ src, aspectRatio, className = "" }) 
           onLoadedData={() => {
             setReady(true);
             setDuration(videoRef.current?.duration || 0);
+            const width = videoRef.current?.videoWidth;
+            const height = videoRef.current?.videoHeight;
+            if (width > 0 && height > 0) setNaturalRatio(`${width} / ${height}`);
             paint();
           }}
           onPlay={() => setPlaying(true)}
