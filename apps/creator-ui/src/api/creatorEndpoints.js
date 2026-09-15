@@ -3197,6 +3197,18 @@ export const creatorApi = apiSlice.injectEndpoints({
       providesTags: (_result, _error, args) => [{ type: "CreatorHomeProjects", id: `dialogue-fit-${args?.projectId}` }],
     }),
 
+    // What to do about a shot whose line overruns it, judged rather than calculated. Called ONLY for
+    // a shot the fit report flagged -- the report itself is arithmetic against measured audio and
+    // costs nothing, so a shot that fits never reaches a model. 204 (undefined here) when there is
+    // nothing to advise on or the gateway could not answer; the three options still stand, just
+    // without a suggested one.
+    adviseShotDialogueFit: builder.mutation({
+      query: ({ projectId, shotId }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/dialogue-fit/advice`),
+        method: "POST",
+      }),
+    }),
+
     // Rewrite a line to take a given number of seconds to say, keeping its meaning. Both
     // directions: shorter when it overruns the shot, longer when the shot runs on in silence after
     // it. Returns the rewrite and saves NOTHING -- the line is the creator's writing, so it is shown
@@ -3648,6 +3660,7 @@ export const {
   useGetProjectDialogueFitQuery,
   useGetShotDialogueFitQuery,
   useRetimeShotDialogueMutation,
+  useAdviseShotDialogueFitMutation,
   useLazyListProjectShotPromptsQuery,
   useListVideoModelsQuery,
   useGetShotScenePromptQuery,

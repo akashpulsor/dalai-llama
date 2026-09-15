@@ -1,10 +1,11 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { AlertTriangle, ArrowRight, Check, Clock, Film, Loader2, Scissors, Wand2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, Film, Lightbulb, Loader2, Wand2 } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useGetShotDialogueFitQuery,
+  useAdviseShotDialogueFitMutation,
   useRetimeShotDialogueMutation,
   useUpdatePreProductionShotMutation,
   useUpdateShotDialogueBeatMutation,
@@ -21,15 +22,17 @@ import {
  * its clip comes back severed mid-word -- the model speaks what fits and stops, or the dub is pinned
  * to the video length and the rest is dropped. Nothing downstream can recover it.
  *
- * <p>The opposite case is NOT that failure and is not presented as one. A short line in a long shot
- * plays in full; the shot simply runs on, which is ordinary filmmaking and frequently the intent.
- * It is shown only because clips are billed by the second, so the spare seconds are worth offering
- * back -- a neutral note with a trim button, never a warning.
+ * <p>The opposite case renders nothing at all. A short line in a long shot plays in full; the shot
+ * simply runs on afterwards, which is ordinary filmmaking and frequently the intent. Nothing is cut,
+ * so there is nothing to decide and the shot is simply generated.
  *
- * <p>Deliberately not a blocking modal and deliberately not self-repairing. Whether silence after a
- * line is a mistake or a held beat is not something a duration comparison can know, so this states
- * what is true and lets the creator decide. A rephrase is shown against the original and replaces it
- * only on an explicit "Use this line".
+ * <p>Which remedy suits the shot is asked of a model, because it is a judgement about craft rather
+ * than arithmetic -- whether the extra seconds would still look like the film, whether the line can
+ * afford to lose words. That suggestion arrives with its reasoning and selects one of the three; it
+ * never adds a fourth. Only shots with a real overrun ever reach it.
+ *
+ * <p>Deliberately not a blocking modal and deliberately not self-repairing. A rephrase is shown
+ * against the original and replaces it only on an explicit "Use this line".
  */
 
 const VERDICT_STYLES = {
@@ -39,19 +42,17 @@ const VERDICT_STYLES = {
     icon: AlertTriangle,
     label: "Line runs past the end of the shot",
   },
+  NEEDS_REWRITE: {
+    tone: "border-amber-400/30 bg-amber-500/10",
+    text: "text-amber-200",
+    icon: AlertTriangle,
+    label: "Line runs well past the end of the shot",
+  },
   UNFITTABLE: {
     tone: "border-rose-400/30 bg-rose-500/10",
     text: "text-rose-200",
     icon: AlertTriangle,
     label: "Line is too long for any clip this model can make",
-  },
-  // Not a warning. Every word is heard; the shot just runs on afterwards, which is ordinary
-  // filmmaking. Styled as a neutral note so it cannot be mistaken for the case that breaks a render.
-  AUDIO_SHORTER: {
-    tone: "border-white/10 bg-white/[0.03]",
-    text: "text-slate-300",
-    icon: Clock,
-    label: "Shot runs on after the line ends",
   },
 };
 
@@ -119,14 +120,36 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
     { skip: !projectId || !shot?.id },
   );
   const [retime, retimeState] = useRetimeShotDialogueMutation();
+  const [advise] = useAdviseShotDialogueFitMutation();
+  const [advice, setAdvice] = React.useState(null);
   const [updateShot, updateShotState] = useUpdatePreProductionShotMutation();
   const [updateBeat] = useUpdateShotDialogueBeatMutation();
   const [retimed, setRetimed] = React.useState(null);
   const [applying, setApplying] = React.useState(false);
 
-  // A shot whose line and clip agree needs no interface. Same for one with nothing spoken in it --
-  // a row that says "nothing to check" on every shot buries the few that need a decision.
+  // Only the cases where something is actually lost get an interface. A shot whose line fits, or
+  // whose line is SHORTER than the clip, renders nothing at all: every word is heard, the shot just
+  // runs on afterwards, and that is ordinary filmmaking -- so it is simply generated. A panel on
+  // every shot would bury the few that need a decision.
   const style = fit && VERDICT_STYLES[fit.verdict];
+  const needsDecision = !!style;
+
+  // Asked once per flagged shot, and never for one that fits: the arithmetic upstream is free, the
+  // judgement is a prompt call. It answers which remedy suits THIS shot -- whether the extra seconds
+  // would still look like the film, whether the line can afford to lose words -- which is the part
+  // no threshold can decide. Declared above the early return because hooks cannot be conditional;
+  // `needsDecision` is what actually gates the call.
+  React.useEffect(() => {
+    if (!needsDecision || advice !== null || !shot?.id) return undefined;
+    let cancelled = false;
+    advise({ projectId, shotId: shot.id }).unwrap()
+      // `false` rather than null for "asked, got nothing" -- null still means "not asked yet", and
+      // conflating them would retry the call on every render.
+      .then((result) => { if (!cancelled) setAdvice(result || false); })
+      .catch(() => { if (!cancelled) setAdvice(false); });
+    return () => { cancelled = true; };
+  }, [needsDecision, advice, advise, projectId, shot?.id]);
+
   if (isLoading || !fit || !style) return null;
 
   const Icon = style.icon;
@@ -195,13 +218,13 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
 
   const handleResize = async () => {
     try {
-      await updateShot({ projectId, shotId: shot.id, durationSeconds: fit.suggestedDurationSeconds }).unwrap();
+      await updateShot({ projectId, shotId: shot.id, durationSeconds: extendTo }).unwrap();
       refetch();
       // The prepared prompt carries the old duration, so it has to be rebuilt before it means
       // anything -- the parent owns that, since it also owns the prepare button's busy state.
-      onResized?.(fit.suggestedDurationSeconds);
+      onResized?.(extendTo);
       dispatch(showFlash({
-        message: `Shot is now ${fit.suggestedDurationSeconds}s. Prepare it again so the prompt matches.`,
+        message: `Shot is now ${extendTo}s. Prepare it again so the prompt matches.`,
         type: "success",
       }));
     } catch (error) {
@@ -209,9 +232,17 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
     }
   };
 
-  const resizeLabel = fit.verdict === "AUDIO_SHORTER"
-    ? `Shorten shot to ${fit.suggestedDurationSeconds}s`
-    : `Extend shot to ${fit.suggestedDurationSeconds}s`;
+  // Only overruns reach this panel, so extending is the only resize on offer. What it costs is
+  // stated on the button: clips are billed per second, and "+2s" is the part a creator is agreeing
+  // to when they press it.
+  // A recommended extension can exceed the blanket allowance -- that is exactly why a judgement was
+  // asked for, and it is still bounded by what the model will generate and still confirmed by a
+  // click. Without one, the allowance stands.
+  const recommendedExtend = advice && advice.recommendation === "EXTEND"
+    ? advice.recommendedDurationSeconds : null;
+  const extendTo = recommendedExtend ?? (fit.verdict === "AUDIO_LONGER" ? fit.suggestedDurationSeconds : null);
+  const extraSeconds = (extendTo ?? 0) - (fit.plannedDurationSeconds ?? 0);
+  const canExtend = extendTo != null && extraSeconds > 0;
 
   return (
     <div className={`rounded-md border p-3 ${style.tone}`}>
@@ -229,6 +260,14 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
               language and voice. Dub it for a real measurement.
             </p>
           )}
+          {fit.verdict === "NEEDS_REWRITE" && (
+            <p className="mt-1 text-[10px] font-medium text-amber-200/80">
+              Giving this shot the {seconds(fit.requiredSeconds)} its line needs would be{" "}
+              {((fit.requiredSeconds / Math.max(1, fit.plannedDurationSeconds))).toFixed(1)}× its
+              length — billed per second, and added to the film's running time. Rephrasing costs
+              nothing.
+            </p>
+          )}
           {fit.verdict === "UNFITTABLE" && (
             <p className="mt-1 text-[10px] font-medium text-rose-200/80">
               No clip length can hold this line, so generating it now would produce a shot that is cut
@@ -243,21 +282,38 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
             </p>
           )}
 
+          {/* The judgement, where there is one. Shown above the buttons rather than as a fourth
+              option: it recommends one of the three, it does not add a way out. The reason is the
+              point -- a recommendation without one is just another button. */}
+          {advice && advice.recommendation && (
+            <div className="mt-2 flex items-start gap-1.5 rounded-md border border-white/10 bg-black/20 p-2">
+              <Lightbulb size={11} className="mt-0.5 shrink-0 text-amber-300" />
+              <p className="text-[10px] font-medium leading-relaxed text-slate-300">
+                <span className="font-extrabold text-slate-200">
+                  {advice.recommendation === "EXTEND"
+                    ? `Suggested: extend to ${advice.recommendedDurationSeconds}s`
+                    : advice.recommendation === "REWRITE"
+                      ? "Suggested: rephrase the line"
+                      : "Suggested: generate as planned"}
+                </span>
+                {advice.reason ? ` — ${advice.reason}` : ""}
+              </p>
+            </div>
+          )}
+
           {/* Three options, stated as three. Only the first two change anything; "go with the
               original" is a real choice rather than the absence of one, so it is a button like the
               others -- and for a line too long for any clip it is the only way past the block. */}
           <div className="mt-2 flex flex-wrap gap-2">
-            {fit.suggestedDurationSeconds != null && fit.verdict !== "UNFITTABLE" && (
+            {canExtend && (
               <button
                 type="button"
                 disabled={updateShotState.isLoading}
                 onClick={handleResize}
                 className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 py-1.5 text-[10px] font-bold text-slate-200 hover:border-white/30 disabled:opacity-50"
               >
-                {updateShotState.isLoading
-                  ? <Loader2 size={11} className="animate-spin" />
-                  : fit.verdict === "AUDIO_SHORTER" ? <Scissors size={11} /> : <ArrowRight size={11} />}
-                {resizeLabel}
+                {updateShotState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <ArrowRight size={11} />}
+                {`Extend shot to ${extendTo}s (+${extraSeconds}s, billed)`}
               </button>
             )}
             {lineToRewrite && fit.suggestedTargetAudioSeconds != null && (
@@ -273,7 +329,7 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
                   : `Rephrase dialogue for ${seconds(fit.suggestedTargetAudioSeconds)}`}
               </button>
             )}
-            {onKeepOriginal && fit.verdict !== "AUDIO_SHORTER" && (
+            {onKeepOriginal && (
               <button
                 type="button"
                 onClick={onKeepOriginal}
@@ -286,9 +342,9 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
             )}
           </div>
           <p className="mt-1.5 text-[10px] font-medium text-slate-500">
-            {fit.verdict === "AUDIO_SHORTER"
-              ? "Nothing is wrong with this shot — the whole line is heard. Shortening it only saves the seconds you are billed for; if the silence is a beat the shot needs, leave it."
-              : "Extending the shot keeps the whole line but costs more per second. Rephrasing keeps the length and the cost. Going with the original means the line will be hurried or cut where it overruns."}
+            Extending keeps the whole line but adds billed seconds to this shot and to the film.
+            Rephrasing keeps both the length and the cost. Going with the original means the end of
+            the line is cut.
           </p>
 
           {retimed && (
