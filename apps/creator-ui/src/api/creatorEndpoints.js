@@ -3591,6 +3591,12 @@ export const creatorApi = apiSlice.injectEndpoints({
     // pre-production-service PublicProjectController -- unauthenticated, token-based read of
     // a project's assembled final video for the client review page. Server-side gate: videoUrl
     // is null when the creator has not unlocked download for this client.
+    // Individual shots the creator published for this client, ahead of any finished film.
+    // Unauthenticated and token-scoped, like every other read on the review page.
+    getPublicPublishedShots: builder.query({
+      query: (token) => ({ url: platformUrl(`/public/projects/${token}/published-shots`) }),
+    }),
+
     getPublicFinalVideo: builder.query({
       query: (token) => ({ url: platformUrl(`/public/projects/${token}/final-video`) }),
     }),
@@ -3968,6 +3974,7 @@ export const {
   useLazyGetFinalRenderQuery,
   useUpdateFinalVideoLockMutation,
   useGetPublicFinalVideoQuery,
+  useGetPublicPublishedShotsQuery,
   useExportShotsPdfMutation,
   useGetAnimatedPreviewHtmlMutation,
   useListShotTypesQuery,

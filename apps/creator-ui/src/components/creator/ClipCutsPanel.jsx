@@ -175,14 +175,12 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] p-3">
-        <Loader2 size={13} className="animate-spin text-slate-400" />
-        <p className="text-[11px] font-medium text-slate-400">Loading this shot's versions…</p>
-      </div>
-    );
-  }
+  // Deliberately NOT an early return while loading.
+  //
+  // This used to render a spinner INSTEAD of the panel, so a slow or failed version lookup hid the
+  // two buttons the panel exists for -- and the download and upload with them. The buttons do not
+  // depend on that list: they act on the shot, not on a version. So they render immediately and the
+  // list says it is still loading in its own corner.
 
   return (
     <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
@@ -267,7 +265,14 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
         </div>
       )}
 
-      {versions.length === 0 && (
+      {isLoading && (
+        <div className="mt-2 flex items-center gap-1.5">
+          <Loader2 size={11} className="animate-spin text-slate-500" />
+          <p className="text-[10px] font-medium text-slate-500">Checking earlier versions…</p>
+        </div>
+      )}
+
+      {!isLoading && versions.length === 0 && (
         <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-white/10 pt-2.5">
           <span className="text-[10px] font-medium text-slate-500">
             This shot is on its generated video:
@@ -291,7 +296,7 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
         </div>
       )}
 
-      {versions.length > 0 && (
+      {!isLoading && versions.length > 0 && (
         <div className="mt-2.5 border-t border-white/10 pt-2">
           <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
             All versions

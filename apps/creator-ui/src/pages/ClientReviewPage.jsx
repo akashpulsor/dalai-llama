@@ -10,6 +10,7 @@ import {
   useEndReviewMutation,
   useGetLockQuoteMutation,
   useGetPublicFinalVideoQuery,
+  useGetPublicPublishedShotsQuery,
   useGetPublicProjectQuery,
   useGetPublicReviewCommentsQuery,
   useGetReviewStatusQuery,
@@ -39,6 +40,9 @@ export default function ClientReviewPage() {
   const dispatch = useDispatch();
   const { data, isLoading, isError, error, refetch } = useGetPublicProjectQuery(token, { skip: !token });
   const { data: finalVideo } = useGetPublicFinalVideoQuery(token, { skip: !token });
+  // Individual shots the creator chose to show, which can arrive long before a finished film --
+  // often the one shot they are unsure about and want an opinion on now.
+  const { data: publishedShots = [] } = useGetPublicPublishedShotsQuery(token, { skip: !token });
   const [getQuote] = useGetLockQuoteMutation();
   const [startPayment] = useStartLockPaymentMutation();
   const [verifyPayment] = useVerifyLockPaymentMutation();
@@ -153,6 +157,36 @@ export default function ClientReviewPage() {
                 />
               </div>
             )}
+            {publishedShots.length > 0 && (
+              <div className="creator-panel mb-4 p-6">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="text-[11px] font-extrabold uppercase tracking-widest text-purple-300">
+                    {publishedShots.length === 1 ? "A shot for you" : "Shots for you"}
+                  </p>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-400/25 bg-slate-500/10 px-2.5 py-1 text-[10.5px] font-bold text-slate-300">
+                    <Lock size={11} /> Preview only
+                  </span>
+                </div>
+                {/* Shaped by the PROJECT's aspect ratio, the same as the film below -- a vertical
+                    cut in a landscape frame is the one thing a shaped canvas exists to avoid, and
+                    a client judging a shot should see it as it will be delivered. */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {publishedShots.map((shot) => (
+                    <div key={shot.versionId}>
+                      <p className="mb-1 text-[11px] font-bold text-slate-300">
+                        {shot.shotRef || "Shot"}
+                      </p>
+                      <CanvasVideoPlayer
+                        key={shot.videoUrl}
+                        src={shot.videoUrl}
+                        aspectRatio={finalVideo?.aspectRatio}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {finalVideo?.available && !finalVideo?.videoUrl && (
               <div className="creator-panel mb-4 p-6">
                 <div className="flex items-center justify-between gap-3">
