@@ -90,6 +90,8 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
   const [draft, setDraft] = React.useState("");
   const [editing, setEditing] = React.useState(false);
   const audioUrl = dubbed?.audioUrl || dubbed?.audioDataUri;
+  const [takeLoading, setTakeLoading] = React.useState(true);
+  React.useEffect(() => { setTakeLoading(true); }, [audioUrl]);
   // The take on file was made from these words; the shot now says those. When they differ the
   // recording is of a line that no longer exists, which is exactly what the fit report stops
   // treating as a measurement -- so say it here too, next to the button that fixes it.
@@ -189,7 +191,25 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
       </div>
       {audioUrl ? (
         <div className="space-y-2">
-          <audio controls src={audioUrl} className="h-9 w-full" />
+          {/* Same reason as the clip: a bare audio element is an inert grey bar until the file has
+              arrived, which reads as nothing having happened. */}
+          <div className="relative">
+            <audio
+              key={audioUrl}
+              controls
+              src={audioUrl}
+              preload="metadata"
+              onLoadedMetadata={() => setTakeLoading(false)}
+              onError={() => setTakeLoading(false)}
+              className="h-9 w-full"
+            />
+            {takeLoading && (
+              <div className="pointer-events-none absolute inset-0 flex items-center gap-1.5 rounded bg-black/70 px-2">
+                <Loader2 size={12} className="animate-spin text-slate-300" />
+                <span className="text-[10px] font-bold text-slate-400">Loading the take…</span>
+              </div>
+            )}
+          </div>
           {dubbed?.durationMs > 0 && (
             <p className="text-[10px] font-medium text-slate-500">
               This take runs {(dubbed.durationMs / 1000).toFixed(1)}s.
@@ -269,6 +289,52 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
           >
             <Pencil size={11} /> Change the words and dub again
           </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The finished clip, with something on screen while it arrives.
+ *
+ * <p>A bare video element is blank until enough of the file has downloaded, and these are megabytes
+ * fetched from object storage -- long enough that the card looked broken and the obvious reaction
+ * was to press something again. Saying "loading" is the difference between waiting and re-running
+ * work that is already running.
+ *
+ * <p>An error is stated too. A clip whose object is missing failed silently as an empty black box,
+ * which is indistinguishable from one that simply has not loaded yet.
+ */
+function ShotPlayer({ src, aspect }) {
+  const [state, setState] = React.useState("loading");
+  // A new src is a new load, not the previous one continuing.
+  React.useEffect(() => { setState("loading"); }, [src]);
+  return (
+    <div className="relative mx-auto w-full max-w-md">
+      <video
+        key={src}
+        src={src}
+        controls
+        preload="metadata"
+        onLoadedMetadata={() => setState("ready")}
+        onError={() => setState("error")}
+        className="w-full rounded-lg border border-white/10 bg-black"
+        style={{ aspectRatio: aspect }}
+      />
+      {state !== "ready" && (
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1.5 rounded-lg bg-black/70">
+          {state === "loading" ? (
+            <>
+              <Loader2 size={18} className="animate-spin text-slate-300" />
+              <p className="text-[10px] font-bold text-slate-400">Loading the clip…</p>
+            </>
+          ) : (
+            <p className="px-4 text-center text-[10px] font-bold text-rose-300">
+              This clip could not be loaded. It may have been replaced by a repair — try an earlier
+              cut under Other ways.
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -731,12 +797,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
           )}
 
           {video?.outputUri && (
-            <video
-              src={video.outputUri}
-              controls
-              className="mx-auto w-full max-w-md rounded-lg border border-white/10 bg-black"
-              style={{ aspectRatio: aspect }}
-            />
+            <ShotPlayer src={video.outputUri} aspect={aspect} />
           )}
 
           {/* Shown before the prompt is built -- the mismatch is knowable from the plan and the

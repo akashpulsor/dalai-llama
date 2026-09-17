@@ -3235,6 +3235,31 @@ export const creatorApi = apiSlice.injectEndpoints({
       invalidatesTags: (_r, _e, a) => [
         { type: "CreatorHomeProjects", id: `shot-videos-${a?.projectId}` },
         { type: "CreatorHomeProjects", id: `clip-sources-${a?.shotId}` },
+        { type: "CreatorHomeProjects", id: `clip-versions-${a?.shotId}` },
+      ],
+    }),
+
+    // Every clip a shot has had, newest first, each with a playable URL so a version can be
+    // watched before it is chosen. Written before each repair moves the pointer, so the list is
+    // a record rather than a reconstruction.
+    listShotClipVersions: builder.query({
+      query: ({ projectId, shotId }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/clip-versions`),
+      }),
+      providesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `clip-versions-${a?.shotId}` }],
+    }),
+
+    // Puts the shot back on one of its earlier clips. The clip being replaced is kept first, so
+    // this goes both ways.
+    restoreShotClipVersion: builder.mutation({
+      query: ({ projectId, shotId, versionId }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/clip-versions/${versionId}/restore`),
+        method: "POST",
+      }),
+      invalidatesTags: (_r, _e, a) => [
+        { type: "CreatorHomeProjects", id: `shot-videos-${a?.projectId}` },
+        { type: "CreatorHomeProjects", id: `clip-sources-${a?.shotId}` },
+        { type: "CreatorHomeProjects", id: `clip-versions-${a?.shotId}` },
       ],
     }),
 
@@ -3249,6 +3274,7 @@ export const creatorApi = apiSlice.injectEndpoints({
       invalidatesTags: (_r, _e, a) => [
         { type: "CreatorHomeProjects", id: `shot-videos-${a?.projectId}` },
         { type: "CreatorHomeProjects", id: `clip-sources-${a?.shotId}` },
+        { type: "CreatorHomeProjects", id: `clip-versions-${a?.shotId}` },
       ],
     }),
 
@@ -3266,6 +3292,7 @@ export const creatorApi = apiSlice.injectEndpoints({
       invalidatesTags: (_r, _e, a) => [
         { type: "CreatorHomeProjects", id: `shot-videos-${a?.projectId}` },
         { type: "CreatorHomeProjects", id: `clip-sources-${a?.shotId}` },
+        { type: "CreatorHomeProjects", id: `clip-versions-${a?.shotId}` },
       ],
     }),
 
@@ -3739,7 +3766,9 @@ export const {
   useAdviseShotDialogueFitMutation,
   useGetShotClipSourcesQuery,
   useExtendShotTailMutation,
+  useListShotClipVersionsQuery,
   useRestoreShotClipMutation,
+  useRestoreShotClipVersionMutation,
   useUploadShotClipMutation,
   useLazyListProjectShotPromptsQuery,
   useListVideoModelsQuery,

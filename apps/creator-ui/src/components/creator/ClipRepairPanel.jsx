@@ -6,9 +6,22 @@ import { showFlash } from "@dalaillama/shared-store";
 import {
   useExtendShotTailMutation,
   useGetShotClipSourcesQuery,
+  useListShotClipVersionsQuery,
   useRestoreShotClipMutation,
+  useRestoreShotClipVersionMutation,
   useUploadShotClipMutation,
 } from "../../api/creatorEndpoints.js";
+
+/** What made a version, in words rather than the stored token. */
+const ORIGIN_LABEL = {
+  GENERATED: "as generated",
+  DUBBED: "with the dubbed voice",
+  SILENCED: "with no voice",
+  TAIL_FROZEN: "extended by freezing the last frame",
+  TAIL_GENERATED: "extended with generated seconds",
+  UPLOADED: "your own upload",
+  REPAIRED: "repaired",
+};
 
 /**
  * Repairing a finished clip whose dialogue does not fit it, without paying to generate it again.
@@ -69,6 +82,11 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
   const [extendTail, extendState] = useExtendShotTailMutation();
   const [uploadClip, uploadState] = useUploadShotClipMutation();
   const [restoreClip, restoreState] = useRestoreShotClipMutation();
+  const { data: versions = [] } = useListShotClipVersionsQuery(
+    { projectId, shotId: shot?.id },
+    { skip: !projectId || !shot?.id },
+  );
+  const [restoreVersion, restoreVersionState] = useRestoreShotClipVersionMutation();
   const fileRef = React.useRef(null);
   const [showMore, setShowMore] = React.useState(false);
 
@@ -145,7 +163,25 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
     }
   };
 
-  const busy = extendState.isLoading || uploadState.isLoading || restoreState.isLoading;
+  const handleRestoreVersion = async (versionId) => {
+    try {
+      const result = await restoreVersion({ projectId, shotId: shot.id, versionId }).unwrap();
+      dispatch(showFlash({
+        message: `Back on that cut — ${seconds(result.seconds)}. The one it replaced is still here.`,
+        type: "success",
+      }));
+      refetch();
+      onRepaired?.(result);
+    } catch (error) {
+      dispatch(showFlash({
+        message: error?.data?.message || "Could not bring that version back",
+        type: "error",
+      }));
+    }
+  };
+
+  const busy = extendState.isLoading || uploadState.isLoading || restoreState.isLoading
+    || restoreVersionState.isLoading;
   // Every repair writes a new object and repoints the shot at it, so a shot whose origin is no
   // longer GENERATED is one a repair has replaced -- and the clip it replaced is still in storage.
   const repaired = !!sources.outputOrigin && sources.outputOrigin !== "GENERATED";
@@ -213,7 +249,41 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
               {`Freeze the last frame instead → ${seconds((clip ?? 0) + needed)}, no model cost`}
             </button>
           )}
-          {repaired && (
+          {/* Every cut this shot has had. Kept before each repair moved the pointer, so this is a
+              record rather than a reconstruction -- and restoring keeps the one being replaced, so
+              it goes both ways and nothing is ever spent to change your mind. */}
+          {versions.length > 0 && (
+            <div className="rounded-md border border-white/10 bg-black/20 p-2">
+              <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                Earlier cuts of this shot
+              </p>
+              <div className="mt-1 space-y-1">
+                {versions.map((version) => (
+                  <div key={version.versionId} className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[10px] font-medium text-slate-300">
+                      {ORIGIN_LABEL[version.origin] || version.origin}
+                      {version.durationSeconds ? ` · ${version.durationSeconds}s` : ""}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <a href={version.videoUrl} target="_blank" rel="noreferrer"
+                         className="text-[10px] font-bold text-slate-400 hover:text-slate-200">
+                        Watch
+                      </a>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => handleRestoreVersion(version.versionId)}
+                        className="text-[10px] font-bold text-purple-300 hover:text-purple-200 disabled:opacity-50"
+                      >
+                        Use this one
+                      </button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {repaired && versions.length === 0 && (
             <button
               type="button"
               disabled={busy}
