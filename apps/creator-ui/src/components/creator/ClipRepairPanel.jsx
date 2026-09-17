@@ -190,6 +190,56 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
   // should match -- and which ffmpeg call gets them there is not a decision worth making. So the
   // situation picks the action, the button says what it will do and what it costs, and everything
   // else lives behind "other ways" for the cases where the obvious answer is not the right one.
+  // The clip will not load. Probing it server-side came back with nothing, which means the object
+  // the shot points at cannot be read -- so no repair is the right next move, getting the picture
+  // back is. This used to sit under "Other ways" alongside five things that all assume there IS a
+  // clip, which is the one situation where none of them apply.
+  const clipUnreadable = clip == null;
+  if (clipUnreadable) {
+    return (
+      <div className="rounded-md border border-rose-400/30 bg-rose-500/[0.07] p-3">
+        <div className="mb-1 flex items-center gap-1.5">
+          <RotateCcw size={13} className="text-rose-300" />
+          <p className="text-[10px] font-extrabold uppercase tracking-wide text-rose-200">
+            This shot's clip will not load
+          </p>
+        </div>
+        <p className="text-[11px] font-medium leading-relaxed text-slate-300">
+          Nothing was deleted — every repair writes a new file and leaves the old one in storage.
+          The shot is just pointing at one that cannot be read. Put an earlier cut back and the
+          picture returns; you can redo the repair afterwards.
+        </p>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={versions.length ? () => handleRestoreVersion(versions[0].versionId) : handleRestore}
+          className="creator-primary mt-2 flex w-full items-center justify-center gap-2 py-2 text-[11px] font-bold text-white disabled:opacity-60"
+        >
+          {busy ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+          {busy ? "Putting it back…" : "Put the working clip back"}
+        </button>
+        {versions.length > 1 && (
+          <div className="mt-2 space-y-1 border-t border-white/10 pt-2">
+            <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Or pick one</p>
+            {versions.map((version) => (
+              <div key={version.versionId} className="flex items-center justify-between gap-2">
+                <span className="truncate text-[10px] font-medium text-slate-300">
+                  {ORIGIN_LABEL[version.origin] || version.origin}
+                  {version.durationSeconds ? ` · ${version.durationSeconds}s` : ""}
+                </span>
+                <button type="button" disabled={busy}
+                        onClick={() => handleRestoreVersion(version.versionId)}
+                        className="shrink-0 text-[10px] font-bold text-purple-300 hover:text-purple-200 disabled:opacity-50">
+                  Use this one
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   const plan = !hasDub
     ? { mode: "SILENCE", label: `Remove the invented voice → ${seconds(clip)} silent clip`, cost: "no model cost" }
     : !overruns && !forPlan

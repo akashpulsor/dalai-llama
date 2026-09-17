@@ -4,7 +4,7 @@ import { useDispatch } from "react-redux";
 import { AlertTriangle, ArrowRight, Check, Film, Lightbulb, Loader2, Wand2 } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
-  useGetShotDialogueFitQuery,
+  useGetProjectDialogueFitQuery,
   useAdviseShotDialogueFitMutation,
   useRetimeShotDialogueMutation,
   useTestShotVoiceMutation,
@@ -123,9 +123,23 @@ function RewritePreview({ retimed, onUse, onDismiss, applying }) {
 
 export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOriginal, onDialogueReplaced }) {
   const dispatch = useDispatch();
-  const { data: fit, isLoading, refetch } = useGetShotDialogueFitQuery(
-    { projectId, shotId: shot?.id },
-    { skip: !projectId || !shot?.id },
+  // The project's fit report, not this shot's.
+  //
+  // Both endpoints exist and both cost a full prepare-bundle assembly on the server. Asking per
+  // shot meant one bundle per card: opening a thirteen-shot project fired thirteen assemblies of
+  // the same project, and measured across a live window that was 181 of them, median 53ms and up
+  // to 2.7 SECONDS each. The project report does the same work once and returns every shot, and
+  // RTK hands the identical cached result to every card -- so this is one request for the page
+  // rather than one per card, with no change to what any card displays.
+  const { data: projectFit = [], isLoading, refetch } = useGetProjectDialogueFitQuery(projectId, {
+    skip: !projectId,
+  });
+  // Shots with nothing spoken in them are left out of the project report rather than listed as
+  // fitting. Absent therefore means "nothing to decide", which is exactly what this panel renders
+  // for them anyway.
+  const fit = React.useMemo(
+    () => projectFit.find((row) => row.shotId === shot?.id),
+    [projectFit, shot?.id],
   );
   const [retime, retimeState] = useRetimeShotDialogueMutation();
   const [advise] = useAdviseShotDialogueFitMutation();
