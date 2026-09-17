@@ -265,31 +265,6 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
               {isLoading ? <Loader2 size={11} className="animate-spin" /> : <AudioLines size={11} />}
               {isLoading ? "Dubbing…" : "Dub again with the current line"}
             </button>
-            {/* Turning a take down matters because every cut reaches for the NEWEST take: a
-                recording that came out wrong otherwise sits as the newest thing there is and gets
-                picked up by everything made afterwards. The row is kept, so this is reversible. */}
-            <button
-              type="button"
-              disabled={isLoading || editing || rejectState.isLoading}
-              onClick={async () => {
-                try {
-                  await rejectDub({ projectId, shotId }).unwrap();
-                  dispatch(showFlash({
-                    message: "Take rejected. Nothing will use it — dub again when you are ready.",
-                    type: "success",
-                  }));
-                } catch (error) {
-                  dispatch(showFlash({
-                    message: error?.data?.message || "Could not reject this take",
-                    type: "error",
-                  }));
-                }
-              }}
-              className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-rose-300 disabled:opacity-60"
-            >
-              {rejectState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
-              Reject this take
-            </button>
           </div>
         </div>
       ) : (
@@ -303,6 +278,36 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
           {isLoading ? "Dubbing…" : "Dub this shot to hear it"}
         </button>
       )}
+
+      {/* Rejecting sits outside the has-audio branch on purpose.
+          
+          This panel only shows a take whose stored text still matches the line, which is right for
+          "here is your recording" and wrong for rejecting: a take whose words have since been
+          replaced is hidden here while the cut path still reaches for it, because that path selects
+          by recency rather than by text. So the one situation where a creator most needs to say
+          "not that one" was the one where the button was not on screen. */}
+      <button
+        type="button"
+        disabled={isLoading || editing || rejectState.isLoading}
+        onClick={async () => {
+          try {
+            await rejectDub({ projectId, shotId }).unwrap();
+            dispatch(showFlash({
+              message: "Take rejected. Nothing will use it — dub again when you are ready.",
+              type: "success",
+            }));
+          } catch (error) {
+            dispatch(showFlash({
+              message: error?.data?.message || error?.message || "Could not reject this take",
+              type: "error",
+            }));
+          }
+        }}
+        className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-rose-300 disabled:opacity-60"
+      >
+        {rejectState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
+        Reject the latest take
+      </button>
 
       {/* The words themselves, which this panel never showed -- it offered to re-record a line
           without ever saying what the line was. */}
