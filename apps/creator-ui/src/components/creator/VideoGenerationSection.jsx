@@ -359,9 +359,28 @@ export default function VideoGenerationSection({ projectId }) {
         projectId,
         dialogueFit: options?.dialogueFit,
       }).unwrap();
-      setVideos((v) => ({ ...v, [shotId]: job }));
+      // Approve now queues the render and returns -- it no longer waits for it. The reply is the
+      // accepted cost and a job that is PROCESSING, so the answer about the shot comes from
+      // polling that job, not from this response.
+      if (job?.status === "COMPLETED" || job?.status === "FAILED") {
+        setVideos((v) => ({ ...v, [shotId]: job }));
+        setRegenerating((r) => ({ ...r, [shotId]: false }));
+        reportJobOutcome(job);
+        refetchShotVideos();
+        return;
+      }
+      dispatch(showFlash({ message: "Queued — generating this shot now.", type: "info" }));
+      const settled = await pollJobUntilSettled(info.externalJobId, shotId);
       setRegenerating((r) => ({ ...r, [shotId]: false }));
-      reportJobOutcome(job);
+      refetchShotVideos();
+      if (settled) {
+        reportJobOutcome(settled);
+      } else {
+        dispatch(showFlash({
+          message: "Still rendering — this shot is taking a while. It will appear here when it finishes.",
+          type: "info",
+        }));
+      }
     } catch (error) {
       // A gateway timeout (504) or a dropped connection means we stopped waiting, not that the
       // render stopped running. Ask the job.
