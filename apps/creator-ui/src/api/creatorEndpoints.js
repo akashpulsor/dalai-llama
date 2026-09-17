@@ -3284,13 +3284,18 @@ export const creatorApi = apiSlice.injectEndpoints({
 
     // A cut the creator made themselves and brought back.
     uploadClipCut: builder.mutation({
-      query: ({ projectId, shotId, shotRef, file }) => {
+      query: ({ projectId, shotId, shotRef, editedFromVersionId, file }) => {
         const body = new FormData();
         body.append("file", file);
+        const params = {};
+        if (shotRef) params.shotRef = shotRef;
+        // Says which cut this was edited from, so a version that went out and came back reads as a
+        // chain rather than two unrelated rows -- and clears the "out for edit" mark on it.
+        if (editedFromVersionId) params.editedFromVersionId = editedFromVersionId;
         return {
           url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/clip-versions/uploaded`),
           method: "POST",
-          params: shotRef ? { shotRef } : undefined,
+          params: Object.keys(params).length ? params : undefined,
           body,
         };
       },
@@ -3307,6 +3312,36 @@ export const creatorApi = apiSlice.injectEndpoints({
         { type: "CreatorHomeProjects", id: `clip-cuts-${a?.shotId}` },
         { type: "CreatorHomeProjects", id: `film-${a?.projectId}` },
       ],
+    }),
+
+    // Marks a cut as taken away to be edited. The download button calls this, so "what am I still
+    // waiting on" has an answer -- until now only the coming-back half left a trace.
+    checkoutClipVersion: builder.mutation({
+      query: ({ projectId, shotId, versionId }) => ({
+        url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/clip-versions/${versionId}/checkout`),
+        method: "POST",
+      }),
+      invalidatesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `clip-cuts-${a?.shotId}` }],
+    }),
+
+    // Show one shot to the client on its own, ahead of any film.
+    publishClipVersion: builder.mutation({
+      query: ({ projectId, shotId, versionId, published = true }) => ({
+        url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/clip-versions/${versionId}/publish`),
+        method: "POST",
+        params: { published },
+      }),
+      invalidatesTags: (_r, _e, a) => [
+        { type: "CreatorHomeProjects", id: `clip-cuts-${a?.shotId}` },
+        { type: "CreatorHomeProjects", id: `project-clips-${a?.projectId}` },
+      ],
+    }),
+
+    // The current cut of every shot, in one call. What the editor lists -- it needs all the shots,
+    // not only the joined film, because a creator opens it to work on one shot and save it back.
+    listProjectClips: builder.query({
+      query: (projectId) => ({ url: platformUrl(`/post-production/projects/${projectId}/clips`) }),
+      providesTags: (_r, _e, projectId) => [{ type: "CreatorHomeProjects", id: `project-clips-${projectId}` }],
     }),
 
     // --- The whole film (post-production-service) ---
@@ -3884,6 +3919,9 @@ export const {
   useGetShotClipSourcesQuery,
   useExtendShotTailMutation,
   useAcceptClipCutMutation,
+  useCheckoutClipVersionMutation,
+  useListProjectClipsQuery,
+  usePublishClipVersionMutation,
   useAssembleFilmMutation,
   useCreateDubbedCutMutation,
   useCreateSilentCutMutation,

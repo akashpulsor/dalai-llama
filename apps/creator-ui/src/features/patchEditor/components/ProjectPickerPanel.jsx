@@ -6,7 +6,9 @@ import { usePatchEditor } from "../state/PatchEditorProvider.jsx";
 import { sleep } from "../utils/jobStatus.js";
 import {
   useCreateFinalRenderMutation,
+  useGetLatestFilmQuery,
   useGetLatestFinalRenderQuery,
+  useListProjectClipsQuery,
   useGetPreProductionProjectQuery,
   useListPreProductionProjectsQuery,
   useListProjectShotVideosQuery,
@@ -73,6 +75,16 @@ export default function ProjectPickerPanel() {
     useGetLatestFinalRenderQuery(projectId, { skip: !projectId });
   const { data: shotVideos = [], isFetching: shotsLoading } =
     useListProjectShotVideosQuery(projectId, { skip: !projectId });
+  // The cut of each shot the creator actually CHOSE, from post-production.
+  //
+  // This panel listed video-generation-service's raw output, which is the clip as the model made
+  // it -- not the version with the dubbed voice on it, not the silent one, not the edit brought
+  // back by hand. So a creator who had accepted a cut opened the editor and found the old audio
+  // waiting for them, and anything they did from there was work on a file the film no longer used.
+  const { data: projectClips = [] } = useListProjectClipsQuery(projectId, { skip: !projectId });
+  // The joined film from post-production, preferred over video-gen's older final render for the
+  // same reason.
+  const { data: film } = useGetLatestFilmQuery(projectId, { skip: !projectId });
   const [createFinalRender] = useCreateFinalRenderMutation();
   // Publishing lives on the planner page too, but that is a different screen from the one where the
   // cut is actually made -- a creator who has just assembled a film has to go and find it. The
@@ -104,9 +116,26 @@ export default function ProjectPickerPanel() {
   const setAudioFor = (shotRef, choice) => setShotAudio((current) => ({ ...current, [shotRef]: choice }));
   const changedCount = Object.entries(shotAudio).filter(([, v]) => v && v !== "CLIP").length;
 
-  const fullVideoUrl = finalRender?.videoUrl || "";
+  // Post-production's film first; video-gen's render is the fallback for projects joined before
+  // assembling moved there.
+  const fullVideoUrl = (film?.status === "COMPLETED" ? film?.videoUrl : null) || finalRender?.videoUrl || "";
   const renderStatus = finalRender?.status || "";
-  const playableShots = useMemo(() => shotVideos.filter((shot) => shot?.videoUrl), [shotVideos]);
+  // Every shot that has a chosen cut, falling back to the raw generated list for projects that
+  // have never been cut in post-production.
+  const playableShots = useMemo(() => {
+    if (projectClips.length) {
+      return projectClips
+        .filter((clip) => clip?.videoUrl)
+        .map((clip) => ({
+          jobId: clip.versionId,
+          shotRef: clip.shotRef,
+          videoUrl: clip.videoUrl,
+          versionNumber: clip.versionNumber,
+          origin: clip.origin,
+        }));
+    }
+    return shotVideos.filter((shot) => shot?.videoUrl);
+  }, [projectClips, shotVideos]);
   const projectLabel = selectedProject?.title || "project";
 
   const load = async (url, name) => {

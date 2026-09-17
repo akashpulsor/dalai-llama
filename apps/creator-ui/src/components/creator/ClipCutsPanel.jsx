@@ -1,11 +1,13 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { AudioLines, Check, Loader2, Upload, VolumeX } from "lucide-react";
+import { AudioLines, Check, Download, Loader2, Send, Upload, VolumeX } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import ShotCanvasPlayer from "./ShotCanvasPlayer.jsx";
 import {
   useAcceptClipCutMutation,
+  useCheckoutClipVersionMutation,
+  usePublishClipVersionMutation,
   useCreateDubbedCutMutation,
   useCreateSilentCutMutation,
   useListClipVersionsQuery,
@@ -44,10 +46,65 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
   const [createSilent, silentState] = useCreateSilentCutMutation();
   const [uploadCut, uploadState] = useUploadClipCutMutation();
   const [acceptCut, acceptState] = useAcceptClipCutMutation();
+  const [checkout] = useCheckoutClipVersionMutation();
+  const [publishVersion, publishState] = usePublishClipVersionMutation();
   const fileRef = React.useRef(null);
+  // Which cut the pending upload is an edit OF. Set when a version is downloaded, so bringing the
+  // file back links the two rather than leaving a version that came from nowhere.
+  const editingFromRef = React.useRef(null);
 
   const busy = dubbedState.isLoading || silentState.isLoading
-    || uploadState.isLoading || acceptState.isLoading;
+    || uploadState.isLoading || acceptState.isLoading || publishState.isLoading;
+
+  /**
+   * Takes a cut away to be edited: marks it out, then saves the file.
+   *
+   * <p>The mark is what makes "which shots am I waiting on" answerable. The download itself is done
+   * by fetching the bytes and handing them over as a blob -- the download attribute is ignored for
+   * cross-origin URLs, so a plain link opens the video in a tab instead of saving it.
+   */
+  const handleDownload = async (version) => {
+    try {
+      await checkout({ projectId, shotId, versionId: version.versionId }).unwrap();
+      editingFromRef.current = version.versionId;
+    } catch {
+      // Marking is bookkeeping; never block the download itself over it.
+    }
+    const filename = `${shot?.shotRef || "shot"}-v${version.versionNumber}.mp4`;
+    try {
+      const response = await fetch(version.videoUrl);
+      if (!response.ok) throw new Error(String(response.status));
+      const blobUrl = URL.createObjectURL(await response.blob());
+      const anchor = document.createElement("a");
+      anchor.href = blobUrl;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+    } catch {
+      window.open(version.videoUrl, "_blank", "noopener");
+    }
+  };
+
+  const handlePublish = async (version) => {
+    try {
+      await publishVersion({
+        projectId, shotId, versionId: version.versionId, published: !version.published,
+      }).unwrap();
+      dispatch(showFlash({
+        message: version.published
+          ? "Taken down — your client no longer sees this shot."
+          : "Published — your client can watch this shot on their review page.",
+        type: "success",
+      }));
+    } catch (error) {
+      dispatch(showFlash({
+        message: error?.data?.message || "Could not change whether the client sees this shot",
+        type: "error",
+      }));
+    }
+  };
 
   const current = versions.find((version) => version.status === "ACTIVE");
   const previews = versions.filter((version) => version.status === "PREVIEW");
@@ -88,7 +145,9 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
   const handleUpload = async (event) => {
     const file = event.target.files?.[0];
     if (file) {
-      await run(uploadCut, { file }, "Your edit is in as a new version.");
+      await run(uploadCut, { file, editedFromVersionId: editingFromRef.current },
+        "Your edit is in as a new version.");
+      editingFromRef.current = null;
     }
     if (fileRef.current) fileRef.current.value = "";
   };
@@ -185,7 +244,7 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
         </div>
       )}
 
-      {versions.length > 1 && (
+      {versions.length > 0 && (
         <div className="mt-2.5 border-t border-white/10 pt-2">
           <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
             All versions
@@ -195,17 +254,45 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
               <span className="truncate text-[10px] font-medium text-slate-400">
                 v{version.versionNumber} · {ORIGIN_LABEL[version.origin] || version.origin}
                 {version.status === "ACTIVE" ? " · in use" : ""}
+                {version.published ? " · shown to client" : ""}
+                {/* Said out loud, because "which shots am I still waiting on" had no answer before
+                    downloading left a trace. */}
+                {version.downloadedForEditAt ? " · out for edit" : ""}
               </span>
-              {version.status !== "ACTIVE" && (
+              <span className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => handleAccept(version.versionId)}
-                  className="shrink-0 text-[10px] font-bold text-purple-300 hover:text-purple-200 disabled:opacity-50"
+                  onClick={() => handleDownload(version)}
+                  title="Download to edit elsewhere, then upload it back"
+                  className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-slate-200 disabled:opacity-50"
                 >
-                  Use this one
+                  <Download size={10} /> Edit
                 </button>
-              )}
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => handlePublish(version)}
+                  title={version.published
+                    ? "Stop showing this shot to the client"
+                    : "Show this shot to the client on its own"}
+                  className={`flex items-center gap-1 text-[10px] font-bold disabled:opacity-50 ${
+                    version.published ? "text-slate-400 hover:text-slate-200" : "text-purple-300 hover:text-purple-200"
+                  }`}
+                >
+                  <Send size={10} /> {version.published ? "Unpublish" : "Publish"}
+                </button>
+                {version.status !== "ACTIVE" && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => handleAccept(version.versionId)}
+                    className="text-[10px] font-bold text-purple-300 hover:text-purple-200 disabled:opacity-50"
+                  >
+                    Use this one
+                  </button>
+                )}
+              </span>
             </div>
           ))}
         </div>
