@@ -3356,6 +3356,21 @@ export const creatorApi = apiSlice.injectEndpoints({
       ],
     }),
 
+    // Turns a cut down, or takes the rejection back. Nothing is removed: the cut stays watchable
+    // and the film keeps whatever cut it was already using -- accept is still the only thing that
+    // changes that. Rejecting the ACTIVE cut is refused by the service on purpose.
+    rejectClipCut: builder.mutation({
+      query: ({ projectId, shotId, versionId, rejected = true }) => ({
+        url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/clip-versions/${versionId}/reject`),
+        method: "POST",
+        params: { rejected },
+      }),
+      invalidatesTags: (_r, _e, a) => [
+        { type: "CreatorHomeProjects", id: `clip-cuts-${a?.shotId}` },
+        { type: "CreatorHomeProjects", id: `film-${a?.projectId}` },
+      ],
+    }),
+
     // Marks a cut as taken away to be edited. The download button calls this, so "what am I still
     // waiting on" has an answer -- until now only the coming-back half left a trace.
     checkoutClipVersion: builder.mutation({
@@ -3997,6 +4012,7 @@ export const {
   useGetShotClipSourcesQuery,
   useExtendShotTailMutation,
   useAcceptClipCutMutation,
+  useRejectClipCutMutation,
   useLazyGetShotReorderImpactQuery,
   useReorderShotMutation,
   useCheckoutClipVersionMutation,

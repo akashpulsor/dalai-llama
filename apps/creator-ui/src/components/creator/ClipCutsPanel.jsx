@@ -1,11 +1,12 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { AudioLines, Check, Download, Loader2, Send, Upload, VolumeX } from "lucide-react";
+import { AudioLines, Check, Download, Loader2, RotateCcw, Send, Upload, VolumeX, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import ShotCanvasPlayer from "./ShotCanvasPlayer.jsx";
 import {
   useAcceptClipCutMutation,
+  useRejectClipCutMutation,
   useCheckoutClipVersionMutation,
   useImportClipBaselineMutation,
   usePublishClipVersionMutation,
@@ -47,6 +48,7 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
   const [createSilent, silentState] = useCreateSilentCutMutation();
   const [uploadCut, uploadState] = useUploadClipCutMutation();
   const [acceptCut, acceptState] = useAcceptClipCutMutation();
+  const [rejectCut, rejectState] = useRejectClipCutMutation();
   const [checkout] = useCheckoutClipVersionMutation();
   const [publishVersion, publishState] = usePublishClipVersionMutation();
   const [importBaseline, baselineState] = useImportClipBaselineMutation();
@@ -56,7 +58,7 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
   const editingFromRef = React.useRef(null);
 
   const busy = dubbedState.isLoading || silentState.isLoading
-    || uploadState.isLoading || acceptState.isLoading || publishState.isLoading
+    || uploadState.isLoading || acceptState.isLoading || rejectState.isLoading || publishState.isLoading
     || baselineState.isLoading;
 
   /**
@@ -67,7 +69,14 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
    * buttons. The first time one of those is wanted, this creates it.
    */
   const ensureBaseline = async () => {
-    if (versions.length) return versions.find((v) => v.status === "ACTIVE") || versions[0];
+    // Never a rejected cut. Falling back to the newest row is right until one has been turned
+    // down, and then it is exactly wrong: "not that one" has to mean the download and publish
+    // buttons stop reaching for it too, not just the decide list.
+    if (versions.length) {
+      return versions.find((v) => v.status === "ACTIVE")
+        || versions.find((v) => !v.rejected)
+        || versions[0];
+    }
     try {
       return await importBaseline({ projectId, shotId, shotRef: shot?.shotRef }).unwrap();
     } catch (error) {
@@ -130,7 +139,11 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
   };
 
   const current = versions.find((version) => version.status === "ACTIVE");
-  const previews = versions.filter((version) => version.status === "PREVIEW");
+  // A turned-down cut drops out of "waiting for you to decide" -- that list is the decisions still
+  // owed, and one already made does not belong in it. It is not gone: rejected cuts are listed
+  // below, still watchable, and the rejection can be taken back.
+  const previews = versions.filter((version) => version.status === "PREVIEW" && !version.rejected);
+  const rejectedCuts = versions.filter((version) => version.rejected && version.status !== "ACTIVE");
 
   const run = async (action, args, madeMessage) => {
     try {
@@ -146,6 +159,27 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
         type: "error",
       }));
       return null;
+    }
+  };
+
+  /** Turning a cut down. Nothing is removed and the film is untouched -- this only takes the cut
+   * out of the list of decisions still owed. Rejecting the cut the film uses is refused by the
+   * service, which is why there is no such button on the current cut. */
+  const handleReject = async (versionId, rejected) => {
+    try {
+      await rejectCut({ projectId, shotId, versionId, rejected }).unwrap();
+      dispatch(showFlash({
+        message: rejected
+          ? "Turned down. It is still here if you want it back."
+          : "Back in the list for you to decide on.",
+        type: "success",
+      }));
+      onChanged?.();
+    } catch (error) {
+      dispatch(showFlash({
+        message: error?.data?.message || error?.data?.error || "Could not turn that cut down",
+        type: "error",
+      }));
     }
   };
 
@@ -244,15 +278,27 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
                   v{version.versionNumber} · {ORIGIN_LABEL[version.origin] || version.origin}
                   {version.durationSeconds ? ` · ${seconds(version.durationSeconds)}` : ""}
                 </span>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => handleAccept(version.versionId)}
-                  className="flex shrink-0 items-center gap-1 rounded-md border border-purple-400/30 bg-purple-500/15 px-2 py-1 text-[10px] font-bold text-purple-200 disabled:opacity-50"
-                >
-                  {acceptState.isLoading ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
-                  Use this cut
-                </button>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => handleAccept(version.versionId)}
+                    className="flex shrink-0 items-center gap-1 rounded-md border border-purple-400/30 bg-purple-500/15 px-2 py-1 text-[10px] font-bold text-purple-200 disabled:opacity-50"
+                  >
+                    {acceptState.isLoading ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
+                    Use this cut
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => handleReject(version.versionId, true)}
+                    title="Turn this cut down. It stays here and the film is unchanged."
+                    className="flex shrink-0 items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold text-slate-300 disabled:opacity-50"
+                  >
+                    {rejectState.isLoading ? <Loader2 size={10} className="animate-spin" /> : <X size={10} />}
+                    Not this one
+                  </button>
+                </div>
               </div>
               <ShotCanvasPlayer
                 src={version.videoUrl}
@@ -260,6 +306,35 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
                 className="mx-auto w-full max-w-xs"
                 label={`v${version.versionNumber}`}
               />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {rejectedCuts.length > 0 && (
+        <div className="mt-2.5 space-y-1.5 border-t border-white/10 pt-2.5">
+          <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+            Turned down
+          </p>
+          {rejectedCuts.map((version) => (
+            <div
+              key={version.versionId}
+              className="flex items-center justify-between gap-2 rounded-md border border-white/5 bg-black/20 px-2 py-1.5"
+            >
+              <span className="truncate text-[11px] font-semibold text-slate-500 line-through">
+                v{version.versionNumber} · {ORIGIN_LABEL[version.origin] || version.origin}
+                {version.durationSeconds ? ` · ${seconds(version.durationSeconds)}` : ""}
+              </span>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => handleReject(version.versionId, false)}
+                title="Put this cut back in the list to decide on."
+                className="flex shrink-0 items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold text-slate-300 disabled:opacity-50"
+              >
+                <RotateCcw size={10} />
+                Undo
+              </button>
             </div>
           ))}
         </div>
