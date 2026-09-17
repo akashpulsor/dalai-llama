@@ -18,6 +18,7 @@ import {
   useUpdatePreProductionShotMutation,
 } from "../../api/creatorEndpoints.js";
 import ShotImagesPanel from "./ShotImagesPanel.jsx";
+import ShotReorderControl from "./ShotReorderControl.jsx";
 import ShotProductReferencePanel from "./ShotProductReferencePanel.jsx";
 import LightingCameraPlanPanel from "./LightingCameraPlanPanel.jsx";
 import ShotAssetBatchPanel from "./ShotAssetBatchPanel.jsx";
@@ -570,6 +571,15 @@ export default function ShotsSection({ projectId }) {
                       )}
                     </p>
                     <p className="mt-0.5 line-clamp-1 text-[11px] font-medium text-slate-400">{shot.scriptLine || shot.cameraNote}</p>
+                    {/* Reordering belongs here, on the shot list, because this is where the edit
+                        is decided -- and it says what the move would do before it does it. */}
+                    <div className="mt-1.5" onClick={(event) => event.stopPropagation()}>
+                      <ShotReorderControl
+                        shot={shot}
+                        projectId={projectId}
+                        totalShots={shots.length}
+                      />
+                    </div>
                   </div>
                 </div>
                 {isOpen ? <ChevronUp size={15} className="shrink-0 text-slate-400" /> : <ChevronDown size={15} className="shrink-0 text-slate-400" />}

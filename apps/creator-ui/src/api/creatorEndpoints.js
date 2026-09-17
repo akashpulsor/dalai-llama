@@ -3252,6 +3252,32 @@ export const creatorApi = apiSlice.injectEndpoints({
       ],
     }),
 
+    // --- Reordering shots (pre-production-service) ---
+    // What moving a shot would do, asked BEFORE it moves. A read with no side effects: the shot
+    // stays where it is until the creator says otherwise.
+    getShotReorderImpact: builder.query({
+      query: ({ projectId, shotId, position }) => ({
+        url: platformUrl(`/projects/${projectId}/shots/${shotId}/reorder-impact`),
+        params: { position },
+      }),
+    }),
+
+    // Moves the shot and renumbers the rest. Changes NOTHING else -- not the script, not the shot
+    // descriptions, not a single generated clip. Video follows on its own because clips are keyed
+    // to a shot and everything downstream orders by shot number.
+    reorderShot: builder.mutation({
+      query: ({ projectId, shotId, position }) => ({
+        url: platformUrl(`/projects/${projectId}/shots/${shotId}/reorder`),
+        method: "POST",
+        body: { position },
+      }),
+      invalidatesTags: (_r, _e, a) => [
+        { type: "CreatorHomeProjects", id: `shots-${a?.projectId}` },
+        { type: "CreatorHomeProjects", id: `project-clips-${a?.projectId}` },
+        { type: "CreatorHomeProjects", id: `film-${a?.projectId}` },
+      ],
+    }),
+
     // --- Cutting a shot (post-production-service, /v1/post-production) ---
     // A shot's clip is a sequence of numbered versions, not a file. Making a cut never changes what
     // the film uses: it returns a PREVIEW, and accepting it is a separate, deliberate call.
@@ -3941,6 +3967,8 @@ export const {
   useGetShotClipSourcesQuery,
   useExtendShotTailMutation,
   useAcceptClipCutMutation,
+  useLazyGetShotReorderImpactQuery,
+  useReorderShotMutation,
   useCheckoutClipVersionMutation,
   useImportClipBaselineMutation,
   useListProjectClipsQuery,
