@@ -3252,6 +3252,110 @@ export const creatorApi = apiSlice.injectEndpoints({
       ],
     }),
 
+    // --- Cutting a shot (post-production-service, /v1/post-production) ---
+    // A shot's clip is a sequence of numbered versions, not a file. Making a cut never changes what
+    // the film uses: it returns a PREVIEW, and accepting it is a separate, deliberate call.
+    listClipVersions: builder.query({
+      query: ({ projectId, shotId }) => ({
+        url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/clip-versions`),
+      }),
+      providesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `clip-cuts-${a?.shotId}` }],
+    }),
+
+    // Strip the invented audio and put the recorded take on instead.
+    createDubbedCut: builder.mutation({
+      query: ({ projectId, shotId, shotRef }) => ({
+        url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/clip-versions/dubbed`),
+        method: "POST",
+        params: shotRef ? { shotRef } : undefined,
+      }),
+      invalidatesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `clip-cuts-${a?.shotId}` }],
+    }),
+
+    // Strip the audio and leave the shot silent.
+    createSilentCut: builder.mutation({
+      query: ({ projectId, shotId, shotRef }) => ({
+        url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/clip-versions/silent`),
+        method: "POST",
+        params: shotRef ? { shotRef } : undefined,
+      }),
+      invalidatesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `clip-cuts-${a?.shotId}` }],
+    }),
+
+    // A cut the creator made themselves and brought back.
+    uploadClipCut: builder.mutation({
+      query: ({ projectId, shotId, shotRef, file }) => {
+        const body = new FormData();
+        body.append("file", file);
+        return {
+          url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/clip-versions/uploaded`),
+          method: "POST",
+          params: shotRef ? { shotRef } : undefined,
+          body,
+        };
+      },
+      invalidatesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `clip-cuts-${a?.shotId}` }],
+    }),
+
+    // Make this cut the one the film uses. The cut it replaces is kept, so this goes both ways.
+    acceptClipCut: builder.mutation({
+      query: ({ projectId, shotId, versionId }) => ({
+        url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/clip-versions/${versionId}/accept`),
+        method: "POST",
+      }),
+      invalidatesTags: (_r, _e, a) => [
+        { type: "CreatorHomeProjects", id: `clip-cuts-${a?.shotId}` },
+        { type: "CreatorHomeProjects", id: `film-${a?.projectId}` },
+      ],
+    }),
+
+    // --- The whole film (post-production-service) ---
+    // Whether every shot has a cut yet, and which do not -- so the combine button can say WHY it
+    // is disabled rather than being greyed out with no reason.
+    getFilmReadiness: builder.query({
+      query: (projectId) => ({ url: platformUrl(`/post-production/projects/${projectId}/film/readiness`) }),
+      providesTags: (_r, _e, projectId) => [{ type: "CreatorHomeProjects", id: `film-${projectId}` }],
+    }),
+
+    assembleFilm: builder.mutation({
+      query: (projectId) => ({
+        url: platformUrl(`/post-production/projects/${projectId}/film`),
+        method: "POST",
+      }),
+      invalidatesTags: (_r, _e, projectId) => [{ type: "CreatorHomeProjects", id: `film-${projectId}` }],
+    }),
+
+    getLatestFilm: builder.query({
+      query: (projectId) => ({ url: platformUrl(`/post-production/projects/${projectId}/film/latest`) }),
+      providesTags: (_r, _e, projectId) => [{ type: "CreatorHomeProjects", id: `film-${projectId}` }],
+    }),
+
+    // Show the film on the client's review page, or take it back down. Off means invisible there,
+    // not merely undownloadable.
+    publishFilm: builder.mutation({
+      query: ({ projectId, renderId, published = true }) => ({
+        url: platformUrl(`/post-production/projects/${projectId}/film/${renderId}/publish`),
+        method: "POST",
+        params: { published },
+      }),
+      invalidatesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `film-${a?.projectId}` }],
+    }),
+
+    // --- Dubbing, queued (video-generation-service) ---
+    // Returns a job id immediately; the page polls it. The synchronous /clone stays for the
+    // project-wide prepare, which is already a batch the caller waits on.
+    queueShotDub: builder.mutation({
+      query: ({ projectId, shotId, text }) => ({
+        url: platformUrl("/clone/jobs"),
+        method: "POST",
+        body: { projectId, shotId, text },
+      }),
+    }),
+
+    getDubJob: builder.query({
+      query: (jobId) => ({ url: platformUrl(`/clone/jobs/${jobId}`) }),
+    }),
+
     // Every clip a shot has had, newest first, each with a playable URL so a version can be
     // watched before it is chosen. Written before each repair moves the pointer, so the list is
     // a record rather than a reconstruction.
@@ -3779,6 +3883,18 @@ export const {
   useAdviseShotDialogueFitMutation,
   useGetShotClipSourcesQuery,
   useExtendShotTailMutation,
+  useAcceptClipCutMutation,
+  useAssembleFilmMutation,
+  useCreateDubbedCutMutation,
+  useCreateSilentCutMutation,
+  useGetDubJobQuery,
+  useGetFilmReadinessQuery,
+  useGetLatestFilmQuery,
+  useLazyGetDubJobQuery,
+  useListClipVersionsQuery,
+  usePublishFilmMutation,
+  useQueueShotDubMutation,
+  useUploadClipCutMutation,
   useListShotClipVersionsQuery,
   useRestoreShotClipMutation,
   useRestoreShotClipVersionMutation,

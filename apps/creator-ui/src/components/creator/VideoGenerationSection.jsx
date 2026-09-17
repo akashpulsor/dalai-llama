@@ -23,6 +23,7 @@ import {
   useUpdateShotScenePromptMutation,
 } from "../../api/creatorEndpoints.js";
 import ShotVideoCard from "./ShotVideoCard.jsx";
+import FilmAssemblyBar from "./FilmAssemblyBar.jsx";
 
 const dialogueTextForShot = (shot) => (
   shot?.voiceOver || (shot?.shotType === "DIALOGUE" ? shot?.scriptLine : "") || ""
@@ -684,6 +685,10 @@ export default function VideoGenerationSection({ projectId }) {
           />
         ))}
       </div>
+
+      {/* The last step, at the bottom because that is where it comes in the work: join every
+          shot's chosen version into one film, then decide whether the client sees it. */}
+      <FilmAssemblyBar projectId={projectId} aspectRatio={shots[0]?.aspectRatio} />
     </div>
   );
 }

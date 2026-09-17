@@ -8,12 +8,16 @@ import {
   useGetShotBackgroundMusicQuery,
   useListPreProductionShotImagesQuery,
   useListShotPromptVersionsQuery,
+  useLazyGetDubJobQuery,
+  useQueueShotDubMutation,
   useTestShotVoiceMutation,
   useUpdatePreProductionShotMutation,
 } from "../../api/creatorEndpoints.js";
 import DialogueBeatsEditor from "./DialogueBeatsEditor.jsx";
 import DialogueFitPanel from "./DialogueFitPanel.jsx";
 import ClipRepairPanel from "./ClipRepairPanel.jsx";
+import ClipCutsPanel from "./ClipCutsPanel.jsx";
+import ShotCanvasPlayer from "./ShotCanvasPlayer.jsx";
 import MotionGraphicPanel from "./MotionGraphicPanel.jsx";
 import CritiqueFindingsPanel from "./CritiqueFindingsPanel.jsx";
 import ShotThoughtLog from "./ShotThoughtLog.jsx";
@@ -85,7 +89,35 @@ function BackgroundMusicControl({ shotId }) {
  */
 function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
   const dispatch = useDispatch();
-  const [redub, { isLoading }] = useTestShotVoiceMutation();
+  // Queued, not waited on. Recording a line takes seconds to tens of seconds, and while the request
+  // held the connection there was nothing on screen saying so -- which is exactly why pressing the
+  // button again was a reasonable thing to do. Now the request returns a job id and this polls it,
+  // so the control can say what is happening and stay disabled until it is actually finished.
+  const [queueDub] = useQueueShotDubMutation();
+  const [fetchDubJob] = useLazyGetDubJobQuery();
+  const [dubbing, setDubbing] = React.useState(false);
+  const isLoading = dubbing;
+
+  /** Queues a dub and waits for the job to settle. Returns true when a take was recorded. */
+  const runDub = async (text) => {
+    setDubbing(true);
+    try {
+      const job = await queueDub({ projectId, shotId, text }).unwrap();
+      for (let attempt = 0; attempt < 90; attempt += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((resolve) => { setTimeout(resolve, 2000); });
+        // eslint-disable-next-line no-await-in-loop
+        const latest = await fetchDubJob(job.jobId).unwrap().catch(() => null);
+        if (latest?.status === "COMPLETED") return true;
+        if (latest?.status === "FAILED") {
+          throw new Error(latest.lastError || "The dub failed");
+        }
+      }
+      throw new Error("Still recording — it will appear here when it finishes");
+    } finally {
+      setDubbing(false);
+    }
+  };
   const [saveLine, saveState] = useUpdatePreProductionShotMutation();
   const [draft, setDraft] = React.useState("");
   const [editing, setEditing] = React.useState(false);
@@ -107,7 +139,7 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
   // not a step worth offering on its own.
   const saveAndDub = async (text) => {
     await saveLine({ projectId, shotId, voiceOver: text }).unwrap();
-    await redub({ projectId, shotId, text }).unwrap();
+    await runDub(text);
   };
 
   if (!line) {
@@ -119,7 +151,7 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
         setDraft("");
         dispatch(showFlash({ message: "Line saved and dubbed. Prepare again so the shot is built around it.", type: "success" }));
       } catch (error) {
-        dispatch(showFlash({ message: error?.data?.message || "Could not save that line", type: "error" }));
+        dispatch(showFlash({ message: error?.data?.message || error?.message || "Could not save that line", type: "error" }));
       }
     };
     return (
@@ -154,10 +186,10 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
 
   const handleRedub = async () => {
     try {
-      await redub({ projectId, shotId, text: line }).unwrap();
+      await runDub(line);
       dispatch(showFlash({ message: "Re-dubbed with the current line.", type: "success" }));
     } catch (error) {
-      dispatch(showFlash({ message: error?.data?.message || "Could not dub this shot", type: "error" }));
+      dispatch(showFlash({ message: error?.data?.message || error?.message || "Could not dub this shot", type: "error" }));
     }
   };
 
@@ -179,7 +211,7 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
         type: "success",
       }));
     } catch (error) {
-      dispatch(showFlash({ message: error?.data?.message || "Could not save that line", type: "error" }));
+      dispatch(showFlash({ message: error?.data?.message || error?.message || "Could not save that line", type: "error" }));
     }
   };
 
@@ -698,12 +730,16 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
       <button type="button" onClick={onToggle} className="group block w-full text-left">
         <div className="relative w-full bg-black" style={{ aspectRatio: aspect }}>
           {video?.outputUri ? (
-            // preload="metadata" and no autoplay: this tile used to autoplay the whole clip, so
-            // opening a project with thirteen finished shots downloaded thirteen entire videos
-            // before anything was usable. The still below is preferred when the shot has one; this
-            // is the fallback for shots that do not, and it now fetches a header rather than a film.
-            <video src={video.outputUri} muted loop playsInline preload="metadata"
-                   className="absolute inset-0 h-full w-full object-cover" />
+            // One player, not two. This tile and the full player below used to be separate
+            // elements holding the same file: two downloads, a tile that could never be heard and
+            // a player that could never be glanced at. Now it is the same component, looping
+            // quietly like the tile did with the sound one click away.
+            <ShotCanvasPlayer
+              src={video.outputUri}
+              aspectRatio={shot.aspectRatio}
+              autoLoop
+              className="absolute inset-0 h-full w-full border-0"
+            />
           ) : frameSrc ? (
             <img src={frameSrc} alt={`Shot ${shot.shotNumber}`} className="absolute inset-0 h-full w-full object-cover" />
           ) : (
@@ -797,7 +833,12 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
           )}
 
           {video?.outputUri && (
-            <ShotPlayer src={video.outputUri} aspect={aspect} />
+            <ShotCanvasPlayer
+              src={video.outputUri}
+              aspectRatio={shot.aspectRatio}
+              className="mx-auto w-full max-w-md"
+              label="Loading the clip…"
+            />
           )}
 
           {/* Shown before the prompt is built -- the mismatch is knowable from the plan and the
@@ -883,6 +924,15 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               saved -- could only be fixed by never having generated it. Regenerating builds a fresh
               prompt from the shot as it stands now, then goes through the same approve step, so the
               new clip is costed and confirmed exactly like the first one. */}
+          {video && (
+            <ClipCutsPanel
+              shot={shot}
+              projectId={projectId}
+              aspectRatio={shot.aspectRatio}
+              onChanged={onPrepare}
+            />
+          )}
+
           {video && (
             <ClipRepairPanel shot={shot} projectId={projectId} />
           )}
