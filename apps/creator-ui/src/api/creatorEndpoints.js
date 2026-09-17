@@ -3238,6 +3238,20 @@ export const creatorApi = apiSlice.injectEndpoints({
       ],
     }),
 
+    // Puts the shot back on the clip that was generated for it, when a repair made things worse.
+    // The generated object is still in storage under a key derived from the job id, so this needs
+    // nothing to have been recorded beforehand.
+    restoreShotClip: builder.mutation({
+      query: ({ projectId, shotId }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/restore-clip`),
+        method: "POST",
+      }),
+      invalidatesTags: (_r, _e, a) => [
+        { type: "CreatorHomeProjects", id: `shot-videos-${a?.projectId}` },
+        { type: "CreatorHomeProjects", id: `clip-sources-${a?.shotId}` },
+      ],
+    }),
+
     // The creator's own finished clip, replacing what the model produced for this shot.
     uploadShotClip: builder.mutation({
       query: ({ projectId, shotId, file }) => {
@@ -3725,6 +3739,7 @@ export const {
   useAdviseShotDialogueFitMutation,
   useGetShotClipSourcesQuery,
   useExtendShotTailMutation,
+  useRestoreShotClipMutation,
   useUploadShotClipMutation,
   useLazyListProjectShotPromptsQuery,
   useListVideoModelsQuery,

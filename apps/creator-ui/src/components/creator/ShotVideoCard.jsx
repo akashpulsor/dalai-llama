@@ -632,7 +632,12 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
       <button type="button" onClick={onToggle} className="group block w-full text-left">
         <div className="relative w-full bg-black" style={{ aspectRatio: aspect }}>
           {video?.outputUri ? (
-            <video src={video.outputUri} muted loop autoPlay playsInline className="absolute inset-0 h-full w-full object-cover" />
+            // preload="metadata" and no autoplay: this tile used to autoplay the whole clip, so
+            // opening a project with thirteen finished shots downloaded thirteen entire videos
+            // before anything was usable. The still below is preferred when the shot has one; this
+            // is the fallback for shots that do not, and it now fetches a header rather than a film.
+            <video src={video.outputUri} muted loop playsInline preload="metadata"
+                   className="absolute inset-0 h-full w-full object-cover" />
           ) : frameSrc ? (
             <img src={frameSrc} alt={`Shot ${shot.shotNumber}`} className="absolute inset-0 h-full w-full object-cover" />
           ) : (

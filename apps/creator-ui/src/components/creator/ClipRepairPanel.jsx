@@ -1,11 +1,12 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { Download, Loader2, Scissors, Upload, Volume2, VolumeX, Wand2 } from "lucide-react";
+import { Download, Loader2, RotateCcw, Scissors, Upload, Volume2, VolumeX, Wand2 } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useExtendShotTailMutation,
   useGetShotClipSourcesQuery,
+  useRestoreShotClipMutation,
   useUploadShotClipMutation,
 } from "../../api/creatorEndpoints.js";
 
@@ -67,6 +68,7 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
   );
   const [extendTail, extendState] = useExtendShotTailMutation();
   const [uploadClip, uploadState] = useUploadShotClipMutation();
+  const [restoreClip, restoreState] = useRestoreShotClipMutation();
   const fileRef = React.useRef(null);
   const [showMore, setShowMore] = React.useState(false);
 
@@ -126,7 +128,27 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
     }
   };
 
-  const busy = extendState.isLoading || uploadState.isLoading;
+  const handleRestore = async () => {
+    try {
+      const result = await restoreClip({ projectId, shotId: shot.id }).unwrap();
+      dispatch(showFlash({
+        message: `Back on the clip that was generated — ${seconds(result.seconds)}.`,
+        type: "success",
+      }));
+      refetch();
+      onRepaired?.(result);
+    } catch (error) {
+      dispatch(showFlash({
+        message: error?.data?.message || "Could not put the generated clip back",
+        type: "error",
+      }));
+    }
+  };
+
+  const busy = extendState.isLoading || uploadState.isLoading || restoreState.isLoading;
+  // Every repair writes a new object and repoints the shot at it, so a shot whose origin is no
+  // longer GENERATED is one a repair has replaced -- and the clip it replaced is still in storage.
+  const repaired = !!sources.outputOrigin && sources.outputOrigin !== "GENERATED";
 
   // One action, not a menu. The creator's goal is always the same -- the voice and the picture
   // should match -- and which ffmpeg call gets them there is not a decision worth making. So the
@@ -189,6 +211,17 @@ export default function ClipRepairPanel({ shot, projectId, onRepaired }) {
             >
               <Scissors size={11} />
               {`Freeze the last frame instead → ${seconds((clip ?? 0) + needed)}, no model cost`}
+            </button>
+          )}
+          {repaired && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={handleRestore}
+              className="flex items-center gap-1.5 text-[10px] font-bold text-slate-300 hover:text-slate-100 disabled:opacity-50"
+            >
+              {restoreState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />}
+              Put the originally generated clip back
             </button>
           )}
           {hasDub && (
