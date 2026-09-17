@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { Film, Loader2, Send } from "lucide-react";
+import { Download, Film, Loader2, Send, Upload } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import ShotCanvasPlayer from "./ShotCanvasPlayer.jsx";
 import {
@@ -9,6 +9,7 @@ import {
   useGetFilmReadinessQuery,
   useGetLatestFilmQuery,
   usePublishFilmMutation,
+  useUploadFilmEditMutation,
 } from "../../api/creatorEndpoints.js";
 
 /**
@@ -32,7 +33,48 @@ export default function FilmAssemblyBar({ projectId, aspectRatio }) {
   const { data: film, refetch: refetchFilm } = useGetLatestFilmQuery(projectId, { skip: !projectId });
   const [assemble] = useAssembleFilmMutation();
   const [publish, publishState] = usePublishFilmMutation();
+  const [uploadEdit, uploadState] = useUploadFilmEditMutation();
   const [joining, setJoining] = React.useState(false);
+  const fileRef = React.useRef(null);
+
+  /** The film, saved so it can be cut elsewhere. Fetched and handed over as a blob because the
+   * download attribute is ignored for cross-origin URLs, which would open it in a tab instead. */
+  const handleDownload = async () => {
+    const filename = "film.mp4";
+    try {
+      const response = await fetch(film.videoUrl);
+      if (!response.ok) throw new Error(String(response.status));
+      const blobUrl = URL.createObjectURL(await response.blob());
+      const anchor = document.createElement("a");
+      anchor.href = blobUrl;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+    } catch {
+      window.open(film.videoUrl, "_blank", "noopener");
+    }
+  };
+
+  const handleUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      try {
+        await uploadEdit({ projectId, file }).unwrap();
+        dispatch(showFlash({
+          message: "Your edit is in. Publish it when you want the client to see it.",
+          type: "success",
+        }));
+      } catch (error) {
+        dispatch(showFlash({
+          message: error?.data?.message || "Could not take that file",
+          type: "error",
+        }));
+      }
+    }
+    if (fileRef.current) fileRef.current.value = "";
+  };
 
   const ready = readiness?.ready === true;
   const missing = readiness?.missingShotRefs || [];
@@ -117,6 +159,29 @@ export default function FilmAssemblyBar({ projectId, aspectRatio }) {
           {joining ? <Loader2 size={14} className="animate-spin" /> : <Film size={14} />}
           {joining ? "Joining…" : "Combine into one video"}
         </button>
+
+        {film?.status === "COMPLETED" && film?.videoUrl && (
+          <button
+            type="button"
+            onClick={handleDownload}
+            className="flex min-h-9 items-center justify-center gap-2 rounded-md border border-white/10 px-4 text-xs font-black text-slate-300 hover:text-slate-100"
+          >
+            <Download size={14} /> Download to edit
+          </button>
+        )}
+
+        {film?.status === "COMPLETED" && (
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploadState.isLoading}
+            className="flex min-h-9 items-center justify-center gap-2 rounded-md border border-white/10 px-4 text-xs font-black text-slate-300 hover:text-slate-100 disabled:opacity-60"
+          >
+            {uploadState.isLoading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+            {uploadState.isLoading ? "Uploading…" : "Upload your edit"}
+          </button>
+        )}
+        <input ref={fileRef} type="file" accept="video/*" onChange={handleUpload} className="hidden" />
 
         {film?.status === "COMPLETED" && film?.videoUrl && (
           <button

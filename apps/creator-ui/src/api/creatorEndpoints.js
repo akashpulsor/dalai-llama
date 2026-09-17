@@ -3407,6 +3407,21 @@ export const creatorApi = apiSlice.injectEndpoints({
       providesTags: (_r, _e, projectId) => [{ type: "CreatorHomeProjects", id: `film-${projectId}` }],
     }),
 
+    // The creator's own edit of the whole film, brought back after cutting it elsewhere. Recorded
+    // as a NEW render, so the joined version and the hand-edited one both survive.
+    uploadFilmEdit: builder.mutation({
+      query: ({ projectId, file }) => {
+        const body = new FormData();
+        body.append("file", file);
+        return {
+          url: platformUrl(`/post-production/projects/${projectId}/film/uploaded`),
+          method: "POST",
+          body,
+        };
+      },
+      invalidatesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `film-${a?.projectId}` }],
+    }),
+
     // Show the film on the client's review page, or take it back down. Off means invisible there,
     // not merely undownloadable.
     publishFilm: builder.mutation({
@@ -3997,6 +4012,7 @@ export const {
   useLazyGetDubJobQuery,
   useListClipVersionsQuery,
   usePublishFilmMutation,
+  useUploadFilmEditMutation,
   useQueueShotDubMutation,
   useRejectShotDubMutation,
   useUploadClipCutMutation,

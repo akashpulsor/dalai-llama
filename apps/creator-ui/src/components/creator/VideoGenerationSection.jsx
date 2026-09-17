@@ -1,8 +1,7 @@
 // @ts-nocheck
 import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
-import { AudioLines, Clapperboard, Layers, Loader2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { AudioLines, Clapperboard, Loader2 } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useApproveVideoGenJobMutation,
@@ -557,19 +556,6 @@ export default function VideoGenerationSection({ projectId }) {
               {plannedTotal - targetTotal}s over. Lengthening shots to fit their dialogue is how that
               happens; rephrasing a line instead keeps the running time where it was agreed.
             </p>
-          )}
-          {/* Where the film gets put together. Assembly lives on the editor page, which is not
-              somewhere you would look from here -- so the last step of this page points at it
-              instead of leaving it to be found. Shown once any shot has a clip, since that is the
-              point from which there is something to assemble. */}
-          {Object.keys(videos).length > 0 && (
-            <Link
-              to="/editor"
-              className="flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/10 px-3.5 py-2 text-xs font-bold text-purple-200 hover:border-purple-400/60"
-            >
-              <Layers size={13} />
-              Merge the shots into one film
-            </Link>
           )}
           <button
             type="button"

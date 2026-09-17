@@ -285,14 +285,6 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
           >
             <Download size={10} /> Download to edit
           </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={async () => { const v = await ensureBaseline(); if (v) handlePublish(v); }}
-            className="flex items-center gap-1 text-[10px] font-bold text-purple-300 hover:text-purple-200 disabled:opacity-50"
-          >
-            <Send size={10} /> Publish this shot
-          </button>
         </div>
       )}
 
@@ -306,7 +298,6 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
               <span className="truncate text-[10px] font-medium text-slate-400">
                 v{version.versionNumber} · {ORIGIN_LABEL[version.origin] || version.origin}
                 {version.status === "ACTIVE" ? " · in use" : ""}
-                {version.published ? " · shown to client" : ""}
                 {/* Said out loud, because "which shots am I still waiting on" had no answer before
                     downloading left a trace. */}
                 {version.downloadedForEditAt ? " · out for edit" : ""}
@@ -320,19 +311,6 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
                   className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-slate-200 disabled:opacity-50"
                 >
                   <Download size={10} /> Edit
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => handlePublish(version)}
-                  title={version.published
-                    ? "Stop showing this shot to the client"
-                    : "Show this shot to the client on its own"}
-                  className={`flex items-center gap-1 text-[10px] font-bold disabled:opacity-50 ${
-                    version.published ? "text-slate-400 hover:text-slate-200" : "text-purple-300 hover:text-purple-200"
-                  }`}
-                >
-                  <Send size={10} /> {version.published ? "Unpublish" : "Publish"}
                 </button>
                 {version.status !== "ACTIVE" && (
                   <button
