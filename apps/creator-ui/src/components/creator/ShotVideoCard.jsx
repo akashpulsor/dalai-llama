@@ -10,6 +10,7 @@ import {
   useListShotPromptVersionsQuery,
   useLazyGetDubJobQuery,
   useQueueShotDubMutation,
+  useRejectShotDubMutation,
   useTestShotVoiceMutation,
   useUpdatePreProductionShotMutation,
 } from "../../api/creatorEndpoints.js";
@@ -94,6 +95,7 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
   // button again was a reasonable thing to do. Now the request returns a job id and this polls it,
   // so the control can say what is happening and stay disabled until it is actually finished.
   const [queueDub] = useQueueShotDubMutation();
+  const [rejectDub, rejectState] = useRejectShotDubMutation();
   const [fetchDubJob] = useLazyGetDubJobQuery();
   const [dubbing, setDubbing] = React.useState(false);
   const isLoading = dubbing;
@@ -253,15 +255,42 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
               until then the fit figures are an estimate.
             </p>
           )}
-          <button
-            type="button"
-            disabled={isLoading || editing}
-            onClick={handleRedub}
-            className="flex items-center gap-1.5 text-[10px] font-bold text-purple-300 hover:text-purple-200 disabled:opacity-60"
-          >
-            {isLoading ? <Loader2 size={11} className="animate-spin" /> : <AudioLines size={11} />}
-            {isLoading ? "Dubbing…" : "Dub again with the current line"}
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={isLoading || editing}
+              onClick={handleRedub}
+              className="flex items-center gap-1.5 text-[10px] font-bold text-purple-300 hover:text-purple-200 disabled:opacity-60"
+            >
+              {isLoading ? <Loader2 size={11} className="animate-spin" /> : <AudioLines size={11} />}
+              {isLoading ? "Dubbing…" : "Dub again with the current line"}
+            </button>
+            {/* Turning a take down matters because every cut reaches for the NEWEST take: a
+                recording that came out wrong otherwise sits as the newest thing there is and gets
+                picked up by everything made afterwards. The row is kept, so this is reversible. */}
+            <button
+              type="button"
+              disabled={isLoading || editing || rejectState.isLoading}
+              onClick={async () => {
+                try {
+                  await rejectDub({ projectId, shotId }).unwrap();
+                  dispatch(showFlash({
+                    message: "Take rejected. Nothing will use it — dub again when you are ready.",
+                    type: "success",
+                  }));
+                } catch (error) {
+                  dispatch(showFlash({
+                    message: error?.data?.message || "Could not reject this take",
+                    type: "error",
+                  }));
+                }
+              }}
+              className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-rose-300 disabled:opacity-60"
+            >
+              {rejectState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
+              Reject this take
+            </button>
+          </div>
         </div>
       ) : (
         <button

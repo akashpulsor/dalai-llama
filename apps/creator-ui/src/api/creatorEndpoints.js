@@ -3429,6 +3429,21 @@ export const creatorApi = apiSlice.injectEndpoints({
       }),
     }),
 
+    // Turns down the most recent take, or takes the rejection back. Every flow that puts "the
+    // dubbed voice" on a clip reaches for the newest take, so without this a recording that came
+    // out wrong sits as the newest thing there is and every later cut picks it up.
+    rejectShotDub: builder.mutation({
+      query: ({ projectId, shotId, rejected = true }) => ({
+        url: platformUrl(`/clone/shots/${shotId}/reject`),
+        method: "POST",
+        params: { projectId, rejected },
+      }),
+      invalidatesTags: (_r, _e, a) => [
+        { type: "CreatorHomeProjects", id: `clone-audio-${a?.projectId}` },
+        { type: "CreatorHomeProjects", id: `dialogue-fit-${a?.projectId}` },
+      ],
+    }),
+
     getDubJob: builder.query({
       query: (jobId) => ({ url: platformUrl(`/clone/jobs/${jobId}`) }),
     }),
@@ -3983,6 +3998,7 @@ export const {
   useListClipVersionsQuery,
   usePublishFilmMutation,
   useQueueShotDubMutation,
+  useRejectShotDubMutation,
   useUploadClipCutMutation,
   useListShotClipVersionsQuery,
   useRestoreShotClipMutation,
