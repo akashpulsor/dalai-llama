@@ -3097,6 +3097,19 @@ export const creatorApi = apiSlice.injectEndpoints({
           params: acceptDialogueOverrun ? { acceptDialogueOverrun: true } : undefined,
         };
       },
+      // Invalidated on failure as well as success, and that is the point. Approve renders
+      // synchronously and holds the connection for minutes; when the answer is lost -- a gateway
+      // timeout, a dropped connection, a closed tab -- the render carries on and finishes, and
+      // without this the page never asks again. The shot then looks ungenerated while its clip sits
+      // finished in storage, which is how a shot gets generated, and paid for, twice.
+      //
+      // It also replaces the URL the response carried. That one is the job's STORED outputUri --
+      // the provider's own link, which expires -- whereas the listing re-signs from MinIO on every
+      // read. Taking the fresh one means a finished shot plays instead of showing an empty frame.
+      invalidatesTags: (_result, _error, arg) => {
+        const projectId = typeof arg === "object" && arg !== null ? arg.projectId : undefined;
+        return projectId ? [{ type: "CreatorHomeProjects", id: `shot-videos-${projectId}` }] : [];
+      },
     }),
 
     rejectVideoGenJob: builder.mutation({

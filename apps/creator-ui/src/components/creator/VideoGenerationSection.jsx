@@ -97,7 +97,7 @@ export default function VideoGenerationSection({ projectId }) {
   // approve whose request timed out while the render carried on -- came back looking like it
   // had never run. The clip existed and was paid for; the page just never asked for it, and
   // the obvious reaction to a shot that looks ungenerated is to generate it again.
-  const { data: existingShotVideos = [] } = useListProjectShotVideosQuery(projectId, { skip: !projectId });
+  const { data: existingShotVideos = [], refetch: refetchShotVideos } = useListProjectShotVideosQuery(projectId, { skip: !projectId });
   useEffect(() => {
     if (!existingShotVideos.length) return;
     setVideos((current) => {
@@ -356,6 +356,7 @@ export default function VideoGenerationSection({ projectId }) {
     try {
       const job = await approveJob({
         jobId: info.externalJobId,
+        projectId,
         dialogueFit: options?.dialogueFit,
       }).unwrap();
       setVideos((v) => ({ ...v, [shotId]: job }));
@@ -367,6 +368,10 @@ export default function VideoGenerationSection({ projectId }) {
       const timedOut = error?.status === 504 || error?.status === "FETCH_ERROR" || error?.status === "TIMEOUT_ERROR";
       if (timedOut) {
         const job = await pollJobUntilSettled(info.externalJobId, shotId);
+        // Whatever the poll concluded, the listing is the authority on where the clip is and holds
+        // a freshly signed URL. Asking it again is what turns a finished-but-unseen render into a
+        // shot that plays, instead of one that looks like it was never generated.
+        refetchShotVideos();
         if (job) {
           reportJobOutcome(job);
           return;
