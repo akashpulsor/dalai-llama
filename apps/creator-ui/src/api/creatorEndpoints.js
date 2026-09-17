@@ -3262,6 +3262,22 @@ export const creatorApi = apiSlice.injectEndpoints({
       providesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `clip-cuts-${a?.shotId}` }],
     }),
 
+    // Makes sure the shot has version 1 -- its generated clip. Versions are created lazily, the
+    // first time a shot is cut, so a shot the creator is happy with has no rows at all and nothing
+    // to download, publish or point at. Called the first time any of those is wanted.
+    importClipBaseline: builder.mutation({
+      query: ({ projectId, shotId, shotRef }) => ({
+        url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/clip-versions/baseline`),
+        method: "POST",
+        params: shotRef ? { shotRef } : undefined,
+      }),
+      invalidatesTags: (_r, _e, a) => [
+        { type: "CreatorHomeProjects", id: `clip-cuts-${a?.shotId}` },
+        { type: "CreatorHomeProjects", id: `project-clips-${a?.projectId}` },
+        { type: "CreatorHomeProjects", id: `film-${a?.projectId}` },
+      ],
+    }),
+
     // Strip the invented audio and put the recorded take on instead.
     createDubbedCut: builder.mutation({
       query: ({ projectId, shotId, shotRef }) => ({
@@ -3920,6 +3936,7 @@ export const {
   useExtendShotTailMutation,
   useAcceptClipCutMutation,
   useCheckoutClipVersionMutation,
+  useImportClipBaselineMutation,
   useListProjectClipsQuery,
   usePublishClipVersionMutation,
   useAssembleFilmMutation,

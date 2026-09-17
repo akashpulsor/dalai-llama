@@ -7,6 +7,7 @@ import ShotCanvasPlayer from "./ShotCanvasPlayer.jsx";
 import {
   useAcceptClipCutMutation,
   useCheckoutClipVersionMutation,
+  useImportClipBaselineMutation,
   usePublishClipVersionMutation,
   useCreateDubbedCutMutation,
   useCreateSilentCutMutation,
@@ -48,13 +49,35 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
   const [acceptCut, acceptState] = useAcceptClipCutMutation();
   const [checkout] = useCheckoutClipVersionMutation();
   const [publishVersion, publishState] = usePublishClipVersionMutation();
+  const [importBaseline, baselineState] = useImportClipBaselineMutation();
   const fileRef = React.useRef(null);
   // Which cut the pending upload is an edit OF. Set when a version is downloaded, so bringing the
   // file back links the two rather than leaving a version that came from nowhere.
   const editingFromRef = React.useRef(null);
 
   const busy = dubbedState.isLoading || silentState.isLoading
-    || uploadState.isLoading || acceptState.isLoading || publishState.isLoading;
+    || uploadState.isLoading || acceptState.isLoading || publishState.isLoading
+    || baselineState.isLoading;
+
+  /**
+   * Starts tracking this shot's generated clip as version 1, and returns it.
+   *
+   * <p>Nothing exists to download, publish or point at until a shot has a version, and versions are
+   * only made when a shot is cut -- so a shot the creator is perfectly happy with had no row and no
+   * buttons. The first time one of those is wanted, this creates it.
+   */
+  const ensureBaseline = async () => {
+    if (versions.length) return versions.find((v) => v.status === "ACTIVE") || versions[0];
+    try {
+      return await importBaseline({ projectId, shotId, shotRef: shot?.shotRef }).unwrap();
+    } catch (error) {
+      dispatch(showFlash({
+        message: error?.data?.message || "Could not read this shot's generated video",
+        type: "error",
+      }));
+      return null;
+    }
+  };
 
   /**
    * Takes a cut away to be edited: marks it out, then saves the file.
@@ -241,6 +264,30 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
               />
             </div>
           ))}
+        </div>
+      )}
+
+      {versions.length === 0 && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-white/10 pt-2.5">
+          <span className="text-[10px] font-medium text-slate-500">
+            This shot is on its generated video:
+          </span>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={async () => { const v = await ensureBaseline(); if (v) handleDownload(v); }}
+            className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-slate-200 disabled:opacity-50"
+          >
+            <Download size={10} /> Download to edit
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={async () => { const v = await ensureBaseline(); if (v) handlePublish(v); }}
+            className="flex items-center gap-1 text-[10px] font-bold text-purple-300 hover:text-purple-200 disabled:opacity-50"
+          >
+            <Send size={10} /> Publish this shot
+          </button>
         </div>
       )}
 
