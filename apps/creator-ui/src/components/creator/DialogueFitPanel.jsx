@@ -7,6 +7,7 @@ import {
   useGetShotDialogueFitQuery,
   useAdviseShotDialogueFitMutation,
   useRetimeShotDialogueMutation,
+  useTestShotVoiceMutation,
   useUpdatePreProductionShotMutation,
   useUpdateShotDialogueBeatMutation,
 } from "../../api/creatorEndpoints.js";
@@ -131,6 +132,7 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
   const [advice, setAdvice] = React.useState(null);
   const [updateShot, updateShotState] = useUpdatePreProductionShotMutation();
   const [updateBeat] = useUpdateShotDialogueBeatMutation();
+  const [redub] = useTestShotVoiceMutation();
   const [retimed, setRetimed] = React.useState(null);
   const [applying, setApplying] = React.useState(false);
 
@@ -222,6 +224,26 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
         await updateShot({ projectId, shotId: shot.id, voiceOver: retimed.rewritten }).unwrap();
       }
       setRetimed(null);
+
+      // Record the new line here, with the text in hand.
+      //
+      // Re-dubbing was left to the Spoken take panel's button, which sends the SHOT's voice-over --
+      // and a rewrite that targets a beat does not change that field. So the next dub faithfully
+      // re-recorded the old words and the shot came back in the old voice, having reported success
+      // at every step. Even when the two fields do agree, that button reads them from a cached
+      // shot, so pressing it immediately re-records whatever the page last loaded.
+      //
+      // Passing the accepted text directly removes both: the take is of the line that was just
+      // approved, whichever field happens to hold it.
+      let dubbed = false;
+      try {
+        await redub({ projectId, shotId: shot.id, text: retimed.rewritten }).unwrap();
+        dubbed = true;
+      } catch {
+        // The line is saved either way. A failed dub leaves the fit figures as a labelled estimate,
+        // which is what they should be until the words have actually been spoken.
+      }
+
       // The stored take was synthesized from the OLD words, so its length no longer describes this
       // line. The server refuses to call that a measurement (it compares the take's text against
       // the shot's), so refetching swaps the confident number for a labelled estimate rather than
@@ -232,11 +254,18 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
       // rather than re-preparing: re-preparing rebuilds the model choice, the cost estimate and the
       // compression too, when all that changed was the words.
       const swapped = onDialogueReplaced ? await onDialogueReplaced(original, retimed.rewritten) : false;
+      // Says which of the three things happened, because they fail independently. "Updated" while
+      // the prompt still held the old words is how a shot got generated saying something nobody
+      // had approved.
       dispatch(showFlash({
-        message: swapped
-          ? "Line updated in the shot and in the prompt. Re-dub to hear the new timing before generating."
-          : "Line updated on the shot. Prepare again so the prompt picks it up, then re-dub.",
-        type: "success",
+        message: swapped && dubbed
+          ? "Line updated, prompt updated, and re-dubbed in the new words."
+          : swapped
+            ? "Line and prompt updated, but re-dubbing failed — dub it again before generating."
+            : dubbed
+              ? "Line updated and re-dubbed. The prompt still has the old wording — prepare the shot again so it picks this up."
+              : "Line updated on the shot. The prompt still has the old wording and nothing has been re-dubbed — prepare again, then dub.",
+        type: swapped && dubbed ? "success" : "info",
       }));
     } catch (error) {
       dispatch(showFlash({ message: error?.data?.message || "Could not save the new line", type: "error" }));

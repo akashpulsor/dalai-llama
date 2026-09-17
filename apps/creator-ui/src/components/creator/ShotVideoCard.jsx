@@ -20,6 +20,7 @@ import ShotThoughtLog from "./ShotThoughtLog.jsx";
 import ProCta from "../common/ProCta.jsx";
 import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
 import { useCachedImageUrl } from "../../utils/cachedImageUrl.js";
+import replaceDialogueLine from "../../utils/replaceDialogueLine.js";
 
 /** On-demand only -- never auto-generated as part of dispatch, one track per shot, sourced from
  * the shot's already-planned ambient_bed sound design. */
@@ -747,9 +748,15 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             // everything -- model recommendation, cost estimate, compression -- when the only thing
             // that changed was the words. Changing the dialogue should change the dialogue.
             onDialogueReplaced={info?.prompt && onSavePrompt ? async (oldLine, newLine) => {
-              const current = info.prompt.promptCompressed || info.prompt.promptOriginal || "";
-              if (!current || !oldLine || !current.includes(oldLine)) return false;
-              return onSavePrompt(current.split(oldLine).join(newLine));
+              // The text that will actually be sent: the compressed one when compression ran,
+              // since that is what dispatch picks. Swapping the line in the other one would edit a
+              // prompt nobody uses and look like it had worked.
+              const current = info.prompt.compressionApplied
+                ? (info.prompt.promptCompressed || info.prompt.promptOriginal || "")
+                : (info.prompt.promptOriginal || info.prompt.promptCompressed || "");
+              const swapped = replaceDialogueLine(current, oldLine, newLine);
+              if (!swapped) return false;
+              return onSavePrompt(swapped.text);
             } : undefined}
             // Only offered once there is a job to approve -- "go with the original" is a way of
             // generating, so before prepare there is nothing for it to act on.
