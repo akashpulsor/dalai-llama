@@ -1,13 +1,14 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { Download, Film, Loader2, Send, Upload } from "lucide-react";
+import { AlertTriangle, Download, Film, Loader2, Send, Upload } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import ShotCanvasPlayer from "./ShotCanvasPlayer.jsx";
 import {
   useAssembleFilmMutation,
   useGetFilmReadinessQuery,
   useGetLatestFilmQuery,
+  useListProjectClipsQuery,
   usePublishFilmMutation,
   useUploadFilmEditMutation,
 } from "../../api/creatorEndpoints.js";
@@ -31,7 +32,27 @@ export default function FilmAssemblyBar({ projectId, aspectRatio }) {
   const dispatch = useDispatch();
   const { data: readiness } = useGetFilmReadinessQuery(projectId, { skip: !projectId });
   const { data: film, refetch: refetchFilm } = useGetLatestFilmQuery(projectId, { skip: !projectId });
+  const { data: currentClips = [] } = useListProjectClipsQuery(projectId, { skip: !projectId });
   const [assemble] = useAssembleFilmMutation();
+
+  /**
+   * Whether the film on screen was built from the cuts the shots have NOW.
+   *
+   * <p>A film is a built artifact, not a live view -- accepting a new cut cannot change an .mp4 that
+   * already exists. Nothing said so, so fixing a shot and pressing play showed the old film and read
+   * as "the fix did not work". It is the one question this panel could not answer and the server
+   * could not answer for it.
+   *
+   * <p>Compared here rather than flagged by the server: the film carries the version ids it was made
+   * from and this page already holds the current ones, so the comparison is two lists. A server-side
+   * "stale" boolean would have to be recomputed on every read and would go wrong quietly.
+   */
+  const staleShotCount = React.useMemo(() => {
+    const builtFrom = film?.sourceVersionIds;
+    if (!builtFrom?.length || !currentClips.length) return 0;
+    const inFilm = new Set(builtFrom);
+    return currentClips.filter((clip) => !inFilm.has(clip.versionId)).length;
+  }, [film?.sourceVersionIds, currentClips]);
   const [publish, publishState] = usePublishFilmMutation();
   const [uploadEdit, uploadState] = useUploadFilmEditMutation();
   const [joining, setJoining] = React.useState(false);
@@ -202,6 +223,19 @@ export default function FilmAssemblyBar({ projectId, aspectRatio }) {
 
       {!ready && disabledReason && (
         <p className="mt-1.5 text-[10px] font-bold text-amber-200/90">{disabledReason}</p>
+      )}
+
+      {staleShotCount > 0 && film?.status === "COMPLETED" && (
+        <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-400/30 bg-amber-500/[0.08] px-3 py-2">
+          <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-300" />
+          <p className="text-[11px] font-semibold leading-relaxed text-amber-100">
+            {staleShotCount === 1
+              ? "One shot has been re-cut since this film was made."
+              : `${staleShotCount} shots have been re-cut since this film was made.`}{" "}
+            <span className="font-bold">Combine again</span> to put them in it — this video still has
+            the older cuts.
+          </p>
+        </div>
       )}
 
       {film?.status === "FAILED" && (
