@@ -75,6 +75,10 @@ export default function AdminOpsPage() {
     { key: "llm-logs", label: "LLM gateway logs", component: <LlmGatewayLogsTab /> },
     { key: "tenants", label: "Tenants", component: <TenantsTab /> },
     { key: "wallets", label: "Wallets", component: <WalletsTab /> },
+    { key: "grafana", label: "Grafana", component: <EmbeddedToolTab src="/grafana" name="Grafana" /> },
+    { key: "kiali", label: "Kiali", component: <EmbeddedToolTab src="/kiali/" name="Kiali" /> },
+    { key: "prom", label: "Prometheus", component: <EmbeddedToolTab src="/prom/" name="Prometheus" /> },
+    { key: "jaeger", label: "Jaeger", component: <EmbeddedToolTab src="/jaeger/" name="Jaeger" /> },
   ];
 
   return (
@@ -462,6 +466,45 @@ function WalletsTab() {
         </div>
       )}
     </section>
+  );
+}
+
+// ------- Embedded tool tab (Grafana / Kiali / Prom / Jaeger) ----------------
+
+/** Iframes an ops tool served from the same origin. Auth is already established
+ * (oauth2-proxy set the cookie on ops.dalaillama.in), so the iframe request
+ * carries the cookie automatically and the tool renders inline.
+ *
+ * Grafana needs [security] allow_embedding = true (set in grafana-ops-config.yaml).
+ * Kiali/Prometheus/Jaeger have no default frame-ancestors restriction so they
+ * work out of the box.
+ *
+ * A "pop out" link on the header row escape-hatches into the same tool as a
+ * standalone tab -- useful for deep dives where the iframe chrome (this page's
+ * header, tab bar) wastes vertical space. */
+function EmbeddedToolTab({ src, name }) {
+  return (
+    <div className="flex h-[calc(100vh-190px)] flex-col rounded-lg border border-white/10 bg-black/20">
+      <div className="flex items-center gap-2 border-b border-white/10 bg-white/[0.03] px-3 py-1.5 text-[10px] text-slate-500">
+        <span>{name} · <code className="text-slate-400">{src}</code></span>
+        <a
+          href={src}
+          target="_blank"
+          rel="noreferrer"
+          className="ml-auto flex items-center gap-1 text-[11px] font-bold text-purple-300 hover:text-purple-200"
+        >
+          Pop out <ExternalLink size={11} />
+        </a>
+      </div>
+      <iframe
+        src={src}
+        title={name}
+        className="flex-1 border-0"
+        // Sandboxed but with the flags each tool needs to work: run scripts, keep same-origin
+        // cookies for auth, allow top-frame navigation for internal links, allow popups.
+        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-top-navigation-by-user-activation allow-downloads"
+      />
+    </div>
   );
 }
 
