@@ -8,6 +8,7 @@ import CreatorShell from "./layout/CreatorShell.jsx";
 import routes from "./routes.jsx";
 import ClientFundingPage from "./pages/ClientFundingPage.jsx";
 import ClientReviewPage from "./pages/ClientReviewPage.jsx";
+import AdminOpsPage from "./pages/AdminOpsPage.jsx";
 import usePostHogIdentity from "./hooks/usePostHogIdentity.js";
 import "./api/creatorEndpoints.js";
 
@@ -45,8 +46,17 @@ export default function App() {
         {/* Public, unauthenticated -- whoever holds the share link, not a tenant user. */}
         <Route path="/brief/:shareToken" element={<ClientFundingPage />} />
         <Route path="/review/:token" element={<ClientReviewPage />} />
+        {/* /admin is served under ops.dalaillama.in behind oauth2-proxy + dalai_admin (see
+         * ops-virtualservice.yaml + ops-oauth2-authz.yaml). The Istio gate is the perimeter,
+         * so this route MUST NOT sit behind ProtectedCreatorShell -- that shell uses creator-
+         * ui's own Keycloak client (creator-ui) whose JWT the ops-dashboard flow never mints.
+         * Sitting behind the shell caused the "Authenticated but nothing shows" loop
+         * on ops.dalaillama.in/admin. AdminOpsPage does its own host check
+         * (isServedOnOpsHost) so if it is loaded from creator.dalaillama.in it explains and
+         * redirects the user. */}
+        <Route path="/admin" element={<AdminOpsPage />} />
         <Route path="/" element={<ProtectedCreatorShell />}>
-          {routes.map((route) => (
+          {routes.filter((r) => r.path !== "admin").map((route) => (
             <Route key={route.path || "index"} index={route.index} path={route.path} element={route.element} />
           ))}
         </Route>

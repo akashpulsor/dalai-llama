@@ -59,15 +59,12 @@ export default function AdminOpsPage() {
       </Notice>
     );
   }
-  if (!hasAdminRole(user)) {
-    return (
-      <Notice icon={<ShieldAlert size={16} />} tone="error">
-        You are signed in as <b>{user?.email || "unknown"}</b>, which does not have the
-        <code className="mx-1 rounded bg-black/40 px-1 py-0.5 text-[10px]">dalai_admin</code>
-        realm role. Ask Keycloak admin to grant it and refresh.
-      </Notice>
-    );
-  }
+  // On ops.dalaillama.in the perimeter is oauth2-proxy + dalai_admin at the Istio gateway --
+  // any request that reaches this component is already role-checked upstream. The Redux
+  // auth.user is null here because creator-ui's OWN Keycloak flow (client=creator-ui) never
+  // runs on ops.*; the oauth2-proxy flow uses a different client (client=ops-dashboard) and
+  // sets a cookie the React SPA cannot introspect. So we trust the gate on ops.* and skip
+  // the in-app role check. On any other host isServedOnOpsHost() short-circuits above.
 
   const TABS = [
     { key: "jobs", label: "LLM jobs", component: <JobsTab /> },
@@ -87,8 +84,8 @@ export default function AdminOpsPage() {
         <p className="text-[11px] font-extrabold uppercase tracking-widest text-purple-300">Ops dashboard</p>
         <h1 className="mt-1 text-2xl font-black text-slate-100">Platform admin</h1>
         <p className="mt-1 text-xs font-medium text-slate-400">
-          Signed in as <b className="text-slate-200">{user.email}</b>. Actions here affect real
-          tenant data — no undo.
+          Signed in via oauth2-proxy (Keycloak <code className="text-slate-300">dalai_admin</code>).
+          Actions here affect real tenant data — no undo.
         </p>
       </header>
       <nav className="mb-4 flex gap-2 border-b border-white/10">
