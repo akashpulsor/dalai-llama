@@ -3745,6 +3745,17 @@ export const creatorApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (_r, _e, { tenantId }) => [{ type: "CreatorHomeProjects", id: `admin-wallet-${tenantId}` }],
     }),
+    // Loki HTTP API pass-through (routed by ops-virtualservice /loki/api -> loki service).
+    // {query} is a LogQL expression, {sinceMinutes} shifts the range window. Loki's query_range
+    // response shape is preserved -- callers unpack data.result[].values themselves rather than
+    // this endpoint normalising to a domain DTO, so any LogQL is queryable without service changes.
+    queryLokiRange: builder.query({
+      query: ({ logql, sinceMinutes = 60, limit = 100 }) => {
+        const end = Date.now() * 1_000_000;
+        const start = end - sinceMinutes * 60 * 1_000_000_000;
+        return { url: `/loki/api/v1/query_range?query=${encodeURIComponent(logql)}&start=${start}&end=${end}&limit=${limit}&direction=backward` };
+      },
+    }),
   }),
   overrideExisting: false,
 });
@@ -4004,6 +4015,7 @@ export const {
   useDeactivateAdminTenantMutation,
   useGetAdminWalletQuery,
   useCreditAdminWalletMutation,
+  useQueryLokiRangeQuery,
   useListPreProductionShotsQuery,
   useCreatePreProductionShotMutation,
   useUpdatePreProductionShotMutation,

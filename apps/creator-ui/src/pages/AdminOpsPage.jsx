@@ -22,6 +22,7 @@ import {
   useDeactivateAdminTenantMutation,
   useGetAdminWalletQuery,
   useCreditAdminWalletMutation,
+  useQueryLokiRangeQuery,
 } from "../api/creatorEndpoints.js";
 
 const OPS_HOST_HINT = "ops.dalaillama.in";
@@ -70,6 +71,8 @@ export default function AdminOpsPage() {
 
   const TABS = [
     { key: "jobs", label: "LLM jobs", component: <JobsTab /> },
+    { key: "errors", label: "Live errors", component: <LiveErrorsTab /> },
+    { key: "llm-logs", label: "LLM gateway logs", component: <LlmGatewayLogsTab /> },
     { key: "tenants", label: "Tenants", component: <TenantsTab /> },
     { key: "wallets", label: "Wallets", component: <WalletsTab /> },
   ];
@@ -458,6 +461,158 @@ function WalletsTab() {
           </div>
         </div>
       )}
+    </section>
+  );
+}
+
+// ------- Live errors tab (Loki-backed) --------------------------------------
+
+/** Reusable Loki log viewer. LogQL comes from the parent tab so this component
+ * stays generic -- error stream, LLM gateway stream, tenant-filtered slice, etc.
+ * are all the same widget with different queries. */
+function LokiLogPanel({ logql, sinceMinutes, tenantFilter, limit = 100, refetchMs = 15000 }) {
+  const fullQuery = tenantFilter ? `${logql} |= "tenant_id=\\"${tenantFilter}\\""` : logql;
+  const { data, isFetching, refetch } = useQueryLokiRangeQuery(
+    { logql: fullQuery, sinceMinutes, limit },
+    { pollingInterval: refetchMs, refetchOnMountOrArgChange: true }
+  );
+
+  const rows = (data?.data?.result || []).flatMap((stream) =>
+    (stream.values || []).map(([ns, line]) => ({
+      ts: new Date(Number(ns) / 1_000_000),
+      labels: stream.stream || {},
+      line,
+    }))
+  ).sort((a, b) => b.ts - a.ts);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-3 text-[10px] text-slate-500">
+        <span>Query: <code className="text-slate-400">{fullQuery}</code></span>
+        <span className="ml-auto">
+          {isFetching ? <Loader2 size={11} className="inline animate-spin" /> : `${rows.length} lines · auto-refresh ${refetchMs / 1000}s`}
+        </span>
+        <button
+          type="button"
+          onClick={refetch}
+          className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-slate-300 hover:border-purple-400/30"
+        >
+          Reload
+        </button>
+      </div>
+      <div className="max-h-[500px] overflow-auto rounded-lg border border-white/10 bg-black/30 p-2 font-mono text-[10.5px] leading-4">
+        {rows.length === 0 && !isFetching && (
+          <p className="p-2 text-slate-500">No log lines in the last {sinceMinutes} minutes.</p>
+        )}
+        {rows.map((r, i) => {
+          const parsed = tryParseJson(r.line);
+          const level = parsed?.level || r.labels.level || "";
+          const tenantId = parsed?.tenant_id || r.labels.tenant_id || "";
+          const msg = parsed?.message || r.line;
+          const levelTone = level === "ERROR" ? "text-rose-300" : level === "WARN" ? "text-amber-300" : "text-slate-400";
+          return (
+            <div key={`${r.ts.getTime()}-${i}`} className="border-b border-white/5 py-1">
+              <span className="text-slate-500">{r.ts.toISOString().slice(11, 23)}</span>{" "}
+              <span className={`font-bold ${levelTone}`}>{level.padEnd(5) || "     "}</span>{" "}
+              <span className="text-purple-300">{r.labels.app || parsed?.app || "-"}</span>{" "}
+              {tenantId && <span className="text-emerald-300">t={tenantId.slice(0, 8)}</span>}{" "}
+              <span className="text-slate-200">{msg}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function tryParseJson(s) {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+}
+
+function LiveErrorsTab() {
+  const { data: tenants = [] } = useListAdminTenantsQuery();
+  const [tenantId, setTenantId] = useState("");
+  const [sinceMinutes, setSinceMinutes] = useState(60);
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <label className="text-slate-500">Tenant filter:</label>
+        <select value={tenantId} onChange={(e) => setTenantId(e.target.value)} className="creator-input px-2 py-1 text-[11px]">
+          <option value="">All tenants</option>
+          {tenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+        <label className="ml-2 text-slate-500">Since:</label>
+        <select value={sinceMinutes} onChange={(e) => setSinceMinutes(Number(e.target.value))} className="creator-input px-2 py-1 text-[11px]">
+          <option value={15}>15 min</option>
+          <option value={60}>1 hour</option>
+          <option value={360}>6 hours</option>
+          <option value={1440}>24 hours</option>
+        </select>
+        <a
+          href={`/grafana/explore?left=${encodeURIComponent(JSON.stringify({ datasource: "loki", queries: [{ expr: `{level="ERROR"}` }], range: { from: `now-${sinceMinutes}m`, to: "now" } }))}`}
+          target="_blank"
+          rel="noreferrer"
+          className="ml-auto flex items-center gap-1.5 text-[11px] font-bold text-purple-300 hover:text-purple-200"
+        >
+          Open in Grafana <ExternalLink size={11} />
+        </a>
+      </div>
+      <LokiLogPanel
+        logql={'{level="ERROR"}'}
+        sinceMinutes={sinceMinutes}
+        tenantFilter={tenantId}
+        refetchMs={10000}
+      />
+    </section>
+  );
+}
+
+// ------- LLM gateway logs tab -----------------------------------------------
+
+function LlmGatewayLogsTab() {
+  const { data: tenants = [] } = useListAdminTenantsQuery();
+  const [tenantId, setTenantId] = useState("");
+  const [sinceMinutes, setSinceMinutes] = useState(60);
+  const [levelFilter, setLevelFilter] = useState("all");
+  const baseQuery = levelFilter === "all"
+    ? '{app="llm-gateway"}'
+    : `{app="llm-gateway",level="${levelFilter}"}`;
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <label className="text-slate-500">Tenant:</label>
+        <select value={tenantId} onChange={(e) => setTenantId(e.target.value)} className="creator-input px-2 py-1 text-[11px]">
+          <option value="">All</option>
+          {tenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+        <label className="ml-2 text-slate-500">Level:</label>
+        <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)} className="creator-input px-2 py-1 text-[11px]">
+          <option value="all">All</option>
+          <option value="ERROR">ERROR</option>
+          <option value="WARN">WARN</option>
+          <option value="INFO">INFO</option>
+        </select>
+        <label className="ml-2 text-slate-500">Since:</label>
+        <select value={sinceMinutes} onChange={(e) => setSinceMinutes(Number(e.target.value))} className="creator-input px-2 py-1 text-[11px]">
+          <option value={15}>15 min</option>
+          <option value={60}>1 hour</option>
+          <option value={360}>6 hours</option>
+          <option value={1440}>24 hours</option>
+        </select>
+        <a
+          href={`/grafana/explore?left=${encodeURIComponent(JSON.stringify({ datasource: "loki", queries: [{ expr: baseQuery }], range: { from: `now-${sinceMinutes}m`, to: "now" } }))}`}
+          target="_blank"
+          rel="noreferrer"
+          className="ml-auto flex items-center gap-1.5 text-[11px] font-bold text-purple-300 hover:text-purple-200"
+        >
+          Open in Grafana <ExternalLink size={11} />
+        </a>
+      </div>
+      <LokiLogPanel logql={baseQuery} sinceMinutes={sinceMinutes} tenantFilter={tenantId} refetchMs={10000} />
     </section>
   );
 }
