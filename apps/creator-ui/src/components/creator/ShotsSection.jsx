@@ -10,6 +10,7 @@ import {
   useExportShotsPdfMutation,
   useGeneratePreProductionShotListMutation,
   useGetAnimatedPreviewHtmlMutation,
+  useGetLatestPreProductionShotListJobQuery,
   useGetPreProductionShotListJobQuery,
   useListPreProductionShotsQuery,
   useListShotAssetCompletionQuery,
@@ -22,6 +23,26 @@ import ShotReorderControl from "./ShotReorderControl.jsx";
 import ShotProductReferencePanel from "./ShotProductReferencePanel.jsx";
 import LightingCameraPlanPanel from "./LightingCameraPlanPanel.jsx";
 import ShotAssetBatchPanel from "./ShotAssetBatchPanel.jsx";
+
+/** Turns the raw LLM-side error string on a FAILED shot_list_job into something a creator can
+ * act on. The Reactor timeout message ("Did not observe any item or terminal signal within
+ * 90000ms in 'flatMap' (and no fallback has been configured)") is the specific one Pragya hit --
+ * V103 raised the model's timeout to 300s so it should not recur, but if it does the creator sees
+ * a readable line instead of framework noise. Every other case falls through to the raw message,
+ * so nothing gets swallowed: unknown errors are still shown verbatim. */
+function friendlyShotListError(raw) {
+  if (!raw) return "Shot list generation failed.";
+  if (raw.includes("Did not observe any item") || /within\s+\d+ms/.test(raw)) {
+    return "The model took too long to write the shot list. Please try again — the timeout has been raised, so a retry should succeed.";
+  }
+  if (raw.startsWith("Gemini call failed status=")) {
+    return "Google Gemini returned an error. Please try again in a moment; if it keeps failing, check the API key or quota.";
+  }
+  if (raw.startsWith("Post-response persistence failed:")) {
+    return "The shot list was generated but could not be saved. Please try again.";
+  }
+  return raw;
+}
 
 /** Shots, the stage after Cast: one shot list per project (destructive regenerate, no versioning
  * yet -- same as Script), each shot expandable into its 4 image kinds plus an optional per-shot
@@ -327,27 +348,37 @@ export default function ShotsSection({ projectId }) {
     { projectId, jobId: activeJobId },
     { skip: !projectId || !activeJobId, pollingInterval: 3000 },
   );
-  const generating = submitting || (!!activeJobId && shotListJob?.status === "PENDING");
+  // On mount / after a submit: the latest terminal-or-pending job for this project. Persists past
+  // reload so a FAILED run's banner + retry come back, instead of the empty-shot-list panel
+  // hiding that a generation was already attempted (Pragya's project sat empty for exactly this
+  // reason -- her job was FAILED but the section rendered as if nothing had ever been submitted).
+  const { data: latestShotListJob, refetch: refetchLatestJob } =
+    useGetLatestPreProductionShotListJobQuery(projectId, { skip: !projectId });
+  const generating = submitting || (!!activeJobId && shotListJob?.status === "PENDING")
+    || (!activeJobId && latestShotListJob?.status === "PENDING");
 
   useEffect(() => {
     if (!shotListJob) return;
     if (shotListJob.status === "SUCCEEDED") {
       refetchShots();
+      refetchLatestJob();
       dispatch(showFlash({ message: "Shot list ready", type: "success" }));
       setActiveJobId(null);
     } else if (shotListJob.status === "FAILED") {
+      refetchLatestJob();
       dispatch(showFlash({
-        message: shotListJob.errorMessage || "Shot list generation failed", type: "error",
+        message: friendlyShotListError(shotListJob.errorMessage), type: "error",
       }));
       setActiveJobId(null);
     }
-  }, [shotListJob, dispatch, refetchShots]);
+  }, [shotListJob, dispatch, refetchShots, refetchLatestJob]);
   const [exportPdf, { isLoading: exporting }] = useExportShotsPdfMutation();
   const [getAnimatedPreview, { isLoading: loadingPreview }] = useGetAnimatedPreviewHtmlMutation();
   const [createShot, { isLoading: creatingShot }] = useCreatePreProductionShotMutation();
   const [updateShot, { isLoading: updatingShot }] = useUpdatePreProductionShotMutation();
 
   const [addingShot, setAddingShot] = useState(false);
+  const [showShotListErrorDetails, setShowShotListErrorDetails] = useState(false);
   const [newScriptLine, setNewScriptLine] = useState("");
   const [newDurationSeconds, setNewDurationSeconds] = useState("4");
   // New shots need an existing screenplay scene to belong to -- default to the same scene the
@@ -360,6 +391,7 @@ export default function ShotsSection({ projectId }) {
     try {
       const job = await generateList(projectId).unwrap();
       setActiveJobId(job.jobId);
+      refetchLatestJob();
       dispatch(showFlash({
         message: shots.length ? "Regenerating shot list…" : "Generating shot list…",
         type: "info",
@@ -472,7 +504,49 @@ export default function ShotsSection({ projectId }) {
         </div>
       </div>
 
-      {shots.length === 0 && (
+      {/* Persistent failure banner: shows when the latest shot-list generation ended in FAILED
+       * and no shots exist yet. Survives page reload because it comes from the latest-list-job
+       * endpoint, not from an in-memory activeJobId. Retry re-submits via the same handleGenerate
+       * path -- the backend's resubmitIfTerminal resets the row to PENDING and republishes the
+       * Kafka event, so no duplicate row is created. */}
+      {shots.length === 0 && latestShotListJob?.status === "FAILED" && !generating && (
+        <div className="mb-3 rounded-lg border border-rose-400/25 bg-rose-500/[0.06] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide text-rose-300">
+                <AlertTriangle size={12} />
+                Shot list generation failed
+              </p>
+              <p className="mt-1.5 text-xs font-medium text-slate-200">
+                {friendlyShotListError(latestShotListJob.errorMessage)}
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowShotListErrorDetails((v) => !v)}
+                className="mt-2 text-[10px] font-bold uppercase tracking-wide text-slate-400 hover:text-slate-200"
+              >
+                {showShotListErrorDetails ? "Hide details" : "Show details"}
+              </button>
+              {showShotListErrorDetails && (
+                <pre className="mt-1.5 max-h-32 overflow-auto whitespace-pre-wrap rounded border border-white/10 bg-black/30 p-2 text-[10px] font-mono text-slate-400">
+                  {latestShotListJob.errorMessage || "(no detail returned by the backend)"}
+                </pre>
+              )}
+            </div>
+            <button
+              type="button"
+              disabled={generating}
+              onClick={handleGenerate}
+              className="creator-primary flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-60"
+            >
+              <RefreshCw size={12} />
+              Try again
+            </button>
+          </div>
+        </div>
+      )}
+
+      {shots.length === 0 && latestShotListJob?.status !== "FAILED" && (
         <p className="rounded-lg border border-dashed border-white/10 py-8 text-center text-xs font-medium text-slate-500">
           No shots yet — generate the shot list from the screenplay above.
         </p>

@@ -2455,6 +2455,17 @@ export const creatorApi = apiSlice.injectEndpoints({
       ],
     }),
 
+    // Latest shot-list job for this project (any status), fetched on mount so a page reload after
+    // a FAILED run rehydrates the persistent failure banner + retry affordance instead of showing
+    // the same empty-shot-list panel a fresh project shows. Returns undefined when the backend
+    // sends 204 (no job ever submitted).
+    getLatestPreProductionShotListJob: builder.query({
+      query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/shots/latest-list-job`) }),
+      providesTags: (_result, _error, projectId) => [
+        { type: "CreatorHomeProjects", id: `shot-list-latest-job-${projectId}` },
+      ],
+    }),
+
     listPreProductionShots: builder.query({
       query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/shots`) }),
       providesTags: (_result, _error, projectId) => [{ type: "CreatorHomeProjects", id: `shots-${projectId}` }],
@@ -3936,6 +3947,7 @@ export const {
   useCreateCastAssignmentMutation,
   useGeneratePreProductionShotListMutation,
   useGetPreProductionShotListJobQuery,
+  useGetLatestPreProductionShotListJobQuery,
   useListPreProductionShotsQuery,
   useCreatePreProductionShotMutation,
   useUpdatePreProductionShotMutation,
