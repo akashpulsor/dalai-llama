@@ -3717,6 +3717,22 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: (jobId) => ({ url: opsAdminUrl(`/llm-jobs/${jobId}/retry`), method: "POST" }),
       invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-stuck-llm-jobs" }],
     }),
+    listAdminTenants: builder.query({
+      query: () => ({ url: opsAdminUrl(`/tenants`) }),
+      providesTags: [{ type: "CreatorHomeProjects", id: "admin-tenants" }],
+    }),
+    getAdminWallet: builder.query({
+      query: (tenantId) => ({ url: opsAdminUrl(`/billing/wallets/${tenantId}`) }),
+      providesTags: (_r, _e, tenantId) => [{ type: "CreatorHomeProjects", id: `admin-wallet-${tenantId}` }],
+    }),
+    creditAdminWallet: builder.mutation({
+      query: ({ tenantId, amount, reference }) => ({
+        url: opsAdminUrl(`/billing/wallets/${tenantId}/credit`),
+        method: "POST",
+        body: { amount, reference },
+      }),
+      invalidatesTags: (_r, _e, { tenantId }) => [{ type: "CreatorHomeProjects", id: `admin-wallet-${tenantId}` }],
+    }),
   }),
   overrideExisting: false,
 });
@@ -3971,6 +3987,9 @@ export const {
   useGetLatestPreProductionShotListJobQuery,
   useListStuckLlmJobsQuery,
   useRetryLlmJobMutation,
+  useListAdminTenantsQuery,
+  useGetAdminWalletQuery,
+  useCreditAdminWalletMutation,
   useListPreProductionShotsQuery,
   useCreatePreProductionShotMutation,
   useUpdatePreProductionShotMutation,

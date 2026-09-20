@@ -17,6 +17,9 @@ import { AlertTriangle, RefreshCw, ExternalLink, Loader2, ShieldAlert } from "lu
 import {
   useListStuckLlmJobsQuery,
   useRetryLlmJobMutation,
+  useListAdminTenantsQuery,
+  useGetAdminWalletQuery,
+  useCreditAdminWalletMutation,
 } from "../api/creatorEndpoints.js";
 
 const OPS_HOST_HINT = "ops.dalaillama.in";
@@ -65,8 +68,8 @@ export default function AdminOpsPage() {
 
   const TABS = [
     { key: "jobs", label: "LLM jobs", component: <JobsTab /> },
-    { key: "tenants", label: "Tenants (soon)", component: <PlaceholderTab name="Tenants" /> },
-    { key: "wallets", label: "Wallets (soon)", component: <PlaceholderTab name="Wallets" /> },
+    { key: "tenants", label: "Tenants", component: <TenantsTab /> },
+    { key: "wallets", label: "Wallets", component: <WalletsTab /> },
   ];
 
   return (
@@ -226,13 +229,172 @@ function JobsTab() {
   );
 }
 
-// ------- Placeholder tabs ----------------------------------------------------
+// ------- Tenants tab ---------------------------------------------------------
 
-function PlaceholderTab({ name }) {
+function TenantsTab() {
+  const { data: tenants = [], isLoading, isError, error, refetch } = useListAdminTenantsQuery();
+  const [query, setQuery] = useState("");
+  const filtered = tenants.filter((t) => {
+    if (!query) return true;
+    const q = query.toLowerCase();
+    return (t.name || "").toLowerCase().includes(q)
+      || (t.slug || "").toLowerCase().includes(q)
+      || (t.primaryContactEmail || "").toLowerCase().includes(q);
+  });
+
   return (
-    <p className="rounded-lg border border-dashed border-white/10 py-8 text-center text-xs font-medium text-slate-500">
-      {name} tab not yet wired. Backend admin endpoints for this domain are the next commit.
-    </p>
+    <section className="space-y-4">
+      <div className="flex items-center gap-2">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by name / slug / email"
+          className="creator-input flex-1 px-2.5 py-1.5 text-[11px] font-semibold"
+        />
+        <button
+          type="button"
+          onClick={refetch}
+          className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-slate-300 hover:border-purple-400/30"
+        >
+          Reload
+        </button>
+      </div>
+      {isLoading && <Loader label="Loading tenants" />}
+      {isError && <Notice tone="error" icon={<AlertTriangle size={14} />}>Could not load tenants: {error?.status || "unknown"}</Notice>}
+      {!isLoading && !isError && (
+        <div className="overflow-hidden rounded-lg border border-white/10">
+          <table className="w-full text-[11px]">
+            <thead className="bg-white/[0.03] text-[10px] uppercase tracking-wide text-slate-500">
+              <tr>
+                <Th>Tenant</Th><Th>Contact</Th><Th>Status</Th><Th>Keycloak</Th><Th>Type</Th><Th>Created</Th><Th>Expires</Th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {filtered.map((t) => (
+                <tr key={t.id} className="hover:bg-white/[0.02]">
+                  <Td>
+                    <div className="font-semibold text-slate-200">{t.name}</div>
+                    <div className="text-slate-500">{t.slug} · <code className="text-[10px]">{t.id.slice(0, 8)}</code></div>
+                  </Td>
+                  <Td>
+                    <div className="text-slate-300">{t.primaryContactName || "-"}</div>
+                    <div className="text-slate-500">{t.primaryContactEmail}</div>
+                  </Td>
+                  <Td>
+                    <StatusPill status={t.status} />
+                    {t.statusMessage && (
+                      <div className="mt-1 max-w-xs truncate text-rose-300" title={t.statusMessage}>{t.statusMessage}</div>
+                    )}
+                  </Td>
+                  <Td className={t.keycloakConfigured ? "text-emerald-300" : "text-rose-300"}>
+                    {t.keycloakConfigured ? "configured" : "MISSING"}
+                  </Td>
+                  <Td className="text-slate-300">{t.accountType || "-"}</Td>
+                  <Td className="text-slate-400">{formatTime(t.createdAt)}</Td>
+                  <Td className="text-slate-400">{formatTime(t.expiresAt)}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ------- Wallets tab ---------------------------------------------------------
+
+function WalletsTab() {
+  const { data: tenants = [] } = useListAdminTenantsQuery();
+  const [tenantId, setTenantId] = useState("");
+  const { data: wallet, isFetching, isError, error } = useGetAdminWalletQuery(tenantId, { skip: !tenantId });
+  const [credit, { isLoading: crediting }] = useCreditAdminWalletMutation();
+  const [amount, setAmount] = useState("");
+  const [reference, setReference] = useState("");
+  const [flash, setFlash] = useState(null);
+
+  const handleCredit = async () => {
+    setFlash(null);
+    try {
+      await credit({ tenantId, amount: Number(amount), reference }).unwrap();
+      setFlash({ tone: "success", message: `Credited ₹${amount} to wallet. Reference recorded in transaction ledger.` });
+      setAmount("");
+      setReference("");
+    } catch (err) {
+      setFlash({ tone: "error", message: err?.data?.detail || err?.data?.message || "Credit failed" });
+    }
+  };
+
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <label className="text-slate-500">Tenant:</label>
+        <select
+          value={tenantId}
+          onChange={(e) => setTenantId(e.target.value)}
+          className="creator-input flex-1 px-2.5 py-1.5 text-[11px] font-semibold"
+        >
+          <option value="">— pick a tenant —</option>
+          {tenants.map((t) => (
+            <option key={t.id} value={t.id}>{t.name} ({t.primaryContactEmail})</option>
+          ))}
+        </select>
+      </div>
+
+      {flash && (<Notice tone={flash.tone} icon={flash.tone === "error" ? <AlertTriangle size={14} /> : null}>{flash.message}</Notice>)}
+
+      {!tenantId && <p className="rounded-lg border border-dashed border-white/10 py-6 text-center text-xs text-slate-500">Pick a tenant to view their wallet.</p>}
+      {tenantId && isFetching && <Loader label="Loading wallet" />}
+      {tenantId && isError && <Notice tone="error" icon={<AlertTriangle size={14} />}>Could not load wallet: {error?.status === 404 ? "no wallet exists for this tenant" : error?.status}</Notice>}
+
+      {wallet && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
+            <p className="text-[10px] font-extrabold uppercase tracking-wide text-purple-300">Balance</p>
+            <p className="mt-1 text-3xl font-black text-slate-100">{wallet.currency} {Number(wallet.balance).toFixed(2)}</p>
+            <dl className="mt-3 space-y-1 text-[11px] text-slate-400">
+              <div className="flex justify-between"><dt>Credit limit</dt><dd>{wallet.creditLimit ?? "-"}</dd></div>
+              <div className="flex justify-between"><dt>Low-balance alert</dt><dd>{wallet.lowBalanceThreshold ?? "-"}</dd></div>
+              <div className="flex justify-between"><dt>Auto-recharge</dt><dd>{wallet.autoRechargeEnabled ? `on @ ${wallet.autoRechargeThreshold} → ${wallet.autoRechargeAmount}` : "off"}</dd></div>
+              <div className="flex justify-between"><dt>Last recharged</dt><dd>{formatTime(wallet.lastRechargedAt)}</dd></div>
+              <div className="flex justify-between"><dt>Last deducted</dt><dd>{formatTime(wallet.lastDeductedAt)}</dd></div>
+            </dl>
+          </div>
+          <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
+            <p className="text-[10px] font-extrabold uppercase tracking-wide text-purple-300">Manual credit</p>
+            <p className="mt-1 text-[11px] text-slate-400">Off-payment adjustment. Reference is required and lands verbatim in the transaction ledger for audit.</p>
+            <div className="mt-3 space-y-2">
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder={`Amount in ${wallet.currency}`}
+                className="creator-input w-full px-2.5 py-1.5 text-[11px] font-semibold"
+              />
+              <input
+                type="text"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                placeholder={"Reference (e.g. 'comp for shot-list-gen incident 2026-09-20')"}
+                className="creator-input w-full px-2.5 py-1.5 text-[11px] font-semibold"
+              />
+              <button
+                type="button"
+                onClick={handleCredit}
+                disabled={crediting || !amount || Number(amount) <= 0 || !reference || reference.length < 3}
+                className="creator-primary flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black text-white disabled:opacity-40"
+              >
+                {crediting ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+                Apply credit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
