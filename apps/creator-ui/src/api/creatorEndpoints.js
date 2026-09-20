@@ -26,14 +26,26 @@ const platformApiOrigin = (() => {
 const platformUrl = (path) => `${platformApiOrigin}/v1${path}`;
 
 /**
- * Same-origin URL for admin ops endpoints. The /admin route is only served on ops.dalaillama.in
- * (via ops-virtualservice.yaml), and ops.dalaillama.in routes /api/v1/internal/admin/** to the
- * owning service (llm-gateway, tenant-service, billing-service) inside the cluster. Using a
- * relative path here means the browser hits the same origin the page was served from -- so admin
- * calls made from creator.dalaillama.in would fail routing, which is intentional: admin surface
- * is only reachable behind the oauth2-proxy Keycloak gate at ops.dalaillama.in.
+ * Same-origin URL for admin ops endpoints. Uses window.location.origin explicitly rather than
+ * a leading-slash relative path because RTK Query's baseUrl (`platformApiOrigin/api/v1`) prepends
+ * to any non-absolute URL -- returning `/api/v1/internal/admin/...` produced double-prefixed
+ * requests like https://api.dalaillama.in/api/v1/api/v1/internal/admin/... (observed in prod).
+ *
+ * The /admin route only renders on ops.dalaillama.in (AdminOpsPage.isServedOnOpsHost guard), so
+ * window.location.origin is always the ops hostname when these endpoints are called; the ops
+ * VirtualService then routes /api/v1/internal/admin/** to the owning backend service.
  */
-const opsAdminUrl = (path) => `/api/v1/internal/admin${path}`;
+const opsAdminUrl = (path) => {
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  return `${origin}/api/v1/internal/admin${path}`;
+};
+
+/** Same rationale as opsAdminUrl -- Loki HTTP API is same-origin on ops.dalaillama.in via the
+ * VirtualService /loki/api route. */
+const opsLokiUrl = (path) => {
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  return `${origin}/loki/api${path}`;
+};
 
 const normalizeOrganization = (response = {}) => {
   const data = response?.data && typeof response.data === "object" ? response.data : response;
@@ -3753,7 +3765,7 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: ({ logql, sinceMinutes = 60, limit = 100 }) => {
         const end = Date.now() * 1_000_000;
         const start = end - sinceMinutes * 60 * 1_000_000_000;
-        return { url: `/loki/api/v1/query_range?query=${encodeURIComponent(logql)}&start=${start}&end=${end}&limit=${limit}&direction=backward` };
+        return { url: opsLokiUrl(`/v1/query_range?query=${encodeURIComponent(logql)}&start=${start}&end=${end}&limit=${limit}&direction=backward`) };
       },
     }),
   }),
