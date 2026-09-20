@@ -10,6 +10,7 @@ import ProjectPage from "./pages/ProjectPage.jsx";
 import WalletBillingPage from "./pages/WalletBillingPage.jsx";
 import SubscriptionPage from "./pages/SubscriptionPage.jsx";
 import CastLibraryPage from "./pages/CastLibraryPage.jsx";
+import AdminOpsPage from "./pages/AdminOpsPage.jsx";
 
 const routes = [
   { index: true, element: <HomePage /> },
@@ -18,6 +19,9 @@ const routes = [
   { path: "wallet-billing", element: <WalletBillingPage /> },
   { path: "subscription", element: <SubscriptionPage /> },
   { path: "cast-library", element: <CastLibraryPage /> },
+  // Ops dashboard. Component enforces both host (ops.dalaillama.in) and role (dalai_admin);
+  // adding the route unconditionally keeps routes.jsx simple and defers gating to the page.
+  { path: "admin", element: <AdminOpsPage /> },
   { path: "home", element: <Navigate to="/" replace /> },
   { path: "requirements/:requirementId", element: <ProjectRequirementPage /> },
   { path: "projects/:projectId", element: <ProjectPage /> },

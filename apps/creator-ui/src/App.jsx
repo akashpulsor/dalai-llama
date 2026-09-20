@@ -8,6 +8,7 @@ import CreatorShell from "./layout/CreatorShell.jsx";
 import routes from "./routes.jsx";
 import ClientFundingPage from "./pages/ClientFundingPage.jsx";
 import ClientReviewPage from "./pages/ClientReviewPage.jsx";
+import usePostHogIdentity from "./hooks/usePostHogIdentity.js";
 import "./api/creatorEndpoints.js";
 
 const AuthCallbackPage = () => {
@@ -24,6 +25,10 @@ const AuthCallbackPage = () => {
 const ProtectedCreatorShell = () => {
   const { status } = useAuthGuard();
   useTenantEvents({ source: "creator-ui", broker: "tenant-service", topics: ["wallet", "billing", "apps"] });
+  // Attach the current authed user + tenant to PostHog so session replays and
+  // events are attributed to them instead of an anonymous distinct_id. No-op
+  // when POSTHOG_API_KEY is unset (dev builds).
+  usePostHogIdentity();
 
   if (status === "checking" || status === "redirecting") {
     return <AuthLoader message="Preparing creator workspace" />;

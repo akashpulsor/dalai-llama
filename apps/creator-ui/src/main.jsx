@@ -7,6 +7,7 @@ import { ErrorBoundary, Toaster } from "@dalaillama/shared-ui";
 import App from "./App.jsx";
 import { initGoogleAnalytics } from "./analytics.js";
 import { initFaro } from "./faro.js";
+import { initPostHog } from "./posthog.js";
 import "./index.css";
 
 const rootEl = document.getElementById("root");
@@ -14,6 +15,7 @@ if (!rootEl) throw new Error("Root element #root not found");
 
 initGoogleAnalytics();
 initFaro();
+initPostHog();
 
 ReactDOM.createRoot(rootEl).render(
   <Provider store={store}>

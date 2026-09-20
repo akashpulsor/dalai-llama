@@ -25,6 +25,16 @@ const platformApiOrigin = (() => {
 })();
 const platformUrl = (path) => `${platformApiOrigin}/v1${path}`;
 
+/**
+ * Same-origin URL for admin ops endpoints. The /admin route is only served on ops.dalaillama.in
+ * (via ops-virtualservice.yaml), and ops.dalaillama.in routes /api/v1/internal/admin/** to the
+ * owning service (llm-gateway, tenant-service, billing-service) inside the cluster. Using a
+ * relative path here means the browser hits the same origin the page was served from -- so admin
+ * calls made from creator.dalaillama.in would fail routing, which is intentional: admin surface
+ * is only reachable behind the oauth2-proxy Keycloak gate at ops.dalaillama.in.
+ */
+const opsAdminUrl = (path) => `/api/v1/internal/admin${path}`;
+
 const normalizeOrganization = (response = {}) => {
   const data = response?.data && typeof response.data === "object" ? response.data : response;
   const tenantId = data?.tenantId || data?.tenant_id || data?.id || null;
@@ -3696,6 +3706,17 @@ export const creatorApi = apiSlice.injectEndpoints({
         responseHandler: (response) => response.text(),
       }),
     }),
+
+    // Ops dashboard admin endpoints. Same-origin (ops.dalaillama.in) -- see opsAdminUrl comment
+    // for the routing decision. Every call is gated by oauth2-proxy + dalai_admin at the ingress.
+    listStuckLlmJobs: builder.query({
+      query: (lookbackHours = 24) => ({ url: opsAdminUrl(`/llm-jobs/stuck?lookbackHours=${lookbackHours}`) }),
+      providesTags: [{ type: "CreatorHomeProjects", id: "admin-stuck-llm-jobs" }],
+    }),
+    retryLlmJob: builder.mutation({
+      query: (jobId) => ({ url: opsAdminUrl(`/llm-jobs/${jobId}/retry`), method: "POST" }),
+      invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-stuck-llm-jobs" }],
+    }),
   }),
   overrideExisting: false,
 });
@@ -3948,6 +3969,8 @@ export const {
   useGeneratePreProductionShotListMutation,
   useGetPreProductionShotListJobQuery,
   useGetLatestPreProductionShotListJobQuery,
+  useListStuckLlmJobsQuery,
+  useRetryLlmJobMutation,
   useListPreProductionShotsQuery,
   useCreatePreProductionShotMutation,
   useUpdatePreProductionShotMutation,
