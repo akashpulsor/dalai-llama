@@ -3721,6 +3721,18 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: () => ({ url: opsAdminUrl(`/tenants`) }),
       providesTags: [{ type: "CreatorHomeProjects", id: "admin-tenants" }],
     }),
+    activateAdminTenant: builder.mutation({
+      query: (tenantId) => ({ url: opsAdminUrl(`/tenants/${tenantId}/activate`), method: "POST" }),
+      invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-tenants" }],
+    }),
+    deactivateAdminTenant: builder.mutation({
+      query: ({ tenantId, reason }) => ({
+        url: opsAdminUrl(`/tenants/${tenantId}/deactivate`),
+        method: "POST",
+        body: { reason },
+      }),
+      invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-tenants" }],
+    }),
     getAdminWallet: builder.query({
       query: (tenantId) => ({ url: opsAdminUrl(`/billing/wallets/${tenantId}`) }),
       providesTags: (_r, _e, tenantId) => [{ type: "CreatorHomeProjects", id: `admin-wallet-${tenantId}` }],
@@ -3988,6 +4000,8 @@ export const {
   useListStuckLlmJobsQuery,
   useRetryLlmJobMutation,
   useListAdminTenantsQuery,
+  useActivateAdminTenantMutation,
+  useDeactivateAdminTenantMutation,
   useGetAdminWalletQuery,
   useCreditAdminWalletMutation,
   useListPreProductionShotsQuery,

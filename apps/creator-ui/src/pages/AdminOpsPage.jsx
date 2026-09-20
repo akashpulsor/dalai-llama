@@ -18,6 +18,8 @@ import {
   useListStuckLlmJobsQuery,
   useRetryLlmJobMutation,
   useListAdminTenantsQuery,
+  useActivateAdminTenantMutation,
+  useDeactivateAdminTenantMutation,
   useGetAdminWalletQuery,
   useCreditAdminWalletMutation,
 } from "../api/creatorEndpoints.js";
@@ -233,7 +235,12 @@ function JobsTab() {
 
 function TenantsTab() {
   const { data: tenants = [], isLoading, isError, error, refetch } = useListAdminTenantsQuery();
+  const [activate, { isLoading: activating }] = useActivateAdminTenantMutation();
+  const [deactivate, { isLoading: deactivating }] = useDeactivateAdminTenantMutation();
   const [query, setQuery] = useState("");
+  const [flash, setFlash] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+
   const filtered = tenants.filter((t) => {
     if (!query) return true;
     const q = query.toLowerCase();
@@ -241,6 +248,36 @@ function TenantsTab() {
       || (t.slug || "").toLowerCase().includes(q)
       || (t.primaryContactEmail || "").toLowerCase().includes(q);
   });
+
+  const handleActivate = async (t) => {
+    setBusyId(t.id);
+    setFlash(null);
+    try {
+      await activate(t.id).unwrap();
+      setFlash({ tone: "success", message: `${t.name} activated. status → ACTIVE.` });
+    } catch (err) {
+      setFlash({ tone: "error", message: err?.data?.message || err?.data?.detail || "Activate failed" });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleDeactivate = async (t) => {
+    // Reason is required by policy (so an auditor can tell later WHY a tenant was cut off) --
+    // ship the prompt as a native browser prompt for now; a dedicated modal is polish for later.
+    const reason = window.prompt(`Reason for suspending "${t.name}"?\n(Lands in tenants.suspension_reason — used for audit later.)`);
+    if (reason == null) return; // cancelled
+    setBusyId(t.id);
+    setFlash(null);
+    try {
+      await deactivate({ tenantId: t.id, reason }).unwrap();
+      setFlash({ tone: "warn", message: `${t.name} suspended. status → SUSPENDED. Reason: ${reason || "(none)"}` });
+    } catch (err) {
+      setFlash({ tone: "error", message: err?.data?.message || err?.data?.detail || "Deactivate failed" });
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <section className="space-y-4">
@@ -260,6 +297,7 @@ function TenantsTab() {
           Reload
         </button>
       </div>
+      {flash && (<Notice tone={flash.tone} icon={flash.tone === "error" ? <AlertTriangle size={14} /> : null}>{flash.message}</Notice>)}
       {isLoading && <Loader label="Loading tenants" />}
       {isError && <Notice tone="error" icon={<AlertTriangle size={14} />}>Could not load tenants: {error?.status || "unknown"}</Notice>}
       {!isLoading && !isError && (
@@ -267,34 +305,60 @@ function TenantsTab() {
           <table className="w-full text-[11px]">
             <thead className="bg-white/[0.03] text-[10px] uppercase tracking-wide text-slate-500">
               <tr>
-                <Th>Tenant</Th><Th>Contact</Th><Th>Status</Th><Th>Keycloak</Th><Th>Type</Th><Th>Created</Th><Th>Expires</Th>
+                <Th>Tenant</Th><Th>Contact</Th><Th>Status</Th><Th>Keycloak</Th><Th>Type</Th><Th>Created</Th><Th>Action</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {filtered.map((t) => (
-                <tr key={t.id} className="hover:bg-white/[0.02]">
-                  <Td>
-                    <div className="font-semibold text-slate-200">{t.name}</div>
-                    <div className="text-slate-500">{t.slug} · <code className="text-[10px]">{t.id.slice(0, 8)}</code></div>
-                  </Td>
-                  <Td>
-                    <div className="text-slate-300">{t.primaryContactName || "-"}</div>
-                    <div className="text-slate-500">{t.primaryContactEmail}</div>
-                  </Td>
-                  <Td>
-                    <StatusPill status={t.status} />
-                    {t.statusMessage && (
-                      <div className="mt-1 max-w-xs truncate text-rose-300" title={t.statusMessage}>{t.statusMessage}</div>
-                    )}
-                  </Td>
-                  <Td className={t.keycloakConfigured ? "text-emerald-300" : "text-rose-300"}>
-                    {t.keycloakConfigured ? "configured" : "MISSING"}
-                  </Td>
-                  <Td className="text-slate-300">{t.accountType || "-"}</Td>
-                  <Td className="text-slate-400">{formatTime(t.createdAt)}</Td>
-                  <Td className="text-slate-400">{formatTime(t.expiresAt)}</Td>
-                </tr>
-              ))}
+              {filtered.map((t) => {
+                const isActive = t.status === "ACTIVE";
+                const rowBusy = busyId === t.id && (activating || deactivating);
+                return (
+                  <tr key={t.id} className="hover:bg-white/[0.02]">
+                    <Td>
+                      <div className="font-semibold text-slate-200">{t.name}</div>
+                      <div className="text-slate-500">{t.slug} · <code className="text-[10px]">{t.id.slice(0, 8)}</code></div>
+                    </Td>
+                    <Td>
+                      <div className="text-slate-300">{t.primaryContactName || "-"}</div>
+                      <div className="text-slate-500">{t.primaryContactEmail}</div>
+                    </Td>
+                    <Td>
+                      <StatusPill status={t.status} />
+                      {t.statusMessage && (
+                        <div className="mt-1 max-w-xs truncate text-rose-300" title={t.statusMessage}>{t.statusMessage}</div>
+                      )}
+                    </Td>
+                    <Td className={t.keycloakConfigured ? "text-emerald-300" : "text-rose-300"}>
+                      {t.keycloakConfigured ? "configured" : "MISSING"}
+                    </Td>
+                    <Td className="text-slate-300">{t.accountType || "-"}</Td>
+                    <Td className="text-slate-400">{formatTime(t.createdAt)}</Td>
+                    <Td>
+                      {isActive ? (
+                        <button
+                          type="button"
+                          disabled={rowBusy}
+                          onClick={() => handleDeactivate(t)}
+                          className="flex items-center gap-1 rounded border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-[11px] font-bold text-rose-200 hover:border-rose-400/60 disabled:opacity-40"
+                        >
+                          {rowBusy ? <Loader2 size={11} className="animate-spin" /> : <AlertTriangle size={11} />}
+                          Suspend
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={rowBusy}
+                          onClick={() => handleActivate(t)}
+                          className="flex items-center gap-1 rounded border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-bold text-emerald-200 hover:border-emerald-400/60 disabled:opacity-40"
+                        >
+                          {rowBusy ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+                          Activate
+                        </button>
+                      )}
+                    </Td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
