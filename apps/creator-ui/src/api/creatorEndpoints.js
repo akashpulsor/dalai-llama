@@ -3763,6 +3763,26 @@ export const creatorApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (_r, _e, { tenantId }) => [{ type: "CreatorHomeProjects", id: `admin-wallet-${tenantId}` }],
     }),
+    listAdminPlans: builder.query({
+      query: () => ({ url: opsAdminUrl(`/plans`) }),
+      providesTags: [{ type: "CreatorHomeProjects", id: "admin-plans" }],
+    }),
+    createAdminPlan: builder.mutation({
+      query: (body) => ({ url: opsAdminUrl(`/plans`), method: "POST", body }),
+      invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-plans" }],
+    }),
+    updateAdminPlan: builder.mutation({
+      query: ({ planId, ...body }) => ({ url: opsAdminUrl(`/plans/${planId}`), method: "PUT", body }),
+      invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-plans" }],
+    }),
+    activateAdminPlan: builder.mutation({
+      query: (planId) => ({ url: opsAdminUrl(`/plans/${planId}/activate`), method: "POST" }),
+      invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-plans" }],
+    }),
+    deactivateAdminPlan: builder.mutation({
+      query: (planId) => ({ url: opsAdminUrl(`/plans/${planId}/deactivate`), method: "POST" }),
+      invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-plans" }],
+    }),
     // Loki HTTP API pass-through (routed by ops-virtualservice /loki/api -> loki service).
     // {query} is a LogQL expression, {sinceMinutes} shifts the range window. Loki's query_range
     // response shape is preserved -- callers unpack data.result[].values themselves rather than
@@ -4034,6 +4054,11 @@ export const {
   useDeactivateAdminTenantMutation,
   useGetAdminWalletQuery,
   useCreditAdminWalletMutation,
+  useListAdminPlansQuery,
+  useCreateAdminPlanMutation,
+  useUpdateAdminPlanMutation,
+  useActivateAdminPlanMutation,
+  useDeactivateAdminPlanMutation,
   useQueryLokiRangeQuery,
   useListPreProductionShotsQuery,
   useCreatePreProductionShotMutation,

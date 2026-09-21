@@ -13,7 +13,7 @@
  */
 import React, { useState } from "react";
 import { useSelector } from "react-redux";
-import { AlertTriangle, RefreshCw, ExternalLink, Loader2, ShieldAlert } from "lucide-react";
+import { AlertTriangle, RefreshCw, ExternalLink, Loader2, ShieldAlert, Plus } from "lucide-react";
 import {
   useListStuckLlmJobsQuery,
   useListRecentLlmJobsQuery,
@@ -23,6 +23,11 @@ import {
   useDeactivateAdminTenantMutation,
   useGetAdminWalletQuery,
   useCreditAdminWalletMutation,
+  useListAdminPlansQuery,
+  useCreateAdminPlanMutation,
+  useUpdateAdminPlanMutation,
+  useActivateAdminPlanMutation,
+  useDeactivateAdminPlanMutation,
 } from "../api/creatorEndpoints.js";
 
 const OPS_HOST_HINT = "ops.dalaillama.in";
@@ -74,6 +79,7 @@ export default function AdminOpsPage() {
     { key: "jobs", label: "LLM jobs", component: <JobsTab /> },
     { key: "tenants", label: "Tenants", component: <TenantsTab /> },
     { key: "wallets", label: "Wallets", component: <WalletsTab /> },
+    { key: "plans", label: "Plans", component: <PlansTab /> },
   ];
 
   return (
@@ -695,6 +701,155 @@ function LlmGatewayLogsTab() {
          * ext-authz redirect quirk. */}
       </div>
       <LokiLogPanel logql={baseQuery} sinceMinutes={sinceMinutes} tenantFilter={tenantId} refetchMs={10000} />
+    </section>
+  );
+}
+
+// ------- Plans tab ----------------------------------------------------------
+
+function PlansTab() {
+  const { data: plans = [], isLoading, isError, error, refetch } = useListAdminPlansQuery();
+  const [createPlan, { isLoading: creating }] = useCreateAdminPlanMutation();
+  const [activatePlan] = useActivateAdminPlanMutation();
+  const [deactivatePlan] = useDeactivateAdminPlanMutation();
+  const [flash, setFlash] = useState(null);
+
+  // Create form state -- kept minimal, only monthly today per product ask.
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({
+    code: "", name: "", description: "", amount: "", currency: "INR",
+    walletCreditPerCycle: "",
+  });
+
+  const handleCreate = async () => {
+    setFlash(null);
+    try {
+      await createPlan({
+        code: form.code.toUpperCase(),
+        name: form.name,
+        description: form.description,
+        amount: Number(form.amount),
+        currency: form.currency.toUpperCase(),
+        frequency: "MONTHLY",
+        walletCreditPerCycle: Number(form.walletCreditPerCycle),
+        isDefault: false,
+        active: true,
+      }).unwrap();
+      setFlash({ tone: "success", message: `Plan ${form.code} created` });
+      setShowForm(false);
+      setForm({ code: "", name: "", description: "", amount: "", currency: "INR", walletCreditPerCycle: "" });
+    } catch (err) {
+      setFlash({ tone: "error", message: err?.data?.detail || err?.data?.message || "Create failed" });
+    }
+  };
+
+  const handleToggle = async (plan) => {
+    setFlash(null);
+    try {
+      if (plan.active) {
+        await deactivatePlan(plan.id).unwrap();
+        setFlash({ tone: "warn", message: `${plan.code} deactivated` });
+      } else {
+        await activatePlan(plan.id).unwrap();
+        setFlash({ tone: "success", message: `${plan.code} activated` });
+      }
+    } catch (err) {
+      setFlash({ tone: "error", message: err?.data?.detail || err?.data?.message || "Toggle failed" });
+    }
+  };
+
+  return (
+    <section className="space-y-4">
+      <div className="flex items-center gap-2 text-xs">
+        <button
+          type="button"
+          onClick={() => setShowForm((v) => !v)}
+          className="creator-primary flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black text-white"
+        >
+          {showForm ? "Cancel" : "New monthly plan"}
+        </button>
+        <button
+          type="button"
+          onClick={refetch}
+          className="rounded border border-white/10 bg-white/5 px-2 py-1 text-slate-300 hover:border-purple-400/30"
+        >
+          Reload
+        </button>
+      </div>
+      {flash && (<Notice tone={flash.tone} icon={flash.tone === "error" ? <AlertTriangle size={14} /> : null}>{flash.message}</Notice>)}
+      {showForm && (
+        <div className="rounded-lg border border-purple-400/25 bg-purple-500/[0.05] p-3">
+          <p className="mb-2 text-[10px] font-extrabold uppercase tracking-wide text-purple-300">New monthly plan</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <input placeholder="code (STARTER, PRO, ...)" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className="creator-input px-2 py-1 text-[11px]" />
+            <input placeholder="name (human-friendly)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="creator-input px-2 py-1 text-[11px]" />
+            <input placeholder="description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="creator-input px-2 py-1 text-[11px] sm:col-span-2" />
+            <input type="number" step="0.01" placeholder="amount charged per month" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="creator-input px-2 py-1 text-[11px]" />
+            <input type="number" step="0.01" placeholder="wallet credit per month" value={form.walletCreditPerCycle} onChange={(e) => setForm({ ...form, walletCreditPerCycle: e.target.value })} className="creator-input px-2 py-1 text-[11px]" />
+            <input placeholder="currency (INR)" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} className="creator-input px-2 py-1 text-[11px]" />
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleCreate}
+              disabled={creating || !form.code || !form.name || !form.amount || Number(form.amount) < 0 || !form.walletCreditPerCycle}
+              className="creator-primary flex items-center gap-1.5 px-3 py-1 text-[11px] font-black text-white disabled:opacity-40"
+            >
+              {creating ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />} Create
+            </button>
+            <span className="text-[10px] text-slate-500">Cycle: monthly (only supported today)</span>
+          </div>
+        </div>
+      )}
+      {isLoading && <Loader label="Loading plans" />}
+      {isError && <Notice tone="error" icon={<AlertTriangle size={14} />}>Could not load plans: {error?.status || "unknown"}</Notice>}
+      {!isLoading && !isError && plans.length === 0 && (
+        <p className="rounded-lg border border-dashed border-white/10 py-8 text-center text-xs font-medium text-slate-500">
+          No plans yet. Create one to start enrolling tenants.
+        </p>
+      )}
+      {plans.length > 0 && (
+        <div className="overflow-hidden rounded-lg border border-white/10">
+          <table className="w-full text-[11px]">
+            <thead className="bg-white/[0.03] text-[10px] uppercase tracking-wide text-slate-500">
+              <tr>
+                <Th>Plan</Th><Th>Charge / cycle</Th><Th>Wallet credit</Th><Th>Cycle</Th><Th>Status</Th><Th>Action</Th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {plans.map((p) => (
+                <tr key={p.id} className="hover:bg-white/[0.02]">
+                  <Td>
+                    <div className="font-bold text-slate-100">{p.name || p.code}</div>
+                    <div className="text-slate-500">
+                      <code className="text-[10px]">{p.code}</code>
+                      {p.isDefault && <span className="ml-2 rounded bg-purple-500/20 px-1 py-0.5 text-[9px] font-bold text-purple-200">DEFAULT</span>}
+                    </div>
+                    {p.description && <div className="mt-1 max-w-md text-[10px] text-slate-500">{p.description}</div>}
+                  </Td>
+                  <Td className="font-mono text-slate-200">{p.currency} {Number(p.amount || 0).toFixed(2)}</Td>
+                  <Td className="font-mono text-emerald-300">{p.currency} {Number(p.walletCreditPerCycle || 0).toFixed(2)}</Td>
+                  <Td className="text-slate-300">{p.frequency}</Td>
+                  <Td>
+                    <span className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${p.active ? "border-emerald-400/30 bg-emerald-500/15 text-emerald-300" : "border-slate-500/30 bg-slate-500/15 text-slate-400"}`}>
+                      {p.active ? "ACTIVE" : "INACTIVE"}
+                    </span>
+                  </Td>
+                  <Td>
+                    <button
+                      type="button"
+                      onClick={() => handleToggle(p)}
+                      className={`flex items-center gap-1 rounded border px-2 py-1 text-[11px] font-bold ${p.active ? "border-rose-400/30 bg-rose-500/10 text-rose-200 hover:border-rose-400/60" : "border-emerald-400/30 bg-emerald-500/10 text-emerald-200 hover:border-emerald-400/60"}`}
+                    >
+                      {p.active ? "Deactivate" : "Activate"}
+                    </button>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }
