@@ -3725,6 +3725,12 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: (lookbackHours = 24) => ({ url: opsAdminUrl(`/llm-jobs/stuck?lookbackHours=${lookbackHours}`) }),
       providesTags: [{ type: "CreatorHomeProjects", id: "admin-stuck-llm-jobs" }],
     }),
+    // Every LLM job (all statuses including COMPLETED) in the window. For the "did this run"
+    // audit view in /admin -- filtered client-side by status/tenant/etc.
+    listRecentLlmJobs: builder.query({
+      query: (lookbackHours = 24) => ({ url: opsAdminUrl(`/llm-jobs/recent?lookbackHours=${lookbackHours}`) }),
+      providesTags: [{ type: "CreatorHomeProjects", id: "admin-recent-llm-jobs" }],
+    }),
     retryLlmJob: builder.mutation({
       query: (jobId) => ({ url: opsAdminUrl(`/llm-jobs/${jobId}/retry`), method: "POST" }),
       invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-stuck-llm-jobs" }],
@@ -4021,6 +4027,7 @@ export const {
   useGetPreProductionShotListJobQuery,
   useGetLatestPreProductionShotListJobQuery,
   useListStuckLlmJobsQuery,
+  useListRecentLlmJobsQuery,
   useRetryLlmJobMutation,
   useListAdminTenantsQuery,
   useActivateAdminTenantMutation,

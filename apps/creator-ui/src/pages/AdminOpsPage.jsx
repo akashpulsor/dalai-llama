@@ -16,13 +16,13 @@ import { useSelector } from "react-redux";
 import { AlertTriangle, RefreshCw, ExternalLink, Loader2, ShieldAlert } from "lucide-react";
 import {
   useListStuckLlmJobsQuery,
+  useListRecentLlmJobsQuery,
   useRetryLlmJobMutation,
   useListAdminTenantsQuery,
   useActivateAdminTenantMutation,
   useDeactivateAdminTenantMutation,
   useGetAdminWalletQuery,
   useCreditAdminWalletMutation,
-  useQueryLokiRangeQuery,
 } from "../api/creatorEndpoints.js";
 
 const OPS_HOST_HINT = "ops.dalaillama.in";
@@ -66,16 +66,14 @@ export default function AdminOpsPage() {
   // sets a cookie the React SPA cannot introspect. So we trust the gate on ops.* and skip
   // the in-app role check. On any other host isServedOnOpsHost() short-circuits above.
 
+  // /admin is deliberately narrow: LLM job ledger, tenants, wallets. Metrics/logs/traces/mesh
+  // live at their own subdomains (grafana./prometheus./jaeger./kiali./loki.dalaillama.in) so
+  // each tool serves at its native root without subpath contortions -- see
+  // manifests/ops-tool-subdomains.yaml. The ExternalTools nav below links them out.
   const TABS = [
     { key: "jobs", label: "LLM jobs", component: <JobsTab /> },
-    { key: "errors", label: "Live errors", component: <LiveErrorsTab /> },
-    { key: "llm-logs", label: "LLM gateway logs", component: <LlmGatewayLogsTab /> },
     { key: "tenants", label: "Tenants", component: <TenantsTab /> },
     { key: "wallets", label: "Wallets", component: <WalletsTab /> },
-    { key: "grafana", label: "Grafana", component: <EmbeddedToolTab src="/grafana" name="Grafana" /> },
-    { key: "kiali", label: "Kiali", component: <EmbeddedToolTab src="/kiali/" name="Kiali" /> },
-    { key: "prom", label: "Prometheus", component: <EmbeddedToolTab src="/prom/" name="Prometheus" /> },
-    { key: "jaeger", label: "Jaeger", component: <EmbeddedToolTab src="/jaeger/" name="Jaeger" /> },
   ];
 
   return (
@@ -97,6 +95,17 @@ export default function AdminOpsPage() {
          * ops.dalaillama.in/admin -- a fresh login prompt greets the operator on return. */}
         <SignOutButton />
       </header>
+      {/* External tools: sibling subdomains, oauth2-proxy shares the same dalai_admin session
+       * across .dalaillama.in via the cookie domain, so clicking these opens the tool without
+       * re-login. Each tool serves at its own native root -- no subpath quirks. */}
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2 text-[11px]">
+        <span className="font-extrabold uppercase tracking-wide text-slate-500">Ops tools:</span>
+        <a href="https://grafana.dalaillama.in/" target="_blank" rel="noreferrer" className="rounded border border-white/10 bg-white/5 px-2 py-0.5 font-bold text-slate-300 hover:border-purple-400/40 hover:text-purple-200">Grafana</a>
+        <a href="https://prometheus.dalaillama.in/" target="_blank" rel="noreferrer" className="rounded border border-white/10 bg-white/5 px-2 py-0.5 font-bold text-slate-300 hover:border-purple-400/40 hover:text-purple-200">Prometheus</a>
+        <a href="https://jaeger.dalaillama.in/" target="_blank" rel="noreferrer" className="rounded border border-white/10 bg-white/5 px-2 py-0.5 font-bold text-slate-300 hover:border-purple-400/40 hover:text-purple-200">Jaeger</a>
+        <a href="https://kiali.dalaillama.in/" target="_blank" rel="noreferrer" className="rounded border border-white/10 bg-white/5 px-2 py-0.5 font-bold text-slate-300 hover:border-purple-400/40 hover:text-purple-200">Kiali</a>
+        <a href="https://loki.dalaillama.in/" target="_blank" rel="noreferrer" className="rounded border border-white/10 bg-white/5 px-2 py-0.5 font-bold text-slate-300 hover:border-purple-400/40 hover:text-purple-200">Loki</a>
+      </div>
       <nav className="mb-4 flex gap-2 border-b border-white/10">
         {TABS.map((tab) => (
           <button
@@ -122,7 +131,12 @@ export default function AdminOpsPage() {
 
 function JobsTab() {
   const [lookbackHours, setLookbackHours] = useState(24);
-  const { data: jobs = [], isLoading, isError, error, refetch } = useListStuckLlmJobsQuery(lookbackHours);
+  // "stuck" hides COMPLETED so operator focus is on things needing attention. "all" shows
+  // every job for the "did this run" audit view.
+  const [scope, setScope] = useState("stuck");
+  const stuckQuery = useListStuckLlmJobsQuery(lookbackHours, { skip: scope !== "stuck" });
+  const recentQuery = useListRecentLlmJobsQuery(lookbackHours, { skip: scope !== "all" });
+  const { data: jobs = [], isLoading, isError, error, refetch } = scope === "stuck" ? stuckQuery : recentQuery;
   const [retryJob, { isLoading: retrying }] = useRetryLlmJobMutation();
   const [flash, setFlash] = useState(null);
 
@@ -140,7 +154,16 @@ function JobsTab() {
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs">
-          <label className="text-slate-500">Lookback:</label>
+          <label className="text-slate-500">Scope:</label>
+          <select
+            value={scope}
+            onChange={(e) => setScope(e.target.value)}
+            className="rounded border border-white/10 bg-white/[0.03] px-2 py-1 text-slate-200"
+          >
+            <option value="stuck">Needs attention (stuck/failed)</option>
+            <option value="all">All jobs (incl. completed)</option>
+          </select>
+          <label className="ml-2 text-slate-500">Lookback:</label>
           <select
             value={lookbackHours}
             onChange={(e) => setLookbackHours(Number(e.target.value))}
@@ -159,7 +182,7 @@ function JobsTab() {
           </button>
         </div>
         <a
-          href="/grafana/explore"
+          href="https://grafana.dalaillama.in/explore"
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-1.5 text-[11px] font-bold text-purple-300 hover:text-purple-200"
