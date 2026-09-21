@@ -80,13 +80,22 @@ export default function AdminOpsPage() {
 
   return (
     <div className="mx-auto max-w-6xl p-6">
-      <header className="mb-6">
-        <p className="text-[11px] font-extrabold uppercase tracking-widest text-purple-300">Ops dashboard</p>
-        <h1 className="mt-1 text-2xl font-black text-slate-100">Platform admin</h1>
-        <p className="mt-1 text-xs font-medium text-slate-400">
-          Signed in via oauth2-proxy (Keycloak <code className="text-slate-300">dalai_admin</code>).
-          Actions here affect real tenant data — no undo.
-        </p>
+      <header className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-extrabold uppercase tracking-widest text-purple-300">Ops dashboard</p>
+          <h1 className="mt-1 text-2xl font-black text-slate-100">Platform admin</h1>
+          <p className="mt-1 text-xs font-medium text-slate-400">
+            Signed in via oauth2-proxy (Keycloak <code className="text-slate-300">dalai_admin</code>).
+            Actions here affect real tenant data — no undo.
+          </p>
+        </div>
+        {/* Sign-out flow: oauth2-proxy /oauth2/sign_out clears its session cookie on ops.
+         * dalaillama.in. The rd= URL is the Keycloak end-session endpoint so Keycloak's own
+         * session is closed too (otherwise clicking sign-out then immediately hitting /admin
+         * would silently sign back in via the still-valid Keycloak session). After Keycloak
+         * ends the session it 302s to post_logout_redirect_uri which we point back at
+         * ops.dalaillama.in/admin -- a fresh login prompt greets the operator on return. */}
+        <SignOutButton />
       </header>
       <nav className="mb-4 flex gap-2 border-b border-white/10">
         {TABS.map((tab) => (
@@ -466,6 +475,27 @@ function WalletsTab() {
   );
 }
 
+// ------- Sign-out ------------------------------------------------------------
+
+function SignOutButton() {
+  const handleSignOut = () => {
+    const keycloakLogout = new URL("https://auth.dalaillama.in/realms/dalai-llama/protocol/openid-connect/logout");
+    keycloakLogout.searchParams.set("client_id", "ops-dashboard");
+    keycloakLogout.searchParams.set("post_logout_redirect_uri", `${window.location.origin}/admin`);
+    const rd = encodeURIComponent(keycloakLogout.toString());
+    window.location.href = `${window.location.origin}/oauth2/sign_out?rd=${rd}`;
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleSignOut}
+      className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-slate-300 hover:border-rose-400/40 hover:text-rose-200"
+    >
+      Sign out
+    </button>
+  );
+}
+
 // ------- Embedded tool tab (Grafana / Kiali / Prom / Jaeger) ----------------
 
 /** Iframes an ops tool served from the same origin. Auth is already established
@@ -484,14 +514,11 @@ function EmbeddedToolTab({ src, name }) {
     <div className="flex h-[calc(100vh-190px)] flex-col rounded-lg border border-white/10 bg-black/20">
       <div className="flex items-center gap-2 border-b border-white/10 bg-white/[0.03] px-3 py-1.5 text-[10px] text-slate-500">
         <span>{name} · <code className="text-slate-400">{src}</code></span>
-        <a
-          href={src}
-          target="_blank"
-          rel="noreferrer"
-          className="ml-auto flex items-center gap-1 text-[11px] font-bold text-purple-300 hover:text-purple-200"
-        >
-          Pop out <ExternalLink size={11} />
-        </a>
+        {/* "Pop out" (previously a new-tab link) removed -- same oauth2-proxy ext-authz
+         * redirect quirk as the "Open in Grafana" link. The iframe below already carries the
+         * session cookie from ops.dalaillama.in; opening the tool full-screen inside the same
+         * tab is achievable by clicking the browser's own "open in new tab" on the URL if
+         * really needed. */}
       </div>
       <iframe
         src={src}
@@ -592,14 +619,11 @@ function LiveErrorsTab() {
           <option value={360}>6 hours</option>
           <option value={1440}>24 hours</option>
         </select>
-        <a
-          href={`/grafana/explore?left=${encodeURIComponent(JSON.stringify({ datasource: "loki", queries: [{ expr: `{level="ERROR"}` }], range: { from: `now-${sinceMinutes}m`, to: "now" } }))}`}
-          target="_blank"
-          rel="noreferrer"
-          className="ml-auto flex items-center gap-1.5 text-[11px] font-bold text-purple-300 hover:text-purple-200"
-        >
-          Open in Grafana <ExternalLink size={11} />
-        </a>
+        {/* The "Open in Grafana" link that used to live here opened a new tab whose ext-authz
+         * call had oauth2-proxy record /oauth2/auth/grafana/explore as the post-auth redirect
+         * target (Envoy path_prefix + client path), so the user landed on the internal ext-authz
+         * URL after login. Cleanest fix is the Grafana tab in the nav bar above -- it iframes
+         * the same Grafana with a live authenticated session, no new-tab handoff needed. */}
       </div>
       <LokiLogPanel
         logql={'{level="ERROR"}'}
@@ -643,14 +667,9 @@ function LlmGatewayLogsTab() {
           <option value={360}>6 hours</option>
           <option value={1440}>24 hours</option>
         </select>
-        <a
-          href={`/grafana/explore?left=${encodeURIComponent(JSON.stringify({ datasource: "loki", queries: [{ expr: baseQuery }], range: { from: `now-${sinceMinutes}m`, to: "now" } }))}`}
-          target="_blank"
-          rel="noreferrer"
-          className="ml-auto flex items-center gap-1.5 text-[11px] font-bold text-purple-300 hover:text-purple-200"
-        >
-          Open in Grafana <ExternalLink size={11} />
-        </a>
+        {/* See LiveErrorsTab: dropped the "Open in Grafana" link -- the Grafana tab in the
+         * nav bar handles the same query in a same-session iframe without the new-tab
+         * ext-authz redirect quirk. */}
       </div>
       <LokiLogPanel logql={baseQuery} sinceMinutes={sinceMinutes} tenantFilter={tenantId} refetchMs={10000} />
     </section>
