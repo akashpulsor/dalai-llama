@@ -7,6 +7,8 @@ import {
   selectTenantId,
   showFlash,
   useCreateProjectRequirementPaymentMutation,
+  useFundProjectRequirementFromWalletMutation,
+  useGetWalletQuery,
   useVerifyWalletPaymentMutation,
 } from "@dalaillama/shared-store";
 import {
@@ -211,6 +213,15 @@ export default function ProjectRequirementPage() {
 
   const [createPayment] = useCreateProjectRequirementPaymentMutation();
   const [verifyPayment] = useVerifyWalletPaymentMutation();
+  const [fundFromWallet, fundFromWalletState] = useFundProjectRequirementFromWalletMutation();
+  // Wallet balance drives the primary CTA -- if the tenant already has enough to fund the brief,
+  // "Pay from wallet" is the fast path; Razorpay is the fallback / top-up path. The Razorpay path
+  // itself credits the wallet on capture (see PaymentServiceImpl.handlePaymentSuccess) rather
+  // than debiting anything, so both paths converge on a Payment(SUCCESS) tagged with
+  // projectRequirementId that flips the brief to funded.
+  const { data: wallet } = useGetWalletQuery(tenantId ? { tenantId } : undefined, { skip: !tenantId });
+  const walletBalance = Number(wallet?.balance ?? 0);
+  const walletHasEnough = tenantId && walletBalance >= Number(fundDueAmount || 0) && Number(fundDueAmount || 0) > 0;
   const [generateIdeas, { isLoading: generating }] = useGenerateProjectRequirementIdeasMutation();
   const [saveEditedIdea, { isLoading: savingEdit }] = useSaveEditedProjectRequirementIdeaMutation();
   const [lockIdea, { isLoading: locking }] = useLockProjectRequirementIdeaMutation();
@@ -265,6 +276,28 @@ export default function ProjectRequirementPage() {
       refetchRequirement();
     } catch (error) {
       dispatch(showFlash({ message: error?.message || "Could not complete payment", type: "error" }));
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  const handleFundFromWallet = async () => {
+    if (!tenantId) return;
+    setPaying(true);
+    try {
+      await fundFromWallet({
+        tenantId,
+        requirementId,
+        amount: Number(fundDueAmount),
+        description: `Fund brief: ${requirement?.briefText?.slice(0, 60) || requirementId}`,
+      }).unwrap();
+      setJustFunded(true);
+      dispatch(showFlash({ message: `Paid ₹${Number(fundDueAmount).toFixed(2)} from wallet`, type: "success" }));
+      refetchRequirement();
+    } catch (error) {
+      const message = error?.data?.detail || error?.data?.message || error?.message
+        || "Could not fund from wallet";
+      dispatch(showFlash({ message, type: "error" }));
     } finally {
       setPaying(false);
     }
@@ -420,14 +453,31 @@ export default function ProjectRequirementPage() {
                 )}
               </p>
             </div>
+            {walletHasEnough && (
+              <button
+                type="button"
+                disabled={paying || fundDueAmount < 1}
+                onClick={handleFundFromWallet}
+                className="creator-primary mb-2 flex w-full items-center justify-center gap-2 py-3 text-[13px] font-bold text-white disabled:opacity-60"
+              >
+                <CreditCard size={16} />
+                {paying
+                  ? "Processing…"
+                  : `Pay ₹${Number(fundDueAmount).toFixed(2)} from wallet (balance ₹${walletBalance.toFixed(2)})`}
+              </button>
+            )}
             <button
               type="button"
               disabled={paying || fundDueAmount < 1}
               onClick={handleFund}
-              className="creator-primary flex w-full items-center justify-center gap-2 py-3 text-[13px] font-bold text-white disabled:opacity-60"
+              className={`flex w-full items-center justify-center gap-2 py-3 text-[13px] font-bold text-white disabled:opacity-60 ${walletHasEnough ? "rounded-lg border border-white/15 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]" : "creator-primary"}`}
             >
               <CreditCard size={16} />
-              {paying ? "Processing…" : `Fund ₹${Number(fundDueAmount).toFixed(2)}`}
+              {paying
+                ? "Processing…"
+                : walletHasEnough
+                  ? `Or pay via Razorpay`
+                  : `Fund ₹${Number(fundDueAmount).toFixed(2)}`}
             </button>
           </div>
         )}

@@ -1899,6 +1899,23 @@ export const api = createApi({
       },
       transformResponse: normalizeRazorpayPaymentOrder,
     }),
+    // Wallet-only fund path -- skips Razorpay when the tenant's wallet already holds enough.
+    // Same downstream PaymentReceivedEvent so creative-planning marks the brief funded
+    // identically to the Razorpay path. Idempotent on requirementId.
+    fundProjectRequirementFromWallet: builder.mutation({
+      query: (/** @type {{ tenantId: string, requirementId: string, amount: number, description?: string }} */ body) => {
+        const { tenantId, requirementId, amount, description } = body || {};
+        return {
+          url: `/billing/${tenantId}/project-requirements/${requirementId}/wallet-pay`,
+          method: "POST",
+          body: { amount, currency: "INR", description },
+        };
+      },
+      invalidatesTags: (_r, _e, args) => [
+        { type: "CreatorProjectRequirements", id: `funding-${args?.requirementId || "current"}` },
+        "CreatorWallet",
+      ],
+    }),
     getProjectRequirementFunding: builder.query({
       query: (/** @type {{ tenantId: string, requirementId: string }} */ args) =>
         `/billing/${args?.tenantId}/project-requirements/${args?.requirementId}/funding`,
@@ -2682,6 +2699,7 @@ export const {
   useAddWalletBalanceMutation,
   useVerifyWalletPaymentMutation,
   useCreateProjectRequirementPaymentMutation,
+  useFundProjectRequirementFromWalletMutation,
   useGetProjectRequirementFundingQuery,
   useGetLiveCallQuery,
   useGetInvoicesQuery,
