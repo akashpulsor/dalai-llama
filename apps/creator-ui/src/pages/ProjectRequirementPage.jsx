@@ -8,7 +8,7 @@ import {
   showFlash,
   useCreateProjectRequirementPaymentMutation,
   useFundProjectRequirementFromWalletMutation,
-  useGetWalletQuery,
+  useGetWalletBalanceQuery,
   useVerifyWalletPaymentMutation,
 } from "@dalaillama/shared-store";
 import {
@@ -219,7 +219,7 @@ export default function ProjectRequirementPage() {
   // itself credits the wallet on capture (see PaymentServiceImpl.handlePaymentSuccess) rather
   // than debiting anything, so both paths converge on a Payment(SUCCESS) tagged with
   // projectRequirementId that flips the brief to funded.
-  const { data: wallet } = useGetWalletQuery(tenantId ? { tenantId } : undefined, { skip: !tenantId });
+  const { data: wallet } = useGetWalletBalanceQuery(tenantId ? { tenantId } : undefined, { skip: !tenantId });
   const walletBalance = Number(wallet?.balance ?? 0);
   const walletHasEnough = tenantId && walletBalance >= Number(fundDueAmount || 0) && Number(fundDueAmount || 0) > 0;
   const [generateIdeas, { isLoading: generating }] = useGenerateProjectRequirementIdeasMutation();
