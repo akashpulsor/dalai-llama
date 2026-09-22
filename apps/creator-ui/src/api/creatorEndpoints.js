@@ -2814,6 +2814,16 @@ export const creatorApi = apiSlice.injectEndpoints({
       providesTags: (_result, _error, token) => [{ type: "CreatorHomeProjects", id: `public-project-${token}` }],
     }),
 
+    // Lazy-loaded brief summary for the client-review page's "Brief" section. Backend is
+    // creative-planning-service's /v1/public/locked-ideas/{id}/brief; it resolves the requirement
+    // internally so the client doesn't need to know the requirement's share token to see the
+    // brief content they submitted. Returns 404 when the locked idea came from a chat session --
+    // handled by the caller as "no brief attached".
+    getPublicBriefByLockedIdea: builder.query({
+      query: (lockedIdeaId) => ({ url: platformUrl(`/public/locked-ideas/${lockedIdeaId}/brief`) }),
+      providesTags: (_result, _error, lockedIdeaId) => [{ type: "CreatorHomeProjects", id: `public-brief-${lockedIdeaId}` }],
+    }),
+
     // The pay-to-lock flow (the bare /lock route was removed -- a client must pay to lock):
     // quote (show the price) -> payment (create Razorpay order) -> verify (verify signature,
     // credit the creator, then lock). Same token-scoped public surface.
@@ -4088,6 +4098,7 @@ export const {
   useSendChatMessageMutation,
   useGetChatMessagesQuery,
   useGetPublicProjectQuery,
+  useGetPublicBriefByLockedIdeaQuery,
   useLockPublicProjectMutation,
   useGetLockQuoteMutation,
   useStartLockPaymentMutation,

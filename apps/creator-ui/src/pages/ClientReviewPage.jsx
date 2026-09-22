@@ -2,13 +2,14 @@
 import React, { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { CheckCircle2, Circle, CreditCard, ImageIcon, ImagePlus, Loader2, Lock, PlayCircle, Send, Sparkles, User2, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, Circle, CreditCard, FileText, ImageIcon, ImagePlus, Loader2, Lock, PlayCircle, Send, Sparkles, User2, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import CanvasVideoPlayer from "../components/review/CanvasVideoPlayer.jsx";
 import {
   useAddPublicReviewCommentMutation,
   useEndReviewMutation,
   useGetLockQuoteMutation,
+  useGetPublicBriefByLockedIdeaQuery,
   useGetPublicFinalVideoQuery,
   useGetPublicPublishedShotsQuery,
   useGetPublicProjectQuery,
@@ -138,6 +139,10 @@ export default function ClientReviewPage() {
               <RailLine done={isLocked} />
               <RailStep active={isLocked} label="Approved" />
             </div>
+
+            {data.lockedIdeaId && (
+              <BriefSection lockedIdeaId={data.lockedIdeaId} />
+            )}
 
             {finalVideo?.available && finalVideo?.videoUrl && (
               <div className="creator-panel mb-4 p-6">
@@ -357,6 +362,101 @@ export default function ClientReviewPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Lazy-loaded brief summary for the client review page. Collapsed by default so a client
+ * arriving to review the final cut doesn't pay the extra round trip unless they actually want
+ * to double-check what they briefed for. Backed by creative-planning-service's
+ * /v1/public/locked-ideas/{id}/brief endpoint (unauthenticated, resolves shareToken internally
+ * so the review page doesn't need to know it). A 404 falls back to a "brief unavailable" note
+ * -- projects locked from a chat session have no requirement to show. */
+function BriefSection({ lockedIdeaId }) {
+  const [expanded, setExpanded] = useState(false);
+  const { data: brief, isFetching, isError, error } = useGetPublicBriefByLockedIdeaQuery(lockedIdeaId, { skip: !expanded || !lockedIdeaId });
+  return (
+    <div className="creator-panel mb-4 p-4">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 text-left"
+      >
+        <span className="flex items-center gap-2">
+          <FileText size={14} className="text-purple-300" />
+          <span className="text-[11px] font-extrabold uppercase tracking-widest text-purple-300">The original brief</span>
+        </span>
+        {expanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+      </button>
+      {expanded && (
+        <div className="mt-4">
+          {isFetching && <p className="text-xs font-semibold text-slate-400">Loading brief…</p>}
+          {isError && (
+            <p className="text-xs font-semibold text-slate-500">
+              {error?.status === 404
+                ? "This project wasn't created from a brief, so there's nothing to show here."
+                : "Couldn't load the brief."}
+            </p>
+          )}
+          {brief && (
+            <>
+              {brief.briefText && (
+                <p className="mb-4 border-l-2 border-purple-500/40 pl-3 text-[13px] font-semibold leading-relaxed text-white">
+                  &ldquo;{brief.briefText}&rdquo;
+                </p>
+              )}
+              <div className="mb-3 grid grid-cols-2 gap-2 text-[11px]">
+                {brief.targetAudience && (
+                  <div className="rounded border border-white/10 bg-white/[0.03] px-2.5 py-2">
+                    <p className="mb-0.5 text-[9px] font-extrabold uppercase tracking-wide text-slate-500">Target audience</p>
+                    <p className="font-bold text-slate-100">{brief.targetAudience}</p>
+                  </div>
+                )}
+                {brief.durationSeconds != null && (
+                  <div className="rounded border border-white/10 bg-white/[0.03] px-2.5 py-2">
+                    <p className="mb-0.5 text-[9px] font-extrabold uppercase tracking-wide text-slate-500">Duration</p>
+                    <p className="font-bold text-slate-100">{brief.durationSeconds}s</p>
+                  </div>
+                )}
+                {Array.isArray(brief.languages) && brief.languages.length > 0 && (
+                  <div className="rounded border border-white/10 bg-white/[0.03] px-2.5 py-2">
+                    <p className="mb-0.5 text-[9px] font-extrabold uppercase tracking-wide text-slate-500">Languages</p>
+                    <p className="font-bold text-slate-100">{brief.languages.join(", ")}</p>
+                  </div>
+                )}
+                {brief.campaignDirection && (
+                  <div className="rounded border border-white/10 bg-white/[0.03] px-2.5 py-2">
+                    <p className="mb-0.5 text-[9px] font-extrabold uppercase tracking-wide text-slate-500">Campaign direction</p>
+                    <p className="font-bold text-slate-100">{brief.campaignDirection}</p>
+                  </div>
+                )}
+              </div>
+              {brief.product && (
+                <div className="mb-3 rounded border border-white/10 bg-white/[0.03] px-2.5 py-2">
+                  <p className="mb-0.5 text-[9px] font-extrabold uppercase tracking-wide text-slate-500">Product</p>
+                  <p className="text-[12px] font-bold text-slate-100">{brief.product.name}</p>
+                  {brief.product.description && <p className="mt-1 text-[11px] text-slate-400">{brief.product.description}</p>}
+                </div>
+              )}
+              {Array.isArray(brief.projectReferenceImages) && brief.projectReferenceImages.length > 0 && (
+                <div>
+                  <p className="mb-1 text-[9px] font-extrabold uppercase tracking-wide text-slate-500">Client references</p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {brief.projectReferenceImages.slice(0, 8).map((img) => (
+                      <img
+                        key={img.id}
+                        src={img.signedUrl || img.url}
+                        alt="reference"
+                        className="aspect-square w-full rounded border border-white/10 object-cover"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
