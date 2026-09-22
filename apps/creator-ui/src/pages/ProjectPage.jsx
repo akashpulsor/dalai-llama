@@ -249,7 +249,19 @@ export default function ProjectPage() {
     if (hasScript) setIdeaExpanded(false);
   }, [hasScript]);
 
-  const composedBrief = useMemo(() => composeBriefFromIdea(editedIdea), [editedIdea]);
+  const composedBrief = useMemo(() => {
+    const base = composeBriefFromIdea(editedIdea);
+    // Optional ad-hoc: if the client answered "yes" to "want shots from my reference videos?"
+    // on the brief page (creative-planning surfaces the text via LockedIdeaView.videoShotsIntent),
+    // append it so the script prompt is aware to leave a slot for a manually-inserted shot.
+    // Silently no-op when unset -- the existing script flow is unchanged for projects without an
+    // originating brief or where the client answered No.
+    if (lockedIdea?.videoShotsIntent && lockedIdea.videoShotsIntent.trim()) {
+      const note = `Reserve a shot slot for a client-supplied reference video clip. What that shot should convey: ${lockedIdea.videoShotsIntent.trim()}`;
+      return [base, note].filter(Boolean).join(". ");
+    }
+    return base;
+  }, [editedIdea, lockedIdea?.videoShotsIntent]);
 
   const updateField = (key, value) => setEditedIdea((current) => ({ ...current, [key]: value }));
 

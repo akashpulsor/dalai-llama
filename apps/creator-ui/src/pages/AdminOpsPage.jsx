@@ -508,11 +508,15 @@ function WalletsTab() {
 
 function SignOutButton() {
   const handleSignOut = () => {
-    const keycloakLogout = new URL("https://auth.dalaillama.in/realms/dalai-llama/protocol/openid-connect/logout");
-    keycloakLogout.searchParams.set("client_id", "ops-dashboard");
-    keycloakLogout.searchParams.set("post_logout_redirect_uri", `${window.location.origin}/admin`);
-    const rd = encodeURIComponent(keycloakLogout.toString());
-    window.location.href = `${window.location.origin}/oauth2/sign_out?rd=${rd}`;
+    // Just clear the oauth2-proxy cookie and land back at /admin -- oauth2-proxy will re-auth
+    // against Keycloak on the next request, and if the KC session is still live the user gets
+    // straight back in (that's the shared-perimeter contract). We deliberately DON'T chain into
+    // Keycloak's end_session endpoint: it validates post_logout_redirect_uri against the
+    // ops-dashboard client's `post.logout.redirect.uris` attribute, and any mismatch (including
+    // trailing-slash / port normalisation quirks) blows up with "invalid_redirect_uri" and
+    // leaves the user stuck on a Keycloak error page instead of signed out. If a full KC logout
+    // is ever required, provision a real logout job and hit it from server-side.
+    window.location.href = `${window.location.origin}/oauth2/sign_out?rd=${encodeURIComponent("/admin")}`;
   };
   return (
     <button

@@ -1601,6 +1601,15 @@ const baseQueryWithMetrics = async (args, api, extra) => {
   const error = normalizeError(rawResult.error);
   let status = error.status;
 
+  // Tracks whether a 401 was survivable via a token refresh. If refresh succeeded but the
+  // backend still refused, the JWT is fine -- something at the resource layer (tenant not
+  // provisioned yet, role missing, etc) rejected the call. That's NOT a session-expiration
+  // signal; a redirect back to Keycloak just re-authenticates the user into the same denied
+  // state, which is exactly the infinite login loop physio.stuti.1287@gmail.com hit right after
+  // registration (no tenant row yet -> every backend endpoint 401 -> redirect -> re-login ->
+  // 401 -> ...). Broken auth still redirects; here we only skip the redirect for the "JWT is
+  // fine but backend refused" case.
+  let refreshedButStill401 = false;
   if (!appConfig.MOCK_MODE && !isPublicRoute(requestPath) && status === 401 && getAccessToken()) {
     try {
       await refreshAuthToken(api);
@@ -1611,13 +1620,14 @@ const baseQueryWithMetrics = async (args, api, extra) => {
       }
 
       status = normalizeError(rawResult.error).status;
+      refreshedButStill401 = status === 401;
     } catch {
       // Fall through to the existing logout + redirect behavior.
     }
   }
 
   if (!appConfig.MOCK_MODE && !isPublicRoute(requestPath)) {
-    if (status === 401) {
+    if (status === 401 && !isTenantOnboardingProbe(requestPath) && !refreshedButStill401) {
       clearAuthState();
       api.dispatch(logout());
       api.dispatch(
