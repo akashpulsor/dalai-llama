@@ -3,19 +3,22 @@ import React, { useState } from "react";
 import { ChevronDown, LogOut, Settings, User } from "lucide-react";
 import { useSelector } from "react-redux";
 import { useKeycloakLogoutMutation } from "@dalaillama/shared-hooks/keycloakApi";
+import useCreatorVideoEntitlements from "../hooks/useCreatorVideoEntitlements.js";
 
 export default function UserChip() {
   const user = useSelector((state) => state.auth?.user);
   const name = user?.name || user?.email || "Creator";
   const email = user?.email || "Signed in";
   const [open, setOpen] = useState(false);
-  const [status, setStatus] = useState("Free Plan");
   const [keycloakLogout, logoutState] = useKeycloakLogoutMutation();
+  // Real plan from product-service entitlements -- header used to hardcode "Free Plan" as an
+  // initial useState and never updated it, so every subscribed creator (Pragya included) saw a
+  // wrong "Free" label forever. Same hook every gated feature point already reads from, so this
+  // stays consistent with the actual subscription state.
+  const { planName, isSubscribed, isLoading } = useCreatorVideoEntitlements();
+  const status = isLoading ? "…" : (isSubscribed ? planName : "Free");
 
-  const action = (label) => {
-    setStatus(label);
-    setOpen(false);
-  };
+  const closeMenu = () => setOpen(false);
 
   const signOut = async () => {
     setOpen(false);
@@ -41,8 +44,8 @@ export default function UserChip() {
 
       {open && (
         <div className="absolute bottom-[calc(100%+8px)] left-0 right-0 overflow-hidden rounded-lg border border-white/10 bg-[#0b1020] p-1 shadow-2xl">
-          <MenuButton icon={User} label={email} onClick={() => action("Profile opened")} />
-          <MenuButton icon={Settings} label="Settings" onClick={() => action("Settings opened")} />
+          <MenuButton icon={User} label={email} onClick={closeMenu} />
+          <MenuButton icon={Settings} label="Settings" onClick={closeMenu} />
           <MenuButton icon={LogOut} label={logoutState.isLoading ? "Signing out..." : "Sign out"} onClick={signOut} />
         </div>
       )}
