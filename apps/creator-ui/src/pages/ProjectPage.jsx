@@ -8,8 +8,12 @@ import {
   useGenerateScriptMutation,
   useGetLockedIdeaQuery,
   useGetPreProductionProjectQuery,
+  useGetProjectRequirementQuery,
+  useGetProjectRequirementProductQuery,
   useGetScriptQuery,
   useListCastProfilesQuery,
+  useListProjectRequirementProductImagesQuery,
+  useListProjectRequirementReferenceImagesQuery,
 } from "../api/creatorEndpoints.js";
 import ScriptSection from "../components/creator/ScriptSection.jsx";
 import ScreenplaySection from "../components/creator/ScreenplaySection.jsx";
@@ -47,6 +51,7 @@ function composeBriefFromIdea(idea) {
 }
 
 const TABS = [
+  { id: "brief", label: "Brief" },
   { id: "idea", label: "Idea" },
   { id: "script", label: "Script" },
   { id: "screenplay", label: "Screenplay" },
@@ -56,6 +61,103 @@ const TABS = [
 ];
 
 const NEXT_TAB = Object.fromEntries(TABS.map((tab, index) => [tab.id, TABS[index + 1] || null]));
+
+/** Read-only view of the originating brief -- the client's requirement text, product, target
+ * audience, reference images, quoted price. Shown on the workspace as its own tab so a creator
+ * looking at ideas/script/shots can always look back at what the client actually asked for
+ * without leaving the project page. Editing is intentionally not exposed here yet: once a script
+ * has been generated the brief is effectively frozen (ideas/screenplay/shots were all generated
+ * off it), and the share-token brief page remains the pre-lock edit surface. Follow-up work will
+ * add a PATCH endpoint + editable form for the still-unlocked case. */
+function BriefPanel({ requirement, product, productImages, referenceImages, shareUrl, locked, hasRequirement }) {
+  if (!hasRequirement) {
+    return (
+      <p className="creator-panel mt-6 p-6 text-center text-xs font-semibold text-slate-500">
+        This project wasn't started from a brief (locked from a chat session instead), so there's
+        no client brief to show here.
+      </p>
+    );
+  }
+  if (!requirement) {
+    return <p className="creator-panel mt-6 p-6 text-center text-xs font-semibold text-slate-500">Loading brief…</p>;
+  }
+  return (
+    <div className="creator-panel mt-6 p-6">
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <p className="text-[11px] font-extrabold uppercase tracking-widest text-purple-300">The brief</p>
+        <span className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${locked ? "border-slate-500/30 bg-slate-500/15 text-slate-400" : "border-emerald-400/30 bg-emerald-500/15 text-emerald-300"}`}>
+          {locked ? "LOCKED (view only)" : "EDITABLE"}
+        </span>
+      </div>
+      <p className="mb-5 border-l-2 border-purple-500/40 pl-3.5 text-[15px] font-semibold leading-relaxed text-white">
+        &ldquo;{requirement.briefText}&rdquo;
+      </p>
+      <div className="mb-5 grid grid-cols-2 gap-3">
+        {requirement.targetAudience && (
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-3">
+            <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Target audience</p>
+            <p className="text-[13px] font-bold text-slate-100">{requirement.targetAudience}</p>
+          </div>
+        )}
+        {requirement.durationSeconds != null && (
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-3">
+            <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Duration</p>
+            <p className="text-[13px] font-bold text-slate-100">{requirement.durationSeconds}s</p>
+          </div>
+        )}
+        {Boolean(requirement.languages?.length) && (
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-3">
+            <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Languages</p>
+            <p className="text-[13px] font-bold text-slate-100">{requirement.languages.join(", ")}</p>
+          </div>
+        )}
+        {requirement.quotedTotalPrice != null && (
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-3">
+            <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Quoted price</p>
+            <p className="text-[13px] font-bold text-slate-100">
+              {requirement.quotedCurrency || "INR"} {Number(requirement.quotedTotalPrice).toFixed(2)}
+            </p>
+          </div>
+        )}
+      </div>
+      {product && (
+        <div className="mb-5 border-t border-white/10 pt-5">
+          <p className="mb-2.5 text-[11px] font-extrabold uppercase tracking-widest text-purple-300">Product</p>
+          <div className="mb-3 rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-3">
+            <p className="text-[13px] font-bold text-slate-100">{product.name}</p>
+            {product.category && <p className="text-[11px] font-semibold text-slate-500">{product.category}</p>}
+            {product.description && <p className="mt-1.5 text-xs font-medium text-slate-400">{product.description}</p>}
+          </div>
+          {Array.isArray(productImages) && productImages.length > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              {productImages.slice(0, 6).map((image) => (
+                <img key={image.id} src={image.signedUrl || image.url} alt="product" className="aspect-square w-full rounded border border-white/10 object-cover" />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {Array.isArray(referenceImages) && referenceImages.length > 0 && (
+        <div className="mb-5 border-t border-white/10 pt-5">
+          <p className="mb-2.5 text-[11px] font-extrabold uppercase tracking-widest text-purple-300">Client references</p>
+          <div className="grid grid-cols-3 gap-2">
+            {referenceImages.slice(0, 6).map((image) => (
+              <img key={image.id} src={image.signedUrl || image.url} alt="reference" className="aspect-square w-full rounded border border-white/10 object-cover" />
+            ))}
+          </div>
+        </div>
+      )}
+      {shareUrl && !locked && (
+        <div className="mt-4 rounded-lg border border-white/10 bg-black/40 px-3 py-2.5">
+          <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Edit via brief link</p>
+          <a href={shareUrl} target="_blank" rel="noreferrer" className="text-xs font-semibold text-purple-300 hover:text-purple-200 break-all">
+            {shareUrl}
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** A stage's own generate/save controls live inside its section component -- this is just the
  * "you're done here, keep going" nudge once that stage has something to show, so the creator
@@ -80,7 +182,7 @@ function ContinueButton({ fromTabId, onContinue }) {
 export default function ProjectPage() {
   const { projectId } = useParams();
   const dispatch = useDispatch();
-  const [activeTab, setActiveTab] = useState("idea");
+  const [activeTab, setActiveTab] = useState("brief");
   const [ideaExpanded, setIdeaExpanded] = useState(true);
   const [editedIdea, setEditedIdea] = useState(null);
   const [duration, setDuration] = useState(60);
@@ -100,6 +202,19 @@ export default function ProjectPage() {
 
   const hasScript = Boolean(script?.scriptText);
   const scriptNotYetGenerated = scriptError?.status === 404;
+
+  // Backend added projectRequirementId to LockedIdeaView so the creator's workspace can hydrate a
+  // "Brief" panel without a reverse-lookup call. Null for projects that were locked from a chat
+  // session rather than a requirement/brief -- Brief tab shows a "no brief attached" note in that
+  // case rather than a spinner. Read-only once a script exists (editing the brief text after the
+  // fact has no effect: ideas + script were already generated from it).
+  const requirementId = lockedIdea?.projectRequirementId || null;
+  const { data: requirement } = useGetProjectRequirementQuery(requirementId, { skip: !requirementId });
+  const { data: briefProduct } = useGetProjectRequirementProductQuery(requirementId, { skip: !requirementId });
+  const { data: briefProductImages } = useListProjectRequirementProductImagesQuery(requirementId, { skip: !requirementId || !briefProduct });
+  const { data: briefReferenceImages } = useListProjectRequirementReferenceImagesQuery(requirementId, { skip: !requirementId });
+  const briefLocked = hasScript;
+  const briefShareUrl = requirement?.shareToken ? `${window.location.origin}/brief/${requirement.shareToken}` : "";
 
   // Migrated projects (ported from the old system) have no real locked idea to fetch -- their
   // locked_idea_id is a synthetic placeholder. Falling back to the script's own story-structure
@@ -169,7 +284,7 @@ export default function ProjectPage() {
     <div className="mx-auto max-w-3xl px-6 py-8 lg:px-10">
       <h1 className="text-2xl font-extrabold text-white">{project.name}</h1>
       <p className="mt-1.5 text-sm font-medium text-slate-400">
-        {activeTab === "idea" ? "Idea" : activeTab === "script" ? "Script" : activeTab === "screenplay" ? "Screenplay" : activeTab === "cast" ? "Character" : activeTab === "video" ? "Video" : "Shots"}
+        {activeTab === "brief" ? "Brief" : activeTab === "idea" ? "Idea" : activeTab === "script" ? "Script" : activeTab === "screenplay" ? "Screenplay" : activeTab === "cast" ? "Character" : activeTab === "video" ? "Video" : "Shots"}
         {" "}&middot; regenerating replaces the current draft, there's no version history
       </p>
 
@@ -187,6 +302,18 @@ export default function ProjectPage() {
           </button>
         ))}
       </div>
+
+      {activeTab === "brief" && (
+        <BriefPanel
+          requirement={requirement}
+          product={briefProduct}
+          productImages={briefProductImages}
+          referenceImages={briefReferenceImages}
+          shareUrl={briefShareUrl}
+          locked={briefLocked}
+          hasRequirement={Boolean(requirementId)}
+        />
+      )}
 
       {activeTab === "idea" && <ProjectSettingsPanel projectId={projectId} />}
 
