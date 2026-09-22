@@ -2068,15 +2068,27 @@ export const creatorApi = apiSlice.injectEndpoints({
     // multipart so images can ride along with the text edits; `data` is optional (a pure
     // image-only edit posts with no text part).
     updateRequirementFromClient: builder.mutation({
-      query: ({ shareToken, briefText, targetAudience, campaignDirection, brand, product, images, productImages }) => {
+      query: ({ shareToken, briefText, targetAudience, campaignDirection, brand, product, images, productImages, includeVideoShots, videoShotsIntent }) => {
         const formData = new FormData();
-        const hasTextEdit = briefText != null || targetAudience != null || campaignDirection != null || brand != null || product != null;
+        const hasTextEdit = briefText != null || targetAudience != null || campaignDirection != null
+          || brand != null || product != null || includeVideoShots != null;
         if (hasTextEdit) {
-          formData.append("data", new Blob([JSON.stringify({ briefText, targetAudience, campaignDirection, brand, product })], { type: "application/json" }));
+          formData.append("data", new Blob([JSON.stringify({ briefText, targetAudience, campaignDirection, brand, product, includeVideoShots, videoShotsIntent })], { type: "application/json" }));
         }
         (images || []).forEach((file) => formData.append("images", file));
         (productImages || []).forEach((file) => formData.append("productImages", file));
         return { url: platformUrl(`/public/project-requirements/${shareToken}`), method: "PATCH", body: formData };
+      },
+      invalidatesTags: (_result, _error, args) => [{ type: "CreatorProjectRequirements", id: args?.shareToken }],
+    }),
+
+    // Client-side video upload -- one file at a time (multipart form field name: file). Capped
+    // at ~5 MB by the backend; the button reflects that.
+    uploadPublicRequirementReferenceVideo: builder.mutation({
+      query: ({ shareToken, file }) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        return { url: platformUrl(`/public/project-requirements/${shareToken}/reference-videos`), method: "POST", body: formData };
       },
       invalidatesTags: (_result, _error, args) => [{ type: "CreatorProjectRequirements", id: args?.shareToken }],
     }),
@@ -4020,6 +4032,7 @@ export const {
   useCreateProjectRequirementMutation,
   useUploadProjectRequirementAttachmentMutation,
   useGetPublicProjectRequirementQuery,
+  useUploadPublicRequirementReferenceVideoMutation,
   useUpdateRequirementFromClientMutation,
   useStartRequirementPaymentMutation,
   useVerifyRequirementPaymentMutation,

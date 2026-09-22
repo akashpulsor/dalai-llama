@@ -2,12 +2,13 @@
 import React, { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { CheckCircle2, CreditCard, ImageIcon, ImagePlus, Loader2, Package, Palette, Pencil, Save, Sparkles, X } from "lucide-react";
+import { CheckCircle2, CreditCard, Film, ImageIcon, ImagePlus, Loader2, Package, Palette, Pencil, Save, Sparkles, Upload, Video, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useGetPublicProjectRequirementQuery,
   useUpdateRequirementFromClientMutation,
   useStartRequirementPaymentMutation,
+  useUploadPublicRequirementReferenceVideoMutation,
   useVerifyRequirementPaymentMutation,
 } from "../api/creatorEndpoints.js";
 import { runRazorpayCheckout } from "../utils/walletRecharge.js";
@@ -81,6 +82,8 @@ export default function ClientFundingPage() {
         description: data.product?.description || "",
         category: data.product?.category || "",
       },
+      includeVideoShots: data.includeVideoShots ?? null,
+      videoShotsIntent: data.videoShotsIntent || "",
     });
     setPendingImages([]);
     setPendingProductImages([]);
@@ -118,6 +121,10 @@ export default function ClientFundingPage() {
         product: draft.product,
         images: pendingImages,
         productImages: pendingProductImages,
+        // Only send the shot-ask pair when it's been touched -- omitting it leaves whatever the
+        // client answered earlier alone.
+        includeVideoShots: draft.includeVideoShots ?? undefined,
+        videoShotsIntent: draft.videoShotsIntent ?? undefined,
       }).unwrap();
       dispatch(showFlash({ message: "Saved — the creator will see your updates", type: "success" }));
       setEditing(false);
@@ -371,6 +378,22 @@ export default function ClientFundingPage() {
                 </div>
               )}
 
+              {!data.funded && (
+                <ReferenceVideoSection
+                  shareToken={shareToken}
+                  videos={Array.isArray(data.projectReferenceVideos) ? data.projectReferenceVideos : []}
+                  includeVideoShots={draft?.includeVideoShots ?? data.includeVideoShots}
+                  videoShotsIntent={draft?.videoShotsIntent ?? data.videoShotsIntent}
+                  editable={editing}
+                  onShotAsk={(includeVideoShots, videoShotsIntent) => setDraft((c) => ({
+                    ...(c || {}),
+                    includeVideoShots,
+                    videoShotsIntent,
+                  }))}
+                  onUploaded={refetch}
+                />
+              )}
+
               <div className="border-t border-white/10 pt-6">
                 {editing ? (
                   <div className="flex gap-2">
@@ -418,6 +441,104 @@ export default function ClientFundingPage() {
               </div>
             </div>
           </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Ad-hoc "attach reference clips + tell us what shots to reuse" panel on the client-funding
+ * page. Every clip goes straight to MinIO through creative-planning-service's public upload
+ * endpoint (5 MB cap per file, enforced server-side); the shot-ask Y/N + intent textarea are
+ * persisted through the existing PATCH .../{shareToken} flow when the client hits Save changes.
+ * Deliberately no video analysis at this stage -- the client hasn't paid yet, so the LLM only
+ * gets the free-text intent later during script generation. */
+function ReferenceVideoSection({ shareToken, videos, includeVideoShots, videoShotsIntent, editable, onShotAsk, onUploaded }) {
+  const dispatch = useDispatch();
+  const [uploadVideo, { isLoading: uploading }] = useUploadPublicRequirementReferenceVideoMutation();
+  const anyAnswer = includeVideoShots != null;
+  const yes = includeVideoShots === true;
+  const MAX_MB = 5;
+
+  const handleFiles = async (fileList) => {
+    const files = Array.from(fileList || []);
+    for (const file of files) {
+      if (file.size > MAX_MB * 1024 * 1024) {
+        dispatch(showFlash({ message: `${file.name} is over ${MAX_MB} MB. Try a shorter clip.`, type: "error" }));
+        continue;
+      }
+      try {
+        await uploadVideo({ shareToken, file }).unwrap();
+      } catch (err) {
+        dispatch(showFlash({ message: err?.data?.message || `Couldn't upload ${file.name}`, type: "error" }));
+      }
+    }
+    onUploaded?.();
+  };
+
+  return (
+    <div className="mb-6 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+      <div className="mb-2.5 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-widest text-slate-400">
+        <Film size={13} /> Reference videos (optional)
+      </div>
+      <p className="mb-3 text-[11px] font-medium leading-relaxed text-slate-500">
+        Add short clips ({MAX_MB} MB each) that inspire the video you want -- we'll keep them handy for the creator.
+      </p>
+      <div className="mb-3 flex flex-wrap gap-2">
+        {videos.map((v) => (
+          <div key={v.id} className="relative h-24 w-32 shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/40">
+            <video src={v.signedUrl} className="h-full w-full object-cover" muted />
+            <div className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-black/60 px-1 py-0.5 text-[9px] font-semibold text-slate-200">
+              <Video size={9} /><span className="truncate">{v.originalFilename || "clip"}</span>
+            </div>
+          </div>
+        ))}
+        <label className="flex h-24 w-32 shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-white/20 text-slate-500 hover:border-purple-400/50 hover:text-purple-300">
+          {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+          <span className="text-[9px] font-bold uppercase tracking-wide">{uploading ? "Uploading" : `Add clip (${MAX_MB} MB)`}</span>
+          <input type="file" accept="video/*" multiple className="hidden" onChange={(event) => handleFiles(event.target.files)} />
+        </label>
+      </div>
+      <div className="mt-4 border-t border-white/10 pt-3">
+        <p className="mb-2 text-[11px] font-bold text-slate-300">
+          Do you want the creator to use specific shots from these clips in the final video?
+        </p>
+        {editable ? (
+          <>
+            <div className="mb-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => onShotAsk?.(true, videoShotsIntent || "")}
+                className={`flex-1 rounded-md border py-1.5 text-[11px] font-bold ${yes ? "border-purple-400/60 bg-purple-500/20 text-purple-100" : "border-white/10 bg-white/5 text-slate-300 hover:border-purple-400/30"}`}
+              >
+                Yes
+              </button>
+              <button
+                type="button"
+                onClick={() => onShotAsk?.(false, "")}
+                className={`flex-1 rounded-md border py-1.5 text-[11px] font-bold ${anyAnswer && !yes ? "border-purple-400/60 bg-purple-500/20 text-purple-100" : "border-white/10 bg-white/5 text-slate-300 hover:border-purple-400/30"}`}
+              >
+                No, skip
+              </button>
+            </div>
+            {yes && (
+              <textarea
+                rows={3}
+                placeholder="What should those shots convey? What's in them? The creator will keep space in the script for you to hand-pick the exact frames later."
+                value={videoShotsIntent || ""}
+                onChange={(event) => onShotAsk?.(true, event.target.value)}
+                className="creator-input w-full resize-y px-3 py-2 text-[11px]"
+              />
+            )}
+          </>
+        ) : (
+          <p className="text-[11px] font-medium text-slate-400">
+            {!anyAnswer && "Not answered yet -- switch to edit mode to tell us."}
+            {anyAnswer && yes && (videoShotsIntent
+              ? `Yes -- ${videoShotsIntent}`
+              : "Yes -- no details given yet.")}
+            {anyAnswer && !yes && "No, skip using shots from these clips."}
+          </p>
         )}
       </div>
     </div>
