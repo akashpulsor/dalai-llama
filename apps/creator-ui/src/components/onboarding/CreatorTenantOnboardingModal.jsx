@@ -1,13 +1,14 @@
 // @ts-nocheck
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { AlertCircle, ArrowRight, CheckCircle2, ChevronDown, Clock, Globe2, Loader2, MapPin, Phone, ShieldCheck, Sparkles, User, WalletCards } from "lucide-react";
+import { AlertCircle, ArrowRight, CheckCircle2, ChevronDown, Clock, Globe2, Loader2, LogOut, MapPin, Phone, ShieldCheck, Sparkles, User, WalletCards } from "lucide-react";
 import {
   clearTenant,
   selectTenantId,
   setTenantIdentity,
   showFlash,
 } from "@dalaillama/shared-store";
+import { useKeycloakLogoutMutation } from "@dalaillama/shared-hooks/keycloakApi";
 import {
   useGetOrganizationQuery,
   useSetupOrganizationMutation,
@@ -170,6 +171,7 @@ export default function CreatorTenantOnboardingModal() {
     refetch,
   } = useGetOrganizationQuery(undefined, { refetchOnMountOrArgChange: true });
   const [setupOrganization, setupState] = useSetupOrganizationMutation();
+  const [keycloakLogout, logoutState] = useKeycloakLogoutMutation();
   const [serverError, setServerError] = useState(null);
   const [completedTenantId, setCompletedTenantId] = useState(null);
   const [touched, setTouched] = useState({});
@@ -264,6 +266,21 @@ export default function CreatorTenantOnboardingModal() {
     });
   };
 
+  // Explicit sign-out path from the onboarding modal: the user cannot proceed without filling
+  // the form (that's intentional), but they MUST be able to bail out. Mirrors UserChip's
+  // signOut -- Keycloak logout, then hard-navigate to "/" so the app rehydrates without any
+  // stale session state or cached CSRF tokens.
+  const signOut = async () => {
+    try {
+      await keycloakLogout().unwrap();
+    } catch {
+      // Best-effort: even if the Keycloak endpoint 4xx's (already logged out, network),
+      // still send the user home so the oauth2-proxy cookie gets re-established fresh.
+    } finally {
+      window.location.assign("/");
+    }
+  };
+
   const submit = async () => {
     const allTouched = Object.keys(form).reduce((next, key) => ({ ...next, [key]: true }), {});
     setTouched(allTouched);
@@ -302,6 +319,31 @@ export default function CreatorTenantOnboardingModal() {
     void refetch?.();
     flash("Organization created and wallet service connected.");
   };
+
+  // "Invalid CSRF token" on browser-back-out-of-modal: pressing browser back from here
+  // navigates the user OFF the SPA and onto the previously-rendered Keycloak login page in
+  // history, whose CSRF form token expired the moment the SPA loaded. Fix: while the modal
+  // is showing, push a sentinel history entry so `back` triggers popstate on OUR page (not a
+  // full navigation to a stale form), and treat that popstate as a sign-out intent -- the
+  // user was trying to leave, we route them out cleanly through the fresh Keycloak logout URL
+  // instead of resurrecting a dead login form.
+  useEffect(() => {
+    if (!shouldShow) return undefined;
+    try {
+      window.history.pushState({ dalaillamaModal: "creator-onboarding" }, "");
+    } catch {
+      // history.pushState can fail in constrained iframe/browser contexts -- fall through;
+      // the visible "Sign out" button below is still a valid escape hatch.
+    }
+    const onPopState = () => {
+      // Fire-and-forget; signOut() itself handles both the logout call and the redirect.
+      void signOut();
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+    // Only bind when the modal is shown; unbind on unmount / when a tenant appears.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldShow]);
 
   if (!shouldShow) return null;
 
@@ -356,11 +398,25 @@ export default function CreatorTenantOnboardingModal() {
                 This links creator-ui to tenant-service, billing, wallet, and creator-service calls.
               </p>
             </div>
-            {isError && (
-              <button type="button" onClick={() => refetch?.()} className="creator-control px-3 py-2 text-xs font-bold text-slate-200">
-                Retry check
+            <div className="flex items-center gap-2">
+              {isError && (
+                <button type="button" onClick={() => refetch?.()} className="creator-control px-3 py-2 text-xs font-bold text-slate-200">
+                  Retry check
+                </button>
+              )}
+              {/* Explicit exit -- required so the user is never trapped in a modal they cannot
+                  yet complete. The form itself deliberately blocks "proceed to app" until it's
+                  filled, but sign-out must always be available. */}
+              <button
+                type="button"
+                onClick={signOut}
+                disabled={logoutState.isLoading}
+                className="creator-control flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-200 disabled:opacity-50"
+              >
+                <LogOut size={13} />
+                {logoutState.isLoading ? "Signing out..." : "Sign out"}
               </button>
-            )}
+            </div>
           </div>
 
           {serverError && (
