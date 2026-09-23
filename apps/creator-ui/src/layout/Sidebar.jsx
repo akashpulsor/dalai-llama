@@ -8,6 +8,7 @@ import {
   CreditCard,
   FolderOpen,
   Home,
+  Mail,
   Sparkles,
   Users,
   Wand2,
@@ -28,6 +29,10 @@ const navItems = [
   { id: "cast", label: "Cast Library", icon: Users, path: "/cast-library" },
   { id: "ai-editor", label: "AI Editor", icon: Wand2, path: "/editor" },
   { id: "wallet-billing", label: "Wallet & Billing", icon: CreditCard, path: "/wallet-billing" },
+  // Lead management -- creator's business email identity + composer for outreach. Phase 1
+  // uses the shared Hostinger relay; recipient-facing sender is the creator's own
+  // partner.dalaillama.in identity via display-name aliasing on the From header.
+  { id: "marketing", label: "Marketing", icon: Mail, path: "/marketing" },
 ];
 
 export default function Sidebar() {

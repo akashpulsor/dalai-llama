@@ -11,6 +11,7 @@ import WalletBillingPage from "./pages/WalletBillingPage.jsx";
 import SubscriptionPage from "./pages/SubscriptionPage.jsx";
 import CastLibraryPage from "./pages/CastLibraryPage.jsx";
 import AdminOpsPage from "./pages/AdminOpsPage.jsx";
+import MarketingPage from "./pages/MarketingPage.jsx";
 
 const routes = [
   { index: true, element: <HomePage /> },
@@ -19,6 +20,8 @@ const routes = [
   { path: "wallet-billing", element: <WalletBillingPage /> },
   { path: "subscription", element: <SubscriptionPage /> },
   { path: "cast-library", element: <CastLibraryPage /> },
+  // Lead management / creator outbound email (business identity + composer).
+  { path: "marketing", element: <MarketingPage /> },
   // Ops dashboard. Component enforces both host (ops.dalaillama.in) and role (dalai_admin);
   // adding the route unconditionally keeps routes.jsx simple and defers gating to the page.
   { path: "admin", element: <AdminOpsPage /> },
