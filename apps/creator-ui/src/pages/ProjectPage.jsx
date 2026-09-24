@@ -393,17 +393,45 @@ export default function ProjectPage() {
               </div>
             ))}
             <div className="flex flex-wrap gap-6">
+              {/* Duration is a preset dropdown for the common lengths PLUS a "Custom" option that
+                  reveals a free-form numeric input, so a creator can pick e.g. 22s or 180s without
+                  us having to enumerate every possibility. Clamped 1..600s (10 min) to keep the
+                  server-side prompt from receiving an absurd value; the LLM has to plan beats to
+                  fit this exact time. */}
               <div>
                 <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Target duration (seconds)</label>
-                <select
-                  value={duration}
-                  onChange={(event) => setDuration(Number(event.target.value))}
-                  className="creator-input w-32 px-3 py-2.5 text-[13px] font-semibold"
-                >
-                  {[15, 30, 45, 60, 90, 120].map((seconds) => (
-                    <option key={seconds} value={seconds}>{seconds}s</option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={[15, 30, 45, 60, 90, 120].includes(duration) ? String(duration) : "custom"}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (value === "custom") return;
+                      setDuration(Number(value));
+                    }}
+                    className="creator-input w-32 px-3 py-2.5 text-[13px] font-semibold"
+                  >
+                    {[15, 30, 45, 60, 90, 120].map((seconds) => (
+                      <option key={seconds} value={seconds}>{seconds}s</option>
+                    ))}
+                    <option value="custom">Custom…</option>
+                  </select>
+                  {![15, 30, 45, 60, 90, 120].includes(duration) && (
+                    <input
+                      type="number"
+                      min="1"
+                      max="600"
+                      value={duration}
+                      onChange={(event) => {
+                        const parsed = Number(event.target.value);
+                        if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 600) {
+                          setDuration(parsed);
+                        }
+                      }}
+                      className="creator-input w-24 px-3 py-2.5 text-[13px] font-semibold"
+                      placeholder="e.g. 22"
+                    />
+                  )}
+                </div>
               </div>
               {/* BCP-47 language picker -- overrides ProjectConfig.dialogueLanguage AND becomes
                   the new saved default so screenplay/shot-list/dialogue-details all see it, no
