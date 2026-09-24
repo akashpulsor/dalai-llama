@@ -6,6 +6,7 @@ import { CheckCircle2, CreditCard, Film, ImageIcon, ImagePlus, Loader2, Package,
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useGetPublicProjectRequirementQuery,
+  usePreviewPublicRequirementQuoteQuery,
   useUpdateRequirementFromClientMutation,
   useStartRequirementPaymentMutation,
   useUploadPublicRequirementReferenceVideoMutation,
@@ -15,6 +16,15 @@ import { runRazorpayCheckout } from "../utils/walletRecharge.js";
 
 const rupee = (n, code = "INR") =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: code || "INR", maximumFractionDigits: 0 }).format(Number(n) || 0);
+
+/** Turn the draft's raw duration string ("30", "  30 ", "", null) into an int the backend
+ * accepts. Returns null for any invalid / non-positive value so the caller can decide whether
+ * to omit the field entirely (a pure text/image edit shouldn't imply a duration change). */
+const parseDurationDraft = (raw) => {
+  if (raw === null || raw === undefined || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && Number.isInteger(n) && n > 0 && n <= 600 ? n : null;
+};
 
 /**
  * Public, unauthenticated page for whoever holds a project-requirement share link -- the
@@ -70,6 +80,9 @@ export default function ClientFundingPage() {
       briefText: data.briefText || "",
       targetAudience: data.targetAudience || "",
       campaignDirection: data.campaignDirection || "",
+      // Client-editable video duration -- re-quotes price via the backend on save
+      // (see PublicProjectRequirementController.updateFromClient). Refused after funding.
+      durationSeconds: data.durationSeconds ?? "",
       brand: {
         brandName: data.brand?.brandName || "",
         industry: data.brand?.industry || "",
@@ -111,12 +124,17 @@ export default function ClientFundingPage() {
   const setProductField = (field, value) => setDraft((current) => ({ ...current, product: { ...current.product, [field]: value } }));
 
   const handleSaveEdit = async () => {
+    // durationSeconds is only sent when the client actually changed it -- keeps this off the
+    // wire for pure text/image edits so the backend doesn't re-quote on every save.
+    const durationDraft = parseDurationDraft(draft?.durationSeconds);
+    const durationChanged = durationDraft != null && durationDraft !== data?.durationSeconds;
     try {
       await updateFromClient({
         shareToken,
         briefText: draft.briefText,
         targetAudience: draft.targetAudience,
         campaignDirection: draft.campaignDirection,
+        durationSeconds: durationChanged ? durationDraft : undefined,
         brand: draft.brand,
         product: draft.product,
         images: pendingImages,
@@ -217,6 +235,14 @@ export default function ClientFundingPage() {
                       placeholder="Any direction, tone, or style you have in mind"
                     />
                   </div>
+                  <DurationWithLivePriceEditor
+                    shareToken={shareToken}
+                    valueSeconds={draft.durationSeconds}
+                    currentSeconds={data.durationSeconds}
+                    currentTotal={data.quotedTotalPrice}
+                    currency={data.quotedCurrency}
+                    onChange={(next) => setDraft((current) => ({ ...current, durationSeconds: next }))}
+                  />
                 </div>
               ) : (
                 <>
@@ -443,6 +469,64 @@ export default function ClientFundingPage() {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Client-side duration edit with live price preview. Debounced 300 ms so the backend isn't
+ * hit on every keystroke; RTK Query caches per (shareToken, durationSeconds) so revisiting a
+ * value already tried in this session doesn't refetch. Deliberately does NOT surface any
+ * per-second breakdown -- creator-only economics stay off this public page (backend enforces
+ * the same on the endpoint side). Refused after funding upstream; parent already hides this
+ * editor once data.funded is true. */
+function DurationWithLivePriceEditor({ shareToken, valueSeconds, currentSeconds, currentTotal, currency, onChange }) {
+  const [debounced, setDebounced] = React.useState(valueSeconds);
+  React.useEffect(() => {
+    const handle = window.setTimeout(() => setDebounced(valueSeconds), 300);
+    return () => window.clearTimeout(handle);
+  }, [valueSeconds]);
+  const parsed = parseDurationDraft(debounced);
+  const dirty = parsed != null && parsed !== currentSeconds;
+  const { data: preview, isFetching } = usePreviewPublicRequirementQuoteQuery(
+    { shareToken, durationSeconds: parsed },
+    { skip: !dirty }
+  );
+  const previewTotal = dirty ? preview?.totalPrice : "";
+  const previewCurrency = dirty ? preview?.currency : "";
+
+  return (
+    <div>
+      <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+        Duration (seconds)
+      </label>
+      <div className="flex items-center gap-3">
+        <input
+          type="number"
+          min={1}
+          max={600}
+          value={valueSeconds ?? ""}
+          onChange={(event) => onChange(event.target.value)}
+          className="creator-input w-32 px-3 py-2.5 text-[13px]"
+          placeholder="30"
+        />
+        <div className="text-[12px] font-semibold text-slate-400">
+          {dirty ? (
+            isFetching || !previewTotal ? (
+              <span className="text-slate-500">Recalculating price…</span>
+            ) : (
+              <span>
+                New price: <span className="font-bold text-purple-300">{rupee(previewTotal, previewCurrency || currency)}</span>
+                <span className="ml-2 text-slate-500">(was {rupee(currentTotal, currency)})</span>
+              </span>
+            )
+          ) : currentTotal != null ? (
+            <span>Current price: <span className="font-bold text-slate-200">{rupee(currentTotal, currency)}</span></span>
+          ) : null}
+        </div>
+      </div>
+      <p className="mt-1 text-[11px] text-slate-500">
+        You can only change duration before payment. Price updates automatically.
+      </p>
     </div>
   );
 }

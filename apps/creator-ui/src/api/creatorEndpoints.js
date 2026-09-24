@@ -2068,18 +2068,29 @@ export const creatorApi = apiSlice.injectEndpoints({
     // multipart so images can ride along with the text edits; `data` is optional (a pure
     // image-only edit posts with no text part).
     updateRequirementFromClient: builder.mutation({
-      query: ({ shareToken, briefText, targetAudience, campaignDirection, brand, product, images, productImages, includeVideoShots, videoShotsIntent }) => {
+      query: ({ shareToken, briefText, targetAudience, campaignDirection, brand, product, images, productImages, includeVideoShots, videoShotsIntent, durationSeconds }) => {
         const formData = new FormData();
         const hasTextEdit = briefText != null || targetAudience != null || campaignDirection != null
-          || brand != null || product != null || includeVideoShots != null;
+          || brand != null || product != null || includeVideoShots != null || durationSeconds != null;
         if (hasTextEdit) {
-          formData.append("data", new Blob([JSON.stringify({ briefText, targetAudience, campaignDirection, brand, product, includeVideoShots, videoShotsIntent })], { type: "application/json" }));
+          formData.append("data", new Blob([JSON.stringify({ briefText, targetAudience, campaignDirection, brand, product, includeVideoShots, videoShotsIntent, durationSeconds })], { type: "application/json" }));
         }
         (images || []).forEach((file) => formData.append("images", file));
         (productImages || []).forEach((file) => formData.append("productImages", file));
         return { url: platformUrl(`/public/project-requirements/${shareToken}`), method: "PATCH", body: formData };
       },
       invalidatesTags: (_result, _error, args) => [{ type: "CreatorProjectRequirements", id: args?.shareToken }],
+    }),
+
+    // creative-planning-service PublicProjectRequirementController: GET
+    // /v1/public/project-requirements/{shareToken}/quote-preview?durationSeconds=X --
+    // read-only, no persistence. Returns PublicQuotePreviewView { durationSeconds, totalPrice,
+    // currency } -- client-safe fields only, no per-second cost breakdown.
+    previewPublicRequirementQuote: builder.query({
+      query: ({ shareToken, durationSeconds }) => ({
+        url: platformUrl(`/public/project-requirements/${shareToken}/quote-preview`),
+        params: { durationSeconds },
+      }),
     }),
 
     // Client-side video upload -- one file at a time (multipart form field name: file). Capped
@@ -4034,6 +4045,7 @@ export const {
   useGetPublicProjectRequirementQuery,
   useUploadPublicRequirementReferenceVideoMutation,
   useUpdateRequirementFromClientMutation,
+  usePreviewPublicRequirementQuoteQuery,
   useStartRequirementPaymentMutation,
   useVerifyRequirementPaymentMutation,
   useGetProjectRequirementQuery,
