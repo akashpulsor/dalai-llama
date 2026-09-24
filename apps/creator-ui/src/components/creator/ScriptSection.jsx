@@ -3,12 +3,13 @@ import ProCta from "../common/ProCta.jsx";
 import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil, Save, Sparkles, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil, RefreshCw, Save, Sparkles, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useGetScriptQuery,
   useGetScriptVersionQuery,
   useListScriptVersionsQuery,
+  useRegenerateScriptMutation,
   useSaveScriptEditMutation,
 } from "../../api/creatorEndpoints.js";
 
@@ -44,6 +45,8 @@ export default function ScriptSection({ projectId }) {
   const [showCritiqueNotes, setShowCritiqueNotes] = useState(false);
   const [showBeatPlan, setShowBeatPlan] = useState(false);
 
+  const [regenerateNote, setRegenerateNote] = useState("");
+
   const { data: latest, isLoading: latestLoading, error: latestError } = useGetScriptQuery(projectId, { skip: !projectId });
   const { data: versions = [] } = useListScriptVersionsQuery(projectId, { skip: !projectId });
   const { data: specificVersion } = useGetScriptVersionQuery(
@@ -51,6 +54,17 @@ export default function ScriptSection({ projectId }) {
     { skip: !projectId || viewedVersion == null }
   );
   const [saveEdit, { isLoading: savingEdit }] = useSaveScriptEditMutation();
+  const [regenerateScript, { isLoading: regenerating }] = useRegenerateScriptMutation();
+
+  const handleRegenerate = async () => {
+    try {
+      await regenerateScript({ projectId, note: regenerateNote.trim() || undefined }).unwrap();
+      dispatch(showFlash({ message: "Script regenerated with your edits kept", type: "success" }));
+      setRegenerateNote("");
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not regenerate the script", type: "error" }));
+    }
+  };
 
   // Latest carries `characters` (versions don't -- characters aren't versioned, see
   // ScriptVersion's javadoc); merge that in whenever viewing a specific older version so the cast
@@ -243,16 +257,43 @@ export default function ScriptSection({ projectId }) {
             </div>
           )}
 
-          <div className="mt-5">
-            <ProCta
-              unlocked={entitlements.editsEnabled}
-              feature="Editing the script"
-              onClick={startEdit}
-              className="flex items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs font-bold text-slate-200 hover:border-purple-400/30"
-            >
-              <Pencil size={12} />
-              Edit script
-            </ProCta>
+          <div className="mt-5 space-y-3">
+            {/* Regenerate uses /script/regenerate (which folds the CURRENT live script text --
+                including manual saveScriptEdit changes -- back into the LLM prompt), so a
+                creator's edits are respected rather than wiped the way the plain generate
+                endpoint from the Idea tab does. Note is optional. */}
+            <div>
+              <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                Regenerate note (optional) -- what should change in this pass
+              </label>
+              <textarea
+                rows={2}
+                value={regenerateNote}
+                onChange={(event) => setRegenerateNote(event.target.value)}
+                placeholder="e.g. soften the ending, add a product close-up beat, cut the intro to one line"
+                className="creator-input w-full resize-y px-3 py-2 text-xs"
+              />
+            </div>
+            <div className="flex gap-2.5">
+              <ProCta
+                unlocked={entitlements.editsEnabled}
+                feature="Editing the script"
+                onClick={startEdit}
+                className="flex items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs font-bold text-slate-200 hover:border-purple-400/30"
+              >
+                <Pencil size={12} />
+                Edit script
+              </ProCta>
+              <button
+                type="button"
+                disabled={regenerating}
+                onClick={handleRegenerate}
+                className="creator-primary flex flex-1 items-center justify-center gap-2 py-2.5 text-xs font-bold text-white disabled:opacity-60"
+              >
+                <RefreshCw size={13} />
+                {regenerating ? "Regenerating…" : "Regenerate keeping my edits"}
+              </button>
+            </div>
           </div>
         </>
       )}

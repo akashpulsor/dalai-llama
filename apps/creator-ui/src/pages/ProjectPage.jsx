@@ -8,10 +8,12 @@ import {
   useGenerateScriptMutation,
   useGetLockedIdeaQuery,
   useGetPreProductionProjectQuery,
+  useGetProjectConfigQuery,
   useGetProjectRequirementQuery,
   useGetProjectRequirementProductQuery,
   useGetScriptQuery,
   useListCastProfilesQuery,
+  useListDialogueLanguagesQuery,
   useListProjectRequirementProductImagesQuery,
   useListProjectRequirementReferenceImagesQuery,
 } from "../api/creatorEndpoints.js";
@@ -186,6 +188,7 @@ export default function ProjectPage() {
   const [ideaExpanded, setIdeaExpanded] = useState(true);
   const [editedIdea, setEditedIdea] = useState(null);
   const [duration, setDuration] = useState(60);
+  const [dialogueLanguage, setDialogueLanguage] = useState("");
   const [selectedProductIds, setSelectedProductIds] = useState([]);
   const [creatingProduct, setCreatingProduct] = useState(false);
 
@@ -199,6 +202,19 @@ export default function ProjectPage() {
   } = useGetScriptQuery(projectId, { skip: !projectId });
   const [generateScript, { isLoading: generating }] = useGenerateScriptMutation();
   const { data: productProfiles = [] } = useListCastProfilesQuery({ projectId, profileType: "PRODUCT" }, { skip: !projectId });
+  const { data: dialogueLanguageOptions = [] } = useListDialogueLanguagesQuery();
+  const { data: projectConfig } = useGetProjectConfigQuery(projectId, { skip: !projectId });
+
+  // Pre-fill the language picker from ProjectConfig once it loads, so an existing choice
+  // (persisted from a prior generate or the project's default) is visible instead of blank.
+  // The creator can still change it before generating -- the mutation only sends dialogueLanguage
+  // when it's non-empty, and ProjectConfigService.resolveDialogueLanguage overwrites the saved
+  // default whenever a non-blank value comes in.
+  useEffect(() => {
+    if (!dialogueLanguage && projectConfig?.dialogueLanguage) {
+      setDialogueLanguage(projectConfig.dialogueLanguage);
+    }
+  }, [dialogueLanguage, projectConfig?.dialogueLanguage]);
 
   const hasScript = Boolean(script?.scriptText);
   const scriptNotYetGenerated = scriptError?.status === 404;
@@ -280,6 +296,7 @@ export default function ProjectPage() {
         briefText: composedBrief,
         targetDurationSeconds: duration,
         productCastProfileIds: selectedProductIds,
+        dialogueLanguage: dialogueLanguage || undefined,
       }).unwrap();
       dispatch(showFlash({ message: hasScript ? "Script regenerated" : "Script generated", type: "success" }));
       refetchScript();
@@ -375,17 +392,38 @@ export default function ProjectPage() {
                 )}
               </div>
             ))}
-            <div>
-              <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Target duration (seconds)</label>
-              <select
-                value={duration}
-                onChange={(event) => setDuration(Number(event.target.value))}
-                className="creator-input w-32 px-3 py-2.5 text-[13px] font-semibold"
-              >
-                {[15, 30, 45, 60, 90, 120].map((seconds) => (
-                  <option key={seconds} value={seconds}>{seconds}s</option>
-                ))}
-              </select>
+            <div className="flex flex-wrap gap-6">
+              <div>
+                <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Target duration (seconds)</label>
+                <select
+                  value={duration}
+                  onChange={(event) => setDuration(Number(event.target.value))}
+                  className="creator-input w-32 px-3 py-2.5 text-[13px] font-semibold"
+                >
+                  {[15, 30, 45, 60, 90, 120].map((seconds) => (
+                    <option key={seconds} value={seconds}>{seconds}s</option>
+                  ))}
+                </select>
+              </div>
+              {/* BCP-47 language picker -- overrides ProjectConfig.dialogueLanguage AND becomes
+                  the new saved default so screenplay/shot-list/dialogue-details all see it, no
+                  separate project-settings save required. Empty option means "leave the saved
+                  default alone" (falls back to en-US server-side if nothing was ever set). */}
+              <div>
+                <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Dialogue language</label>
+                <select
+                  value={dialogueLanguage}
+                  onChange={(event) => setDialogueLanguage(event.target.value)}
+                  className="creator-input w-56 px-3 py-2.5 text-[13px] font-semibold"
+                >
+                  <option value="">Use project default</option>
+                  {dialogueLanguageOptions.map((option) => (
+                    <option key={option.code || option.value} value={option.code || option.value}>
+                      {option.label || option.displayName || option.code || option.value}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div>

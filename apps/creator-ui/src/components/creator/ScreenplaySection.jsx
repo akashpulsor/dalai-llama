@@ -7,8 +7,10 @@ import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil, Plus, Refres
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useGenerateScreenplayMutation,
+  useGetProjectConfigQuery,
   useGetScreenplayQuery,
   useGetScreenplayVersionQuery,
+  useListDialogueLanguagesQuery,
   useListScreenplayVersionsQuery,
   useSaveScreenplayEditMutation,
 } from "../../api/creatorEndpoints.js";
@@ -32,6 +34,18 @@ export default function ScreenplaySection({ projectId }) {
   const [editing, setEditing] = useState(false);
   const [editedScenes, setEditedScenes] = useState(null);
   const [expandedSceneId, setExpandedSceneId] = useState(null);
+  const [dialogueLanguage, setDialogueLanguage] = useState("");
+
+  const { data: dialogueLanguageOptions = [] } = useListDialogueLanguagesQuery();
+  const { data: projectConfig } = useGetProjectConfigQuery(projectId, { skip: !projectId });
+
+  // Pre-fill from ProjectConfig once loaded so an existing choice (persisted from a prior
+  // script/screenplay generate) is visible. Blank means "use the saved default" server-side.
+  useEffect(() => {
+    if (!dialogueLanguage && projectConfig?.dialogueLanguage) {
+      setDialogueLanguage(projectConfig.dialogueLanguage);
+    }
+  }, [dialogueLanguage, projectConfig?.dialogueLanguage]);
 
   const { data: latest, isLoading: latestLoading, error: latestError } = useGetScreenplayQuery(projectId, { skip: !projectId });
   const { data: versions = [] } = useListScreenplayVersionsQuery(projectId, { skip: !projectId });
@@ -68,7 +82,7 @@ export default function ScreenplaySection({ projectId }) {
 
   const handleGenerate = async () => {
     try {
-      await generateScreenplay(projectId).unwrap();
+      await generateScreenplay({ projectId, dialogueLanguage: dialogueLanguage || undefined }).unwrap();
       dispatch(showFlash({ message: hasScreenplay ? "New screenplay version generated" : "Screenplay generated", type: "success" }));
     } catch (error) {
       dispatch(showFlash({ message: error?.data?.message || "Could not generate the screenplay", type: "error" }));
@@ -146,15 +160,22 @@ export default function ScreenplaySection({ projectId }) {
       </div>
 
       {!hasScreenplay && (
-        <button
-          type="button"
-          disabled={generating}
-          onClick={handleGenerate}
-          className="creator-primary flex w-full items-center justify-center gap-2 py-3 text-[13px] font-bold text-white disabled:opacity-60"
-        >
-          <Sparkles size={15} />
-          {generating ? "Generating…" : noScreenplayYet ? "Generate screenplay" : "Generate screenplay"}
-        </button>
+        <div className="space-y-3">
+          <DialogueLanguagePicker
+            value={dialogueLanguage}
+            onChange={setDialogueLanguage}
+            options={dialogueLanguageOptions}
+          />
+          <button
+            type="button"
+            disabled={generating}
+            onClick={handleGenerate}
+            className="creator-primary flex w-full items-center justify-center gap-2 py-3 text-[13px] font-bold text-white disabled:opacity-60"
+          >
+            <Sparkles size={15} />
+            {generating ? "Generating…" : noScreenplayYet ? "Generate screenplay" : "Generate screenplay"}
+          </button>
+        </div>
       )}
 
       {hasScreenplay && !editing && (
@@ -219,20 +240,27 @@ export default function ScreenplaySection({ projectId }) {
               );
             })}
           </div>
-          <div className="mt-4 flex gap-2.5">
-            <ProCta unlocked={entitlements.editsEnabled} feature="Editing the screenplay" onClick={startEdit} className="flex items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs font-bold text-slate-200 hover:border-purple-400/30">
-              <Pencil size={12} />
-              Edit scenes
-            </ProCta>
-            <button
-              type="button"
-              disabled={generating}
-              onClick={handleGenerate}
-              className="creator-primary flex flex-1 items-center justify-center gap-2 py-2.5 text-xs font-bold text-white disabled:opacity-60"
-            >
-              <RefreshCw size={13} />
-              {generating ? "Generating…" : "Regenerate screenplay"}
-            </button>
+          <div className="mt-4 space-y-2.5">
+            <DialogueLanguagePicker
+              value={dialogueLanguage}
+              onChange={setDialogueLanguage}
+              options={dialogueLanguageOptions}
+            />
+            <div className="flex gap-2.5">
+              <ProCta unlocked={entitlements.editsEnabled} feature="Editing the screenplay" onClick={startEdit} className="flex items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs font-bold text-slate-200 hover:border-purple-400/30">
+                <Pencil size={12} />
+                Edit scenes
+              </ProCta>
+              <button
+                type="button"
+                disabled={generating}
+                onClick={handleGenerate}
+                className="creator-primary flex flex-1 items-center justify-center gap-2 py-2.5 text-xs font-bold text-white disabled:opacity-60"
+              >
+                <RefreshCw size={13} />
+                {generating ? "Generating…" : "Regenerate screenplay"}
+              </button>
+            </div>
           </div>
         </>
       )}
@@ -303,6 +331,30 @@ export default function ScreenplaySection({ projectId }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** BCP-47 picker mirroring the one on ProjectPage's script generate form -- surfaced here so the
+ * screenplay stage isn't stuck with whatever language script generation last set. Blank = "use
+ * ProjectConfig's saved default"; a non-blank value overrides AND becomes the new saved default
+ * (see ProjectConfigService.resolveDialogueLanguage). */
+function DialogueLanguagePicker({ value, onChange, options }) {
+  return (
+    <div>
+      <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Dialogue language</label>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="creator-input w-56 px-3 py-2 text-xs font-semibold"
+      >
+        <option value="">Use project default</option>
+        {options.map((option) => (
+          <option key={option.code || option.value} value={option.code || option.value}>
+            {option.label || option.displayName || option.code || option.value}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

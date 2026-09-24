@@ -1480,9 +1480,21 @@ const mockBaseQuery = async (args) => {
 /*                               REAL BASE QUERY                               */
 /* -------------------------------------------------------------------------- */
 
+// `/v1/public/**` is the client-review share-link surface: a stale-JWT-carrying browser hitting
+// these paths gets a 401 (`jwt_authn_access_denied{Jwt_is_expired}`) from Istio's
+// RequestAuthentication, even though the endpoint itself needs no auth. Reviewers commonly open
+// the link on a device that once logged into the platform, so localStorage still holds an expired
+// token and the browser auto-sends it. Sending no Authorization at all keeps the JWT filter out
+// of the way; the token endpoints stay unaffected because they don't hit `/v1/public/`.
+const isPublicShareUrl = (url) => typeof url === "string" && url.includes("/v1/public/");
+
 const realBaseQuery = fetchBaseQuery({
   baseUrl: appConfig.API_BASE_URL,
-  prepareHeaders: (headers, { getState }) => {
+  prepareHeaders: (headers, { getState, arg }) => {
+    const url = typeof arg === "string" ? arg : arg?.url ?? "";
+    if (isPublicShareUrl(url)) {
+      return headers;
+    }
     const token = getAccessToken() || localStorage.getItem("auth_token");
     if (token) headers.set("Authorization", `Bearer ${token}`);
     const state = /** @type {any} */ (getState?.() || {});

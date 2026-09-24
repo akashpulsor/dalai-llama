@@ -2294,22 +2294,59 @@ export const creatorApi = apiSlice.injectEndpoints({
     }),
 
     // pre-production-service ScriptController: POST /v1/projects/{id}/script/generate
-    // { briefText, targetDurationSeconds? } -- no approve gate, calling this again destructively
-    // replaces whatever script already exists. There's no separate "regenerate" endpoint; the
-    // caller composes a fresh briefText (e.g. from an edited locked idea) and calls this again.
+    // { briefText, targetDurationSeconds?, productCastProfileIds?, dialogueLanguage? } -- no
+    // approve gate, calling this again destructively replaces whatever script already exists.
+    // There's no separate "regenerate" endpoint; the caller composes a fresh briefText (e.g. from
+    // an edited locked idea) and calls this again. dialogueLanguage is a BCP-47 code the creator
+    // picked on the form -- when present it overrides the project's saved default AND becomes the
+    // new saved default so screenplay/shot-list/dialogue stages see the same choice without a
+    // separate project-settings save.
     generateScript: builder.mutation({
-      query: ({ projectId, briefText, targetDurationSeconds, productCastProfileIds }) => ({
+      query: ({ projectId, briefText, targetDurationSeconds, productCastProfileIds, dialogueLanguage }) => ({
         url: platformUrl(`/projects/${projectId}/script/generate`),
         method: "POST",
         body: {
           briefText,
           targetDurationSeconds: targetDurationSeconds || undefined,
           productCastProfileIds: productCastProfileIds?.length ? productCastProfileIds : undefined,
+          dialogueLanguage: dialogueLanguage || undefined,
         },
       }),
       invalidatesTags: (_result, _error, args) => [
         { type: "CreatorHomeProjects", id: `script-${args?.projectId || "current"}` },
         { type: "CreatorHomeProjects", id: `script-versions-${args?.projectId || "current"}` },
+      ],
+    }),
+
+    // POST /v1/projects/{id}/script/regenerate -- reruns the LLM with the CURRENT live script
+    // text (including any saveScriptEdit changes) as context, plus an optional creator note. The
+    // plain generateScript endpoint reads its briefText from the request and ignores the live
+    // script, so it wipes edits on regenerate; this endpoint fixes that for the "keep my edits,
+    // just refine" flow. Optional { note } body.
+    regenerateScript: builder.mutation({
+      query: ({ projectId, note }) => ({
+        url: platformUrl(`/projects/${projectId}/script/regenerate`),
+        method: "POST",
+        body: note ? { note } : undefined,
+      }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorHomeProjects", id: `script-${args?.projectId}` },
+        { type: "CreatorHomeProjects", id: `script-versions-${args?.projectId}` },
+      ],
+    }),
+
+    // POST /v1/projects/{id}/screenplay/regenerate -- same shape as regenerateScript for the
+    // screenplay stage. Every call still inserts a new version (screenplay is versioned, nothing
+    // is overwritten).
+    regenerateScreenplay: builder.mutation({
+      query: ({ projectId, note }) => ({
+        url: platformUrl(`/projects/${projectId}/screenplay/regenerate`),
+        method: "POST",
+        body: note ? { note } : undefined,
+      }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorHomeProjects", id: `screenplay-${args?.projectId}` },
+        { type: "CreatorHomeProjects", id: `screenplay-versions-${args?.projectId}` },
       ],
     }),
 
@@ -2358,12 +2395,28 @@ export const creatorApi = apiSlice.injectEndpoints({
       providesTags: (_result, _error, args) => [{ type: "CreatorHomeProjects", id: `screenplay-version-${args?.projectId}-${args?.version}` }],
     }),
 
+    // pre-production-service ScreenplayController: POST /v1/projects/{id}/screenplay/generate
+    // Accepts { dialogueLanguage? } (BCP-47) so the creator can override the language at the
+    // screenplay step -- matches generateScript's contract so a language chosen anywhere flows
+    // through to ProjectConfig.dialogueLanguage. Legacy callers passing just projectId still work
+    // (body is server-side @RequestBody(required = false)).
     generateScreenplay: builder.mutation({
-      query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/screenplay/generate`), method: "POST" }),
-      invalidatesTags: (_result, _error, projectId) => [
-        { type: "CreatorHomeProjects", id: `screenplay-${projectId}` },
-        { type: "CreatorHomeProjects", id: `screenplay-versions-${projectId}` },
-      ],
+      query: (args) => {
+        const projectId = typeof args === "string" ? args : args?.projectId;
+        const dialogueLanguage = typeof args === "string" ? undefined : args?.dialogueLanguage;
+        return {
+          url: platformUrl(`/projects/${projectId}/screenplay/generate`),
+          method: "POST",
+          body: dialogueLanguage ? { dialogueLanguage } : undefined,
+        };
+      },
+      invalidatesTags: (_result, _error, args) => {
+        const projectId = typeof args === "string" ? args : args?.projectId;
+        return [
+          { type: "CreatorHomeProjects", id: `screenplay-${projectId}` },
+          { type: "CreatorHomeProjects", id: `screenplay-versions-${projectId}` },
+        ];
+      },
     }),
 
     // POST /v1/projects/{id}/screenplay/versions/{fromVersion}/edit -- saves a manual scene edit
@@ -4061,6 +4114,7 @@ export const {
   useSyncProjectChatContextMutation,
   useGetScriptQuery,
   useGenerateScriptMutation,
+  useRegenerateScriptMutation,
   useListScriptVersionsQuery,
   useGetScriptVersionQuery,
   useSaveScriptEditMutation,
@@ -4069,6 +4123,7 @@ export const {
   useListScreenplayVersionsQuery,
   useGetScreenplayVersionQuery,
   useGenerateScreenplayMutation,
+  useRegenerateScreenplayMutation,
   useSaveScreenplayEditMutation,
   useListCastProfilesQuery,
   useCreateCastProfileMutation,
