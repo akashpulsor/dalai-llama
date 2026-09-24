@@ -2302,7 +2302,7 @@ export const creatorApi = apiSlice.injectEndpoints({
     // new saved default so screenplay/shot-list/dialogue stages see the same choice without a
     // separate project-settings save.
     generateScript: builder.mutation({
-      query: ({ projectId, briefText, targetDurationSeconds, productCastProfileIds, dialogueLanguage }) => ({
+      query: ({ projectId, briefText, targetDurationSeconds, productCastProfileIds, dialogueLanguage, narrativeLanguage }) => ({
         url: platformUrl(`/projects/${projectId}/script/generate`),
         method: "POST",
         body: {
@@ -2310,6 +2310,7 @@ export const creatorApi = apiSlice.injectEndpoints({
           targetDurationSeconds: targetDurationSeconds || undefined,
           productCastProfileIds: productCastProfileIds?.length ? productCastProfileIds : undefined,
           dialogueLanguage: dialogueLanguage || undefined,
+          narrativeLanguage: narrativeLanguage || undefined,
         },
       }),
       invalidatesTags: (_result, _error, args) => [
@@ -2404,10 +2405,16 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: (args) => {
         const projectId = typeof args === "string" ? args : args?.projectId;
         const dialogueLanguage = typeof args === "string" ? undefined : args?.dialogueLanguage;
+        const narrativeLanguage = typeof args === "string" ? undefined : args?.narrativeLanguage;
+        const scriptVersion = typeof args === "string" ? undefined : args?.scriptVersion;
+        const body = {};
+        if (dialogueLanguage) body.dialogueLanguage = dialogueLanguage;
+        if (narrativeLanguage) body.narrativeLanguage = narrativeLanguage;
+        if (scriptVersion != null) body.scriptVersion = scriptVersion;
         return {
           url: platformUrl(`/projects/${projectId}/screenplay/generate`),
           method: "POST",
-          body: dialogueLanguage ? { dialogueLanguage } : undefined,
+          body: Object.keys(body).length ? body : undefined,
         };
       },
       invalidatesTags: (_result, _error, args) => {

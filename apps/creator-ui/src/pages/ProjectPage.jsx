@@ -189,6 +189,7 @@ export default function ProjectPage() {
   const [editedIdea, setEditedIdea] = useState(null);
   const [duration, setDuration] = useState(60);
   const [dialogueLanguage, setDialogueLanguage] = useState("");
+  const [narrativeLanguage, setNarrativeLanguage] = useState("");
   const [selectedProductIds, setSelectedProductIds] = useState([]);
   const [creatingProduct, setCreatingProduct] = useState(false);
 
@@ -205,16 +206,21 @@ export default function ProjectPage() {
   const { data: dialogueLanguageOptions = [] } = useListDialogueLanguagesQuery();
   const { data: projectConfig } = useGetProjectConfigQuery(projectId, { skip: !projectId });
 
-  // Pre-fill the language picker from ProjectConfig once it loads, so an existing choice
-  // (persisted from a prior generate or the project's default) is visible instead of blank.
-  // The creator can still change it before generating -- the mutation only sends dialogueLanguage
-  // when it's non-empty, and ProjectConfigService.resolveDialogueLanguage overwrites the saved
-  // default whenever a non-blank value comes in.
+  // Pre-fill the language pickers from ProjectConfig once it loads, so existing choices
+  // (persisted from a prior generate or the project's default) are visible instead of blank.
+  // The creator can still change either before generating -- the mutation only sends non-empty
+  // values, and ProjectConfigService.resolveDialogueLanguage/resolveNarrativeLanguage overwrite
+  // the saved default whenever a non-blank value comes in.
   useEffect(() => {
     if (!dialogueLanguage && projectConfig?.dialogueLanguage) {
       setDialogueLanguage(projectConfig.dialogueLanguage);
     }
   }, [dialogueLanguage, projectConfig?.dialogueLanguage]);
+  useEffect(() => {
+    if (!narrativeLanguage && projectConfig?.narrativeLanguage) {
+      setNarrativeLanguage(projectConfig.narrativeLanguage);
+    }
+  }, [narrativeLanguage, projectConfig?.narrativeLanguage]);
 
   const hasScript = Boolean(script?.scriptText);
   const scriptNotYetGenerated = scriptError?.status === 404;
@@ -297,6 +303,7 @@ export default function ProjectPage() {
         targetDurationSeconds: duration,
         productCastProfileIds: selectedProductIds,
         dialogueLanguage: dialogueLanguage || undefined,
+        narrativeLanguage: narrativeLanguage || undefined,
       }).unwrap();
       dispatch(showFlash({ message: hasScript ? "Script regenerated" : "Script generated", type: "success" }));
       refetchScript();
@@ -433,12 +440,28 @@ export default function ProjectPage() {
                   )}
                 </div>
               </div>
-              {/* BCP-47 language picker -- overrides ProjectConfig.dialogueLanguage AND becomes
-                  the new saved default so screenplay/shot-list/dialogue-details all see it, no
-                  separate project-settings save required. Empty option means "leave the saved
-                  default alone" (falls back to en-US server-side if nothing was ever set). */}
+              {/* Two BCP-47 language pickers -- separate so a creator can have English prose
+                  (readable/editable) plus Hindi/Hinglish dialogue lines. Both override
+                  ProjectConfig.narrativeLanguage / dialogueLanguage AND become the new saved
+                  defaults so screenplay/shot-list/dialogue-details all see them. Empty leaves
+                  the saved default alone (falls back to en-US server-side if never set). */}
               <div>
-                <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Dialogue language</label>
+                <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Narrative / prose language</label>
+                <select
+                  value={narrativeLanguage}
+                  onChange={(event) => setNarrativeLanguage(event.target.value)}
+                  className="creator-input w-56 px-3 py-2.5 text-[13px] font-semibold"
+                >
+                  <option value="">Use project default</option>
+                  {dialogueLanguageOptions.map((option) => (
+                    <option key={option.code || option.value} value={option.code || option.value}>
+                      {option.label || option.displayName || option.code || option.value}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Dialogue / spoken language</label>
                 <select
                   value={dialogueLanguage}
                   onChange={(event) => setDialogueLanguage(event.target.value)}
