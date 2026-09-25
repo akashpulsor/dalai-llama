@@ -2171,19 +2171,41 @@ export const creatorApi = apiSlice.injectEndpoints({
     }),
 
     // creative-planning-service ProjectRequirementIdeaService: POST
-    // /v1/project-requirements/{id}/ideas/generate -- only valid once funded; returns a fresh,
-    // unpersisted batch of IdeaOptionView candidates every call.
+    // /v1/project-requirements/{id}/ideas/generate -- returns 202 with a jobId; the actual LLM
+    // call runs on llm-gateway's Kafka worker (see V18 idea_generation_job migration). The UI
+    // polls getGenerateIdeaOptionsJob until status is SUCCEEDED (then listProjectRequirementIdeas
+    // is auto-invalidated below) or FAILED. Only valid once funded.
     generateProjectRequirementIdeas: builder.mutation({
       query: ({ requirementId, count }) => ({
         url: platformUrl(`/project-requirements/${requirementId}/ideas/generate`),
         method: "POST",
         params: count ? { count } : undefined,
       }),
-      // Every option generate() returns is now persisted server-side (source=GENERATED), so a
-      // refresh must see the same list -- invalidate the list query rather than holding the
-      // result only in component state.
       invalidatesTags: (_result, _error, args) => [
-        { type: "CreatorProjectRequirements", id: `ideas-${args?.requirementId || "current"}` },
+        { type: "CreatorProjectRequirements", id: `latest-idea-job-${args?.requirementId}` },
+      ],
+    }),
+
+    // GET /v1/project-requirements/{id}/ideas/generate/{jobId} -- what the UI polls while the
+    // async job is running. Terminal state (SUCCEEDED or FAILED) tells the caller to stop
+    // polling; on SUCCEEDED the caller then re-fetches listProjectRequirementIdeas.
+    getGenerateIdeaOptionsJob: builder.query({
+      query: ({ requirementId, jobId }) => ({
+        url: platformUrl(`/project-requirements/${requirementId}/ideas/generate/${jobId}`),
+      }),
+      providesTags: (_result, _error, args) => [
+        { type: "CreatorProjectRequirements", id: `idea-job-${args?.requirementId}-${args?.jobId}` },
+      ],
+    }),
+
+    // GET /v1/project-requirements/{id}/ideas/generate/latest -- what the UI reads on mount to
+    // rehydrate a still-PENDING or FAILED run instead of showing the empty-options panel.
+    latestGenerateIdeaOptionsJob: builder.query({
+      query: (requirementId) => ({
+        url: platformUrl(`/project-requirements/${requirementId}/ideas/generate/latest`),
+      }),
+      providesTags: (_result, _error, requirementId) => [
+        { type: "CreatorProjectRequirements", id: `latest-idea-job-${requirementId}` },
       ],
     }),
 
@@ -4111,6 +4133,8 @@ export const {
   useGetProjectRequirementQuery,
   useUpdateProjectRequirementQuoteMutation,
   useGenerateProjectRequirementIdeasMutation,
+  useGetGenerateIdeaOptionsJobQuery,
+  useLatestGenerateIdeaOptionsJobQuery,
   useListProjectRequirementIdeasQuery,
   useSaveEditedProjectRequirementIdeaMutation,
   useLockProjectRequirementIdeaMutation,

@@ -13,6 +13,8 @@ import {
 } from "@dalaillama/shared-store";
 import {
   useGenerateProjectRequirementIdeasMutation,
+  useGetGenerateIdeaOptionsJobQuery,
+  useLatestGenerateIdeaOptionsJobQuery,
   useGetOrganizationQuery,
   useGetProjectRequirementProductQuery,
   useGetProjectRequirementQuery,
@@ -191,7 +193,8 @@ export default function ProjectRequirementPage() {
 
   // Persisted on the backend now (source=GENERATED / EDITED) -- this is what survives a page
   // refresh instead of the generate mutation's response living only in component state.
-  const { data: ideaOptions } = useListProjectRequirementIdeasQuery(requirementId, {
+  // refetchIdeas is triggered by the async-job polling loop below once a job hits SUCCEEDED.
+  const { data: ideaOptions, refetch: refetchIdeas } = useListProjectRequirementIdeasQuery(requirementId, {
     skip: !requirementId || !isFunded,
   });
 
@@ -222,7 +225,35 @@ export default function ProjectRequirementPage() {
   const { data: wallet } = useGetWalletBalanceQuery(tenantId ? { tenantId } : undefined, { skip: !tenantId });
   const walletBalance = Number(wallet?.balance ?? 0);
   const walletHasEnough = tenantId && walletBalance >= Number(fundDueAmount || 0) && Number(fundDueAmount || 0) > 0;
-  const [generateIdeas, { isLoading: generating }] = useGenerateProjectRequirementIdeasMutation();
+  const [generateIdeas, { isLoading: submittingGenerate }] = useGenerateProjectRequirementIdeasMutation();
+  // The async flow: submit returns a jobId immediately, then poll until SUCCEEDED/FAILED.
+  // activeJobId tracks the run we just started; the latest-job query rehydrates a still-PENDING
+  // run on page reload so the creator doesn't lose visibility into an in-flight generation.
+  const [activeJobId, setActiveJobId] = useState(null);
+  const { data: latestJob } = useLatestGenerateIdeaOptionsJobQuery(requirementId, { skip: !requirementId });
+  useEffect(() => {
+    if (!activeJobId && latestJob?.status === "PENDING") {
+      setActiveJobId(latestJob.id);
+    }
+  }, [activeJobId, latestJob?.status, latestJob?.id]);
+  const { data: activeJob } = useGetGenerateIdeaOptionsJobQuery(
+    { requirementId, jobId: activeJobId },
+    { skip: !requirementId || !activeJobId, pollingInterval: 2000 }
+  );
+  // Terminal state ends polling and (on success) triggers a list refetch via the
+  // CreatorProjectRequirements/ideas-<id> tag which the mutation now no longer touches directly.
+  useEffect(() => {
+    if (!activeJob) return;
+    if (activeJob.status === "SUCCEEDED") {
+      setActiveJobId(null);
+      refetchIdeas();
+      dispatch(showFlash({ message: "New ideas ready", type: "success" }));
+    } else if (activeJob.status === "FAILED") {
+      setActiveJobId(null);
+      dispatch(showFlash({ message: activeJob.errorMessage || "Idea generation failed", type: "error" }));
+    }
+  }, [activeJob, dispatch, refetchIdeas]);
+  const generating = submittingGenerate || Boolean(activeJobId);
   const [saveEditedIdea, { isLoading: savingEdit }] = useSaveEditedProjectRequirementIdeaMutation();
   const [lockIdea, { isLoading: locking }] = useLockProjectRequirementIdeaMutation();
 
@@ -305,11 +336,14 @@ export default function ProjectRequirementPage() {
 
   const handleGenerateIdeas = async () => {
     try {
-      // Persisted server-side now — invalidatesTags on the mutation refetches the list query
-      // above, so there's nothing to store locally here.
-      await generateIdeas({ requirementId }).unwrap();
+      // Async job: submit returns 202 + jobId; the polling effect above watches until the job
+      // hits SUCCEEDED (which refetches the persisted options list) or FAILED.
+      const job = await generateIdeas({ requirementId }).unwrap();
+      if (job?.id) {
+        setActiveJobId(job.id);
+      }
     } catch (error) {
-      dispatch(showFlash({ message: error?.data?.message || "Could not generate ideas", type: "error" }));
+      dispatch(showFlash({ message: error?.data?.message || "Could not submit idea generation", type: "error" }));
     }
   };
 
