@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { ArrowRight, CheckCircle2, Copy, CreditCard, MessageSquareText, Pencil, Save, Sparkles, X } from "lucide-react";
@@ -334,21 +334,6 @@ export default function ProjectRequirementPage() {
     }
   };
 
-  // Auto-fund from the creator's wallet the moment we can: the creator shouldn't be forced
-  // through a payment prompt for their OWN brief when their wallet already has the amount. The
-  // razorpay path stays for when the wallet is short. autoFundedRef guards against firing more
-  // than once per mount (React StrictMode double-invokes effects in dev, and refetchRequirement
-  // below re-runs this effect once the funded flag flips).
-  const autoFundedRef = useRef(false);
-  useEffect(() => {
-    if (autoFundedRef.current) return;
-    if (isFunded || paying) return;
-    if (!tenantId || !requirementId) return;
-    if (!walletHasEnough) return;
-    autoFundedRef.current = true;
-    handleFundFromWallet();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [walletHasEnough, isFunded, paying, tenantId, requirementId]);
 
   const handleGenerateIdeas = async () => {
     try {
