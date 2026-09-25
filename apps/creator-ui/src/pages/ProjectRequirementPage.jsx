@@ -225,6 +225,14 @@ export default function ProjectRequirementPage() {
   const { data: wallet } = useGetWalletBalanceQuery(tenantId ? { tenantId } : undefined, { skip: !tenantId });
   const walletBalance = Number(wallet?.balance ?? 0);
   const walletHasEnough = tenantId && walletBalance >= Number(fundDueAmount || 0) && Number(fundDueAmount || 0) > 0;
+  // Creator opts in to fronting generation cost from their tenant wallet while the client's
+  // funding is still outstanding. When checked, the "Generate ideas" flow unlocks on the
+  // frontend; the backend (creative-planning-service 0.1.26+) permits generation on any
+  // positive wallet balance too. llm-gateway continues to debit real per-call cost from the
+  // wallet as usual, and requirement.funded stays false so the share-link view still shows
+  // "awaiting funding" to the client.
+  const [useWalletForGeneration, setUseWalletForGeneration] = useState(false);
+  const canGenerateOnWallet = useWalletForGeneration && walletBalance > 0;
   const [generateIdeas, { isLoading: submittingGenerate }] = useGenerateProjectRequirementIdeasMutation();
   // The async flow: submit returns a jobId immediately, then poll until SUCCEEDED/FAILED.
   // activeJobId tracks the run we just started; the latest-job query rehydrates a still-PENDING
@@ -488,6 +496,26 @@ export default function ProjectRequirementPage() {
                 )}
               </p>
             </div>
+            {/* Creator-only bypass: if the tenant wallet has any balance, the creator can proceed
+                with idea generation without waiting for client payment. Explicit isCreator guard
+                so this never leaks into any shared-render path -- the public share link
+                (ClientFundingPage) is a different component and doesn't include this at all, but
+                belt-and-braces. Backend permits generation on any positive balance;
+                llm-gateway debits real per-call cost. Client-side share link still reads
+                'awaiting funding' because requirement.funded is never flipped by this path. */}
+            {isCreator && walletBalance > 0 && (
+              <label className="mb-3 flex cursor-pointer items-start gap-2 rounded-lg border border-purple-400/25 bg-purple-500/5 px-3.5 py-3">
+                <input
+                  type="checkbox"
+                  checked={useWalletForGeneration}
+                  onChange={(event) => setUseWalletForGeneration(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-purple-500"
+                />
+                <span className="flex-1 text-[12px] font-medium text-slate-200">
+                  Use my wallet balance (₹{walletBalance.toFixed(2)}) to start generation now — client still needs to fund the full amount.
+                </span>
+              </label>
+            )}
             {walletHasEnough && (
               <button
                 type="button"
@@ -536,8 +564,13 @@ export default function ProjectRequirementPage() {
           </div>
         )}
 
-        {requirement.funded && !lockedResult && (
+        {(requirement.funded || canGenerateOnWallet) && !lockedResult && (
           <div className="border-t border-white/10 pt-5">
+            {!requirement.funded && canGenerateOnWallet && (
+              <p className="mb-3 rounded-md border border-purple-400/25 bg-purple-500/5 px-3 py-2 text-[11px] font-medium text-purple-200">
+                Proceeding on your wallet balance -- client still needs to fund. LLM cost debits from wallet as calls run.
+              </p>
+            )}
             {!ideaOptions?.length && (
               <button
                 type="button"
