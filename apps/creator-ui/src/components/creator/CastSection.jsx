@@ -6,6 +6,7 @@ import { showFlash } from "@dalaillama/shared-store";
 import {
   useCreateCastAssignmentMutation,
   useListCastAssignmentsQuery,
+  useGenerateCastFaceMutation,
   useListCastProfilesQuery,
   useListSpeakingCharactersQuery,
   useSelectCastProfileBuiltinVoiceMutation,
@@ -73,6 +74,16 @@ export default function CastSection({ projectId, characters }) {
   const [updateCharacter, { isLoading: savingEdit }] = useUpdateScriptCharacterMutation();
   const [uploadMedia, { isLoading: uploadingVoice }] = useUploadCastMediaMutation();
   const [updateVoice, { isLoading: savingVoice }] = useUpdateCastProfileVoiceMutation();
+  const [generateFace, { isLoading: generatingFace }] = useGenerateCastFaceMutation();
+
+  const handleGenerateFace = async (profile) => {
+    try {
+      await generateFace({ castProfileId: profile.id, projectId }).unwrap();
+      dispatch(showFlash({ message: `Generated face for ${profile.displayName}`, type: "success" }));
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not generate a face", type: "error" }));
+    }
+  };
   const [selectBuiltinVoice, { isLoading: savingBuiltinVoice }] = useSelectCastProfileBuiltinVoiceMutation();
   const savingVoiceFile = uploadingVoice || savingVoice;
 
@@ -92,6 +103,20 @@ export default function CastSection({ projectId, characters }) {
   const handlePickExisting = async (character, profileId) => {
     try {
       await createAssignment({ projectId, scriptCharacterId: character.id, castProfileId: profileId }).unwrap();
+      // Copy the profile's identity fields onto the ScriptCharacter so the character card
+      // reflects the picked cast (name, gender, description) instead of the LLM-generated
+      // placeholders. Only fields the CastProfile actually has -- everything else on the
+      // character stays as the script generated it.
+      const profile = profileById.get(profileId);
+      if (profile) {
+        const patch = { projectId, characterId: character.id };
+        if (profile.displayName) patch.characterName = profile.displayName;
+        if (profile.gender) patch.gender = profile.gender;
+        if (profile.description) patch.description = profile.description;
+        if (Object.keys(patch).length > 2) {
+          try { await updateCharacter(patch).unwrap(); } catch { /* non-fatal -- assignment already succeeded */ }
+        }
+      }
       dispatch(showFlash({ message: `${character.characterName} cast`, type: "success" }));
       setOpenCharacterId(null);
     } catch (error) {
@@ -196,6 +221,17 @@ export default function CastSection({ projectId, characters }) {
                       <User2 size={14} className="text-slate-400" />
                     )}
                   </div>
+                  {profile && !profile.faceRefUrl && character.characterType !== "PRODUCT" && (
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateFace(profile)}
+                      disabled={generatingFace}
+                      className="rounded-md border border-purple-400/30 bg-purple-500/10 px-2 py-1 text-[10px] font-bold text-purple-200 hover:border-purple-400/60 disabled:opacity-60"
+                      title="AI-generate a portrait for this cast profile from its gender/description"
+                    >
+                      {generatingFace ? "…" : "AI face"}
+                    </button>
+                  )}
                   <div>
                     <p className="flex items-center gap-1.5 text-xs font-bold text-white">
                       {character.characterName}

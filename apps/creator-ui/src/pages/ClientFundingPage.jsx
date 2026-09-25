@@ -240,6 +240,8 @@ export default function ClientFundingPage() {
                     valueSeconds={draft.durationSeconds}
                     currentSeconds={data.durationSeconds}
                     currentTotal={data.quotedTotalPrice}
+                    currentDueNow={data.requiredAmount}
+                    requiredPaymentPercent={data.requiredPaymentPercent}
                     currency={data.quotedCurrency}
                     onChange={(next) => setDraft((current) => ({ ...current, durationSeconds: next }))}
                   />
@@ -271,11 +273,19 @@ export default function ClientFundingPage() {
                     )}
                     {data.quotedTotalPrice != null && (
                       <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-3">
-                        <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Price</p>
-                        <p className="text-[13px] font-bold text-slate-100">{rupee(data.quotedTotalPrice, data.quotedCurrency)}</p>
-                        {data.requiredPaymentPercent < 100 && data.requiredAmount != null && (
-                          <p className="mt-1 text-[11px] font-semibold text-purple-300">
-                            {rupee(data.requiredAmount, data.quotedCurrency)} due now
+                        {/* Show the amount actually charged as the prominent number -- the client
+                            was confused seeing "3450" when the CTA and their card statement
+                            actually show ~800-1000 (25% up-front). The full quote stays visible
+                            as smaller context so nothing is hidden, just re-ranked. */}
+                        <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                          {data.requiredPaymentPercent < 100 ? "Due now" : "Price"}
+                        </p>
+                        <p className="text-[13px] font-bold text-slate-100">
+                          {rupee(data.requiredAmount ?? data.quotedTotalPrice, data.quotedCurrency)}
+                        </p>
+                        {data.requiredPaymentPercent < 100 && (
+                          <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                            {data.requiredPaymentPercent}% of total {rupee(data.quotedTotalPrice, data.quotedCurrency)}
                           </p>
                         )}
                       </div>
@@ -479,7 +489,7 @@ export default function ClientFundingPage() {
  * per-second breakdown -- creator-only economics stay off this public page (backend enforces
  * the same on the endpoint side). Refused after funding upstream; parent already hides this
  * editor once data.funded is true. */
-function DurationWithLivePriceEditor({ shareToken, valueSeconds, currentSeconds, currentTotal, currency, onChange }) {
+function DurationWithLivePriceEditor({ shareToken, valueSeconds, currentSeconds, currentTotal, currentDueNow, requiredPaymentPercent, currency, onChange }) {
   const [debounced, setDebounced] = React.useState(valueSeconds);
   React.useEffect(() => {
     const handle = window.setTimeout(() => setDebounced(valueSeconds), 300);
@@ -493,6 +503,18 @@ function DurationWithLivePriceEditor({ shareToken, valueSeconds, currentSeconds,
   );
   const previewTotal = dirty ? preview?.totalPrice : "";
   const previewCurrency = dirty ? preview?.currency : "";
+  // The client actually pays requiredPaymentPercent% of the total up front; show THAT as the
+  // new/current price so the "was X, now Y" numbers match what card statement will read (matches
+  // the summary card fix above -- users were confused seeing a total that didn't equal the CTA).
+  const scaleDueNow = (total) => {
+    if (total == null || total === "" || requiredPaymentPercent == null || requiredPaymentPercent >= 100) return total;
+    const numeric = Number(total);
+    if (!Number.isFinite(numeric)) return total;
+    return Math.ceil((numeric * requiredPaymentPercent) / 100);
+  };
+  const previewDueNow = dirty ? scaleDueNow(previewTotal) : "";
+  const displayCurrent = currentDueNow ?? currentTotal;
+  const displayPreview = previewDueNow || previewTotal;
 
   return (
     <div>
@@ -511,16 +533,16 @@ function DurationWithLivePriceEditor({ shareToken, valueSeconds, currentSeconds,
         />
         <div className="text-[12px] font-semibold text-slate-400">
           {dirty ? (
-            isFetching || !previewTotal ? (
+            isFetching || !displayPreview ? (
               <span className="text-slate-500">Recalculating price…</span>
             ) : (
               <span>
-                New price: <span className="font-bold text-purple-300">{rupee(previewTotal, previewCurrency || currency)}</span>
-                <span className="ml-2 text-slate-500">(was {rupee(currentTotal, currency)})</span>
+                New price: <span className="font-bold text-purple-300">{rupee(displayPreview, previewCurrency || currency)}</span>
+                <span className="ml-2 text-slate-500">(was {rupee(displayCurrent, currency)})</span>
               </span>
             )
-          ) : currentTotal != null ? (
-            <span>Current price: <span className="font-bold text-slate-200">{rupee(currentTotal, currency)}</span></span>
+          ) : displayCurrent != null ? (
+            <span>Current price: <span className="font-bold text-slate-200">{rupee(displayCurrent, currency)}</span></span>
           ) : null}
         </div>
       </div>

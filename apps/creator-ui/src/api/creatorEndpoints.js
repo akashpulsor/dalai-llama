@@ -2535,6 +2535,21 @@ export const creatorApi = apiSlice.injectEndpoints({
       },
     }),
 
+    // POST /v1/cast-profiles/{id}/generate-face -- AI-generates a portrait for a cast profile
+    // that has no uploaded face yet. Prompt is built server-side from the profile's
+    // gender/age/description/look, saved to MinIO, and face_ref_bucket + face_ref_object_key are
+    // stamped on the profile so downstream shot generation picks it up as an identity reference.
+    // Slow (image-model call + upload); disable the button while inflight.
+    generateCastFace: builder.mutation({
+      query: ({ castProfileId }) => ({
+        url: platformUrl(`/cast-profiles/${castProfileId}/generate-face`),
+        method: "POST",
+      }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorHomeProjects", id: `cast-profiles-${args?.projectId || "current"}` },
+      ],
+    }),
+
     listCastAssignments: builder.query({
       query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/cast-assignments`) }),
       providesTags: (_result, _error, projectId) => [{ type: "CreatorHomeProjects", id: `cast-assignments-${projectId}` }],
@@ -4161,6 +4176,7 @@ export const {
   useUpdateCastProfileVoiceMutation,
   useSelectCastProfileBuiltinVoiceMutation,
   useUploadCastMediaMutation,
+  useGenerateCastFaceMutation,
   useListCastAssignmentsQuery,
   useListSpeakingCharactersQuery,
   useCreateCastAssignmentMutation,
