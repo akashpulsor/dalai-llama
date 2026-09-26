@@ -339,6 +339,10 @@ export default function ShotsSection({ projectId }) {
   }, [projectId, reanalyzeMissing]);
   const completeShotIds = new Set(completion.filter((c) => c.complete).map((c) => c.shotId));
   const [generateList, { isLoading: submitting }] = useGeneratePreProductionShotListMutation();
+  // Opt-in cache bypass. The backend idempotency key covers the screenplay + script but not the
+  // prompt-template version, so after a template change the same inputs replay the old answer.
+  // Ticking this appends a nonce server-side and forces a real (billed) LLM call.
+  const [forceRegenerate, setForceRegenerate] = useState(false);
 
   // Async job pattern: submitting only kicks off the LLM call on llm-gateway's Kafka worker;
   // we poll this until it reaches SUCCEEDED (then refetch the shot list itself, which is what
@@ -390,11 +394,13 @@ export default function ShotsSection({ projectId }) {
 
   const handleGenerate = async () => {
     try {
-      const job = await generateList(projectId).unwrap();
+      const job = await generateList({ projectId, force: forceRegenerate }).unwrap();
       setActiveJobId(job.jobId);
       refetchLatestJob();
       dispatch(showFlash({
-        message: shots.length ? "Regenerating shot list…" : "Generating shot list…",
+        message: forceRegenerate
+          ? "Forcing a fresh shot list (ignoring cached result)…"
+          : shots.length ? "Regenerating shot list…" : "Generating shot list…",
         type: "info",
       }));
     } catch (error) {
@@ -493,6 +499,22 @@ export default function ShotsSection({ projectId }) {
               Add shot
             </button>
           )}
+          {/* Cache bypass. Only meaningful once a list exists -- a first generate has nothing
+              cached to skip. See forceRegenerate's declaration for why this is needed. */}
+          {shots.length > 0 && (
+            <label
+              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-amber-400/25 bg-amber-400/[0.06] px-2.5 py-2 text-[11px] font-semibold text-amber-200"
+              title="Ignore any cached LLM result for these exact inputs and force a fresh (billed) generation. Use after a prompt-template change."
+            >
+              <input
+                type="checkbox"
+                checked={forceRegenerate}
+                onChange={(event) => setForceRegenerate(event.target.checked)}
+                className="h-3.5 w-3.5 accent-amber-500"
+              />
+              Force fresh
+            </label>
+          )}
           <button
             type="button"
             disabled={generating}
@@ -500,7 +522,11 @@ export default function ShotsSection({ projectId }) {
             className="creator-primary flex items-center gap-2 px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
           >
             {shots.length ? <RefreshCw size={13} /> : <Sparkles size={13} />}
-            {generating ? "Generating…" : shots.length ? "Regenerate shot list" : "Generate shot list"}
+            {generating
+              ? "Generating…"
+              : shots.length
+                ? (forceRegenerate ? "Force regenerate" : "Regenerate shot list")
+                : "Generate shot list"}
           </button>
         </div>
       </div>

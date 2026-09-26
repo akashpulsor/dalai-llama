@@ -2616,8 +2616,19 @@ export const creatorApi = apiSlice.injectEndpoints({
     // getPreProductionShotListJob until status flips to SUCCEEDED (then listPreProductionShots
     // will return the new list) or FAILED (surface the errorMessage). Regenerating an existing
     // list still destructively replaces it -- same as before, just now under the async flow.
+    // Accepts either a bare projectId (legacy callers) or {projectId, force}. force=true appends
+    // a nonce to the backend idempotency key so llm-gateway cannot replay its cached answer --
+    // needed after a prompt-template change, where the screenplay/script inputs are unchanged so
+    // the normal key is identical. A forced run is a real billed LLM call, hence opt-in.
     generatePreProductionShotList: builder.mutation({
-      query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/shots/generate-list`), method: "POST" }),
+      query: (arg) => {
+        const projectId = typeof arg === "object" && arg !== null ? arg.projectId : arg;
+        const force = typeof arg === "object" && arg !== null ? Boolean(arg.force) : false;
+        return {
+          url: platformUrl(`/projects/${projectId}/shots/generate-list${force ? "?force=true" : ""}`),
+          method: "POST",
+        };
+      },
     }),
 
     // Status endpoint for one submitted shot-list job. Poll with `pollingInterval` and stop
