@@ -3074,6 +3074,20 @@ export const creatorApi = apiSlice.injectEndpoints({
         const qs = params.toString();
         return { url: platformUrl(`/voices/builtin${qs ? `?${qs}` : ""}`) };
       },
+      providesTags: [{ type: "CreatorHomeProjects", id: "builtin-voices" }],
+    }),
+
+    // llm-gateway PUT /v1/voices/builtin/{voiceId}/face -- attach a creator-uploaded face image
+    // to a built-in voice. Two-step: upload via uploadCastMedia (kind=FACE) to get
+    // {bucket, objectKey}, then call this to persist those refs on the voice. Replaces on
+    // re-upload; no separate delete endpoint needed.
+    setBuiltinVoiceFace: builder.mutation({
+      query: ({ voiceId, bucket, objectKey, contentType }) => ({
+        url: platformUrl(`/voices/builtin/${voiceId}/face`),
+        method: "PUT",
+        body: { bucket, objectKey, contentType },
+      }),
+      invalidatesTags: [{ type: "CreatorHomeProjects", id: "builtin-voices" }],
     }),
 
     // video-generation-service POST /v1/clone -- given a shot, resolves the primary
@@ -4282,6 +4296,7 @@ export const {
   useResolveProjectReviewCommentMutation,
   useListCloningModelsQuery,
   useListBuiltinVoicesQuery,
+  useSetBuiltinVoiceFaceMutation,
   useSyncBuiltinVoicesMutation,
   useTestShotVoiceMutation,
   useCloneProjectVoicesMutation,

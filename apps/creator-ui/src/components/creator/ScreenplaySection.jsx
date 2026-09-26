@@ -22,7 +22,19 @@ const SCENE_EDIT_FIELDS = [
   { key: "summary", label: "Summary" },
 ];
 
-const BLANK_SCENE = { slug: "", location: "", timeOfDay: null, summary: "", characterFocus: "", emotionalPurpose: "", estimatedSeconds: null };
+const BLANK_SCENE = { slug: "", location: "", timeOfDay: null, summary: "", characterFocus: "", emotionalPurpose: "", estimatedSeconds: null, needsMultiImage: false, multiImageLabel: null, sceneType: null };
+
+// Structural intent for a scene -- reaches the shot page (inherited) and the video-gen prompt so
+// the model knows what kind of shot it is. Keep options coarse; downstream reads unknown/null as
+// GENERIC. Values must stay in lock-step with pre-production-service's SceneType enum.
+const SCENE_TYPE_OPTIONS = [
+  { value: "", label: "Generic (default)" },
+  { value: "IDENTITY", label: "Identity beat (hold on face/cast)" },
+  { value: "MOTION_GRAPHIC", label: "Motion graphic / typographic" },
+  { value: "LIVE_ACTION", label: "Live action" },
+  { value: "PRODUCT_HERO", label: "Product hero" },
+  { value: "GENERIC", label: "Generic" },
+];
 
 /** Screenplay is versioned on the backend (every generate/edit inserts a new row) -- this
  * component is what reads that: it shows the latest version by default, lets the creator step
@@ -114,8 +126,28 @@ export default function ScreenplaySection({ projectId }) {
   const updateScene = (index, key, value) => {
     setEditedScenes((current) => current.map((s, i) => (i === index ? { ...s, [key]: value } : s)));
   };
+  const [newSceneSeconds, setNewSceneSeconds] = useState("");
   const addScene = () => {
-    setEditedScenes((current) => [...current, { ...BLANK_SCENE, sceneNumber: current.length + 1 }]);
+    const raw = Number.parseInt(newSceneSeconds, 10);
+    const addSecs = Number.isFinite(raw) && raw > 0 ? raw : 0;
+    setEditedScenes((current) => {
+      // Proportionally shrink every existing scene that has a duration so the total video length
+      // stays constant. Scenes with no estimatedSeconds are left untouched (they don't contribute
+      // to the total, so there's nothing to shrink). Falls back to a simple append when there's
+      // nothing to shrink (no addSecs, or no scenes with duration).
+      const sized = current.filter((s) => Number.isFinite(Number(s.estimatedSeconds)) && Number(s.estimatedSeconds) > 0);
+      const total = sized.reduce((sum, s) => sum + Number(s.estimatedSeconds), 0);
+      const rebalanced = addSecs > 0 && total > addSecs
+        ? current.map((s) => {
+            const sec = Number(s.estimatedSeconds);
+            if (!Number.isFinite(sec) || sec <= 0) return s;
+            const shrunk = Math.max(1, Math.round(sec * (total - addSecs) / total));
+            return { ...s, estimatedSeconds: shrunk };
+          })
+        : current;
+      return [...rebalanced, { ...BLANK_SCENE, sceneNumber: rebalanced.length + 1, estimatedSeconds: addSecs > 0 ? addSecs : null }];
+    });
+    setNewSceneSeconds("");
   };
   const removeScene = (index) => {
     setEditedScenes((current) => current.filter((_, i) => i !== index));
@@ -138,6 +170,7 @@ export default function ScreenplaySection({ projectId }) {
           estimatedSeconds: s.estimatedSeconds === "" || s.estimatedSeconds == null ? null : Number(s.estimatedSeconds),
           needsMultiImage: Boolean(s.needsMultiImage),
           multiImageLabel: s.multiImageLabel || null,
+          sceneType: s.sceneType || null,
         })),
       }).unwrap();
       dispatch(showFlash({ message: "Saved as a new screenplay version", type: "success" }));
@@ -231,6 +264,14 @@ export default function ScreenplaySection({ projectId }) {
                               title="Creator flagged: needs multiple reference images on the shot page"
                             >
                               +imgs{scene.multiImageLabel ? ` · ${scene.multiImageLabel}` : ""}
+                            </span>
+                          )}
+                          {scene.sceneType && scene.sceneType !== "GENERIC" && (
+                            <span
+                              className="rounded-full border border-sky-400/40 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-200"
+                              title="Structural scene type -- reaches the shot page and video prompt"
+                            >
+                              {scene.sceneType.toLowerCase().replace("_", " ")}
                             </span>
                           )}
                           {scene.estimatedSeconds != null && (
@@ -347,15 +388,29 @@ export default function ScreenplaySection({ projectId }) {
                     />
                   </div>
                 ))}
-                <div>
-                  <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Estimated seconds</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={scene.estimatedSeconds ?? ""}
-                    onChange={(event) => updateScene(index, "estimatedSeconds", event.target.value)}
-                    className="creator-input w-24 px-2.5 py-2 text-xs font-semibold"
-                  />
+                <div className="flex flex-wrap items-end gap-3">
+                  <div>
+                    <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Estimated seconds</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={scene.estimatedSeconds ?? ""}
+                      onChange={(event) => updateScene(index, "estimatedSeconds", event.target.value)}
+                      className="creator-input w-24 px-2.5 py-2 text-xs font-semibold"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[180px]">
+                    <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Scene type</label>
+                    <select
+                      value={scene.sceneType || ""}
+                      onChange={(event) => updateScene(index, "sceneType", event.target.value || null)}
+                      className="creator-input w-full px-2.5 py-2 text-xs font-semibold"
+                    >
+                      {SCENE_TYPE_OPTIONS.map((opt) => (
+                        <option key={opt.value || "GENERIC-blank"} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 {/* Multi-image reference bundle -- creator marks a scene that will need multiple
                     reference images (e.g. an app-flow scene with several screenshots). Phase 1:
@@ -391,14 +446,28 @@ export default function ScreenplaySection({ projectId }) {
               </div>
             </div>
           ))}
-          <button
-            type="button"
-            onClick={addScene}
-            className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-white/15 py-2.5 text-xs font-bold text-slate-300 hover:border-purple-400/40 hover:text-purple-200"
-          >
-            <Plus size={13} />
-            Add scene
-          </button>
+          {/* Add-scene row: creator picks a duration, other sized scenes shrink proportionally so
+              the total video length stays the same (rebalance runs client-side in addScene). Leave
+              seconds blank to just append a blank scene without rebalancing. */}
+          <div className="flex items-stretch gap-2">
+            <input
+              type="number"
+              min="1"
+              placeholder="Seconds (optional)"
+              value={newSceneSeconds}
+              onChange={(event) => setNewSceneSeconds(event.target.value)}
+              className="creator-input w-40 px-2.5 py-2 text-xs font-semibold"
+            />
+            <button
+              type="button"
+              onClick={addScene}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-dashed border-white/15 py-2.5 text-xs font-bold text-slate-300 hover:border-purple-400/40 hover:text-purple-200"
+              title={newSceneSeconds ? "Add scene and proportionally shrink others to keep total constant" : "Add a blank scene"}
+            >
+              <Plus size={13} />
+              Add scene{newSceneSeconds ? ` (${newSceneSeconds}s, rebalanced)` : ""}
+            </button>
+          </div>
           <div className="flex gap-2.5">
             <button type="button" onClick={cancelEdit} className="flex items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs font-bold text-slate-200">
               <X size={12} />

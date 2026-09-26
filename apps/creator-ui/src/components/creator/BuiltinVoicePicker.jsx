@@ -1,8 +1,18 @@
 // @ts-nocheck
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Play, Square } from "lucide-react";
-import { useListBuiltinVoicesQuery, useListDialogueLanguagesQuery } from "../../api/creatorEndpoints.js";
+import { AlertTriangle, ImagePlus, Play, Square } from "lucide-react";
+import {
+  useListBuiltinVoicesQuery,
+  useListDialogueLanguagesQuery,
+  useSetBuiltinVoiceFaceMutation,
+  useUploadCastMediaMutation,
+} from "../../api/creatorEndpoints.js";
 import { normalizeGender } from "../../utils/gender.js";
+
+// Public MinIO reverse-proxy base -- llm-gateway returns just the object key for face refs (it
+// has no MinIO client of its own to presign); the frontend renders it via pre-production-service's
+// existing public prefix (same pattern as cast media).
+const PUBLIC_MEDIA_BASE = "/api/v1/media/public";
 
 /** Alternative to VoiceSampleField for a character with no recorded sample: pick a stock
  * ElevenLabs voice instead. Gender is a default/suggestion only -- picking a voice from the other
@@ -21,7 +31,12 @@ export default function BuiltinVoicePicker({ gender, selectedVoiceId, onSelect }
   const [activeGender, setActiveGender] = useState(suggestedGender || "MALE");
   const [activeLanguage, setActiveLanguage] = useState(""); // "" = any language
   const audioRef = useRef(null);
+  const fileInputRef = useRef(null);
   const [playingVoiceId, setPlayingVoiceId] = useState(null);
+  const [uploadingFace, setUploadingFace] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  const [uploadCastMedia] = useUploadCastMediaMutation();
+  const [setBuiltinVoiceFace] = useSetBuiltinVoiceFaceMutation();
 
   // Real name for each code from language_master (via /v1/dialogue-languages), not a hardcoded
   // frontend map -- so a language added upstream shows up here with no code change.
@@ -67,6 +82,30 @@ export default function BuiltinVoicePicker({ gender, selectedVoiceId, onSelect }
     stopPreview();
     const voice = voices.find((v) => v.voiceId === event.target.value);
     if (voice) onSelect(voice);
+  };
+
+  // Two-step face attach: upload to pre-prod's cast-media MinIO (kind=FACE) -> get bucket+key
+  // back -> PUT them onto the built-in voice via llm-gateway. Re-upload replaces (server just
+  // overwrites the three columns), so there is no explicit delete flow.
+  const handleFacePick = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = ""; // let the same file be re-picked
+    if (!file || !selected) return;
+    setUploadingFace(true);
+    setUploadError(null);
+    try {
+      const uploaded = await uploadCastMedia({ kind: "FACE", file }).unwrap();
+      await setBuiltinVoiceFace({
+        voiceId: selected.voiceId,
+        bucket: uploaded.bucket,
+        objectKey: uploaded.objectKey,
+        contentType: file.type || null,
+      }).unwrap();
+    } catch (error) {
+      setUploadError(error?.data?.message || "Face upload failed");
+    } finally {
+      setUploadingFace(false);
+    }
   };
 
   const togglePreview = () => {
@@ -160,6 +199,50 @@ export default function BuiltinVoicePicker({ gender, selectedVoiceId, onSelect }
           <AlertTriangle size={11} />
           This voice is listed as {selected.gender.toLowerCase()}; the character's gender is {gender}.
         </p>
+      )}
+
+      {/* Face image for the built-in voice -- so a voice-only pick still has a matching visual
+          identity on the cast picker. Replaces the AI-generated identity image flow that used to
+          run at cast-create time. Upload is per-voice and persists on the voice row itself. */}
+      {selected && (
+        <div className="mt-3 rounded-md border border-white/10 bg-white/[0.03] p-2.5">
+          <div className="flex items-center gap-3">
+            {selected.faceRefObjectKey ? (
+              <img
+                src={`${PUBLIC_MEDIA_BASE}/${selected.faceRefObjectKey}`}
+                alt=""
+                className="h-11 w-11 rounded-full border border-white/10 object-cover"
+              />
+            ) : (
+              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-dashed border-white/15 text-slate-500">
+                <ImagePlus size={14} />
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Face image</p>
+              <p className="text-[10px] font-medium text-slate-500">
+                {selected.faceRefObjectKey ? "Uploaded — pick another to replace." : "No face image yet."}
+              </p>
+              {uploadError && <p className="mt-1 text-[10px] font-semibold text-rose-300">{uploadError}</p>}
+            </div>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingFace}
+              className="flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/10 px-2.5 py-1.5 text-[10px] font-bold text-purple-200 hover:bg-purple-500/20 disabled:opacity-60"
+            >
+              <ImagePlus size={11} />
+              {uploadingFace ? "Uploading…" : selected.faceRefObjectKey ? "Replace" : "Upload"}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFacePick}
+              className="hidden"
+            />
+          </div>
+        </div>
       )}
     </div>
   );
