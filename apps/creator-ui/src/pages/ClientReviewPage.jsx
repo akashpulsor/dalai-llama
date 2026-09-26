@@ -256,22 +256,34 @@ export default function ClientReviewPage() {
                         Shot {shot.shotNumber} <span className="ml-1.5 font-medium text-slate-500">{shot.shotType}</span>
                       </p>
                       {shot.action && <p className="mb-3 text-[11px] font-medium text-slate-400">{shot.action}</p>}
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                        {shot.images.map((image) => (
-                          <div key={image.id} className="overflow-hidden rounded-md border border-white/10 bg-black/20">
-                            <img src={image.signedUrl} alt={image.kind} className="aspect-square w-full object-cover" />
-                            <p className="px-2 py-1 text-center text-[9px] font-bold uppercase tracking-wide text-slate-400">
-                              {IMAGE_KIND_LABEL[image.kind] || image.kind}
-                            </p>
+                      {/* Client review is the CLIENT's view. Only show frames that were actually
+                          generated (truthy signedUrl) -- placeholders for pending/failed rows are
+                          creator-side signal and don't belong here. The PRODUCTION frame is the
+                          only one the pipeline treats as mandatory; storyboard/lighting/camera-
+                          plan/motion-graphic frames are creator working material and appear here
+                          only when the creator has actually produced them for this shot. */}
+                      {(() => {
+                        const visible = (shot.images || []).filter((img) => img && img.signedUrl && String(img.signedUrl).trim());
+                        const hasProduct = visible.some((img) => img.kind === "PRODUCTION");
+                        return (
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                            {visible.map((image) => (
+                              <div key={image.id} className="overflow-hidden rounded-md border border-white/10 bg-black/20">
+                                <img src={image.signedUrl} alt={image.kind} className="aspect-square w-full object-cover" />
+                                <p className="px-2 py-1 text-center text-[9px] font-bold uppercase tracking-wide text-slate-400">
+                                  {IMAGE_KIND_LABEL[image.kind] || image.kind}
+                                </p>
+                              </div>
+                            ))}
+                            {!hasProduct && (
+                              <div className="col-span-4 flex items-center justify-center gap-1.5 rounded-md border border-dashed border-white/10 py-4 text-[11px] font-medium text-slate-600">
+                                <ImageIcon size={13} />
+                                Production frame not generated yet
+                              </div>
+                            )}
                           </div>
-                        ))}
-                        {shot.images.length === 0 && (
-                          <div className="col-span-4 flex items-center justify-center gap-1.5 rounded-md border border-dashed border-white/10 py-4 text-[11px] font-medium text-slate-600">
-                            <ImageIcon size={13} />
-                            No images yet
-                          </div>
-                        )}
-                      </div>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>
