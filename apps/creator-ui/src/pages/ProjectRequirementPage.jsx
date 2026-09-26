@@ -496,14 +496,17 @@ export default function ProjectRequirementPage() {
                 )}
               </p>
             </div>
-            {/* Creator-only bypass: if the tenant wallet has any balance, the creator can proceed
-                with idea generation without waiting for client payment. Explicit isCreator guard
-                so this never leaks into any shared-render path -- the public share link
-                (ClientFundingPage) is a different component and doesn't include this at all, but
-                belt-and-braces. Backend permits generation on any positive balance;
-                llm-gateway debits real per-call cost. Client-side share link still reads
-                'awaiting funding' because requirement.funded is never flipped by this path. */}
-            {isCreator && walletBalance > 0 && (
+            {/* Creator-side bypass. Not gated on isCreator because organization.accountType
+                doesn't reliably reflect "CREATOR" on every tenant (single-client deployment;
+                accountType may be null/blank). The public share link goes to ClientFundingPage,
+                a different component that doesn't render this at all, so route separation is
+                already the safety boundary. Shows only when the tenant wallet has money to
+                actually cover the LLM calls -- if the wallet is empty, the checkbox stays
+                hidden and the razorpay/wallet buttons above are the only path. Backend permits
+                generation on any positive wallet balance; llm-gateway debits real per-call cost.
+                requirement.funded is NEVER flipped by this path, so the client-facing view
+                stays "awaiting funding". */}
+            {walletBalance > 0 && (
               <label className="mb-3 flex cursor-pointer items-start gap-2 rounded-lg border border-purple-400/25 bg-purple-500/5 px-3.5 py-3">
                 <input
                   type="checkbox"
