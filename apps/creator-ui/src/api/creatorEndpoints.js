@@ -2535,6 +2535,41 @@ export const creatorApi = apiSlice.injectEndpoints({
       },
     }),
 
+    // Multi-image reference bundle for a shot flagged needsMultiImage at scene time. See V65
+    // (screenplay-side flag+label) and V66 (shot inherit + shot_reference_image table). Upload,
+    // list, delete; the images later feed the storyboard tile, PDF exporter, and video-gen
+    // prompt (video-gen wiring is a follow-up in the same tracking task).
+    listShotReferenceImages: builder.query({
+      query: (shotId) => ({ url: platformUrl(`/shots/${shotId}/reference-images`) }),
+      providesTags: (_result, _error, shotId) => [
+        { type: "CreatorHomeProjects", id: `shot-refs-${shotId}` },
+      ],
+    }),
+    uploadShotReferenceImages: builder.mutation({
+      query: ({ shotId, files, captions }) => {
+        const formData = new FormData();
+        (files || []).forEach((f) => formData.append("files", f));
+        (captions || []).forEach((c) => formData.append("captions", c ?? ""));
+        return {
+          url: platformUrl(`/shots/${shotId}/reference-images`),
+          method: "POST",
+          body: formData,
+        };
+      },
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorHomeProjects", id: `shot-refs-${args?.shotId}` },
+      ],
+    }),
+    deleteShotReferenceImage: builder.mutation({
+      query: ({ shotId, imageId }) => ({
+        url: platformUrl(`/shots/${shotId}/reference-images/${imageId}`),
+        method: "DELETE",
+      }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorHomeProjects", id: `shot-refs-${args?.shotId}` },
+      ],
+    }),
+
     // POST /v1/cast-profiles/{id}/generate-face -- AI-generates a portrait for a cast profile
     // that has no uploaded face yet. Prompt is built server-side from the profile's
     // gender/age/description/look, saved to MinIO, and face_ref_bucket + face_ref_object_key are
@@ -4177,6 +4212,9 @@ export const {
   useSelectCastProfileBuiltinVoiceMutation,
   useUploadCastMediaMutation,
   useGenerateCastFaceMutation,
+  useListShotReferenceImagesQuery,
+  useUploadShotReferenceImagesMutation,
+  useDeleteShotReferenceImageMutation,
   useListCastAssignmentsQuery,
   useListSpeakingCharactersQuery,
   useCreateCastAssignmentMutation,

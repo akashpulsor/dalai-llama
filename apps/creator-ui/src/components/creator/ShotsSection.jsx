@@ -19,6 +19,7 @@ import {
   useUpdatePreProductionShotMutation,
 } from "../../api/creatorEndpoints.js";
 import ShotImagesPanel from "./ShotImagesPanel.jsx";
+import ShotReferenceImagesPanel from "./ShotReferenceImagesPanel.jsx";
 import ShotReorderControl from "./ShotReorderControl.jsx";
 import ShotProductReferencePanel from "./ShotProductReferencePanel.jsx";
 import LightingCameraPlanPanel from "./LightingCameraPlanPanel.jsx";
@@ -731,6 +732,7 @@ export default function ShotsSection({ projectId }) {
                     ]}
                   />
                   <ShotImagesPanel shotId={shot.id} shotRef={shot.shotRef} projectId={projectId} aspectRatio={shot.aspectRatio} shotType={shot.shotType} />
+                  <ShotReferenceImagesPanel shot={shot} />
                   <LightingCameraPlanPanel shotId={shot.id} />
                   <ShotProductReferencePanel shotId={shot.id} />
                 </div>
