@@ -2546,10 +2546,14 @@ export const creatorApi = apiSlice.injectEndpoints({
       ],
     }),
     uploadShotReferenceImages: builder.mutation({
-      query: ({ shotId, files, captions }) => {
+      // `tag` is the free-text handle the video prompt refers to this upload by ("logo", "app
+      // home screen"). Every file in one call shares it, so a tag is also the group: four
+      // screenshots uploaded together under "app flow" are one tagged asset set.
+      query: ({ shotId, files, captions, tag }) => {
         const formData = new FormData();
         (files || []).forEach((f) => formData.append("files", f));
         (captions || []).forEach((c) => formData.append("captions", c ?? ""));
+        if (tag && String(tag).trim()) formData.append("tag", String(tag).trim());
         return {
           url: platformUrl(`/shots/${shotId}/reference-images`),
           method: "POST",
@@ -2560,6 +2564,16 @@ export const creatorApi = apiSlice.injectEndpoints({
         { type: "CreatorHomeProjects", id: `shot-refs-${args?.shotId}` },
       ],
     }),
+    // DELETE /v1/shots/{shotId} -- removes the shot and renumbers the rest server-side so
+    // shot_number stays dense. Child rows (images, uploaded tagged assets, dialogue beats,
+    // plans) go with it via FK cascade. No undo.
+    deletePreProductionShot: builder.mutation({
+      query: ({ shotId }) => ({ url: platformUrl(`/shots/${shotId}`), method: "DELETE" }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorHomeProjects", id: `shots-${args?.projectId}` },
+      ],
+    }),
+
     deleteShotReferenceImage: builder.mutation({
       query: ({ shotId, imageId }) => ({
         url: platformUrl(`/shots/${shotId}/reference-images/${imageId}`),
@@ -4239,6 +4253,7 @@ export const {
   useGenerateCastFaceMutation,
   useListShotReferenceImagesQuery,
   useUploadShotReferenceImagesMutation,
+  useDeletePreProductionShotMutation,
   useDeleteShotReferenceImageMutation,
   useListCastAssignmentsQuery,
   useListSpeakingCharactersQuery,

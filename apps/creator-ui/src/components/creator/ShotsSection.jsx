@@ -3,12 +3,13 @@ import ProCta from "../common/ProCta.jsx";
 import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
 import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Film, FileDown, Loader2, Pencil, Plus, RefreshCw, Save, Sparkles, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Film, FileDown, Loader2, Pencil, Plus, RefreshCw, Save, Sparkles, Trash2, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useCreatePreProductionShotMutation,
   useExportShotsPdfMutation,
   useGeneratePreProductionShotListMutation,
+  useDeletePreProductionShotMutation,
   useGetAnimatedPreviewHtmlMutation,
   useGetLatestPreProductionShotListJobQuery,
   useGetPreProductionShotListJobQuery,
@@ -343,6 +344,22 @@ export default function ShotsSection({ projectId }) {
   // prompt-template version, so after a template change the same inputs replay the old answer.
   // Ticking this appends a nonce server-side and forces a real (billed) LLM call.
   const [forceRegenerate, setForceRegenerate] = useState(false);
+  const [deleteShot, { isLoading: deletingShot }] = useDeletePreProductionShotMutation();
+
+  // Destructive and not undoable -- the shot's images, uploaded tagged assets, dialogue beats and
+  // plans cascade with it -- so this confirms first. Server renumbers the rest.
+  const handleDeleteShot = async (shot) => {
+    const ok = window.confirm(
+      `Delete shot ${shot.shotNumber}? Its images, uploaded assets and dialogue beats go with it. This cannot be undone.`
+    );
+    if (!ok) return;
+    try {
+      await deleteShot({ shotId: shot.id, projectId }).unwrap();
+      dispatch(showFlash({ message: `Shot ${shot.shotNumber} deleted`, type: "success" }));
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not delete the shot", type: "error" }));
+    }
+  };
 
   // Async job pattern: submitting only kicks off the LLM call on llm-gateway's Kafka worker;
   // we poll this until it reaches SUCCEEDED (then refetch the shot list itself, which is what
@@ -674,12 +691,21 @@ export default function ShotsSection({ projectId }) {
                     <p className="mt-0.5 line-clamp-1 text-[11px] font-medium text-slate-400">{shot.scriptLine || shot.cameraNote}</p>
                     {/* Reordering belongs here, on the shot list, because this is where the edit
                         is decided -- and it says what the move would do before it does it. */}
-                    <div className="mt-1.5" onClick={(event) => event.stopPropagation()}>
+                    <div className="mt-1.5 flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
                       <ShotReorderControl
                         shot={shot}
                         projectId={projectId}
                         totalShots={shots.length}
                       />
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteShot(shot)}
+                        disabled={deletingShot}
+                        title="Delete this shot"
+                        className="flex h-6 w-6 items-center justify-center rounded border border-white/10 text-slate-400 hover:border-red-400/40 hover:text-red-300 disabled:opacity-40"
+                      >
+                        <Trash2 size={11} />
+                      </button>
                     </div>
                   </div>
                 </div>

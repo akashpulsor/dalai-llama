@@ -19,6 +19,10 @@ export default function ShotReferenceImagesPanel({ shot }) {
   const dispatch = useDispatch();
   const fileInputRef = useRef(null);
   const [captionDrafts, setCaptionDrafts] = useState({});
+  // Free-text handle applied to the NEXT upload. Every file picked in one go shares it, so a tag
+  // is also the group -- four screenshots under "app flow" are one tagged asset set, one file
+  // under "logo" is another. This is what the video prompt names the asset by.
+  const [tagDraft, setTagDraft] = useState("");
 
   const { data: images = [] } = useListShotReferenceImagesQuery(shot.id, { skip: !shot?.id });
   const [uploadImages, { isLoading: uploading }] = useUploadShotReferenceImagesMutation();
@@ -33,8 +37,14 @@ export default function ShotReferenceImagesPanel({ shot }) {
     // captions later, but the current flow just uploads then edit-in-place captions live under
     // each thumbnail (out of scope for phase 2, tracked as a follow-up).
     try {
-      await uploadImages({ shotId: shot.id, files, captions: [] }).unwrap();
-      dispatch(showFlash({ message: `Uploaded ${files.length} reference image${files.length === 1 ? "" : "s"}`, type: "success" }));
+      await uploadImages({ shotId: shot.id, files, captions: [], tag: tagDraft }).unwrap();
+      dispatch(showFlash({
+        message: tagDraft.trim()
+          ? `Uploaded ${files.length} image${files.length === 1 ? "" : "s"} tagged "${tagDraft.trim()}"`
+          : `Uploaded ${files.length} reference image${files.length === 1 ? "" : "s"}`,
+        type: "success",
+      }));
+      setTagDraft("");
     } catch (error) {
       dispatch(showFlash({ message: error?.data?.message || "Could not upload reference images", type: "error" }));
     } finally {
@@ -59,6 +69,15 @@ export default function ShotReferenceImagesPanel({ shot }) {
         <p className="text-[11px] font-extrabold uppercase tracking-widest text-purple-300">
           {label}
         </p>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={tagDraft}
+            onChange={(event) => setTagDraft(event.target.value)}
+            placeholder="tag e.g. logo, app home screen"
+            title="The name the video prompt will refer to this upload by. All files picked together share it."
+            className="creator-input w-52 px-2.5 py-1.5 text-[11px]"
+          />
         <label className="creator-control flex cursor-pointer items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-slate-200 hover:border-purple-400/40">
           <Upload size={12} />
           {uploading ? "Uploading…" : images.length ? "Add more" : "Upload images"}
@@ -72,10 +91,11 @@ export default function ShotReferenceImagesPanel({ shot }) {
             disabled={uploading}
           />
         </label>
+        </div>
       </div>
       {images.length === 0 && (
         <p className="text-[11px] font-medium text-slate-500">
-          No reference images yet. Upload multiple images that show the flow / states / angles you want the video to reflect.
+          No tagged assets yet. Upload the real artwork the video must contain -- logo, app screens, product shots -- and tag each upload so the prompt can refer to it by name.
         </p>
       )}
       {images.length > 0 && (
@@ -87,9 +107,17 @@ export default function ShotReferenceImagesPanel({ shot }) {
               ) : (
                 <div className="flex h-24 w-full items-center justify-center text-[10px] text-slate-500">preview unavailable</div>
               )}
-              {image.caption && (
+              {image.tag ? (
+                <p className="truncate bg-purple-500/30 px-1.5 py-0.5 text-[9px] font-bold text-purple-100" title={`Prompt refers to this as "${image.tag}"`}>
+                  {image.tag}
+                </p>
+              ) : image.caption ? (
                 <p className="truncate bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold text-slate-200" title={image.caption}>
                   {image.caption}
+                </p>
+              ) : (
+                <p className="truncate bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-semibold text-amber-200" title="No tag -- the prompt falls back to the scene's bundle label">
+                  untagged
                 </p>
               )}
               <button
