@@ -136,6 +136,8 @@ export default function ScreenplaySection({ projectId }) {
           characterFocus: s.characterFocus,
           emotionalPurpose: s.emotionalPurpose,
           estimatedSeconds: s.estimatedSeconds === "" || s.estimatedSeconds == null ? null : Number(s.estimatedSeconds),
+          needsMultiImage: Boolean(s.needsMultiImage),
+          multiImageLabel: s.multiImageLabel || null,
         })),
       }).unwrap();
       dispatch(showFlash({ message: "Saved as a new screenplay version", type: "success" }));
@@ -222,9 +224,19 @@ export default function ScreenplaySection({ projectId }) {
                     <div className="min-w-0 flex-1">
                       <div className="mb-1 flex items-center justify-between gap-2">
                         <p className="text-xs font-extrabold uppercase tracking-wide text-slate-200">{scene.slug}</p>
-                        {scene.estimatedSeconds != null && (
-                          <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-bold text-slate-400">~{scene.estimatedSeconds}s</span>
-                        )}
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {scene.needsMultiImage && (
+                            <span
+                              className="rounded-full border border-purple-400/40 bg-purple-500/10 px-2 py-0.5 text-[10px] font-bold text-purple-200"
+                              title="Creator flagged: needs multiple reference images on the shot page"
+                            >
+                              +imgs{scene.multiImageLabel ? ` · ${scene.multiImageLabel}` : ""}
+                            </span>
+                          )}
+                          {scene.estimatedSeconds != null && (
+                            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-bold text-slate-400">~{scene.estimatedSeconds}s</span>
+                          )}
+                        </div>
                       </div>
                       <p className="mb-1.5 text-[11px] font-semibold text-slate-500">{scene.location} {scene.timeOfDay ? `· ${scene.timeOfDay}` : ""}</p>
                       <p className="mb-1.5 text-xs font-medium leading-relaxed text-slate-400">{scene.summary}</p>
@@ -344,6 +356,37 @@ export default function ScreenplaySection({ projectId }) {
                     onChange={(event) => updateScene(index, "estimatedSeconds", event.target.value)}
                     className="creator-input w-24 px-2.5 py-2 text-xs font-semibold"
                   />
+                </div>
+                {/* Multi-image reference bundle -- creator marks a scene that will need multiple
+                    reference images (e.g. an app-flow scene with several screenshots). Phase 1:
+                    just persist the flag + label on the scene. Phase 2: the shot(s) generated
+                    from this scene inherit the flag and the shot page reveals the actual multi
+                    -image upload UI using this label as the bundle name; the images then flow
+                    to storyboard, PDF, and the video-generation prompt. */}
+                <div className="rounded-md border border-purple-400/20 bg-purple-500/[0.04] p-2.5">
+                  <label className="flex cursor-pointer items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(scene.needsMultiImage)}
+                      onChange={(event) => updateScene(index, "needsMultiImage", event.target.checked)}
+                      className="mt-0.5 h-3.5 w-3.5 accent-purple-500"
+                    />
+                    <span className="flex-1 text-[11px] font-semibold text-slate-200">
+                      This scene needs multiple reference images (uploaded later on the shot page)
+                    </span>
+                  </label>
+                  {scene.needsMultiImage && (
+                    <div className="mt-2 pl-5">
+                      <label className="mb-1 block text-[9px] font-extrabold uppercase tracking-wide text-slate-500">What to call this image bundle</label>
+                      <input
+                        type="text"
+                        value={scene.multiImageLabel ?? ""}
+                        onChange={(event) => updateScene(index, "multiImageLabel", event.target.value)}
+                        placeholder="e.g. app flow, before/after, product angles"
+                        className="creator-input w-full px-2.5 py-1.5 text-[11px]"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
