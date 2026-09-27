@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
-import { Loader2, Music, RefreshCw, RotateCcw, Sparkles } from "lucide-react";
+import { AlertTriangle, Loader2, Music, RefreshCw, RotateCcw, Sparkles } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useGenerateProjectScoreMutation,
@@ -26,7 +26,8 @@ const fmt = (n) => (n == null ? "?" : Number(n) % 1 === 0 ? String(Number(n)) : 
 
 export default function MusicPlanPanel({ projectId, shotsReady }) {
   const dispatch = useDispatch();
-  const { data: plan, isLoading, error } = useGetMusicPlanQuery(projectId, { skip: !projectId });
+  const { data: view, isLoading, error } = useGetMusicPlanQuery(projectId, { skip: !projectId });
+  const plan = view?.plan;
   const [planMusic, { isLoading: planning }] = usePlanMusicMutation();
   const [updatePrompt, { isLoading: savingPrompt }] = useUpdateMusicMasterPromptMutation();
   const [recompose, { isLoading: recomposing }] = useRecomposeMusicMasterPromptMutation();
@@ -87,6 +88,21 @@ export default function MusicPlanPanel({ projectId, shotsReady }) {
 
       {plan && (
         <>
+          {/* The plan is composed for the timeline that existed when it was planned. If shots
+              have been retimed, added or deleted since, the score no longer fits the film --
+              surfaced rather than silently re-planned, because re-planning costs a model call. */}
+          {view?.stale && (
+            <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-400/30 bg-amber-400/[0.07] p-2.5">
+              <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-300" />
+              <p className="text-[11px] font-semibold text-amber-100">
+                The shot timeline changed since this was planned — it is now{" "}
+                {fmt(view.currentTimelineSeconds)}s but the score is composed for{" "}
+                {fmt(plan.totalDurationSeconds)}s. Re-plan before generating, or the music will be
+                written for the wrong runtime.
+              </p>
+            </div>
+          )}
+
           {plan.globalIdentity && (
             <div className="mb-3 rounded-md border border-white/10 bg-white/[0.02] p-3">
               <p className="mb-1 text-[9px] font-extrabold uppercase tracking-wide text-slate-500">
@@ -101,6 +117,26 @@ export default function MusicPlanPanel({ projectId, shotsReady }) {
                 <p className="mt-1 text-[11px] font-medium text-slate-400">
                   Motif: <span className="text-slate-200">{plan.globalIdentity.motif}</span>
                   {plan.globalIdentity.motifDescription ? ` — ${plan.globalIdentity.motifDescription}` : ""}
+                </p>
+              )}
+              {plan.globalIdentity.coreInstruments?.length > 0 && (
+                <p className="mt-1 text-[11px] font-medium text-slate-400">
+                  Core: <span className="text-slate-200">{plan.globalIdentity.coreInstruments.join(", ")}</span>
+                </p>
+              )}
+              {plan.globalIdentity.supportingInstruments?.length > 0 && (
+                <p className="text-[11px] font-medium text-slate-400">
+                  Supporting: <span className="text-slate-200">{plan.globalIdentity.supportingInstruments.join(", ")}</span>
+                </p>
+              )}
+              {(plan.globalIdentity.timeSignature || plan.globalIdentity.sonicTexture
+                || plan.globalIdentity.rhythmicCharacter || plan.globalIdentity.culturalInfluence
+                || plan.globalIdentity.productionStyle || plan.globalIdentity.subGenre) && (
+                <p className="mt-1 text-[10px] font-medium text-slate-500">
+                  {[plan.globalIdentity.subGenre, plan.globalIdentity.timeSignature,
+                    plan.globalIdentity.sonicTexture, plan.globalIdentity.rhythmicCharacter,
+                    plan.globalIdentity.culturalInfluence, plan.globalIdentity.productionStyle]
+                    .filter(Boolean).join(" · ")}
                 </p>
               )}
             </div>
@@ -122,6 +158,14 @@ export default function MusicPlanPanel({ projectId, shotsReady }) {
                   )}
                   {section.motifTreatment && (
                     <p className="mt-0.5 text-[10px] font-medium text-purple-200/70">{section.motifTreatment}</p>
+                  )}
+                  {section.activeInstruments?.length > 0 && (
+                    <p className="text-[10px] font-medium text-slate-500">
+                      {section.activeInstruments.join(", ")}
+                    </p>
+                  )}
+                  {section.dialogueTreatment && (
+                    <p className="text-[10px] font-medium text-sky-200/60">{section.dialogueTreatment}</p>
                   )}
                 </div>
               ))}
