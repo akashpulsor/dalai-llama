@@ -185,6 +185,7 @@ export default function ClientReviewPage() {
                         key={shot.videoUrl}
                         src={shot.videoUrl}
                         aspectRatio={finalVideo?.aspectRatio}
+                        showDuration={false}
                       />
                     </div>
                   ))}

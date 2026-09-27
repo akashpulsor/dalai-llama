@@ -30,7 +30,12 @@ const formatTime = (seconds) => {
  * The canvas is shaped by the project's aspect ratio rather than the file's, so a vertical cut
  * gets a vertical frame instead of being letterboxed into a landscape box.
  */
-export default function CanvasVideoPlayer({ src, aspectRatio, className = "" }) {
+/** {@code showDuration} false hides the total-length readout beside the scrubber. Used for the
+ * per-shot players on the client review page: a client judging one shot shouldn't be reading its
+ * runtime, and a row of "0:04 / 0:03 / 0:05" invites a conversation about individual shot lengths
+ * that isn't what the review is for. The elapsed position and the scrubber stay -- those are
+ * playback controls, not a duration statement. The final film keeps its duration. */
+export default function CanvasVideoPlayer({ src, aspectRatio, className = "", showDuration = true }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const frameRef = useRef(null);
@@ -151,7 +156,9 @@ export default function CanvasVideoPlayer({ src, aspectRatio, className = "" }) 
           className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-white/15 accent-purple-400 disabled:opacity-50"
         />
 
-        <span className="w-10 shrink-0 text-[11px] font-bold tabular-nums text-slate-400">{formatTime(duration)}</span>
+        {showDuration && (
+          <span className="w-10 shrink-0 text-[11px] font-bold tabular-nums text-slate-400">{formatTime(duration)}</span>
+        )}
 
         <button
           type="button"
