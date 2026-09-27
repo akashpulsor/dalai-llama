@@ -49,6 +49,10 @@ function objectPath(url) {
   }
 }
 
+/** A job in one of these is still rendering, so the card shows its generating state even on a
+ * fresh page load -- the in-memory `preparing` flag only survives the session that started it. */
+const IN_FLIGHT_STATUSES = new Set(["QUEUED", "PROCESSING"]);
+
 export default function VideoGenerationSection({ projectId }) {
   const dispatch = useDispatch();
   const { data: shots = [] } = useListPreProductionShotsQuery(projectId, { skip: !projectId });
@@ -97,13 +101,31 @@ export default function VideoGenerationSection({ projectId }) {
   // approve whose request timed out while the render carried on -- came back looking like it
   // had never run. The clip existed and was paid for; the page just never asked for it, and
   // the obvious reaction to a shot that looks ungenerated is to generate it again.
-  const { data: existingShotVideos = [], refetch: refetchShotVideos } = useListProjectShotVideosQuery(projectId, { skip: !projectId });
+  // Poll only while something is actually rendering. A reloaded page has no in-memory poll loop
+  // of its own (pollJobUntilSettled belongs to the session that clicked generate), so without
+  // this the restored "Generating…" state would sit there forever instead of resolving into the
+  // finished clip.
+  const [anyInFlight, setAnyInFlight] = useState(false);
+  const { data: existingShotVideos = [], refetch: refetchShotVideos } = useListProjectShotVideosQuery(projectId, {
+    skip: !projectId,
+    pollingInterval: anyInFlight ? 8000 : 0,
+  });
+  useEffect(() => {
+    setAnyInFlight(existingShotVideos.some((clip) => IN_FLIGHT_STATUSES.has(clip?.status)));
+  }, [existingShotVideos]);
   useEffect(() => {
     if (!existingShotVideos.length) return;
     setVideos((current) => {
       const next = { ...current };
       existingShotVideos.forEach((clip) => {
-        if (!clip?.shotId || !clip?.videoUrl) return;
+        if (!clip?.shotId) return;
+        // In-flight jobs (QUEUED/PROCESSING) come back with a null videoUrl and used to be
+        // dropped here. That left the card with no idea a render was running, so reloading the
+        // page mid-generation showed an idle "Approve & generate" button while the job was very
+        // much alive server-side. Record them too -- the status alone is what drives the loader.
+        // Guard only against downgrading: if this session already has a finished clip and the
+        // listing hasn't caught up, keep what we have.
+        if (!clip.videoUrl && next[clip.shotId]?.outputUri) return;
         const local = next[clip.shotId];
         // Once a shot had a clip, this list could never update it again. The guard was there to
         // stop a list fetched mid-render from clobbering a job this session was watching, but it
@@ -112,10 +134,7 @@ export default function VideoGenerationSection({ projectId }) {
         // it had just removed; replacing the audio, extending the tail and uploading a finished
         // clip all did the same, until a full page reload.
         //
-        // What actually needs protecting is only the first case, so protect only that: a locally
-        // tracked shot with no output yet is a render in flight and the list knows nothing about
-        // it. Anything else, the server is authoritative.
-        if (local && !local.outputUri) return;
+        // The server is authoritative now that the listing reports in-flight jobs too.
         // Presigned URLs are re-signed on every fetch, so the same clip comes back under a new
         // query string each time and swapping it in would make the player reload on every poll.
         // The object path is what actually identifies the clip, and a repair always writes a new
@@ -657,7 +676,7 @@ export default function VideoGenerationSection({ projectId }) {
             isOpen={openShotId === shot.id}
             onToggle={() => setOpenShotId(openShotId === shot.id ? null : shot.id)}
             info={prepared[shot.id]}
-            busy={preparing[shot.id]}
+            busy={preparing[shot.id] || IN_FLIGHT_STATUSES.has(videos[shot.id]?.status)}
             video={videos[shot.id]}
             dubbed={dubbedVoices[shot.id]}
             selected={selectedShotIds.includes(shot.id)}

@@ -1,7 +1,7 @@
 // @ts-nocheck
-import React from "react";
+import React, { useState } from "react";
 import { useDispatch } from "react-redux";
-import { AudioLines, Check, Download, Loader2, RotateCcw, Send, Upload, VolumeX, X } from "lucide-react";
+import { AudioLines, Check, Download, Gauge, Loader2, Music, RotateCcw, Send, Upload, VolumeX, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import ShotCanvasPlayer from "./ShotCanvasPlayer.jsx";
 import {
@@ -12,6 +12,9 @@ import {
   usePublishClipVersionMutation,
   useCreateDubbedCutMutation,
   useCreateSilentCutMutation,
+  useCreateRetimedCutMutation,
+  usePreviewClipMixMutation,
+  useKeepClipPreviewMutation,
   useListClipVersionsQuery,
   useUploadClipCutMutation,
 } from "../../api/creatorEndpoints.js";
@@ -32,6 +35,7 @@ const ORIGIN_LABEL = {
   GENERATED: "as generated",
   DUBBED: "with the dubbed voice",
   SILENT: "no voice",
+  RETIMED: "slowed to fit",
   UPLOADED: "your own edit",
 };
 
@@ -46,6 +50,46 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
   );
   const [createDubbed, dubbedState] = useCreateDubbedCutMutation();
   const [createSilent, silentState] = useCreateSilentCutMutation();
+  const [createRetimed, retimedState] = useCreateRetimedCutMutation();
+  // Defaults to the length the shot plan asked for, which is the whole point -- the clip was
+  // generated shorter than this on purpose.
+  const [retimeTo, setRetimeTo] = useState(shot?.durationSeconds || 3);
+  const [previewMix, previewState] = usePreviewClipMixMutation();
+  const [keepPreview, keepState] = useKeepClipPreviewMutation();
+  // The un-kept render: something to watch and then decide about. Discarding is just clearing
+  // this -- the object on the server ages out on its own, so nothing has to be cleaned up.
+  const [preview, setPreview] = useState(null);
+
+  const runPreview = async (withDub, withMusic, label) => {
+    try {
+      const made = await previewMix({
+        projectId, shotId, shotRef: shot?.shotRef,
+        targetSeconds: Number(retimeTo) || undefined,
+        withDub, withMusic,
+      }).unwrap();
+      setPreview({ ...made, label });
+    } catch (error) {
+      dispatch(showFlash({
+        message: error?.data?.message || error?.data?.error || "Could not make that mix",
+        type: "error",
+      }));
+    }
+  };
+
+  const handleKeepPreview = async () => {
+    try {
+      await keepPreview({
+        projectId, shotId, shotRef: shot?.shotRef,
+        previewKey: preview.previewKey,
+        origin: preview.withDub ? "DUBBED" : "RETIMED",
+      }).unwrap();
+      setPreview(null);
+      dispatch(showFlash({ message: "Kept as a new version.", type: "success" }));
+      onChanged?.();
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not keep that mix", type: "error" }));
+    }
+  };
   const [uploadCut, uploadState] = useUploadClipCutMutation();
   const [acceptCut, acceptState] = useAcceptClipCutMutation();
   const [rejectCut, rejectState] = useRejectClipCutMutation();
@@ -57,7 +101,7 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
   // file back links the two rather than leaving a version that came from nowhere.
   const editingFromRef = React.useRef(null);
 
-  const busy = dubbedState.isLoading || silentState.isLoading
+  const busy = dubbedState.isLoading || silentState.isLoading || retimedState.isLoading
     || uploadState.isLoading || acceptState.isLoading || rejectState.isLoading || publishState.isLoading
     || baselineState.isLoading;
 
@@ -250,6 +294,56 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
           {silentState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <VolumeX size={11} />}
           {silentState.isLoading ? "Making…" : "Remove the audio"}
         </button>
+        {/* Generate short, stretch to the planned length, watch it. Muted by construction --
+            "Use the dubbed voice" afterwards puts the cloned line back at normal speed, which is
+            what keeps the speech from sounding drawled. */}
+        <span className="flex items-center gap-1 rounded-md border border-amber-400/25 bg-amber-400/[0.06] px-2 py-1">
+          <input
+            type="number"
+            min={1}
+            value={retimeTo}
+            onChange={(event) => setRetimeTo(event.target.value)}
+            title="Stretch the picture to this many seconds"
+            className="w-12 bg-transparent text-[10px] font-bold text-amber-100 outline-none"
+          />
+          <span className="text-[10px] font-bold text-amber-200/70">s</span>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => run(createRetimed, { targetSeconds: Number(retimeTo) }, `Stretched the picture to ${retimeTo}s (muted).`)}
+            className="flex items-center gap-1.5 text-[10px] font-bold text-amber-200 disabled:opacity-50"
+          >
+            {retimedState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Gauge size={11} />}
+            {retimedState.isLoading ? "Stretching…" : "Slow to fit"}
+          </button>
+        </span>
+        <button
+          type="button"
+          disabled={busy || previewState.isLoading}
+          onClick={() => runPreview(true, false, "with the dubbed voice")}
+          className="flex items-center gap-1.5 rounded-md border border-sky-400/30 bg-sky-500/10 px-2.5 py-1.5 text-[10px] font-bold text-sky-200 disabled:opacity-50"
+        >
+          {previewState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <AudioLines size={11} />}
+          Try with dub
+        </button>
+        <button
+          type="button"
+          disabled={busy || previewState.isLoading}
+          onClick={() => runPreview(false, true, "with the background music")}
+          className="flex items-center gap-1.5 rounded-md border border-sky-400/30 bg-sky-500/10 px-2.5 py-1.5 text-[10px] font-bold text-sky-200 disabled:opacity-50"
+        >
+          <Music size={11} />
+          Try with music
+        </button>
+        <button
+          type="button"
+          disabled={busy || previewState.isLoading}
+          onClick={() => runPreview(true, true, "with dub and music")}
+          className="flex items-center gap-1.5 rounded-md border border-sky-400/30 bg-sky-500/10 px-2.5 py-1.5 text-[10px] font-bold text-sky-200 disabled:opacity-50"
+        >
+          <Music size={11} />
+          Try with both
+        </button>
         <button
           type="button"
           disabled={busy}
@@ -260,6 +354,38 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
           {uploadState.isLoading ? "Uploading…" : "Upload your own edit"}
         </button>
         <input ref={fileRef} type="file" accept="video/*" onChange={handleUpload} className="hidden" />
+
+        {/* An un-kept render. Nothing on the server's version list points at this yet -- keeping
+            it promotes the same bytes, discarding it just forgets the key. */}
+        {preview && (
+          <div className="mt-3 w-full rounded-lg border border-sky-400/25 bg-sky-500/[0.05] p-3">
+            <p className="mb-2 text-[10px] font-extrabold uppercase tracking-wide text-sky-200">
+              Not kept yet — {preview.label}
+              {preview.targetSeconds ? ` · stretched to ${preview.targetSeconds}s` : ""}
+            </p>
+            <video controls src={preview.videoUrl} className="mb-2 max-h-80 w-full rounded-md bg-black" />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={keepState.isLoading}
+                onClick={handleKeepPreview}
+                className="flex items-center gap-1.5 rounded-md border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1.5 text-[10px] font-bold text-emerald-200 disabled:opacity-50"
+              >
+                {keepState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+                Keep as a version
+              </button>
+              <button
+                type="button"
+                disabled={keepState.isLoading}
+                onClick={() => setPreview(null)}
+                className="flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1.5 text-[10px] font-bold text-slate-400 hover:text-slate-200 disabled:opacity-50"
+              >
+                <X size={11} />
+                Discard
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       <p className="mt-1.5 text-[10px] font-medium leading-relaxed text-slate-500">
         Both make a new version to watch. Neither changes the shot until you choose it, and nothing

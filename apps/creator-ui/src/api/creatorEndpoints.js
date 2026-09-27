@@ -3189,8 +3189,28 @@ export const creatorApi = apiSlice.injectEndpoints({
       providesTags: (_result, _error, shotId) => [{ type: "CreatorHomeProjects", id: `shot-bg-music-${shotId}` }],
     }),
 
+    // Accepts a bare shotId (legacy) or {shotId, prompt, lengthSeconds}. `prompt` is the
+    // creator's own description of the music -- omit it and the backend still derives one from
+    // the shot's sound design, which is what it always did.
+    // The creator's own track instead of a generated one.
+    uploadShotBackgroundMusic: builder.mutation({
+      query: ({ shotId, file }) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        return { url: platformUrl(`/shots/${shotId}/background-music/upload`), method: "POST", body: formData };
+      },
+    }),
+
     generateShotBackgroundMusic: builder.mutation({
-      query: (shotId) => ({ url: platformUrl(`/shots/${shotId}/background-music`), method: "POST" }),
+      query: (arg) => {
+        const shotId = typeof arg === "object" && arg !== null ? arg.shotId : arg;
+        const params = {};
+        if (typeof arg === "object" && arg !== null) {
+          if (arg.prompt && String(arg.prompt).trim()) params.prompt = String(arg.prompt).trim();
+          if (arg.lengthSeconds) params.lengthSeconds = arg.lengthSeconds;
+        }
+        return { url: platformUrl(`/shots/${shotId}/background-music`), method: "POST", params };
+      },
       invalidatesTags: (_result, _error, shotId) => [{ type: "CreatorHomeProjects", id: `shot-bg-music-${shotId}` }],
     }),
 
@@ -3564,6 +3584,44 @@ export const creatorApi = apiSlice.injectEndpoints({
         url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/clip-versions/silent`),
         method: "POST",
         params: shotRef ? { shotRef } : undefined,
+      }),
+      invalidatesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `clip-cuts-${a?.shotId}` }],
+    }),
+
+    // Stretch the picture to a longer slot than it was generated for, muted. The point of
+    // generating a shot short to save money: retime to the planned length, watch it, then accept
+    // or not. Run the dubbed cut afterwards to put the cloned line back at normal speed.
+    createRetimedCut: builder.mutation({
+      query: ({ projectId, shotId, shotRef, targetSeconds }) => ({
+        url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/clip-versions/retimed`),
+        method: "POST",
+        params: shotRef ? { shotRef, targetSeconds } : { targetSeconds },
+      }),
+      invalidatesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `clip-cuts-${a?.shotId}` }],
+    }),
+
+    // Render a combination to watch without keeping it: optional stretch, optional dub, optional
+    // background music. Returns a previewKey + a URL to play. No version row is written, so a
+    // combination that doesn't work costs nothing to discard.
+    previewClipMix: builder.mutation({
+      query: ({ projectId, shotId, shotRef, targetSeconds, withDub, withMusic }) => ({
+        url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/clip-versions/preview-mix`),
+        method: "POST",
+        params: {
+          ...(shotRef ? { shotRef } : {}),
+          ...(targetSeconds ? { targetSeconds } : {}),
+          withDub: Boolean(withDub),
+          withMusic: Boolean(withMusic),
+        },
+      }),
+    }),
+
+    // Promote a preview into a real version. No re-render -- the bytes already exist.
+    keepClipPreview: builder.mutation({
+      query: ({ projectId, shotId, shotRef, previewKey, origin }) => ({
+        url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/clip-versions/keep-preview`),
+        method: "POST",
+        params: { previewKey, ...(origin ? { origin } : {}), ...(shotRef ? { shotRef } : {}) },
       }),
       invalidatesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `clip-cuts-${a?.shotId}` }],
     }),
@@ -4337,6 +4395,7 @@ export const {
   useListTtsModelsQuery,
   useGetShotBackgroundMusicQuery,
   useGenerateShotBackgroundMusicMutation,
+  useUploadShotBackgroundMusicMutation,
   useDispatchShotMutation,
   useGetVideoGenPromptQuery,
   useLazyGetVideoGenPromptQuery,
@@ -4370,6 +4429,9 @@ export const {
   useAssembleFilmMutation,
   useCreateDubbedCutMutation,
   useCreateSilentCutMutation,
+  useCreateRetimedCutMutation,
+  usePreviewClipMixMutation,
+  useKeepClipPreviewMutation,
   useGetDubJobQuery,
   useGetFilmReadinessQuery,
   useGetLatestFilmQuery,
