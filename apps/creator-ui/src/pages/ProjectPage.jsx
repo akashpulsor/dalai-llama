@@ -26,6 +26,7 @@ import ShotsSection from "../components/creator/ShotsSection.jsx";
 import ShotChatPanel from "../components/creator/ShotChatPanel.jsx";
 import ProjectIdeaOptionsPanel from "../components/creator/ProjectIdeaOptionsPanel.jsx";
 import VideoGenerationSection from "../components/creator/VideoGenerationSection.jsx";
+import MusicPlanPanel from "../components/creator/MusicPlanPanel.jsx";
 import ContinuityBiblePanel from "../components/creator/ContinuityBiblePanel.jsx";
 import ClientReviewPanel from "../components/creator/ClientReviewPanel.jsx";
 
@@ -587,6 +588,9 @@ export default function ProjectPage() {
       {activeTab === "shots" && hasScript && (
         <>
           <ShotsSection projectId={projectId} />
+          {/* Score sits under the shot list because that is when it can be planned: the music
+              is fitted to the fixed shot timeline, so it needs the shots to exist first. */}
+          <MusicPlanPanel projectId={projectId} shotsReady />
           <ContinueButton fromTabId="shots" onContinue={() => setActiveTab("video")} />
           <ShotChatPanel projectId={projectId} />
           <ContinuityBiblePanel projectId={projectId} />

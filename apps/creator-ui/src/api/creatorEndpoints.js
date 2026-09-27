@@ -3192,6 +3192,48 @@ export const creatorApi = apiSlice.injectEndpoints({
     // Accepts a bare shotId (legacy) or {shotId, prompt, lengthSeconds}. `prompt` is the
     // creator's own description of the music -- omit it and the backend still derives one from
     // the shot's sound design, which is what it always did.
+    // --- Whole-video score (pre-production-service) ---
+    // Planned once across the complete timeline, not per shot. Planning is a cheap text call the
+    // creator can re-run while tuning; generate is billable audio, hence separate endpoints.
+    getMusicPlan: builder.query({
+      query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/music-plan`) }),
+      providesTags: (_r, _e, projectId) => [{ type: "CreatorHomeProjects", id: `music-plan-${projectId}` }],
+    }),
+    planMusic: builder.mutation({
+      query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/music-plan`), method: "POST" }),
+      invalidatesTags: (_r, _e, projectId) => [{ type: "CreatorHomeProjects", id: `music-plan-${projectId}` }],
+    }),
+    updateMusicMasterPrompt: builder.mutation({
+      query: ({ projectId, masterPrompt }) => ({
+        url: platformUrl(`/projects/${projectId}/music-plan/master-prompt`),
+        method: "PUT",
+        body: { masterPrompt },
+      }),
+      invalidatesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `music-plan-${a?.projectId}` }],
+    }),
+    recomposeMusicMasterPrompt: builder.mutation({
+      query: (projectId) => ({
+        url: platformUrl(`/projects/${projectId}/music-plan/master-prompt/recompose`),
+        method: "POST",
+      }),
+      invalidatesTags: (_r, _e, projectId) => [{ type: "CreatorHomeProjects", id: `music-plan-${projectId}` }],
+    }),
+    // `model` optionally overrides the configured music model -- a registered model id
+    // (elevenlabs/music-v1, fal-ai/ace-step), never a provider name. Provider resolution is
+    // llm-gateway's job.
+    generateProjectScore: builder.mutation({
+      query: ({ projectId, model }) => ({
+        url: platformUrl(`/projects/${projectId}/music-plan/generate`),
+        method: "POST",
+        params: model ? { model } : {},
+      }),
+      invalidatesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `music-plan-${a?.projectId}` }],
+    }),
+    getProjectScore: builder.query({
+      query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/music-plan/score`) }),
+      providesTags: (_r, _e, projectId) => [{ type: "CreatorHomeProjects", id: `music-plan-${projectId}` }],
+    }),
+
     // The creator's own track instead of a generated one.
     uploadShotBackgroundMusic: builder.mutation({
       query: ({ shotId, file }) => {
@@ -4396,6 +4438,12 @@ export const {
   useGetShotBackgroundMusicQuery,
   useGenerateShotBackgroundMusicMutation,
   useUploadShotBackgroundMusicMutation,
+  useGetMusicPlanQuery,
+  usePlanMusicMutation,
+  useUpdateMusicMasterPromptMutation,
+  useRecomposeMusicMasterPromptMutation,
+  useGenerateProjectScoreMutation,
+  useGetProjectScoreQuery,
   useDispatchShotMutation,
   useGetVideoGenPromptQuery,
   useLazyGetVideoGenPromptQuery,
