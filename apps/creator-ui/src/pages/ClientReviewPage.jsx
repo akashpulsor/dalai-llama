@@ -264,21 +264,52 @@ export default function ClientReviewPage() {
                           only when the creator has actually produced them for this shot. */}
                       {(() => {
                         const visible = (shot.images || []).filter((img) => img && img.signedUrl && String(img.signedUrl).trim());
-                        const hasProduct = visible.some((img) => img.kind === "PRODUCTION");
+                        const product = visible.find((img) => img.kind === "PRODUCTION");
+                        // The production frame is the one the client is actually reviewing, so it
+                        // leads at a size you can judge -- centered, capped width, object-contain
+                        // so a 9:16 vertical frame isn't centre-cropped into a square the way the
+                        // old uniform 4-up thumbnail grid did.
+                        const others = visible.filter((img) => img !== product);
                         return (
-                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                            {visible.map((image) => (
-                              <div key={image.id} className="overflow-hidden rounded-md border border-white/10 bg-black/20">
-                                <img src={image.signedUrl} alt={image.kind} className="aspect-square w-full object-cover" />
-                                <p className="px-2 py-1 text-center text-[9px] font-bold uppercase tracking-wide text-slate-400">
-                                  {IMAGE_KIND_LABEL[image.kind] || image.kind}
-                                </p>
-                              </div>
-                            ))}
-                            {!hasProduct && (
-                              <div className="col-span-4 flex items-center justify-center gap-1.5 rounded-md border border-dashed border-white/10 py-4 text-[11px] font-medium text-slate-600">
+                          <div className="space-y-3">
+                            {product ? (
+                              <figure className="mx-auto w-full max-w-sm">
+                                <div className="overflow-hidden rounded-lg border border-white/10 bg-black/30">
+                                  <img
+                                    src={product.signedUrl}
+                                    alt={product.kind}
+                                    className="max-h-[26rem] w-full object-contain"
+                                  />
+                                </div>
+                                <figcaption className="mt-1 text-center text-[9px] font-bold uppercase tracking-wide text-slate-400">
+                                  {IMAGE_KIND_LABEL[product.kind] || product.kind}
+                                </figcaption>
+                              </figure>
+                            ) : (
+                              <div className="flex items-center justify-center gap-1.5 rounded-md border border-dashed border-white/10 py-6 text-[11px] font-medium text-slate-600">
                                 <ImageIcon size={13} />
                                 Production frame not generated yet
+                              </div>
+                            )}
+                            {/* Supporting frames stay secondary and smaller, but still
+                                object-contain so nothing is cropped, and centred as a row so a
+                                single extra frame doesn't sit orphaned hard-left. */}
+                            {others.length > 0 && (
+                              <div className="flex flex-wrap justify-center gap-2">
+                                {others.map((image) => (
+                                  <figure key={image.id} className="w-28">
+                                    <div className="overflow-hidden rounded-md border border-white/10 bg-black/20">
+                                      <img
+                                        src={image.signedUrl}
+                                        alt={image.kind}
+                                        className="h-24 w-full object-contain"
+                                      />
+                                    </div>
+                                    <figcaption className="mt-0.5 truncate text-center text-[9px] font-bold uppercase tracking-wide text-slate-500">
+                                      {IMAGE_KIND_LABEL[image.kind] || image.kind}
+                                    </figcaption>
+                                  </figure>
+                                ))}
                               </div>
                             )}
                           </div>
