@@ -715,13 +715,21 @@ function PromptVersionHistory({ shotId, onUse, canEdit }) {
   );
 }
 
-export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info, busy, video, dubbed, selected, onSelectToggle, onPrepare, onSavePrompt, onApprove, onReject, onAutoFix, onRegenerate, regenerating }) {
+export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info, busy, video, activeClip, dubbed, selected, onSelectToggle, onPrepare, onSavePrompt, onApprove, onReject, onAutoFix, onRegenerate, regenerating }) {
   // Prompt editing is local to the open card: the draft only leaves here on an explicit Save, so
   // collapsing the card or wandering off never silently rewrites what will be generated.
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState("");
   const [saving, setSaving] = React.useState(false);
   const { entitlements } = useCreatorVideoEntitlements();
+
+  // What this shot actually plays.
+  //
+  // video-generation-service only ever knows about the clip IT rendered. Accepting a cut happens
+  // in post-production-service and changes which file the film uses; the other service is never
+  // told, and never should be -- it did not make that file. Playing video.outputUri here meant
+  // accepting a cut flashed success and then went on playing the take it had just replaced.
+  const playableUrl = activeClip?.videoUrl || video?.outputUri;
 
   /** Rejecting is the start of a rewrite, not the end of the shot. Mark it rejected, then drop
    * straight into the prompt so the creator can say what was wrong with it -- saving writes a
@@ -802,13 +810,13 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
       )}
       <button type="button" onClick={onToggle} className="group block w-full text-left">
         <div className="relative w-full bg-black" style={{ aspectRatio: aspect }}>
-          {video?.outputUri ? (
+          {playableUrl ? (
             // One player, not two. This tile and the full player below used to be separate
             // elements holding the same file: two downloads, a tile that could never be heard and
             // a player that could never be glanced at. Now it is the same component, looping
             // quietly like the tile did with the sound one click away.
             <ShotCanvasPlayer
-              src={video.outputUri}
+              src={playableUrl}
               aspectRatio={shot.aspectRatio}
               autoLoop
               className="absolute inset-0 h-full w-full border-0"
@@ -821,7 +829,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             </div>
           )}
 
-          {video?.outputUri && (
+          {playableUrl && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/20">
               <PlayCircle size={30} className="text-white/70" />
             </div>
@@ -905,9 +913,13 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             />
           )}
 
-          {video?.outputUri && (
+          {playableUrl && (
             <ShotCanvasPlayer
-              src={video.outputUri}
+              // Keyed on the URL so accepting a cut swaps the source instead of leaving the
+              // element on the file it already decoded. Without it the player kept the old clip
+              // and sat on its loading label, which read as the accept having hung.
+              key={playableUrl}
+              src={playableUrl}
               aspectRatio={shot.aspectRatio}
               className="mx-auto w-full max-w-md"
               label="Loading the clip…"
@@ -998,11 +1010,15 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               prompt from the shot as it stands now, then goes through the same approve step, so the
               new clip is costed and confirmed exactly like the first one. */}
           {video && (
+            // No onChanged. It used to be wired to onPrepare, so accepting a cut kicked off a
+            // prompt REBUILD of the shot -- the card went busy, the spinner never resolved into
+            // the new clip, and a model call was paid for that nobody asked for. Accepting
+            // invalidates the project's current cuts, and the player reads them, so the swap
+            // happens on its own.
             <ClipCutsPanel
               shot={shot}
               projectId={projectId}
               aspectRatio={shot.aspectRatio}
-              onChanged={onPrepare}
             />
           )}
 

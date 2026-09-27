@@ -16,6 +16,7 @@ import {
   usePrepareShotSceneMutation,
   usePrepareShotScenesBatchMutation,
   useRejectVideoGenJobMutation,
+  useListProjectClipsQuery,
   useListProjectShotVideosQuery,
   useLazyGetVideoGenJobQuery,
   useUpdateProjectConfigMutation,
@@ -151,6 +152,16 @@ export default function VideoGenerationSection({ projectId }) {
       return next;
     });
   }, [existingShotVideos]);
+  // The cut each shot is currently ON, which is not the same thing as the clip that was generated
+  // for it. A shot slowed to fit, dubbed, mixed or hand-edited lives in post-production-service;
+  // video-generation-service still reports the file it rendered and has no way to know it was
+  // superseded. The card plays this when there is one, so accepting a cut is visible immediately.
+  const { data: projectClips = [] } = useListProjectClipsQuery(projectId, { skip: !projectId });
+  const activeClips = React.useMemo(
+    () => Object.fromEntries(projectClips.filter((clip) => clip?.shotId).map((clip) => [clip.shotId, clip])),
+    [projectClips],
+  );
+
   const [flagOverrides, setFlagOverrides] = useState({}); // flagKey -> boolean, undefined = use project default
   const [preparingDialogues, setPreparingDialogues] = useState(false);
   // Empty = "every shot", which is exactly what the batch endpoint does with an empty shotIds --
@@ -678,6 +689,7 @@ export default function VideoGenerationSection({ projectId }) {
             info={prepared[shot.id]}
             busy={preparing[shot.id] || IN_FLIGHT_STATUSES.has(videos[shot.id]?.status)}
             video={videos[shot.id]}
+            activeClip={activeClips[shot.id]}
             dubbed={dubbedVoices[shot.id]}
             selected={selectedShotIds.includes(shot.id)}
             onSelectToggle={() => toggleShotSelected(shot.id)}

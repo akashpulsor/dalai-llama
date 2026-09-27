@@ -6,6 +6,7 @@ import { showFlash } from "@dalaillama/shared-store";
 import {
   useGenerateProjectScoreMutation,
   useGetMusicPlanQuery,
+  useGetProjectScoreQuery,
   usePlanMusicMutation,
   useRecomposeMusicMasterPromptMutation,
   useUpdateMusicMasterPromptMutation,
@@ -32,6 +33,9 @@ export default function MusicPlanPanel({ projectId, shotsReady }) {
   const [updatePrompt, { isLoading: savingPrompt }] = useUpdateMusicMasterPromptMutation();
   const [recompose, { isLoading: recomposing }] = useRecomposeMusicMasterPromptMutation();
   const [generate, { isLoading: generating }] = useGenerateProjectScoreMutation();
+  // The rendered audio, once there is one. 404 until the score has been generated, which is the
+  // normal state of a freshly planned project rather than an error worth showing.
+  const { data: score } = useGetProjectScoreQuery(projectId, { skip: !projectId });
 
   const [prompt, setPrompt] = useState("");
   // Model override is a registered model id, not a provider. Blank uses whatever the deployment
@@ -222,6 +226,27 @@ export default function MusicPlanPanel({ projectId, shotsReady }) {
               {generating ? "Generating…" : "Generate score"}
             </button>
           </div>
+
+          {/* Where the score is listened to. Generating it wrote a file and said so in a flash
+              message, and then there was nowhere in the UI to hear the thing you had just paid
+              for -- the only way was to assemble the film. */}
+          {score?.signedUrl && (
+            <div className="mt-3 rounded-md border border-purple-400/25 bg-purple-500/[0.06] p-3">
+              <p className="mb-2 flex flex-wrap items-center gap-2 text-[10px] font-extrabold uppercase tracking-wide text-purple-200">
+                <Music size={11} /> The generated score
+                <span className="font-bold normal-case tracking-normal text-slate-400">
+                  {fmt(score.durationSeconds)}s{score.modelId ? ` · ${score.modelId}` : ""}
+                </span>
+              </p>
+              {/* Keyed on the URL so re-generating swaps the audio instead of leaving the element
+                  on the take it already loaded. */}
+              <audio key={score.signedUrl} controls src={score.signedUrl} className="w-full" />
+              <p className="mt-1.5 text-[10px] font-medium text-slate-500">
+                This is laid under the whole film when the shots are joined — you do not add it per
+                shot.
+              </p>
+            </div>
+          )}
         </>
       )}
     </div>

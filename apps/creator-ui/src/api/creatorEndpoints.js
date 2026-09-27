@@ -3696,6 +3696,10 @@ export const creatorApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (_r, _e, a) => [
         { type: "CreatorHomeProjects", id: `clip-cuts-${a?.shotId}` },
+        // The video page plays the project's CURRENT cuts, so accepting has to drop that list
+        // too. Without it the accept succeeded and the player went on showing the take it
+        // replaced -- video-generation-service never learns about a cut, and never should.
+        { type: "CreatorHomeProjects", id: `project-clips-${a?.projectId}` },
         { type: "CreatorHomeProjects", id: `film-${a?.projectId}` },
       ],
     }),
