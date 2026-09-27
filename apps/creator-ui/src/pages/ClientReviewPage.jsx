@@ -26,7 +26,7 @@ import { runRazorpayCheckout } from "../utils/walletRecharge.js";
 const rupee = (n, code = "INR") =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: code || "INR", maximumFractionDigits: 0 }).format(Number(n) || 0);
 
-const IMAGE_KIND_LABEL = { STORYBOARD: "Storyboard", PRODUCTION: "Production", LIGHTING: "Lighting", CAMERA_PLAN: "Camera plan" };
+const IMAGE_KIND_LABEL = { STORYBOARD: "Storyboard", PRODUCTION: "Production", LIGHTING: "Lighting", CAMERA_PLAN: "Camera plan", MOTION_GRAPHIC: "Motion graphic" };
 
 /**
  * Public, unauthenticated page for whoever holds a project's client-review link -- the tenant's
@@ -265,7 +265,11 @@ export default function ClientReviewPage() {
                           only when the creator has actually produced them for this shot. */}
                       {(() => {
                         const visible = (shot.images || []).filter((img) => img && img.signedUrl && String(img.signedUrl).trim());
-                        const product = visible.find((img) => img.kind === "PRODUCTION");
+                        // A motion-graphic shot has no production frame -- its MOTION_GRAPHIC
+                        // preview IS the deliverable for that beat, so it gets the same centered
+                        // lead treatment rather than being demoted to a supporting thumbnail.
+                        const product = visible.find((img) => img.kind === "PRODUCTION")
+                          || visible.find((img) => img.kind === "MOTION_GRAPHIC");
                         // The production frame is the one the client is actually reviewing, so it
                         // leads at a size you can judge -- centered, capped width, object-contain
                         // so a 9:16 vertical frame isn't centre-cropped into a square the way the

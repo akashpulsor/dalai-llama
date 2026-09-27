@@ -55,6 +55,16 @@ export default function CanvasVideoPlayer({ src, aspectRatio, className = "", sh
   // landscape box with bars down both sides, which is the one outcome the canvas exists to avoid.
   const ratio = RATIOS[aspectRatio] || naturalRatio || "16 / 9";
 
+  // Width follows the shape. A full-width 9:16 canvas in a wide column becomes absurdly tall --
+  // the aspect ratio is honoured but the result is unusable. Cap the width for portrait/square
+  // cuts so the player stays a sensible height; landscape keeps the full column.
+  const [w, h] = ratio.split("/").map((n) => Number(n.trim()));
+  const portraitness = Number.isFinite(w) && Number.isFinite(h) && w > 0 ? h / w : 0;
+  const widthCap = portraitness >= 1.6 ? "22rem"      // 9:16 and taller
+    : portraitness > 1.05 ? "26rem"                    // 4:5 and similar
+    : portraitness > 0.95 ? "30rem"                    // square
+    : "100%";                                          // 16:9, 21:9
+
   /** One painted frame. Runs on rAF while playing, and once on demand after a seek or load so a
    * paused canvas still shows the current frame rather than going blank. */
   const paint = useCallback(() => {
@@ -100,7 +110,10 @@ export default function CanvasVideoPlayer({ src, aspectRatio, className = "", sh
 
   return (
     <div className={className}>
-      <div className="relative w-full overflow-hidden rounded-lg border border-white/10 bg-black" style={{ aspectRatio: ratio }}>
+      <div
+        className="relative mx-auto w-full overflow-hidden rounded-lg border border-white/10 bg-black"
+        style={{ aspectRatio: ratio, maxWidth: widthCap }}
+      >
         <canvas ref={canvasRef} className="h-full w-full object-contain" />
         {!ready && (
           <div className="absolute inset-0 grid place-items-center text-slate-500">
@@ -132,7 +145,7 @@ export default function CanvasVideoPlayer({ src, aspectRatio, className = "", sh
         />
       </div>
 
-      <div className="mt-2 flex items-center gap-3">
+      <div className="mx-auto mt-2 flex w-full items-center gap-3" style={{ maxWidth: widthCap }}>
         <button
           type="button"
           onClick={toggle}

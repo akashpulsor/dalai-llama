@@ -2569,8 +2569,15 @@ export const creatorApi = apiSlice.injectEndpoints({
     // plans) go with it via FK cascade. No undo.
     deletePreProductionShot: builder.mutation({
       query: ({ shotId }) => ({ url: platformUrl(`/shots/${shotId}`), method: "DELETE" }),
+      // The shot list is the obvious one, but the video page also reads video-generation-service's
+      // own per-project caches (prepared prompts, generated videos, prepare-batch status). Those
+      // live in a different service and still hold rows keyed to the deleted shot, so without
+      // invalidating them too the shot disappears from the shot list and stays on the video page.
       invalidatesTags: (_result, _error, args) => [
         { type: "CreatorHomeProjects", id: `shots-${args?.projectId}` },
+        { type: "CreatorHomeProjects", id: `shot-prompts-${args?.projectId}` },
+        { type: "CreatorHomeProjects", id: `shot-videos-${args?.projectId}` },
+        { type: "CreatorHomeProjects", id: `prepare-batch-${args?.projectId}` },
       ],
     }),
 
