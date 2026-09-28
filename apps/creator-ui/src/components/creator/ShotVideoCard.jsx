@@ -667,13 +667,23 @@ const REFERENCE_KIND_ORIGIN = {
  * inferring it from the prompt text. `references` (kind-tagged, images + audio) comes from
  * video-generation-service 0.2.23 on; older responses only carry the flat image-url list, which
  * still renders, just without labels. */
-function PromptAttachments({ info }) {
+function PromptAttachments({ info, shotImages = [] }) {
   const references = info.references || [];
   const fallbackUrls = references.length ? [] : info.prompt?.referenceImageUrls || [];
-  if (!references.length && !fallbackUrls.length) return null;
 
   const images = references.filter((ref) => !ref.audio);
   const audio = references.filter((ref) => ref.audio);
+
+  // Every image the shot HAS, against the ones that were actually sent.
+  //
+  // The card already fetched all of them to pick a thumbnail and then showed exactly one. A shot
+  // with a production still, a storyboard, a lighting frame and a camera-plan frame displayed the
+  // first and silently hid the rest, so "which images does this shot have" had no answer anywhere
+  // in the UI -- and only one of them is ever attached as the model's frame, by design.
+  const sentKeys = new Set(images.map((ref) => ref.url).filter(Boolean));
+  const notSent = shotImages.filter((img) => img?.signedUrl && !sentKeys.has(img.signedUrl));
+
+  if (!references.length && !fallbackUrls.length && !notSent.length) return null;
 
   return (
     <div className="mt-2.5 space-y-2">
@@ -694,6 +704,28 @@ function PromptAttachments({ info }) {
                 />
                 <figcaption className="mt-0.5 w-14 truncate text-center text-[9px] font-semibold text-slate-500">
                   {REFERENCE_KIND_LABELS[ref.kind] || ref.kind}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </div>
+      )}
+      {notSent.length > 0 && (
+        <div>
+          <p className="mb-1.5 text-[10px] font-medium text-slate-500">
+            This shot's other images — held, not sent to the model
+          </p>
+          <div className="flex gap-1.5 overflow-x-auto">
+            {notSent.map((img) => (
+              <figure key={img.id} className="shrink-0">
+                <img
+                  src={img.signedUrl}
+                  alt={img.kind}
+                  title={img.kind}
+                  className="h-14 w-14 rounded border border-dashed border-white/15 object-cover opacity-70"
+                />
+                <figcaption className="mt-0.5 w-14 truncate text-center text-[9px] font-semibold text-slate-500">
+                  {img.kind}
                 </figcaption>
               </figure>
             ))}
@@ -1282,7 +1314,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
                   {info.prompt.negativePrompt && (
                     <p className="mt-2 text-[10px] font-medium text-slate-500">Negative: {info.prompt.negativePrompt}</p>
                   )}
-                  <PromptAttachments info={info} />
+                  <PromptAttachments info={info} shotImages={images} />
                   <PromptVersionHistory
                     shotId={shot.id}
                     canEdit={entitlements.editsEnabled && !!onSavePrompt}
