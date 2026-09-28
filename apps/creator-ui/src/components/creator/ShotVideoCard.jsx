@@ -838,6 +838,22 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
   // accepting a cut flashed success and then went on playing the take it had just replaced.
   const playableUrl = activeClip?.videoUrl || video?.outputUri;
 
+  // "This shot has a clip", which is NOT the same as "this shot has a job row".
+  //
+  // The project's job listing reports the latest job per shot whatever state it is in -- PENDING
+  // approval, QUEUED, and FAILED all come back, with a null videoUrl -- and the page records all
+  // of them so a reload can show a render in progress. That made `video` a truthy object long
+  // before anything had been rendered, and every gate below reads `video` as "already generated".
+  // The effect was that Approve & generate disappeared from prepared shots and a FAILED shot
+  // became a dead end: no Approve, no Prepare again, no clip, nothing to do with it.
+  //
+  // `busy` still comes from the job's status, so a render in flight keeps its loader.
+  const hasClip = !!playableUrl;
+
+  // A render that failed. FAILED is terminal server-side, so approving that job again is refused
+  // with a 409 -- the way forward is a fresh prompt and a fresh job, which is Prepare again.
+  const jobFailed = !hasClip && video?.status === "FAILED";
+
   /** Rejecting is the start of a rewrite, not the end of the shot. Mark it rejected, then drop
    * straight into the prompt so the creator can say what was wrong with it -- saving writes a
    * new version and leaves the rejected prompt intact as its parent. The card used to vanish
@@ -892,7 +908,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
   // read `beats`: that is a per-shot request fired once per card, so gating the badge on it left
   // every card blank until N round-trips landed (and briefly showed "Needs voice" on shots that
   // in fact had beats, since an unresolved query reads as an empty list).
-  const needsVoice = !video && !!dialogueVoiceText && !dubReady;
+  const needsVoice = !hasClip && !!dialogueVoiceText && !dubReady;
   // Signed URLs are re-signed (new query string) on every images refetch even when the object
   // itself hasn't changed, which would otherwise force the browser to re-download the frame on
   // every open. Cache the bytes locally keyed by shot+kind instead of the ever-changing URL.
@@ -1016,7 +1032,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               dubSeconds={dubSeconds}
               mismatch={dubMismatch}
               overruns={dubOverruns}
-              onChanged={!video ? onPrepare : undefined}
+              onChanged={!hasClip ? onPrepare : undefined}
             />
           )}
 
@@ -1059,7 +1075,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             } : undefined}
             // Only offered once there is a job to approve -- "go with the original" is a way of
             // generating, so before prepare there is nothing for it to act on.
-            onKeepOriginal={info?.externalJobId && !video ? () => onApprove?.({ dialogueFit: "KEEP_PLANNED" }) : undefined}
+            onKeepOriginal={info?.externalJobId && !hasClip ? () => onApprove?.({ dialogueFit: "KEEP_PLANNED" }) : undefined}
           />
 
           {!info && <DialogueBeatsEditor shot={shot} projectId={projectId} />}
@@ -1082,7 +1098,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
           <BackgroundMusicControl shotId={shot.id} plannedSeconds={shot.durationSeconds} />
           <ShotThoughtLog shotId={shot.id} />
 
-          {!info && !video && (
+          {!info && !hasClip && (
             <button
               type="button"
               disabled={busy}
@@ -1100,7 +1116,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               Reject. That is how both motion graphics ended up stuck showing prompts built before
               they could be generated at all. Preparing again writes a new version; the old one
               stays in history. */}
-          {info && !video && (
+          {info && !hasClip && (
             <button
               type="button"
               disabled={busy}
@@ -1117,7 +1133,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               saved -- could only be fixed by never having generated it. Regenerating builds a fresh
               prompt from the shot as it stands now, then goes through the same approve step, so the
               new clip is costed and confirmed exactly like the first one. */}
-          {video && (
+          {hasClip && (
             // No onChanged. It used to be wired to onPrepare, so accepting a cut kicked off a
             // prompt REBUILD of the shot -- the card went busy, the spinner never resolved into
             // the new clip, and a model call was paid for that nobody asked for. Accepting
@@ -1130,11 +1146,11 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             />
           )}
 
-          {video && (
+          {hasClip && (
             <ClipRepairPanel shot={shot} projectId={projectId} />
           )}
 
-          {video && !regenerating && onRegenerate && (
+          {hasClip && !regenerating && onRegenerate && (
             <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
               <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
                 Not right?
@@ -1184,7 +1200,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
                   <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-bold text-slate-300">
                     {/* On a shot already rendered this is what generating it AGAIN would cost, not
                         what was spent -- saying "Est. cost" there would read as a bill already paid. */}
-                    {video && !regenerating ? "Regenerating costs: " : "Est. cost: "}
+                    {hasClip && !regenerating ? "Regenerating costs: " : "Est. cost: "}
                     {formatCost(info.estimatedCost, info.costCurrency)}
                   </span>
                 )}
@@ -1283,7 +1299,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               {/* A prompt with no job behind it cannot be approved -- approve acts on the job, not
                   the text. Say that, and offer the thing that creates one, instead of rendering
                   nothing and leaving the shot looking unprepared. */}
-              {(!video || regenerating) && !info.externalJobId && (
+              {(!hasClip || regenerating) && !info.externalJobId && (
                 <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-400/25 bg-amber-400/[0.06] p-2.5">
                   <p className="flex-1 text-[10px] font-semibold text-amber-100">
                     This prompt has no render job behind it yet, so there is nothing to approve.
@@ -1302,7 +1318,25 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
                 </div>
               )}
 
-              {(!video || regenerating) && info.externalJobId && (
+              {jobFailed && !regenerating && (
+                <div className="flex flex-wrap items-center gap-2 rounded-md border border-rose-400/25 bg-rose-500/[0.07] p-2.5">
+                  <p className="flex-1 text-[10px] font-semibold text-rose-100">
+                    This shot's render failed, so there is no clip. That job cannot be approved
+                    again — prepare it again to build a fresh prompt and try once more.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={onPrepare}
+                    className="flex items-center gap-1.5 rounded-md border border-rose-400/30 bg-rose-500/10 px-2.5 py-1.5 text-[10px] font-bold text-rose-100 disabled:opacity-50"
+                  >
+                    {busy ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                    {busy ? "Preparing…" : "Prepare again"}
+                  </button>
+                </div>
+              )}
+
+              {(!hasClip || regenerating) && info.externalJobId && !jobFailed && (
                 <div className="flex gap-2">
                   <button
                     type="button"
