@@ -1,12 +1,13 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { AudioLines, Check, ChevronDown, History, Loader2, Music, Pencil, PlayCircle, RefreshCw, Save, Sparkles, Upload, X } from "lucide-react";
+import { AudioLines, Check, ChevronDown, History, Loader2, Mic, Music, Pencil, PlayCircle, RefreshCw, Save, Sparkles, Upload, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useGenerateShotBackgroundMusicMutation,
   useUploadShotBackgroundMusicMutation,
   useGetShotBackgroundMusicQuery,
+  useListBuiltinVoicesQuery,
   useListPreProductionShotImagesQuery,
   useListShotPromptVersionsQuery,
   useLazyGetDubJobQuery,
@@ -19,6 +20,7 @@ import DialogueBeatsEditor from "./DialogueBeatsEditor.jsx";
 import DialogueFitPanel from "./DialogueFitPanel.jsx";
 import ClipRepairPanel from "./ClipRepairPanel.jsx";
 import ClipCutsPanel from "./ClipCutsPanel.jsx";
+import BuiltinVoicePicker from "./BuiltinVoicePicker.jsx";
 import ShotCanvasPlayer from "./ShotCanvasPlayer.jsx";
 import MotionGraphicPanel from "./MotionGraphicPanel.jsx";
 import CritiqueFindingsPanel from "./CritiqueFindingsPanel.jsx";
@@ -115,6 +117,102 @@ function BackgroundMusicControl({ shotId, plannedSeconds }) {
 }
 
 /**
+ * Who speaks this shot.
+ *
+ * <p>The voice has always been decided by the cast: the shot's character resolves to a profile and
+ * that profile's voice is used, or the project's narrator when the shot has no character of its
+ * own. That is the right default, and it is still the default -- but it left no way to say that
+ * ONE shot should be read by someone else without re-casting the character, which moves every
+ * other shot they speak in.
+ *
+ * <p>The pick is auditioned before it costs anything: the picker plays each voice's own sample
+ * clip, so choosing is free and only the dub afterwards is billable.
+ */
+function ShotVoiceControl({ shotId, projectId, dubVoiceId, takeVoiceId, hasTake, disabled }) {
+  const dispatch = useDispatch();
+  const [saveShot, { isLoading: saving }] = useUpdatePreProductionShotMutation();
+  const { data: voices = [] } = useListBuiltinVoicesQuery();
+  const [open, setOpen] = React.useState(false);
+
+  const chosen = dubVoiceId ? voices.find((voice) => voice.providerVoiceId === dubVoiceId) : null;
+  // The take on file was recorded in a different voice than the shot now asks for. Same shape of
+  // problem as a take of the previous line, and worth saying for the same reason: nothing
+  // downstream re-records on its own, so the clip would be mixed with the old read.
+  const takeIsOtherVoice = hasTake && !!dubVoiceId && !!takeVoiceId && takeVoiceId !== dubVoiceId;
+
+  const save = async (voiceId, message) => {
+    try {
+      // Empty string clears it on the server, which is how the shot is handed back to the cast.
+      await saveShot({ projectId, shotId, dubVoiceId: voiceId ?? "" }).unwrap();
+      setOpen(false);
+      dispatch(showFlash({ message, type: "success" }));
+    } catch (error) {
+      dispatch(showFlash({
+        message: error?.data?.message || error?.message || "Could not set the voice for this shot",
+        type: "error",
+      }));
+    }
+  };
+
+  return (
+    <div className="mt-2.5 border-t border-white/10 pt-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[10px] font-medium text-slate-400">
+          Voice:{" "}
+          <span className="font-bold text-slate-200">
+            {dubVoiceId ? (chosen?.displayName || dubVoiceId) : "whoever the cast says"}
+          </span>
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={disabled || saving}
+            onClick={() => setOpen((current) => !current)}
+            className="flex items-center gap-1 text-[10px] font-bold text-purple-300 hover:text-purple-200 disabled:opacity-60"
+          >
+            <Mic size={11} />
+            {open ? "Close" : dubVoiceId ? "Change" : "Pick a voice"}
+          </button>
+          {dubVoiceId && (
+            <button
+              type="button"
+              disabled={disabled || saving}
+              onClick={() => save(null, "Back to the cast's voice for this shot.")}
+              title="Drop the override and let the cast decide again"
+              className="text-[10px] font-bold text-slate-500 hover:text-slate-300 disabled:opacity-60"
+            >
+              Use the cast
+            </button>
+          )}
+        </div>
+      </div>
+
+      {takeIsOtherVoice && (
+        <p className="mt-1 text-[10px] font-medium text-amber-200/90">
+          The take on file was recorded in a different voice. Dub again to hear this one.
+        </p>
+      )}
+
+      {open && (
+        <div className="mt-2 rounded-md border border-white/10 bg-black/20 p-2.5">
+          <BuiltinVoicePicker
+            label={null}
+            showFaceImage={false}
+            selectedVoiceId={dubVoiceId || ""}
+            onSelect={(voice) => save(voice.providerVoiceId,
+              `This shot will be read by ${voice.displayName}. Dub again to hear it.`)}
+          />
+          <p className="mt-2 text-[10px] font-medium text-slate-500">
+            Press play to hear a voice before you choose it — auditioning is free, only the dub
+            afterwards costs anything. This changes this shot only.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * The shot's spoken take: hear it, and record it again.
  *
  * <p>There was no way to listen. A dubbed shot got a badge saying so and nothing else, which is a
@@ -127,7 +225,7 @@ function BackgroundMusicControl({ shotId, plannedSeconds }) {
  * time), so the previous recording is gone once this runs. That is worth knowing before pressing it,
  * and worth hearing the current one first.
  */
-function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
+function DubbedVoiceControl({ shotId, projectId, line, dubbed, dubVoiceId }) {
   const dispatch = useDispatch();
   // Queued, not waited on. Recording a line takes seconds to tens of seconds, and while the request
   // held the connection there was nothing on screen saying so -- which is exactly why pressing the
@@ -347,6 +445,15 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed }) {
         {rejectState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
         Reject the latest take
       </button>
+
+      <ShotVoiceControl
+        shotId={shotId}
+        projectId={projectId}
+        dubVoiceId={dubVoiceId}
+        takeVoiceId={dubbed?.providerVoiceId}
+        hasTake={!!audioUrl}
+        disabled={isLoading || editing}
+      />
 
       {/* The words themselves, which this panel never showed -- it offered to re-record a line
           without ever saying what the line was. */}
@@ -970,6 +1077,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             projectId={projectId}
             line={dialogueVoiceText}
             dubbed={dubbed}
+            dubVoiceId={shot.dubVoiceId}
           />
           <BackgroundMusicControl shotId={shot.id} plannedSeconds={shot.durationSeconds} />
           <ShotThoughtLog shotId={shot.id} />

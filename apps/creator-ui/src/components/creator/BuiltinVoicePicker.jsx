@@ -23,7 +23,15 @@ const PUBLIC_MEDIA_BASE = "/api/v1/media/public";
  * couple of languages, but the tenant is expected to keep adding voices and languages -- a chip
  * strip works for the couple-of-languages case and becomes a wall of buttons at ten. A native
  * <select> stays compact at any count. */
-export default function BuiltinVoicePicker({ gender, selectedVoiceId, onSelect }) {
+export default function BuiltinVoicePicker({
+  gender,
+  selectedVoiceId,
+  onSelect,
+  label = "Built-in voice",
+  // The face image belongs to casting a character, not to choosing who says one line. The shot
+  // page reuses the dropdowns and the preview and leaves it off.
+  showFaceImage = true,
+}) {
   const { data: voices = [], isLoading } = useListBuiltinVoicesQuery();
   const { data: dialogueLanguages = [] } = useListDialogueLanguagesQuery();
 
@@ -136,7 +144,9 @@ export default function BuiltinVoicePicker({ gender, selectedVoiceId, onSelect }
 
   return (
     <div>
-      <label className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Built-in voice</label>
+      {label && (
+        <label className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">{label}</label>
+      )}
 
       <div className="grid gap-2 sm:grid-cols-2">
         <div>
@@ -204,7 +214,7 @@ export default function BuiltinVoicePicker({ gender, selectedVoiceId, onSelect }
       {/* Face image for the built-in voice -- so a voice-only pick still has a matching visual
           identity on the cast picker. Replaces the AI-generated identity image flow that used to
           run at cast-create time. Upload is per-voice and persists on the voice row itself. */}
-      {selected && (
+      {selected && showFaceImage && (
         <div className="mt-3 rounded-md border border-white/10 bg-white/[0.03] p-2.5">
           <div className="flex items-center gap-3">
             {selected.faceRefObjectKey ? (
