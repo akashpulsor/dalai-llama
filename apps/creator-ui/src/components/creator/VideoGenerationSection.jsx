@@ -345,7 +345,15 @@ export default function VideoGenerationSection({ projectId }) {
    * dropping the creator's text back to the old version on a failed save would lose their work. */
   const handleSavePrompt = async (shotId, positive) => {
     const info = prepared[shotId];
-    if (!info?.externalPromptId) return false;
+    // Was a bare `return false`. Saving an older prompt version then looked like nothing had
+    // happened at all -- no new text, no error, no reason.
+    if (!info?.externalPromptId) {
+      dispatch(showFlash({
+        message: "This shot has no prepared prompt to save against — prepare it first.",
+        type: "error",
+      }));
+      return false;
+    }
     try {
       const view = await updateShotPrompt({
         projectId,

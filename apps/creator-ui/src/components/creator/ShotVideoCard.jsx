@@ -1164,7 +1164,15 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             />
           )}
 
-          {info && info.externalJobId && (
+          {/* Gated on the PROMPT, not on the job.
+
+              This used to require info.externalJobId, so a shot that had been prepared but had no
+              job row rendered none of this: no prompt, no version history, no Save -- and the card
+              fell through to a bare "Prepare shot for video" as though nothing had ever been built
+              for it. That is why Approve was missing on so many shots, and why restoring an older
+              prompt version "did nothing": the Use button sets the draft, and the Save that would
+              commit it lives in here. Approve itself still needs a job id and says so below. */}
+          {info && (
             <>
               <div className="flex flex-wrap gap-2">
                 {info.recommendedModel && (
@@ -1272,7 +1280,29 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               {/* Approve and reject belong to a shot that has not been rendered yet. Once a clip
                   exists the prompt above it is a record of what produced it, and the action that
                   makes sense is to generate again -- which is the Regenerate control below. */}
-              {(!video || regenerating) && (
+              {/* A prompt with no job behind it cannot be approved -- approve acts on the job, not
+                  the text. Say that, and offer the thing that creates one, instead of rendering
+                  nothing and leaving the shot looking unprepared. */}
+              {(!video || regenerating) && !info.externalJobId && (
+                <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-400/25 bg-amber-400/[0.06] p-2.5">
+                  <p className="flex-1 text-[10px] font-semibold text-amber-100">
+                    This prompt has no render job behind it yet, so there is nothing to approve.
+                    Preparing again builds one from the shot as it stands now — your saved prompt
+                    edits stay in the history.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={onPrepare}
+                    className="flex items-center gap-1.5 rounded-md border border-amber-400/30 bg-amber-500/10 px-2.5 py-1.5 text-[10px] font-bold text-amber-100 disabled:opacity-50"
+                  >
+                    {busy ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                    {busy ? "Preparing…" : "Prepare again"}
+                  </button>
+                </div>
+              )}
+
+              {(!video || regenerating) && info.externalJobId && (
                 <div className="flex gap-2">
                   <button
                     type="button"
