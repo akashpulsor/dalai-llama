@@ -3026,6 +3026,10 @@ export const creatorApi = apiSlice.injectEndpoints({
     startLockPayment: builder.mutation({
       query: (token) => ({ url: platformUrl(`/public/projects/${token}/lock/payment`), method: "POST" }),
     }),
+    // After this video is locked: opens the client's next brief, pre-filled from this one.
+    startNextBrief: builder.mutation({
+      query: (token) => ({ url: platformUrl(`/public/projects/${token}/next-brief`), method: "POST" }),
+    }),
     // Brief already paid in full -> nothing to charge; the server re-checks the balance is zero.
     lockSettled: builder.mutation({
       query: (token) => ({ url: platformUrl(`/public/projects/${token}/lock/settled`), method: "POST" }),
@@ -4451,6 +4455,7 @@ export const {
   useGetLockQuoteMutation,
   useStartLockPaymentMutation,
   useLockSettledMutation,
+  useStartNextBriefMutation,
   useListProjectEconomicsQuery,
   useListAdminProjectEconomicsQuery,
   useGetAdminVideoPricingQuery,

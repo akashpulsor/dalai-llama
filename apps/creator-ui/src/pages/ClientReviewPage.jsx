@@ -1,8 +1,8 @@
 // @ts-nocheck
 import React, { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { CheckCircle2, ChevronDown, ChevronUp, Circle, CreditCard, FileText, ImageIcon, ImagePlus, Loader2, Lock, PlayCircle, Send, Sparkles, User2, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Circle, CreditCard, FileText, ImageIcon, ImagePlus, Loader2, Lock, PlayCircle, Send, Sparkles, User2, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import CanvasVideoPlayer from "../components/review/CanvasVideoPlayer.jsx";
 import {
@@ -16,6 +16,7 @@ import {
   useGetPublicReviewCommentsQuery,
   useGetReviewStatusQuery,
   useLockSettledMutation,
+  useStartNextBriefMutation,
   useStartLockPaymentMutation,
   useStartReviewMutation,
   useStartReviewPaymentMutation,
@@ -40,6 +41,7 @@ const IMAGE_KIND_LABEL = { STORYBOARD: "Storyboard", PRODUCTION: "Production", L
  */
 export default function ClientReviewPage() {
   const { token } = useParams();
+  const navigate = useNavigate();
   const dispatch = useDispatch();
   const { data, isLoading, isError, error, refetch } = useGetPublicProjectQuery(token, { skip: !token });
   const { data: finalVideo } = useGetPublicFinalVideoQuery(token, { skip: !token });
@@ -50,6 +52,7 @@ export default function ClientReviewPage() {
   const [startPayment] = useStartLockPaymentMutation();
   const [verifyPayment] = useVerifyLockPaymentMutation();
   const [lockSettled] = useLockSettledMutation();
+  const [startNextBrief, { isLoading: startingNextBrief }] = useStartNextBriefMutation();
   const [quote, setQuote] = useState(null);
   const [paying, setPaying] = useState(false);
 
@@ -100,6 +103,17 @@ export default function ClientReviewPage() {
       }));
     } finally {
       setPaying(false);
+    }
+  };
+
+  // Paying for this video is what opens the next one: the brief page it lands on is pre-filled
+  // from this brief and editable like any other.
+  const handleStartNextBrief = async () => {
+    try {
+      const { shareToken } = await startNextBrief(token).unwrap();
+      navigate(`/brief/${shareToken}`);
+    } catch (err) {
+      dispatch(showFlash({ message: err?.data?.message || "Could not start your next brief", type: "error" }));
     }
   };
 
@@ -357,10 +371,19 @@ export default function ClientReviewPage() {
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-500/10 text-emerald-300">
                   <CheckCircle2 size={17} />
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-bold text-white">Approved & locked</p>
-                  <p className="text-[11.5px] font-medium text-slate-400">This package is final and moving into production.</p>
+                  <p className="text-[11.5px] font-medium text-slate-400">This video is paid for and final. Ready for the next one?</p>
                 </div>
+                <button
+                  type="button"
+                  disabled={startingNextBrief}
+                  onClick={handleStartNextBrief}
+                  className="creator-primary flex shrink-0 items-center gap-1.5 px-4 py-2.5 text-[12.5px] font-bold text-white disabled:opacity-60"
+                >
+                  {startingNextBrief ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />}
+                  Start your next brief
+                </button>
               </div>
             ) : (
               <div className="relative mt-2 overflow-hidden rounded-lg border border-purple-400/30 bg-gradient-to-br from-purple-500/[0.09] to-transparent p-6">
@@ -396,9 +419,9 @@ export default function ClientReviewPage() {
             </div>
             <h3 className="text-lg font-bold text-white">Pay to finalize this package</h3>
             <p className="mt-1 text-sm font-medium text-slate-400">
-              Paying approves this video as final: the script, screenplay, shot plan, frames, video and music are
-              locked as delivered and the change-request chat opens. Once it is paid you can give your next brief.
-              One-time payment, secured by Razorpay.
+              This pays for this video only. It approves it as final: the script, screenplay, shot plan, frames,
+              video and music are locked as delivered and the change-request chat opens. Once it is paid you can
+              start your next brief from this page. One-time payment, secured by Razorpay.
             </p>
 
             <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.03] p-4">
@@ -435,7 +458,7 @@ export default function ClientReviewPage() {
                 className="creator-primary flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold text-white disabled:opacity-60"
               >
                 {paying ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
-                {paying ? "Processing…" : settled ? "Approve & give next brief" : `Pay ${rupee(quote.totalAmount, quote.currency)} & give next brief`}
+                {paying ? "Processing…" : settled ? "Approve & lock this video" : `Pay ${rupee(quote.totalAmount, quote.currency)} & lock this video`}
               </button>
             </div>
           </div>
