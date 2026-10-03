@@ -78,7 +78,7 @@ export function ProjectEconomicsCard({ economics, title }) {
             <Line label="Actual provider charges" amount={platform.providerCost} currency={c} />
             <Line label="Charged to creator" amount={platform.charged} currency={c} />
             <Line label="Usage margin" amount={platform.usageMargin} currency={c} />
-            <Line label="Share of review payments" amount={platform.reviewPaymentShare} currency={c} />
+            <Line label="Extra review fees" amount={platform.reviewPaymentShare} currency={c} />
             <Line label="Profit" amount={platform.profit} currency={c} tone={profitTone(platform.profit)} />
           </Section>
         )}

@@ -25,7 +25,8 @@ const rupee = (n, code = "INR") =>
 const OUT_TYPES = new Set(["USAGE_DEDUCTION", "DID_RENTAL", "SUBSCRIPTION", "ADJUSTMENT_DEBIT"]);
 // Client-payment earnings are credited via walletService.credit (which records RECHARGE) with a
 // CLIENT_REVIEW_PAYMENT reference -- detect by reference, not type.
-const isClientEarning = (tx) => /CLIENT_REVIEW_PAYMENT/i.test(`${tx.reference || ""} ${tx.description || ""}`);
+// Client money: the creator's earnings and the production share of a lock that tops the wallet up.
+const isClientEarning = (tx) => /CLIENT_REVIEW_PAYMENT|CLIENT_PRODUCTION_FUNDING/i.test(`${tx.reference || ""} ${tx.description || ""}`);
 
 const TYPE_LABEL = {
   RECHARGE: "Wallet recharge",
