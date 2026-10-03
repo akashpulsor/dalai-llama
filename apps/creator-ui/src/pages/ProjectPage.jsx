@@ -5,6 +5,7 @@ import { useDispatch } from "react-redux";
 import { ArrowRight, Check, ChevronDown, ChevronUp, Plus, RefreshCw, Sparkles } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
+  useGetCreativeDirectionsQuery,
   useGenerateScriptMutation,
   useGetLockedIdeaQuery,
   useGetPreProductionProjectQuery,
@@ -25,6 +26,7 @@ import ProjectSettingsPanel from "../components/creator/ProjectSettingsPanel.jsx
 import ShotsSection from "../components/creator/ShotsSection.jsx";
 import ShotChatPanel from "../components/creator/ShotChatPanel.jsx";
 import ProjectIdeaOptionsPanel from "../components/creator/ProjectIdeaOptionsPanel.jsx";
+import CreativeDirectionSection from "../components/creator/CreativeDirectionSection.jsx";
 import VideoGenerationSection from "../components/creator/VideoGenerationSection.jsx";
 import MusicPlanPanel from "../components/creator/MusicPlanPanel.jsx";
 import ContinuityBiblePanel from "../components/creator/ContinuityBiblePanel.jsx";
@@ -56,6 +58,7 @@ function composeBriefFromIdea(idea) {
 const TABS = [
   { id: "brief", label: "Brief" },
   { id: "idea", label: "Idea" },
+  { id: "direction", label: "Direction" },
   { id: "script", label: "Script" },
   { id: "screenplay", label: "Screenplay" },
   { id: "cast", label: "Character" },
@@ -203,6 +206,12 @@ export default function ProjectPage() {
     refetch: refetchScript,
   } = useGetScriptQuery(projectId, { skip: !projectId });
   const [generateScript, { isLoading: generating }] = useGenerateScriptMutation();
+  // Creative Direction gates the script on projects created with it: their hook, script and every
+  // later stage are generated from the approved direction. Legacy projects (required === false)
+  // keep generating straight from the idea.
+  const { data: directionBoard } = useGetCreativeDirectionsQuery(projectId, { skip: !projectId });
+  const approvedDirection = directionBoard?.approved || null;
+  const directionPending = Boolean(directionBoard?.required) && !approvedDirection;
   const { data: productProfiles = [] } = useListCastProfilesQuery({ projectId, profileType: "PRODUCT" }, { skip: !projectId });
   const { data: dialogueLanguageOptions = [] } = useListDialogueLanguagesQuery();
   const { data: projectConfig } = useGetProjectConfigQuery(projectId, { skip: !projectId });
@@ -321,7 +330,7 @@ export default function ProjectPage() {
     <div className="mx-auto max-w-3xl px-6 py-8 lg:px-10">
       <h1 className="text-2xl font-extrabold text-white">{project.name}</h1>
       <p className="mt-1.5 text-sm font-medium text-slate-400">
-        {activeTab === "brief" ? "Brief" : activeTab === "idea" ? "Idea" : activeTab === "script" ? "Script" : activeTab === "screenplay" ? "Screenplay" : activeTab === "cast" ? "Character" : activeTab === "video" ? "Video" : "Shots"}
+        {activeTab === "brief" ? "Brief" : activeTab === "idea" ? "Idea" : activeTab === "direction" ? "Creative direction" : activeTab === "script" ? "Script" : activeTab === "screenplay" ? "Screenplay" : activeTab === "cast" ? "Character" : activeTab === "video" ? "Video" : "Shots"}
         {" "}&middot; regenerating replaces the current draft, there's no version history
       </p>
 
@@ -531,9 +540,15 @@ export default function ProjectPage() {
           </div>
         )}
 
+        {directionPending && (
+          <p className="mb-2 rounded-lg border border-amber-400/25 bg-amber-500/[0.07] p-3 text-[12px] font-semibold text-amber-100">
+            Approve a creative direction before generating the script -- it shapes the hook, script and every stage after it.{" "}
+            <button type="button" onClick={() => setActiveTab("direction")} className="font-bold underline">Go to Direction</button>
+          </p>
+        )}
         <button
           type="button"
-          disabled={generating}
+          disabled={generating || directionPending}
           onClick={() => { handleGenerate(); setActiveTab("script"); }}
           className="creator-primary flex w-full items-center justify-center gap-2 py-3 text-[13px] font-bold text-white disabled:opacity-60"
         >
@@ -545,6 +560,10 @@ export default function ProjectPage() {
 
       {activeTab === "idea" && <ProjectIdeaOptionsPanel projectId={projectId} />}
 
+      {activeTab === "direction" && (
+        <CreativeDirectionSection projectId={projectId} onContinue={() => setActiveTab("idea")} />
+      )}
+
         {activeTab === "script" && !hasScript && (
           <p className="creator-panel mt-6 p-6 text-center text-xs font-semibold text-slate-500">
             No script yet — generate one from the Idea tab first.
@@ -553,6 +572,15 @@ export default function ProjectPage() {
 
         {activeTab === "script" && hasScript && (
           <>
+            {approvedDirection && script.creativeDirectionId !== approvedDirection.id && (
+              <p className="mt-6 rounded-lg border border-amber-400/25 bg-amber-500/[0.07] p-3 text-[12px] font-semibold text-amber-100">
+                {script.creativeDirectionId
+                  ? "This script was generated from an earlier creative direction."
+                  : "This script was generated before a creative direction was approved."}{" "}
+                Regenerate it from the Idea tab to apply "{approvedDirection.title}" -- the screenplay, shots and frames
+                after it follow the script you keep. Nothing is regenerated automatically.
+              </p>
+            )}
             <ScriptSection projectId={projectId} />
             <ContinueButton fromTabId="script" onContinue={() => setActiveTab("screenplay")} />
           </>

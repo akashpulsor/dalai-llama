@@ -2931,6 +2931,65 @@ export const creatorApi = apiSlice.injectEndpoints({
 
     // pre-production-service ProjectController -- idempotent, returns the existing token if one
     // was already generated.
+    // pre-production-service CreativeDirectionController -- the stage between the locked idea and
+    // the script: three director's treatments, reviewed, revised and approved. Every write returns
+    // the treatment it touched; the board query is refreshed so status chips stay truthful.
+    getCreativeDirections: builder.query({
+      query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/creative-directions`) }),
+      providesTags: (_r, _e, projectId) => [{ type: "CreatorHomeProjects", id: `creative-directions-${projectId}` }],
+    }),
+    generateCreativeDirections: builder.mutation({
+      query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/creative-directions/generate`), method: "POST" }),
+      invalidatesTags: (_r, _e, projectId) => [{ type: "CreatorHomeProjects", id: `creative-directions-${projectId}` }],
+    }),
+    selectCreativeDirection: builder.mutation({
+      query: ({ projectId, directionId }) => ({
+        url: platformUrl(`/projects/${projectId}/creative-directions/${directionId}/select`), method: "POST",
+      }),
+      invalidatesTags: (_r, _e, args) => [{ type: "CreatorHomeProjects", id: `creative-directions-${args?.projectId}` }],
+    }),
+    addCreativeDirectionFeedback: builder.mutation({
+      query: ({ projectId, directionId, feedback, requestRevision }) => ({
+        url: platformUrl(`/projects/${projectId}/creative-directions/${directionId}/feedback`),
+        method: "POST",
+        body: { feedback, requestRevision: Boolean(requestRevision) },
+      }),
+      invalidatesTags: (_r, _e, args) => [{ type: "CreatorHomeProjects", id: `creative-directions-${args?.projectId}` }],
+    }),
+    reviseCreativeDirection: builder.mutation({
+      query: ({ projectId, directionId, note }) => ({
+        url: platformUrl(`/projects/${projectId}/creative-directions/${directionId}/revise`),
+        method: "POST",
+        body: { note: note || null },
+      }),
+      invalidatesTags: (_r, _e, args) => [{ type: "CreatorHomeProjects", id: `creative-directions-${args?.projectId}` }],
+    }),
+    approveCreativeDirection: builder.mutation({
+      query: ({ projectId, directionId }) => ({
+        url: platformUrl(`/projects/${projectId}/creative-directions/${directionId}/approve`), method: "POST",
+      }),
+      invalidatesTags: (_r, _e, args) => [{ type: "CreatorHomeProjects", id: `creative-directions-${args?.projectId}` }],
+    }),
+    // The same treatments on the client's review link (pre-production PublicProjectController).
+    getPublicCreativeDirections: builder.query({
+      query: (token) => ({ url: platformUrl(`/public/projects/${token}/creative-directions`) }),
+      providesTags: (_r, _e, token) => [{ type: "CreatorHomeProjects", id: `public-creative-directions-${token}` }],
+    }),
+    addPublicCreativeDirectionFeedback: builder.mutation({
+      query: ({ token, directionId, feedback, requestRevision }) => ({
+        url: platformUrl(`/public/projects/${token}/creative-directions/${directionId}/feedback`),
+        method: "POST",
+        body: { feedback, requestRevision: Boolean(requestRevision) },
+      }),
+      invalidatesTags: (_r, _e, args) => [{ type: "CreatorHomeProjects", id: `public-creative-directions-${args?.token}` }],
+    }),
+    approvePublicCreativeDirection: builder.mutation({
+      query: ({ token, directionId }) => ({
+        url: platformUrl(`/public/projects/${token}/creative-directions/${directionId}/approve`), method: "POST",
+      }),
+      invalidatesTags: (_r, _e, args) => [{ type: "CreatorHomeProjects", id: `public-creative-directions-${args?.token}` }],
+    }),
+
     ensureClientReviewLink: builder.mutation({
       query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/client-review-link`), method: "POST" }),
     }),
@@ -4463,6 +4522,15 @@ export const {
   useGetLockQuoteMutation,
   useStartLockPaymentMutation,
   useLockSettledMutation,
+  useGetCreativeDirectionsQuery,
+  useGenerateCreativeDirectionsMutation,
+  useSelectCreativeDirectionMutation,
+  useAddCreativeDirectionFeedbackMutation,
+  useReviseCreativeDirectionMutation,
+  useApproveCreativeDirectionMutation,
+  useGetPublicCreativeDirectionsQuery,
+  useAddPublicCreativeDirectionFeedbackMutation,
+  useApprovePublicCreativeDirectionMutation,
   useStartNextBriefMutation,
   useListProjectEconomicsQuery,
   useListAdminProjectEconomicsQuery,

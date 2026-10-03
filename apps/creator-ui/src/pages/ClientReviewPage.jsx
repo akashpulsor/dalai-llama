@@ -16,6 +16,9 @@ import {
   useGetPublicReviewCommentsQuery,
   useGetReviewStatusQuery,
   useLockSettledMutation,
+  useGetPublicCreativeDirectionsQuery,
+  useAddPublicCreativeDirectionFeedbackMutation,
+  useApprovePublicCreativeDirectionMutation,
   useStartNextBriefMutation,
   useStartLockPaymentMutation,
   useStartReviewMutation,
@@ -25,6 +28,7 @@ import {
 } from "../api/creatorEndpoints.js";
 import { runRazorpayCheckout } from "../utils/walletRecharge.js";
 import { ProductionChargeLines } from "../components/billing/ProjectEconomics.jsx";
+import CreativeDirectionCard, { DirectionFeedbackForm } from "../components/creativeDirection/CreativeDirectionCard.jsx";
 
 const rupee = (n, code = "INR") =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: code || "INR", maximumFractionDigits: 0 }).format(Number(n) || 0);
@@ -355,6 +359,8 @@ export default function ClientReviewPage() {
               </div>
             )}
 
+            <ClientCreativeDirections token={token} />
+
             {/* Its own panel, not nested inside the shots block above and no longer gated behind
                 isLocked -- ClientReviewChat only ever depends on `token`, never on shots or lock
                 status existing. It used to require both (only visible after paying, only if
@@ -565,6 +571,65 @@ function BriefSection({ lockedIdeaId }) {
 
 /** One dot + label in the Review / Feedback / Approved progress rail. `done` = already passed
  * (filled, checkmark-style); `active` = the current stage; neither = not reached yet. */
+/** The project's director's treatments, shared with the client through this same review link: read
+ * the full treatment and references, leave notes or ask for a revision, and approve one -- the
+ * approved direction is what the script and everything after it are made from. Hidden until the
+ * creator has generated directions. */
+function ClientCreativeDirections({ token }) {
+  const dispatch = useDispatch();
+  const { data: board } = useGetPublicCreativeDirectionsQuery(token, { skip: !token });
+  const [addFeedback, { isLoading: sending }] = useAddPublicCreativeDirectionFeedbackMutation();
+  const [approve, { isLoading: approving, originalArgs }] = useApprovePublicCreativeDirectionMutation();
+  const directions = board?.directions || [];
+  if (directions.length === 0 && !board?.approved) return null;
+
+  const run = async (action, success) => {
+    try {
+      await action();
+      dispatch(showFlash({ message: success, type: "success" }));
+      return true;
+    } catch (err) {
+      dispatch(showFlash({ message: err?.data?.message || "That didn't work -- please try again", type: "error" }));
+      return false;
+    }
+  };
+
+  return (
+    <div className="mb-4 space-y-3">
+      <div className="creator-panel p-5">
+        <p className="text-[10.5px] font-extrabold uppercase tracking-[0.1em] text-purple-300">Creative direction</p>
+        <h3 className="mt-1 text-[15px] font-extrabold text-white">
+          {board?.approved ? `Approved: ${board.approved.title}` : "Choose how your film will be told"}
+        </h3>
+        <p className="mt-1 text-[12px] font-medium text-slate-400">
+          Each option is a director's treatment for your idea. Leave notes on any of them, or approve the one you want --
+          the script, screenplay, shots and frames are all made from the approved direction.
+        </p>
+      </div>
+      {directions.map((direction) => (
+        <CreativeDirectionCard key={direction.id} direction={direction} highlighted={direction.recommended && !board?.approved}>
+          <div className="space-y-3">
+            {direction.reviewStatus !== "APPROVED" && (
+              <button
+                type="button"
+                disabled={approving && originalArgs?.directionId === direction.id}
+                onClick={() => run(() => approve({ token, directionId: direction.id }).unwrap(), `You approved "${direction.title}"`)}
+                className="creator-primary px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-60"
+              >
+                Approve this direction
+              </button>
+            )}
+            <DirectionFeedbackForm
+              busy={sending}
+              onSubmit={(body) => run(() => addFeedback({ token, directionId: direction.id, ...body }).unwrap(), "Thanks -- your notes were sent")}
+            />
+          </div>
+        </CreativeDirectionCard>
+      ))}
+    </div>
+  );
+}
+
 function RailStep({ label, done, active }) {
   return (
     <div className="flex shrink-0 items-center gap-1.5">
