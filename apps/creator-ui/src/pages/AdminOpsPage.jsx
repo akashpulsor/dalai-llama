@@ -24,6 +24,8 @@ import {
   useGetAdminWalletQuery,
   useListAdminProjectEconomicsQuery,
   useGetAdminVideoPricingQuery,
+  useGetAdminProductionCriticsQuery,
+  useUpdateAdminProductionCriticsMutation,
   useUpdateAdminVideoPricingMutation,
   usePreviewAdminVideoPricingQuery,
   useCreditAdminWalletMutation,
@@ -449,6 +451,8 @@ function PricingTab() {
   const quote = preview?.quote;
   return (
     <section className="space-y-4">
+      <ProductionCriticsCard />
+
       <div className="creator-panel space-y-3 p-4">
         <p className="text-sm font-bold text-white">Video rate</p>
         <div className="flex flex-wrap items-end gap-2 text-xs">
@@ -524,6 +528,33 @@ function PricingTab() {
         )}
       </div>
     </section>
+  );
+}
+
+/** Production's critics (script, camera plan, lighting plan, per-shot pre-flight) send plans back
+ * for more attempts; switched off, every plan is its first attempt. Applies from the next step. */
+function ProductionCriticsCard() {
+  const { data } = useGetAdminProductionCriticsQuery();
+  const [setCritics, { isLoading }] = useUpdateAdminProductionCriticsMutation();
+  const enabled = data?.enabled ?? true;
+  return (
+    <div className="creator-panel flex flex-wrap items-center justify-between gap-3 p-4">
+      <div className="min-w-0">
+        <p className="text-sm font-bold text-white">Production critics: {enabled ? "on" : "off"}</p>
+        <p className="text-[11px] text-slate-500">
+          Script, camera, lighting and per-shot critics. Off: each plan is used as first generated, with no critic calls and no
+          retries. Applies from the next generation step.
+        </p>
+      </div>
+      <button
+        type="button"
+        disabled={isLoading || !data}
+        onClick={() => setCritics(!enabled)}
+        className={`px-3 py-1.5 text-[11px] font-bold disabled:opacity-60 ${enabled ? "creator-control text-slate-200" : "creator-primary text-white"}`}
+      >
+        {isLoading ? "Saving…" : enabled ? "Switch critics off" : "Switch critics on"}
+      </button>
+    </div>
   );
 }
 

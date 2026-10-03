@@ -4088,6 +4088,14 @@ export const creatorApi = apiSlice.injectEndpoints({
     }),
     // Ops Pricing tab: the per-second video rate new briefs are quoted at, and a preview of what
     // a client would pay for a given length under it.
+    getAdminProductionCritics: builder.query({
+      query: () => ({ url: opsAdminUrl(`/production/critics`) }),
+      providesTags: [{ type: "CreatorHomeProjects", id: "admin-production-critics" }],
+    }),
+    updateAdminProductionCritics: builder.mutation({
+      query: (enabled) => ({ url: opsAdminUrl(`/production/critics`), method: "PUT", body: { enabled } }),
+      invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-production-critics" }],
+    }),
     getAdminVideoPricing: builder.query({
       query: () => ({ url: opsAdminUrl(`/billing/video-pricing`) }),
       providesTags: [{ type: "CreatorHomeProjects", id: "admin-video-pricing" }],
@@ -4459,6 +4467,8 @@ export const {
   useListProjectEconomicsQuery,
   useListAdminProjectEconomicsQuery,
   useGetAdminVideoPricingQuery,
+  useGetAdminProductionCriticsQuery,
+  useUpdateAdminProductionCriticsMutation,
   useUpdateAdminVideoPricingMutation,
   usePreviewAdminVideoPricingQuery,
   useVerifyLockPaymentMutation,
