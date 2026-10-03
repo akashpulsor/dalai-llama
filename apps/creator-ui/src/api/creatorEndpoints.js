@@ -4082,6 +4082,22 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: (tenantId) => ({ url: opsAdminUrl(`/billing/tenants/${tenantId}/projects/economics`) }),
       providesTags: (_r, _e, tenantId) => [{ type: "CreatorHomeProjects", id: `admin-economics-${tenantId}` }],
     }),
+    // Ops Pricing tab: the per-second video rate new briefs are quoted at, and a preview of what
+    // a client would pay for a given length under it.
+    getAdminVideoPricing: builder.query({
+      query: () => ({ url: opsAdminUrl(`/billing/video-pricing`) }),
+      providesTags: [{ type: "CreatorHomeProjects", id: "admin-video-pricing" }],
+    }),
+    updateAdminVideoPricing: builder.mutation({
+      query: (ratePerSecondInr) => ({ url: opsAdminUrl(`/billing/video-pricing`), method: "PUT", body: { ratePerSecondInr } }),
+      invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-video-pricing" }],
+    }),
+    previewAdminVideoPricing: builder.query({
+      query: ({ tenantId, durationSeconds }) => ({
+        url: opsAdminUrl(`/billing/video-pricing/preview?tenantId=${tenantId}&durationSeconds=${durationSeconds}`),
+      }),
+      providesTags: [{ type: "CreatorHomeProjects", id: "admin-video-pricing" }],
+    }),
     getAdminWallet: builder.query({
       query: (tenantId) => ({ url: opsAdminUrl(`/billing/wallets/${tenantId}`) }),
       providesTags: (_r, _e, tenantId) => [{ type: "CreatorHomeProjects", id: `admin-wallet-${tenantId}` }],
@@ -4437,6 +4453,9 @@ export const {
   useLockSettledMutation,
   useListProjectEconomicsQuery,
   useListAdminProjectEconomicsQuery,
+  useGetAdminVideoPricingQuery,
+  useUpdateAdminVideoPricingMutation,
+  usePreviewAdminVideoPricingQuery,
   useVerifyLockPaymentMutation,
   useGetReviewStatusQuery,
   useStartReviewMutation,

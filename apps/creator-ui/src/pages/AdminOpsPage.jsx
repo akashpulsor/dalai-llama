@@ -11,7 +11,7 @@
  * Currently ships one tab: Jobs (stuck LLM jobs + one-click retry). That is the one operator
  * action the Pragya incident actually needed.
  */
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { AlertTriangle, RefreshCw, ExternalLink, Loader2, ShieldAlert, Plus } from "lucide-react";
 import {
@@ -23,6 +23,9 @@ import {
   useDeactivateAdminTenantMutation,
   useGetAdminWalletQuery,
   useListAdminProjectEconomicsQuery,
+  useGetAdminVideoPricingQuery,
+  useUpdateAdminVideoPricingMutation,
+  usePreviewAdminVideoPricingQuery,
   useCreditAdminWalletMutation,
   useListAdminPlansQuery,
   useCreateAdminPlanMutation,
@@ -30,7 +33,7 @@ import {
   useActivateAdminPlanMutation,
   useDeactivateAdminPlanMutation,
 } from "../api/creatorEndpoints.js";
-import { ProjectEconomicsCard } from "../components/billing/ProjectEconomics.jsx";
+import { ProductionChargeLines, ProjectEconomicsCard, money } from "../components/billing/ProjectEconomics.jsx";
 
 const OPS_HOST_HINT = "ops.dalaillama.in";
 
@@ -82,6 +85,7 @@ export default function AdminOpsPage() {
     { key: "tenants", label: "Tenants", component: <TenantsTab /> },
     { key: "wallets", label: "Wallets", component: <WalletsTab /> },
     { key: "projects", label: "Project P&L", component: <ProjectEconomicsTab /> },
+    { key: "pricing", label: "Pricing", component: <PricingTab /> },
     { key: "plans", label: "Plans", component: <PlansTab /> },
   ];
 
@@ -408,6 +412,117 @@ function TenantsTab() {
           </table>
         </div>
       )}
+    </section>
+  );
+}
+
+// ------- Pricing tab ---------------------------------------------------------
+
+/** Set the per-second video rate new briefs are quoted at, and preview what a client would pay.
+ * A saved rate re-prices new briefs only -- every brief keeps the quote it was created with. */
+function PricingTab() {
+  const { data: tenants = [] } = useListAdminTenantsQuery();
+  const { data: pricing } = useGetAdminVideoPricingQuery();
+  const [saveRate, { isLoading: saving }] = useUpdateAdminVideoPricingMutation();
+  const [rateInput, setRateInput] = useState("");
+  const [tenantId, setTenantId] = useState("");
+  const [seconds, setSeconds] = useState("60");
+  const [flash, setFlash] = useState(null);
+  const durationSeconds = Number(seconds);
+  const canPreview = !!tenantId && Number.isInteger(durationSeconds) && durationSeconds >= 1 && durationSeconds <= 600;
+  const { data: preview, isFetching } = usePreviewAdminVideoPricingQuery({ tenantId, durationSeconds }, { skip: !canPreview });
+
+  useEffect(() => {
+    if (pricing?.ratePerSecondInr != null) setRateInput(String(pricing.ratePerSecondInr));
+  }, [pricing?.ratePerSecondInr]);
+
+  const handleSave = async () => {
+    setFlash(null);
+    try {
+      await saveRate(Number(rateInput)).unwrap();
+      setFlash({ tone: "success", message: "Rate saved. New briefs are quoted at this rate; existing briefs keep their price." });
+    } catch (err) {
+      setFlash({ tone: "error", message: err?.data?.detail || err?.data?.message || "Could not save the rate" });
+    }
+  };
+
+  const quote = preview?.quote;
+  return (
+    <section className="space-y-4">
+      <div className="creator-panel space-y-3 p-4">
+        <p className="text-sm font-bold text-white">Video rate</p>
+        <div className="flex flex-wrap items-end gap-2 text-xs">
+          <label className="flex flex-col gap-1 text-slate-500">
+            Rupees per second of video
+            <input
+              type="number"
+              min="0.01"
+              step="0.0001"
+              value={rateInput}
+              onChange={(e) => setRateInput(e.target.value)}
+              className="creator-input w-36 px-2.5 py-1.5 text-[11px] font-semibold"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={saving || !(Number(rateInput) > 0)}
+            onClick={handleSave}
+            className="creator-primary px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-60"
+          >
+            {saving ? "Saving…" : "Save rate"}
+          </button>
+          {pricing && (
+            <span className="text-[11px] text-slate-500">Default if never set: {money(pricing.defaultRatePerSecondInr)}/s</span>
+          )}
+        </div>
+        {flash && (
+          <p className={`text-[11px] font-semibold ${flash.tone === "success" ? "text-emerald-300" : "text-rose-300"}`}>{flash.message}</p>
+        )}
+      </div>
+
+      <div className="creator-panel space-y-3 p-4">
+        <p className="text-sm font-bold text-white">What will the client pay?</p>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <select
+            value={tenantId}
+            onChange={(e) => setTenantId(e.target.value)}
+            className="creator-input flex-1 px-2.5 py-1.5 text-[11px] font-semibold"
+          >
+            <option value="">— creator (their margin applies) —</option>
+            {tenants.map((t) => (
+              <option key={t.id} value={t.id}>{t.name} ({t.primaryContactEmail})</option>
+            ))}
+          </select>
+          <input
+            type="number"
+            min="1"
+            max="600"
+            value={seconds}
+            onChange={(e) => setSeconds(e.target.value)}
+            className="creator-input w-20 px-2.5 py-1.5 text-[11px] font-semibold"
+          />
+          <span className="text-slate-500">seconds</span>
+        </div>
+        {!canPreview ? (
+          <p className="text-[11px] text-slate-500">Pick a creator and a length between 1 and 600 seconds.</p>
+        ) : isFetching || !preview ? (
+          <p className="text-[11px] text-slate-500">Pricing…</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+              <p className="mb-2 text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Client is shown</p>
+              <ProductionChargeLines production={preview.production} />
+            </div>
+            <div className="space-y-1 rounded-lg border border-white/10 bg-white/[0.02] p-3 text-[11px] text-slate-400">
+              <p className="mb-2 text-[10px] font-extrabold uppercase tracking-widest text-slate-500">How it is built</p>
+              <p>{quote.estimatedShotCount} shots, video at {money(preview.ratePerSecondInr)}/s</p>
+              <p>Platform cost: <span className="font-bold text-slate-200">{money(quote.platformCost)}</span></p>
+              <p>Creator margin: <span className="font-bold text-slate-200">{quote.creatorMarginPercent}% = {money(quote.creatorAmount)}</span></p>
+              <p>Client pays: <span className="font-bold text-white">{money(quote.totalPrice, quote.currency)}</span></p>
+            </div>
+          </div>
+        )}
+      </div>
     </section>
   );
 }
