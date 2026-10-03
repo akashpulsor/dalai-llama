@@ -278,16 +278,16 @@ export default function ClientFundingPage() {
                             actually show ~800-1000 (25% up-front). The full quote stays visible
                             as smaller context so nothing is hidden, just re-ranked. */}
                         <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-                          {data.requiredPaymentPercent < 100 ? "Due now" : "Price"}
+                          {data.requiredPaymentPercent < 100 ? "Due now" : "Tentative production price"}
                         </p>
                         <p className="text-[13px] font-bold text-slate-100">
                           {rupee(data.requiredAmount ?? data.quotedTotalPrice, data.quotedCurrency)}
                         </p>
-                        {data.requiredPaymentPercent < 100 && (
-                          <p className="mt-1 text-[10px] font-semibold text-slate-500">
-                            {data.requiredPaymentPercent}% of total {rupee(data.quotedTotalPrice, data.quotedCurrency)}
-                          </p>
-                        )}
+                        <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                          {data.requiredPaymentPercent < 100
+                            ? `${data.requiredPaymentPercent}% of the tentative production price ${rupee(data.quotedTotalPrice, data.quotedCurrency)}. The balance is due when you approve the final package.`
+                            : "Paid now in full — nothing more is due when you approve the final package."}
+                        </p>
                       </div>
                     )}
                     {data.campaignDirection && (

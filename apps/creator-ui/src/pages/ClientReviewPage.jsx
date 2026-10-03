@@ -15,6 +15,7 @@ import {
   useGetPublicProjectQuery,
   useGetPublicReviewCommentsQuery,
   useGetReviewStatusQuery,
+  useLockSettledMutation,
   useStartLockPaymentMutation,
   useStartReviewMutation,
   useStartReviewPaymentMutation,
@@ -47,10 +48,12 @@ export default function ClientReviewPage() {
   const [getQuote] = useGetLockQuoteMutation();
   const [startPayment] = useStartLockPaymentMutation();
   const [verifyPayment] = useVerifyLockPaymentMutation();
+  const [lockSettled] = useLockSettledMutation();
   const [quote, setQuote] = useState(null);
   const [paying, setPaying] = useState(false);
 
-  const isLocked = data?.status === "CLIENT_LOCKED";
+  // The stamp, not status: status moves with every stage, the lock is recorded once and stays.
+  const isLocked = data?.clientLockedAt != null;
 
   // Step 1: show the price before the client commits.
   const handleShowQuote = async () => {
@@ -62,21 +65,31 @@ export default function ClientReviewPage() {
     }
   };
 
+  // A brief paid in full upfront leaves nothing to charge at lock.
+  const settled = quote != null && Number(quote.totalAmount) <= 0;
+
   // Step 2: create the order, run Razorpay, verify -> the package locks only on a verified payment.
   const handlePayAndLock = async () => {
     setPaying(true);
     try {
-      const order = await startPayment(token).unwrap();
-      await runRazorpayCheckout(
-        { ...order, name: "Dalai Llama Studio", description: `Lock: ${data?.name || "creative package"}` },
-        (response) => verifyPayment({
-          token,
-          gatewayOrderId: response.razorpay_order_id,
-          gatewayPaymentId: response.razorpay_payment_id,
-          gatewaySignature: response.razorpay_signature,
-        }).unwrap()
-      );
-      dispatch(showFlash({ message: "Paid and locked — this is now the final creative package", type: "success" }));
+      if (settled) {
+        await lockSettled(token).unwrap();
+      } else {
+        const order = await startPayment(token).unwrap();
+        await runRazorpayCheckout(
+          { ...order, name: "Dalai Llama Studio", description: `Lock: ${data?.name || "creative package"}` },
+          (response) => verifyPayment({
+            token,
+            gatewayOrderId: response.razorpay_order_id,
+            gatewayPaymentId: response.razorpay_payment_id,
+            gatewaySignature: response.razorpay_signature,
+          }).unwrap()
+        );
+      }
+      dispatch(showFlash({
+        message: settled ? "Locked — this is now the final creative package" : "Paid and locked — this is now the final creative package",
+        type: "success",
+      }));
       setQuote(null);
       refetch();
     } catch (err) {
@@ -385,9 +398,23 @@ export default function ClientReviewPage() {
               Locking approves this creative package as final and unlocks the change-request chat. One-time payment, secured by Razorpay.
             </p>
 
-            <div className="mt-5 flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] p-4">
-              <span className="text-sm font-semibold text-slate-300">Total</span>
-              <span className="text-2xl font-extrabold text-white">{rupee(quote.totalAmount, quote.currency)}</span>
+            <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+              {quote.quotedTotalPrice != null && (
+                <div className="mb-3 space-y-1.5 border-b border-white/10 pb-3 text-sm font-semibold text-slate-400">
+                  <div className="flex justify-between">
+                    <span>Quoted production price</span>
+                    <span className="text-slate-200">{rupee(quote.quotedTotalPrice, quote.currency)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Paid upfront on the brief</span>
+                    <span className="text-slate-200">− {rupee(quote.paidUpfront, quote.currency)}</span>
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-slate-300">{quote.quotedTotalPrice != null ? "Balance due" : "Total"}</span>
+                <span className="text-2xl font-extrabold text-white">{rupee(quote.totalAmount, quote.currency)}</span>
+              </div>
             </div>
 
             <div className="mt-5 flex gap-2">
@@ -406,7 +433,7 @@ export default function ClientReviewPage() {
                 className="creator-primary flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold text-white disabled:opacity-60"
               >
                 {paying ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
-                {paying ? "Processing…" : `Pay ${rupee(quote.totalAmount, quote.currency)} & lock`}
+                {paying ? "Processing…" : settled ? "Approve & lock" : `Pay ${rupee(quote.totalAmount, quote.currency)} & lock`}
               </button>
             </div>
           </div>

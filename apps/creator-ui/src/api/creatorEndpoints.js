@@ -3020,6 +3020,11 @@ export const creatorApi = apiSlice.injectEndpoints({
     startLockPayment: builder.mutation({
       query: (token) => ({ url: platformUrl(`/public/projects/${token}/lock/payment`), method: "POST" }),
     }),
+    // Brief already paid in full -> nothing to charge; the server re-checks the balance is zero.
+    lockSettled: builder.mutation({
+      query: (token) => ({ url: platformUrl(`/public/projects/${token}/lock/settled`), method: "POST" }),
+      invalidatesTags: (_result, _error, token) => [{ type: "CreatorHomeProjects", id: `public-project-${token}` }],
+    }),
     verifyLockPayment: builder.mutation({
       query: ({ token, ...body }) => ({ url: platformUrl(`/public/projects/${token}/lock/verify`), method: "POST", body }),
       invalidatesTags: (_result, _error, args) => [{ type: "CreatorHomeProjects", id: `public-project-${args?.token}` }],
@@ -4418,6 +4423,7 @@ export const {
   useLockPublicProjectMutation,
   useGetLockQuoteMutation,
   useStartLockPaymentMutation,
+  useLockSettledMutation,
   useVerifyLockPaymentMutation,
   useGetReviewStatusQuery,
   useStartReviewMutation,
