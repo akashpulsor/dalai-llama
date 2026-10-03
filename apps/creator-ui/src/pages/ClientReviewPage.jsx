@@ -28,7 +28,7 @@ import {
 } from "../api/creatorEndpoints.js";
 import { runRazorpayCheckout } from "../utils/walletRecharge.js";
 import { ProductionChargeLines } from "../components/billing/ProjectEconomics.jsx";
-import CreativeDirectionCard, { DirectionFeedbackForm } from "../components/creativeDirection/CreativeDirectionCard.jsx";
+import CreativeDirectionCard, { DirectionFeedbackForm, DirectionPager } from "../components/creativeDirection/CreativeDirectionCard.jsx";
 
 const rupee = (n, code = "INR") =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: code || "INR", maximumFractionDigits: 0 }).format(Number(n) || 0);
@@ -577,7 +577,8 @@ function BriefSection({ lockedIdeaId }) {
  * creator has generated directions. */
 function ClientCreativeDirections({ token }) {
   const dispatch = useDispatch();
-  const { data: board } = useGetPublicCreativeDirectionsQuery(token, { skip: !token });
+  const [page, setPage] = useState(0);
+  const { data: board } = useGetPublicCreativeDirectionsQuery({ token, page, size: 3 }, { skip: !token });
   const [addFeedback, { isLoading: sending }] = useAddPublicCreativeDirectionFeedbackMutation();
   const [approve, { isLoading: approving, originalArgs }] = useApprovePublicCreativeDirectionMutation();
   const directions = board?.directions || [];
@@ -606,6 +607,7 @@ function ClientCreativeDirections({ token }) {
           the script, screenplay, shots and frames are all made from the approved direction.
         </p>
       </div>
+      <DirectionPager page={board?.page ?? page} size={board?.size ?? 3} total={board?.totalDirections ?? 0} onPage={setPage} />
       {directions.map((direction) => (
         <CreativeDirectionCard key={direction.id} direction={direction} highlighted={direction.recommended && !board?.approved}>
           <div className="space-y-3">

@@ -2934,13 +2934,20 @@ export const creatorApi = apiSlice.injectEndpoints({
     // pre-production-service CreativeDirectionController -- the stage between the locked idea and
     // the script: three director's treatments, reviewed, revised and approved. Every write returns
     // the treatment it touched; the board query is refreshed so status chips stay truthful.
+    // One page of the latest completed round (recommendation first on page 0) plus the newest
+    // round's job status -- generation is asynchronous, so the screen polls while it is PENDING.
     getCreativeDirections: builder.query({
-      query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/creative-directions`) }),
-      providesTags: (_r, _e, projectId) => [{ type: "CreatorHomeProjects", id: `creative-directions-${projectId}` }],
+      query: ({ projectId, page = 0, size = 3 }) => ({
+        url: platformUrl(`/projects/${projectId}/creative-directions?page=${page}&size=${size}`),
+      }),
+      providesTags: (_r, _e, args) => [{ type: "CreatorHomeProjects", id: `creative-directions-${args?.projectId}` }],
     }),
     generateCreativeDirections: builder.mutation({
-      query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/creative-directions/generate`), method: "POST" }),
-      invalidatesTags: (_r, _e, projectId) => [{ type: "CreatorHomeProjects", id: `creative-directions-${projectId}` }],
+      query: ({ projectId, count }) => ({
+        url: platformUrl(`/projects/${projectId}/creative-directions/generate${count ? `?count=${count}` : ""}`),
+        method: "POST",
+      }),
+      invalidatesTags: (_r, _e, args) => [{ type: "CreatorHomeProjects", id: `creative-directions-${args?.projectId}` }],
     }),
     selectCreativeDirection: builder.mutation({
       query: ({ projectId, directionId }) => ({
@@ -2972,8 +2979,10 @@ export const creatorApi = apiSlice.injectEndpoints({
     }),
     // The same treatments on the client's review link (pre-production PublicProjectController).
     getPublicCreativeDirections: builder.query({
-      query: (token) => ({ url: platformUrl(`/public/projects/${token}/creative-directions`) }),
-      providesTags: (_r, _e, token) => [{ type: "CreatorHomeProjects", id: `public-creative-directions-${token}` }],
+      query: ({ token, page = 0, size = 3 }) => ({
+        url: platformUrl(`/public/projects/${token}/creative-directions?page=${page}&size=${size}`),
+      }),
+      providesTags: (_r, _e, args) => [{ type: "CreatorHomeProjects", id: `public-creative-directions-${args?.token}` }],
     }),
     addPublicCreativeDirectionFeedback: builder.mutation({
       query: ({ token, directionId, feedback, requestRevision }) => ({

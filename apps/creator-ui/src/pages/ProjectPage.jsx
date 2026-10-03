@@ -209,7 +209,7 @@ export default function ProjectPage() {
   // Creative Direction gates the script on projects created with it: their hook, script and every
   // later stage are generated from the approved direction. Legacy projects (required === false)
   // keep generating straight from the idea.
-  const { data: directionBoard } = useGetCreativeDirectionsQuery(projectId, { skip: !projectId });
+  const { data: directionBoard } = useGetCreativeDirectionsQuery({ projectId }, { skip: !projectId });
   const approvedDirection = directionBoard?.approved || null;
   const directionPending = Boolean(directionBoard?.required) && !approvedDirection;
   const { data: productProfiles = [] } = useListCastProfilesQuery({ projectId, profileType: "PRODUCT" }, { skip: !projectId });

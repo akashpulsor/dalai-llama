@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useDispatch } from "react-redux";
 import { ArrowRight, CheckCircle2, Loader2, RefreshCw, Sparkles, Wand2 } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
@@ -10,7 +10,10 @@ import {
   useReviseCreativeDirectionMutation,
   useSelectCreativeDirectionMutation,
 } from "../../api/creatorEndpoints.js";
-import CreativeDirectionCard, { DirectionFeedbackForm } from "../creativeDirection/CreativeDirectionCard.jsx";
+import CreativeDirectionCard, { DirectionFeedbackForm, DirectionPager } from "../creativeDirection/CreativeDirectionCard.jsx";
+
+const PAGE_SIZE = 3;
+const COUNTS = [5, 6, 7, 8, 9, 10];
 
 /**
  * Creative Direction -- between the locked idea and the script. Three director's treatments for the
@@ -20,7 +23,20 @@ import CreativeDirectionCard, { DirectionFeedbackForm } from "../creativeDirecti
  */
 export default function CreativeDirectionSection({ projectId, onContinue }) {
   const dispatch = useDispatch();
-  const { data: board, isLoading, isError, error, refetch } = useGetCreativeDirectionsQuery(projectId, { skip: !projectId });
+  const [page, setPage] = useState(0);
+  const [count, setCount] = useState(6);
+  const [polling, setPolling] = useState(false);
+  // Generation runs as a background job: poll while the newest round is PENDING, stop when it lands.
+  const { data: board, isLoading, isError, error, refetch } = useGetCreativeDirectionsQuery(
+    { projectId, page, size: PAGE_SIZE },
+    { skip: !projectId, pollingInterval: polling ? 4000 : 0 },
+  );
+  const generation = board?.generation;
+  const pending = generation?.status === "PENDING";
+  React.useEffect(() => {
+    setPolling(pending);
+    if (generation?.status === "COMPLETED" && polling) setPage(0);
+  }, [pending, generation?.status]); // eslint-disable-line react-hooks/exhaustive-deps
   const [generate, { isLoading: generating }] = useGenerateCreativeDirectionsMutation();
   const [select] = useSelectCreativeDirectionMutation();
   const [addFeedback, { isLoading: sendingFeedback }] = useAddCreativeDirectionFeedbackMutation();
@@ -53,8 +69,8 @@ export default function CreativeDirectionSection({ projectId, onContinue }) {
 
   const approved = board?.approved;
   const directions = board?.directions || [];
-  const handleGenerate = () => run(() => generate(projectId).unwrap(),
-    directions.length ? "New alternatives are ready" : "Three creative directions are ready");
+  const handleGenerate = () => run(() => generate({ projectId, count }).unwrap(),
+    `Writing ${count} creative directions -- they appear here when ready`).then((ok) => ok && setPolling(true));
 
   return (
     <section className="mt-6 space-y-4">
@@ -74,15 +90,34 @@ export default function CreativeDirectionSection({ projectId, onContinue }) {
             {board.durationSeconds && <p className="mt-0.5 text-slate-500">Target: {board.durationSeconds} seconds</p>}
           </div>
         )}
-        <button
-          type="button"
-          disabled={generating}
-          onClick={handleGenerate}
-          className="creator-primary mt-4 flex items-center gap-2 px-4 py-2.5 text-[12.5px] font-bold text-white disabled:opacity-60"
-        >
-          {generating ? <Loader2 size={14} className="animate-spin" /> : directions.length ? <RefreshCw size={14} /> : <Sparkles size={14} />}
-          {generating ? "Writing three treatments… (up to a minute)" : directions.length ? "Generate new alternatives" : "Generate creative directions"}
-        </button>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-[11.5px] font-semibold text-slate-400">
+            Directions
+            <select value={count} onChange={(event) => setCount(Number(event.target.value))} disabled={pending || generating}
+              className="creator-input px-2 py-1.5 text-[12px] font-semibold">
+              {COUNTS.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+          <button
+            type="button"
+            disabled={generating || pending}
+            onClick={handleGenerate}
+            className="creator-primary flex items-center gap-2 px-4 py-2.5 text-[12.5px] font-bold text-white disabled:opacity-60"
+          >
+            {generating || pending ? <Loader2 size={14} className="animate-spin" /> : directions.length ? <RefreshCw size={14} /> : <Sparkles size={14} />}
+            {pending ? `Writing ${generation.requestedCount} treatments…` : directions.length ? "Generate new alternatives" : "Generate creative directions"}
+          </button>
+        </div>
+        {pending && (
+          <p className="mt-2 text-[11px] font-medium text-slate-500">
+            This takes a minute or two. You can leave this page -- the treatments are saved when they're ready.
+          </p>
+        )}
+        {generation?.status === "FAILED" && (
+          <p className="mt-2 rounded-lg border border-rose-400/25 bg-rose-500/[0.07] p-2.5 text-[11.5px] font-semibold text-rose-200">
+            The last round didn't finish: {generation.errorMessage || "unknown error"}. Generate again to retry.
+          </p>
+        )}
         {directions.length > 0 && approved && (
           <p className="mt-2 text-[11px] font-medium text-slate-500">New alternatives never replace the approved direction until you approve one of them.</p>
         )}
@@ -102,7 +137,7 @@ export default function CreativeDirectionSection({ projectId, onContinue }) {
         </div>
       )}
 
-      {directions.length === 0 && !generating && (
+      {directions.length === 0 && !generating && !pending && (
         <p className="creator-panel p-6 text-center text-xs font-semibold text-slate-500">
           No creative directions yet. Generate them to choose how this idea will be made.
         </p>
@@ -111,6 +146,8 @@ export default function CreativeDirectionSection({ projectId, onContinue }) {
       {approved && !directions.some((direction) => direction.id === approved.id) && (
         <CreativeDirectionCard direction={approved} />
       )}
+
+      <DirectionPager page={board?.page ?? page} size={board?.size ?? PAGE_SIZE} total={board?.totalDirections ?? 0} onPage={setPage} />
 
       {directions.map((direction) => {
         const isApproved = direction.reviewStatus === "APPROVED";
@@ -159,6 +196,8 @@ export default function CreativeDirectionSection({ projectId, onContinue }) {
           </CreativeDirectionCard>
         );
       })}
+
+      <DirectionPager page={board?.page ?? page} size={board?.size ?? PAGE_SIZE} total={board?.totalDirections ?? 0} onPage={setPage} />
     </section>
   );
 }

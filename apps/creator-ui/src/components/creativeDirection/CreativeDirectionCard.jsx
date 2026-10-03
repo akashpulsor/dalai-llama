@@ -165,6 +165,21 @@ export default function CreativeDirectionCard({ direction, highlighted = false, 
   );
 }
 
+/** Page controls shared by creator and client -- the treatments come one page at a time. */
+export function DirectionPager({ page, size, total, onPage }) {
+  const pages = Math.max(1, Math.ceil(total / size));
+  if (total <= size) return null;
+  return (
+    <div className="flex items-center justify-between gap-3 text-[11.5px] font-semibold text-slate-400">
+      <button type="button" disabled={page === 0} onClick={() => onPage(page - 1)}
+        className="creator-control px-3 py-1.5 font-bold text-slate-200 disabled:opacity-40">Previous</button>
+      <span>Page {page + 1} of {pages} · {total} directions</span>
+      <button type="button" disabled={page >= pages - 1} onClick={() => onPage(page + 1)}
+        className="creator-control px-3 py-1.5 font-bold text-slate-200 disabled:opacity-40">Next</button>
+    </div>
+  );
+}
+
 /** Feedback box shared by creator and client: a note, optionally flagged as a revision request. */
 export function DirectionFeedbackForm({ busy, onSubmit }) {
   const [text, setText] = useState("");
