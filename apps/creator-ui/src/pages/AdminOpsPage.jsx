@@ -22,6 +22,7 @@ import {
   useActivateAdminTenantMutation,
   useDeactivateAdminTenantMutation,
   useGetAdminWalletQuery,
+  useListAdminProjectEconomicsQuery,
   useCreditAdminWalletMutation,
   useListAdminPlansQuery,
   useCreateAdminPlanMutation,
@@ -29,6 +30,7 @@ import {
   useActivateAdminPlanMutation,
   useDeactivateAdminPlanMutation,
 } from "../api/creatorEndpoints.js";
+import { ProjectEconomicsCard } from "../components/billing/ProjectEconomics.jsx";
 
 const OPS_HOST_HINT = "ops.dalaillama.in";
 
@@ -79,6 +81,7 @@ export default function AdminOpsPage() {
     { key: "jobs", label: "LLM jobs", component: <JobsTab /> },
     { key: "tenants", label: "Tenants", component: <TenantsTab /> },
     { key: "wallets", label: "Wallets", component: <WalletsTab /> },
+    { key: "projects", label: "Project P&L", component: <ProjectEconomicsTab /> },
     { key: "plans", label: "Plans", component: <PlansTab /> },
   ];
 
@@ -404,6 +407,46 @@ function TenantsTab() {
             </tbody>
           </table>
         </div>
+      )}
+    </section>
+  );
+}
+
+// ------- Project P&L tab -----------------------------------------------------
+
+/** Per project for one tenant: actual provider charges vs what the creator was charged vs what
+ * the client paid, with the creator's and the platform's profit. Same card the creator sees,
+ * plus the platform column billing only serves on this admin route. */
+function ProjectEconomicsTab() {
+  const { data: tenants = [] } = useListAdminTenantsQuery();
+  const [tenantId, setTenantId] = useState("");
+  const { data: statements = [], isFetching, isError, error } = useListAdminProjectEconomicsQuery(tenantId, { skip: !tenantId });
+
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <label className="text-slate-500">Tenant:</label>
+        <select
+          value={tenantId}
+          onChange={(e) => setTenantId(e.target.value)}
+          className="creator-input flex-1 px-2.5 py-1.5 text-[11px] font-semibold"
+        >
+          <option value="">— pick a tenant —</option>
+          {tenants.map((t) => (
+            <option key={t.id} value={t.id}>{t.name} ({t.primaryContactEmail})</option>
+          ))}
+        </select>
+      </div>
+      {!tenantId ? null : isFetching ? (
+        <p className="text-xs text-slate-500">Loading…</p>
+      ) : isError ? (
+        <p className="text-xs text-rose-300">{error?.data?.message || "Could not load project economics"}</p>
+      ) : statements.length === 0 ? (
+        <p className="text-xs text-slate-500">This tenant has no charged or paid projects yet.</p>
+      ) : (
+        statements.map((economics) => (
+          <ProjectEconomicsCard key={economics.projectId} economics={economics} title={`Project ${economics.projectId}`} />
+        ))
       )}
     </section>
   );

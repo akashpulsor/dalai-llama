@@ -379,6 +379,12 @@ export const creatorApi = apiSlice.injectEndpoints({
     // billing-service, /api/v1/billing (default relative baseUrl -- not the platformUrl()
     // /v1 mount every other cross-service call in this file uses, see the note at the top).
     // Real accumulated spend for one project against its quoted price.
+    // Per-project statement: production charges as the client saw them, what the client paid,
+    // the creator's profit. billing strips provider cost / platform take from this route.
+    listProjectEconomics: builder.query({
+      query: (tenantId) => `/billing/${tenantId}/projects/economics`,
+      providesTags: [{ type: "CreatorHomeProjects", id: "project-economics" }],
+    }),
     getProjectSpend: builder.query({
       query: ({ tenantId, projectId }) => `/billing/${tenantId}/projects/${projectId}/spend`,
       providesTags: (_result, _error, args) => [{ type: "CreatorHomeProjects", id: `spend-${args?.projectId}` }],
@@ -4071,6 +4077,11 @@ export const creatorApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-tenants" }],
     }),
+    // Ops: provider cost vs charged vs client paid, with creator and platform profit.
+    listAdminProjectEconomics: builder.query({
+      query: (tenantId) => ({ url: opsAdminUrl(`/billing/tenants/${tenantId}/projects/economics`) }),
+      providesTags: (_r, _e, tenantId) => [{ type: "CreatorHomeProjects", id: `admin-economics-${tenantId}` }],
+    }),
     getAdminWallet: builder.query({
       query: (tenantId) => ({ url: opsAdminUrl(`/billing/wallets/${tenantId}`) }),
       providesTags: (_r, _e, tenantId) => [{ type: "CreatorHomeProjects", id: `admin-wallet-${tenantId}` }],
@@ -4424,6 +4435,8 @@ export const {
   useGetLockQuoteMutation,
   useStartLockPaymentMutation,
   useLockSettledMutation,
+  useListProjectEconomicsQuery,
+  useListAdminProjectEconomicsQuery,
   useVerifyLockPaymentMutation,
   useGetReviewStatusQuery,
   useStartReviewMutation,

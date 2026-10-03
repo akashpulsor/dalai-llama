@@ -23,6 +23,7 @@ import {
   useVerifyReviewPaymentMutation,
 } from "../api/creatorEndpoints.js";
 import { runRazorpayCheckout } from "../utils/walletRecharge.js";
+import { ProductionChargeLines } from "../components/billing/ProjectEconomics.jsx";
 
 const rupee = (n, code = "INR") =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: code || "INR", maximumFractionDigits: 0 }).format(Number(n) || 0);
@@ -395,20 +396,21 @@ export default function ClientReviewPage() {
             </div>
             <h3 className="text-lg font-bold text-white">Pay to finalize this package</h3>
             <p className="mt-1 text-sm font-medium text-slate-400">
-              Locking approves this creative package as final and unlocks the change-request chat. One-time payment, secured by Razorpay.
+              Paying approves this video as final: the script, screenplay, shot plan, frames, video and music are
+              locked as delivered and the change-request chat opens. Once it is paid you can give your next brief.
+              One-time payment, secured by Razorpay.
             </p>
 
             <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.03] p-4">
-              {quote.quotedTotalPrice != null && (
-                <div className="mb-3 space-y-1.5 border-b border-white/10 pb-3 text-sm font-semibold text-slate-400">
-                  <div className="flex justify-between">
-                    <span>Quoted production price</span>
-                    <span className="text-slate-200">{rupee(quote.quotedTotalPrice, quote.currency)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Paid upfront on the brief</span>
-                    <span className="text-slate-200">− {rupee(quote.paidUpfront, quote.currency)}</span>
-                  </div>
+              {quote.production && (
+                <div className="mb-3 border-b border-white/10 pb-3">
+                  <ProductionChargeLines production={quote.production} />
+                </div>
+              )}
+              {quote.paidUpfront != null && Number(quote.paidUpfront) > 0 && (
+                <div className="mb-3 flex justify-between border-b border-white/10 pb-3 text-sm font-semibold text-slate-400">
+                  <span>Paid upfront on the brief</span>
+                  <span className="text-slate-200">− {rupee(quote.paidUpfront, quote.currency)}</span>
                 </div>
               )}
               <div className="flex items-center justify-between">
@@ -433,7 +435,7 @@ export default function ClientReviewPage() {
                 className="creator-primary flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold text-white disabled:opacity-60"
               >
                 {paying ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
-                {paying ? "Processing…" : settled ? "Approve & lock" : `Pay ${rupee(quote.totalAmount, quote.currency)} & lock`}
+                {paying ? "Processing…" : settled ? "Approve & give next brief" : `Pay ${rupee(quote.totalAmount, quote.currency)} & give next brief`}
               </button>
             </div>
           </div>

@@ -5,7 +5,14 @@ import { ArrowDownLeft, ArrowUpRight, ChevronDown, Crown, Percent, Save, Trendin
 import { Link } from "react-router-dom";
 import { selectTenantId, showFlash, useGetWalletBalanceQuery } from "@dalaillama/shared-store";
 import WalletStatementPanel from "../components/billing/WalletStatementPanel.jsx";
-import { useGetOrganizationQuery, useListWalletTransactionsQuery, useUpdateOrganizationMutation } from "../api/creatorEndpoints.js";
+import {
+  useGetOrganizationQuery,
+  useListPreProductionProjectsQuery,
+  useListProjectEconomicsQuery,
+  useListWalletTransactionsQuery,
+  useUpdateOrganizationMutation,
+} from "../api/creatorEndpoints.js";
+import { ProjectEconomicsCard } from "../components/billing/ProjectEconomics.jsx";
 import WalletBalanceButton from "../components/billing/WalletBalanceButton.jsx";
 import useCreatorVideoEntitlements from "../hooks/useCreatorVideoEntitlements.js";
 
@@ -104,6 +111,8 @@ export default function WalletBillingPage() {
       {/* The statement first: what you last added, what has gone out since, and on what. The
           raw feed below is for looking something up, not for understanding the wallet. */}
       <WalletStatementPanel />
+
+      <ProjectStatements tenantId={tenantId} />
 
       {/* LEDGER */}
       <div className="creator-panel mt-6 p-5">
@@ -216,6 +225,39 @@ export default function WalletBillingPage() {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Per project: the production charges the client was shown, what they paid, and your profit. */
+function ProjectStatements({ tenantId }) {
+  const { data: statements = [], isLoading } = useListProjectEconomicsQuery(tenantId, { skip: !tenantId });
+  const { data: projects = [] } = useListPreProductionProjectsQuery(undefined, { skip: !tenantId });
+  const nameOf = useMemo(() => new Map(projects.map((p) => [p.id, p.name])), [projects]);
+
+  return (
+    <div className="mt-6 space-y-3">
+      <div>
+        <p className="text-[11px] font-extrabold uppercase tracking-widest text-purple-300">Projects</p>
+        <p className="mt-0.5 text-xs font-medium text-slate-400">
+          Production charges as your client saw them, what they paid, and what you kept.
+        </p>
+      </div>
+      {isLoading ? (
+        <p className="py-6 text-center text-xs font-medium text-slate-500">Loading…</p>
+      ) : statements.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-white/10 py-6 text-center text-xs font-medium text-slate-500">
+          No project has been charged or paid for yet.
+        </p>
+      ) : (
+        statements.map((economics) => (
+          <ProjectEconomicsCard
+            key={economics.projectId}
+            economics={economics}
+            title={nameOf.get(economics.projectId) || `Project ${economics.projectId.slice(0, 8)}`}
+          />
+        ))
+      )}
     </div>
   );
 }
