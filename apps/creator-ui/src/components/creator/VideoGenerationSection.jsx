@@ -699,6 +699,7 @@ export default function VideoGenerationSection({ projectId }) {
             video={videos[shot.id]}
             activeClip={activeClips[shot.id]}
             dubbed={dubbedVoices[shot.id]}
+            onDubbed={reloadAudio}
             selected={selectedShotIds.includes(shot.id)}
             onSelectToggle={() => toggleShotSelected(shot.id)}
             onPrepare={() => handlePrepare(shot.id)}

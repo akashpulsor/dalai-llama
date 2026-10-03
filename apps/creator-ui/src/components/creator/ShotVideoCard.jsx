@@ -225,7 +225,7 @@ function ShotVoiceControl({ shotId, projectId, dubVoiceId, takeVoiceId, hasTake,
  * time), so the previous recording is gone once this runs. That is worth knowing before pressing it,
  * and worth hearing the current one first.
  */
-function DubbedVoiceControl({ shotId, projectId, line, dubbed, dubVoiceId }) {
+function DubbedVoiceControl({ shotId, projectId, line, dubbed, dubVoiceId, onDubbed }) {
   const dispatch = useDispatch();
   // Queued, not waited on. Recording a line takes seconds to tens of seconds, and while the request
   // held the connection there was nothing on screen saying so -- which is exactly why pressing the
@@ -247,7 +247,16 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed, dubVoiceId }) {
         await new Promise((resolve) => { setTimeout(resolve, 2000); });
         // eslint-disable-next-line no-await-in-loop
         const latest = await fetchDubJob(job.jobId).unwrap().catch(() => null);
-        if (latest?.status === "COMPLETED") return true;
+        if (latest?.status === "COMPLETED") {
+          // queueShotDub returns before the audio exists, so invalidating when that request is
+          // accepted would only reload the same empty result. Refresh after the job commits the
+          // take instead. Otherwise the project query can stay cached for 45 minutes and this
+          // panel keeps rendering `dubbed = null` even though the file has been generated.
+          // A transient reload failure must not report that the already-completed dub itself
+          // failed. The normal focus/poll refresh can still recover the saved take afterwards.
+          await Promise.resolve(onDubbed?.()).catch(() => {});
+          return true;
+        }
         if (latest?.status === "FAILED") {
           throw new Error(latest.lastError || "The dub failed");
         }
@@ -386,6 +395,10 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed, dubVoiceId }) {
               This take runs {(dubbed.durationMs / 1000).toFixed(1)}s.
             </p>
           )}
+          <p className="flex items-center gap-1 text-[10px] font-bold text-emerald-300/90">
+            <Check size={11} />
+            Saved automatically — this is the take used by dubbed mixes.
+          </p>
           {stale && (
             <p className="text-[10px] font-medium text-amber-200/90">
               This recording is of the previous line. Dub again to hear the line as it stands now —
@@ -400,7 +413,7 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed, dubVoiceId }) {
               className="flex items-center gap-1.5 text-[10px] font-bold text-purple-300 hover:text-purple-200 disabled:opacity-60"
             >
               {isLoading ? <Loader2 size={11} className="animate-spin" /> : <AudioLines size={11} />}
-              {isLoading ? "Dubbing…" : "Dub again with the current line"}
+              {isLoading ? "Dubbing…" : "Record the next take"}
             </button>
           </div>
         </div>
@@ -854,12 +867,15 @@ function PromptVersionHistory({ shotId, onUse, canEdit }) {
   );
 }
 
-export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info, busy, video, activeClip, dubbed, selected, onSelectToggle, onPrepare, onSavePrompt, onApprove, onReject, onAutoFix, onRegenerate, regenerating }) {
+export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info, busy, video, activeClip, dubbed, onDubbed, selected, onSelectToggle, onPrepare, onSavePrompt, onApprove, onReject, onAutoFix, onRegenerate, regenerating }) {
   // Prompt editing is local to the open card: the draft only leaves here on an explicit Save, so
   // collapsing the card or wandering off never silently rewrites what will be generated.
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState("");
   const [saving, setSaving] = React.useState(false);
+  // Kept on the card rather than in project config: choosing to cut an overlong line is a
+  // deliberate exception for this one shot, not a new default for every render in the film.
+  const [dialogueFitChoice, setDialogueFitChoice] = React.useState("");
   const { entitlements } = useCreatorVideoEntitlements();
 
   // What this shot actually plays.
@@ -1126,6 +1142,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             line={dialogueVoiceText}
             dubbed={dubbed}
             dubVoiceId={shot.dubVoiceId}
+            onDubbed={onDubbed}
           />
           <BackgroundMusicControl shotId={shot.id} plannedSeconds={shot.durationSeconds} />
           <ShotThoughtLog shotId={shot.id} />
@@ -1369,7 +1386,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               )}
 
               {(!hasClip || regenerating) && info.externalJobId && !jobFailed && (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={handleReject}
@@ -1378,11 +1395,21 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
                     <X size={13} />
                     Reject & rewrite
                   </button>
+                  <select
+                    value={dialogueFitChoice}
+                    onChange={(event) => setDialogueFitChoice(event.target.value)}
+                    disabled={busy || editing}
+                    title="Choose whether generation may resize/refuse the shot for dialogue fit, or must keep the planned duration even if the voice is cut."
+                    className="creator-input min-w-44 px-2.5 py-2 text-[11px] font-bold text-slate-200 disabled:opacity-60"
+                  >
+                    <option value="">Fit dialogue automatically</option>
+                    <option value="KEEP_PLANNED">As planned — keep short clip</option>
+                  </select>
                   <button
                     type="button"
                     disabled={busy || editing}
                     title={editing ? "Save or cancel your prompt edit first." : undefined}
-                    onClick={() => onApprove?.()}
+                    onClick={() => onApprove?.({ dialogueFit: dialogueFitChoice || undefined })}
                     className="creator-primary flex flex-1 items-center justify-center gap-2 py-2 text-xs font-bold text-white disabled:opacity-60"
                   >
                     {busy && <Loader2 size={13} className="animate-spin" />}
