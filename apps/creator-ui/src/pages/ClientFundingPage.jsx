@@ -6,7 +6,6 @@ import { CheckCircle2, CreditCard, Film, ImageIcon, ImagePlus, Loader2, Package,
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useGetPublicProjectRequirementQuery,
-  usePreviewPublicRequirementQuoteQuery,
   useUpdateRequirementFromClientMutation,
   useStartRequirementPaymentMutation,
   useUploadPublicRequirementReferenceVideoMutation,
@@ -80,9 +79,10 @@ export default function ClientFundingPage() {
       briefText: data.briefText || "",
       targetAudience: data.targetAudience || "",
       campaignDirection: data.campaignDirection || "",
-      // Client-editable video duration -- re-quotes price via the backend on save
-      // (see PublicProjectRequirementController.updateFromClient). Refused after funding.
+      // Client-editable video duration and budget. Neither prices the brief -- the creator sets
+      // the price from the budget. Refused after funding.
       durationSeconds: data.durationSeconds ?? "",
+      clientBudget: data.clientBudget ?? "",
       brand: {
         brandName: data.brand?.brandName || "",
         industry: data.brand?.industry || "",
@@ -124,10 +124,11 @@ export default function ClientFundingPage() {
   const setProductField = (field, value) => setDraft((current) => ({ ...current, product: { ...current.product, [field]: value } }));
 
   const handleSaveEdit = async () => {
-    // durationSeconds is only sent when the client actually changed it -- keeps this off the
-    // wire for pure text/image edits so the backend doesn't re-quote on every save.
+    // Duration and budget are only sent when the client changed them.
     const durationDraft = parseDurationDraft(draft?.durationSeconds);
     const durationChanged = durationDraft != null && durationDraft !== data?.durationSeconds;
+    const budgetDraft = Number(draft?.clientBudget);
+    const budgetChanged = budgetDraft > 0 && budgetDraft !== Number(data?.clientBudget);
     try {
       await updateFromClient({
         shareToken,
@@ -135,6 +136,7 @@ export default function ClientFundingPage() {
         targetAudience: draft.targetAudience,
         campaignDirection: draft.campaignDirection,
         durationSeconds: durationChanged ? durationDraft : undefined,
+        clientBudget: budgetChanged ? budgetDraft : undefined,
         brand: draft.brand,
         product: draft.product,
         images: pendingImages,
@@ -235,15 +237,12 @@ export default function ClientFundingPage() {
                       placeholder="Any direction, tone, or style you have in mind"
                     />
                   </div>
-                  <DurationWithLivePriceEditor
-                    shareToken={shareToken}
+                  <DurationAndBudgetEditor
                     valueSeconds={draft.durationSeconds}
-                    currentSeconds={data.durationSeconds}
-                    currentTotal={data.quotedTotalPrice}
-                    currentDueNow={data.requiredAmount}
-                    requiredPaymentPercent={data.requiredPaymentPercent}
-                    currency={data.quotedCurrency}
-                    onChange={(next) => setDraft((current) => ({ ...current, durationSeconds: next }))}
+                    budget={draft.clientBudget}
+                    priced={data.quotedTotalPrice != null}
+                    onSeconds={(next) => setDraft((current) => ({ ...current, durationSeconds: next }))}
+                    onBudget={(next) => setDraft((current) => ({ ...current, clientBudget: next }))}
                   />
                 </div>
               ) : (
@@ -271,6 +270,19 @@ export default function ClientFundingPage() {
                         <p className="text-[13px] font-bold text-slate-100">{data.languages.join(", ")}</p>
                       </div>
                     )}
+                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-3">
+                      <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Your budget</p>
+                      {data.clientBudget != null ? (
+                        <p className="text-[13px] font-bold text-slate-100">{rupee(data.clientBudget, data.clientBudgetCurrency)}</p>
+                      ) : (
+                        <button type="button" onClick={startEditing} className="text-[12px] font-bold text-purple-300 underline">
+                          Tell your creator what you want to spend
+                        </button>
+                      )}
+                      {data.quotedTotalPrice == null && (
+                        <p className="mt-1 text-[10px] font-semibold text-slate-500">Your creator sets the price from your budget. You can pay once they have.</p>
+                      )}
+                    </div>
                     {data.quotedTotalPrice != null && (
                       <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-3">
                         {/* Show the amount actually charged as the prominent number -- the client
@@ -278,14 +290,14 @@ export default function ClientFundingPage() {
                             actually show ~800-1000 (25% up-front). The full quote stays visible
                             as smaller context so nothing is hidden, just re-ranked. */}
                         <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-                          {data.requiredPaymentPercent < 100 ? "Due now" : "Tentative production price"}
+                          {data.requiredPaymentPercent < 100 ? "Due now" : "Your creator's price"}
                         </p>
                         <p className="text-[13px] font-bold text-slate-100">
                           {rupee(data.requiredAmount ?? data.quotedTotalPrice, data.quotedCurrency)}
                         </p>
                         <p className="mt-1 text-[10px] font-semibold text-slate-500">
                           {data.requiredPaymentPercent < 100
-                            ? `${data.requiredPaymentPercent}% of the tentative production price ${rupee(data.quotedTotalPrice, data.quotedCurrency)}. The balance is due when you approve the final package.`
+                            ? `${data.requiredPaymentPercent}% of your creator's price ${rupee(data.quotedTotalPrice, data.quotedCurrency)}. The balance is due when you approve the final package.`
                             : "Paid now in full — nothing more is due when you approve the final package."}
                         </p>
                       </div>
@@ -467,7 +479,7 @@ export default function ClientFundingPage() {
                       {paying ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
                       {paying ? "Processing…" : data.quotedTotalPrice != null
                         ? `Pay ${rupee(data.requiredAmount ?? data.quotedTotalPrice, data.quotedCurrency)} & fund this brief`
-                        : "Fund this brief"}
+                        : "Awaiting your creator's price"}
                     </button>
                     <p className="mt-3.5 text-center text-[11px] font-medium leading-relaxed text-slate-500">
                       Secured by Razorpay. The creator starts work as soon as payment is confirmed.
@@ -483,71 +495,25 @@ export default function ClientFundingPage() {
   );
 }
 
-/** Client-side duration edit with live price preview. Debounced 300 ms so the backend isn't
- * hit on every keystroke; RTK Query caches per (shareToken, durationSeconds) so revisiting a
- * value already tried in this session doesn't refetch. Deliberately does NOT surface any
- * per-second breakdown -- creator-only economics stay off this public page (backend enforces
- * the same on the endpoint side). Refused after funding upstream; parent already hides this
- * editor once data.funded is true. */
-function DurationWithLivePriceEditor({ shareToken, valueSeconds, currentSeconds, currentTotal, currentDueNow, requiredPaymentPercent, currency, onChange }) {
-  const [debounced, setDebounced] = React.useState(valueSeconds);
-  React.useEffect(() => {
-    const handle = window.setTimeout(() => setDebounced(valueSeconds), 300);
-    return () => window.clearTimeout(handle);
-  }, [valueSeconds]);
-  const parsed = parseDurationDraft(debounced);
-  const dirty = parsed != null && parsed !== currentSeconds;
-  const { data: preview, isFetching } = usePreviewPublicRequirementQuoteQuery(
-    { shareToken, durationSeconds: parsed },
-    { skip: !dirty }
-  );
-  const previewTotal = dirty ? preview?.totalPrice : "";
-  const previewCurrency = dirty ? preview?.currency : "";
-  // The client actually pays requiredPaymentPercent% of the total up front; show THAT as the
-  // new/current price so the "was X, now Y" numbers match what card statement will read (matches
-  // the summary card fix above -- users were confused seeing a total that didn't equal the CTA).
-  const scaleDueNow = (total) => {
-    if (total == null || total === "" || requiredPaymentPercent == null || requiredPaymentPercent >= 100) return total;
-    const numeric = Number(total);
-    if (!Number.isFinite(numeric)) return total;
-    return Math.ceil((numeric * requiredPaymentPercent) / 100);
-  };
-  const previewDueNow = dirty ? scaleDueNow(previewTotal) : "";
-  const displayCurrent = currentDueNow ?? currentTotal;
-  const displayPreview = previewDueNow || previewTotal;
-
+/** The client's length and what they want to spend. No price is computed here: the creator sets
+ * it from the budget, so the page never shows a number derived from a per-second rate. */
+function DurationAndBudgetEditor({ valueSeconds, budget, priced, onSeconds, onBudget }) {
   return (
-    <div>
-      <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-        Duration (seconds)
-      </label>
-      <div className="flex items-center gap-3">
-        <input
-          type="number"
-          min={1}
-          max={600}
-          value={valueSeconds ?? ""}
-          onChange={(event) => onChange(event.target.value)}
-          className="creator-input w-32 px-3 py-2.5 text-[13px]"
-          placeholder="30"
-        />
-        <div className="text-[12px] font-semibold text-slate-400">
-          {dirty ? (
-            isFetching || !displayPreview ? (
-              <span className="text-slate-500">Recalculating price…</span>
-            ) : (
-              <span>
-                New price: <span className="font-bold text-purple-300">{rupee(displayPreview, previewCurrency || currency)}</span>
-                <span className="ml-2 text-slate-500">(was {rupee(displayCurrent, currency)})</span>
-              </span>
-            )
-          ) : displayCurrent != null ? (
-            <span>Current price: <span className="font-bold text-slate-200">{rupee(displayCurrent, currency)}</span></span>
-          ) : null}
-        </div>
+    <div className="grid grid-cols-2 gap-3">
+      <div>
+        <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Duration (seconds)</label>
+        <input type="number" min={1} max={600} value={valueSeconds ?? ""} onChange={(event) => onSeconds(event.target.value)}
+          className="creator-input w-full px-3 py-2.5 text-[13px]" placeholder="30" />
       </div>
-      <p className="mt-1 text-[11px] text-slate-500">
-        You can only change duration before payment. Price updates automatically.
+      <div>
+        <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Your budget (₹)</label>
+        <input type="number" min={1} step={1} value={budget ?? ""} onChange={(event) => onBudget(event.target.value)}
+          className="creator-input w-full px-3 py-2.5 text-[13px]" placeholder="What you want to spend" />
+      </div>
+      <p className="col-span-2 text-[11px] text-slate-500">
+        {priced
+          ? "Your creator has set a price. If you change the budget, tell them so they can revisit it."
+          : "Your creator reads your budget and sets the price. You can pay once they have."}
       </p>
     </div>
   );

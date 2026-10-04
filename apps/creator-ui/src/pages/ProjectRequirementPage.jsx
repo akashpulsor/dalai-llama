@@ -66,14 +66,15 @@ function ReferenceImageGrid({ images, emptyLabel }) {
   );
 }
 
-/** Creator-only -- see caller's `isCreator` gate. Lets a creator override the auto-computed quote
- * shown to the client and decide what percentage of it is required upfront (100 = full payment,
+/** Creator-only -- see caller's `isCreator` gate. The creator sets the price from the budget the
+ * client gave (a brief is not auto-priced) and decides what percentage of it is required upfront (100 = full payment,
  * the default); the remainder, if any, is a business matter collected outside the app. Refused
  * server-side once funded, so this is only ever rendered pre-funding (see caller). */
 function ProjectPricingPanel({ requirement, requirementId }) {
   const dispatch = useDispatch();
   const [updateQuote, { isLoading: saving }] = useUpdateProjectRequirementQuoteMutation();
-  const [totalPrice, setTotalPrice] = useState(requirement.quotedTotalPrice ?? 0);
+  const [totalPrice, setTotalPrice] = useState(requirement.quotedTotalPrice ?? requirement.clientBudget ?? "");
+  const currency = requirement.quotedCurrency || requirement.clientBudgetCurrency || "INR";
   const [requiredPercent, setRequiredPercent] = useState(requirement.requiredPaymentPercent ?? 100);
 
   const dueNow = useMemo(() => {
@@ -102,6 +103,18 @@ function ProjectPricingPanel({ requirement, requirementId }) {
       <p className="mb-1 text-[11px] font-extrabold uppercase tracking-widest text-purple-300">Project pricing</p>
       <p className="mb-5 text-xs font-medium text-slate-400">Visible to you only — the client only ever sees the total and what's due now.</p>
 
+      <div className="mb-4 rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-3">
+        <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Client's budget</p>
+        <p className="text-[13px] font-bold text-slate-100">
+          {requirement.clientBudget != null
+            ? `${requirement.clientBudgetCurrency || "INR"} ${Number(requirement.clientBudget).toFixed(2)}`
+            : "Not given yet"}
+        </p>
+        {requirement.quotedTotalPrice == null && (
+          <p className="mt-1 text-[10px] font-semibold text-amber-200">No price yet — the client cannot pay until you save one.</p>
+        )}
+      </div>
+
       {requirement.quotedPlatformCost != null && (
         <div className="mb-4 rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-3">
           <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Your actual cost</p>
@@ -114,7 +127,7 @@ function ProjectPricingPanel({ requirement, requirementId }) {
       <div className="mb-4">
         <label className="mb-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Quote shown to client</label>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-400">{requirement.quotedCurrency}</span>
+          <span className="text-xs font-semibold text-slate-400">{currency}</span>
           <input
             type="number"
             min="0"
@@ -142,13 +155,13 @@ function ProjectPricingPanel({ requirement, requirementId }) {
           className="creator-input w-28 px-3 py-2.5 text-sm font-bold"
         />
         <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
-          Client pays {requirement.quotedCurrency} {dueNow.toFixed(2)} of {requirement.quotedCurrency} {(Number(totalPrice) || 0).toFixed(2)} now
+          Client pays {currency} {dueNow.toFixed(2)} of {currency} {(Number(totalPrice) || 0).toFixed(2)} now
         </p>
       </div>
 
       <button
         type="button"
-        disabled={saving}
+        disabled={saving || !(Number(totalPrice) > 0)}
         onClick={handleSave}
         className="creator-primary w-full py-3 text-[13px] font-bold text-white disabled:opacity-60"
       >
@@ -721,7 +734,7 @@ export default function ProjectRequirementPage() {
         )}
       </div>
 
-      {isCreator && !isFunded && requirement.quotedTotalPrice != null && (
+      {isCreator && !isFunded && (
         <ProjectPricingPanel requirement={requirement} requirementId={requirementId} />
       )}
     </div>

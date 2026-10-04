@@ -491,10 +491,9 @@ export default function HomePage() {
 
                 {validDuration && priceQuote?.totalPrice != null && (
                   <p className="mb-3 text-xs font-semibold text-emerald-300">
-                    Estimated price: {priceQuote.currency} {Number(priceQuote.totalPrice).toFixed(2)}
+                    Your cost estimate: {priceQuote.currency} {Number(priceQuote.platformCost).toFixed(2)}
                     <span className="ml-1 font-medium text-slate-500">
-                      ({priceQuote.currency} {Number(priceQuote.platformCost).toFixed(2)} platform + your{" "}
-                      {Number(priceQuote.creatorMarginPercent).toFixed(0)}% margin)
+                      (for you only — the client is asked for their budget, and you set the price on the brief)
                     </span>
                   </p>
                 )}
@@ -713,9 +712,11 @@ export default function HomePage() {
                   )}
                 </div>
 
-                {createdPrice && (
+                {createdRequirementId && (
                   <p className="mb-4 text-xs font-semibold text-slate-300">
-                    Price quoted to the client: {createdPrice.currency} {Number(createdPrice.amount).toFixed(2)}
+                    {createdPrice
+                      ? `Price set for the client: ${createdPrice.currency} ${Number(createdPrice.amount).toFixed(2)}`
+                      : "The client will be asked for their budget. Set your price on the brief once they reply."}
                   </p>
                 )}
 

@@ -2096,12 +2096,12 @@ export const creatorApi = apiSlice.injectEndpoints({
     // multipart so images can ride along with the text edits; `data` is optional (a pure
     // image-only edit posts with no text part).
     updateRequirementFromClient: builder.mutation({
-      query: ({ shareToken, briefText, targetAudience, campaignDirection, brand, product, images, productImages, includeVideoShots, videoShotsIntent, durationSeconds }) => {
+      query: ({ shareToken, briefText, targetAudience, campaignDirection, brand, product, images, productImages, includeVideoShots, videoShotsIntent, durationSeconds, clientBudget }) => {
         const formData = new FormData();
         const hasTextEdit = briefText != null || targetAudience != null || campaignDirection != null
-          || brand != null || product != null || includeVideoShots != null || durationSeconds != null;
+          || brand != null || product != null || includeVideoShots != null || durationSeconds != null || clientBudget != null;
         if (hasTextEdit) {
-          formData.append("data", new Blob([JSON.stringify({ briefText, targetAudience, campaignDirection, brand, product, includeVideoShots, videoShotsIntent, durationSeconds })], { type: "application/json" }));
+          formData.append("data", new Blob([JSON.stringify({ briefText, targetAudience, campaignDirection, brand, product, includeVideoShots, videoShotsIntent, durationSeconds, clientBudget })], { type: "application/json" }));
         }
         (images || []).forEach((file) => formData.append("images", file));
         (productImages || []).forEach((file) => formData.append("productImages", file));
