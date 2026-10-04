@@ -25,6 +25,9 @@ import {
  */
 const fmt = (n) => (n == null ? "?" : Number(n) % 1 === 0 ? String(Number(n)) : Number(n).toFixed(1));
 
+/** ElevenLabs Music's prompt limit (MasterMusicPromptComposer.MAX_PROMPT_CHARS). */
+const MAX_MUSIC_PROMPT_CHARS = 4100;
+
 export default function MusicPlanPanel({ projectId, shotsReady }) {
   const dispatch = useDispatch();
   const { data: view, isLoading, error } = useGetMusicPlanQuery(projectId, { skip: !projectId });
@@ -45,6 +48,8 @@ export default function MusicPlanPanel({ projectId, shotsReady }) {
 
   const notPlannedYet = error?.status === 404;
   const dirty = plan?.masterPrompt != null && prompt !== plan.masterPrompt;
+  // The music model refuses a longer prompt; the backend refuses to save one.
+  const tooLong = prompt.trim().length > MAX_MUSIC_PROMPT_CHARS;
 
   const run = async (action, arg, message) => {
     try {
@@ -117,6 +122,13 @@ export default function MusicPlanPanel({ projectId, shotsReady }) {
                 {plan.globalIdentity.bpm ? ` · ${plan.globalIdentity.bpm} BPM` : ""}
                 {plan.globalIdentity.keyOrScale ? ` · ${plan.globalIdentity.keyOrScale}` : ""}
               </p>
+              {plan.globalIdentity.raga && (
+                <p className="mt-1 text-[11px] font-medium text-slate-400">
+                  Raga: <span className="text-slate-200">{plan.globalIdentity.raga}</span>
+                  {plan.globalIdentity.ragaPhrase ? ` — ${plan.globalIdentity.ragaPhrase}` : ""}
+                  {plan.globalIdentity.taal ? ` · ${plan.globalIdentity.taal}` : ""}
+                </p>
+              )}
               {plan.globalIdentity.motif && (
                 <p className="mt-1 text-[11px] font-medium text-slate-400">
                   Motif: <span className="text-slate-200">{plan.globalIdentity.motif}</span>
@@ -183,13 +195,16 @@ export default function MusicPlanPanel({ projectId, shotsReady }) {
             rows={8}
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
-            className="creator-input mb-2 w-full resize-y px-2.5 py-2 text-[11px] leading-relaxed"
+            className="creator-input mb-1 w-full resize-y px-2.5 py-2 text-[11px] leading-relaxed"
           />
+          <p className={`mb-2 text-right text-[10px] font-semibold ${tooLong ? "text-orange-300" : "text-slate-500"}`}>
+            {prompt.trim().length} / {MAX_MUSIC_PROMPT_CHARS} characters{tooLong ? " — shorten it to save" : ""}
+          </p>
 
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              disabled={!dirty || savingPrompt}
+              disabled={!dirty || savingPrompt || tooLong}
               onClick={() => run(updatePrompt, { projectId, masterPrompt: prompt }, "Saved the prompt.")}
               className="flex items-center gap-1.5 rounded-md border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1.5 text-[10px] font-bold text-emerald-200 disabled:opacity-40"
             >
