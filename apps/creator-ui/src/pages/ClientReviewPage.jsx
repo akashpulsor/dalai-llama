@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Circle, CreditCard, FileText, ImageIcon, ImagePlus, Loader2, Lock, PlayCircle, Send, Sparkles, User2, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Circle, CreditCard, Download, FileText, ImageIcon, ImagePlus, Loader2, Lock, PlayCircle, Send, Sparkles, User2, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import CanvasVideoPlayer from "../components/review/CanvasVideoPlayer.jsx";
 import {
@@ -43,6 +43,25 @@ const IMAGE_KIND_LABEL = { STORYBOARD: "Storyboard", PRODUCTION: "Production", L
  * -- script, screenplay, cast, every shot's images -- and, once locked, a chat box below the shot
  * images for the client to suggest changes.
  */
+/** Saves the paid film to the client's device. A cross-origin fetch the browser refuses falls back
+ * to opening the file in a new tab, where it can be saved. */
+async function saveFilm(url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const objectUrl = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = "final-video.mp4";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(objectUrl);
+  } catch {
+    window.open(url, "_blank", "noopener");
+  }
+}
+
 export default function ClientReviewPage() {
   const { token } = useParams();
   const navigate = useNavigate();
@@ -180,9 +199,31 @@ export default function ClientReviewPage() {
               <div className="creator-panel mb-4 p-6">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <p className="text-[11px] font-extrabold uppercase tracking-widest text-purple-300">Final video</p>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-400/25 bg-slate-500/10 px-2.5 py-1 text-[10.5px] font-bold text-slate-300">
-                    <Lock size={11} /> Preview only
-                  </span>
+                  {finalVideo.downloadUrl ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => saveFilm(finalVideo.downloadUrl)}
+                        className="creator-primary inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-bold text-white"
+                      >
+                        <Download size={13} /> Download video
+                      </button>
+                      <button
+                        type="button"
+                        disabled={startingNextBrief}
+                        onClick={handleStartNextBrief}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/10 px-3 py-2 text-[12px] font-bold text-purple-100 disabled:opacity-60"
+                      >
+                        {startingNextBrief ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />}
+                        Start your next brief
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-400/25 bg-slate-500/10 px-2.5 py-1 text-[10.5px] font-bold text-slate-300"
+                      title="Download opens once you approve and pay for the video">
+                      <Lock size={11} /> Preview only — download after payment
+                    </span>
+                  )}
                 </div>
                 {/* Drawn to a canvas rather than given as a <video>: the cut is here to be
                     watched and commented on, not taken away. Shaped by the project's own aspect
