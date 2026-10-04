@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { api as apiSlice } from "@dalaillama/shared-store";
 import { appConfig } from "@dalaillama/shared-config";
-import { trendsFromReports } from "./trendsFromReports.js";
+import { trendMomentRequest, trendMomentsFromReports, trendsFromReports, isTrendMomentReport, TREND_MOMENT_CATEGORIES } from "./trendsFromReports.js";
 
 /**
  * The 9 real backend services (creative-planning-service, pre-production-service,
@@ -273,12 +273,21 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: () => "/creator/trend-combinations",
       providesTags: ["CreatorTrends"],
     }),
+    // Trend moments (the idea panel's tags) are trend-intelligence-service reports, one per
+    // category. Reading costs nothing; the page generates them only when none exist yet, and
+    // afterwards only when the creator presses Refresh.
     getWeeklyIdeaTags: builder.query({
-      query: () => "/creator/weekly-idea-tags",
+      query: () => ({ url: platformUrl("/trend-reports") }),
+      transformResponse: (reports) => trendMomentsFromReports(reports),
       providesTags: ["CreatorTrends"],
     }),
     refreshWeeklyIdeaTags: builder.mutation({
-      query: () => ({ url: "/creator/weekly-idea-tags/refresh", method: "POST" }),
+      async queryFn(_arg, _api, _extraOptions, baseQuery) {
+        const results = await Promise.all(TREND_MOMENT_CATEGORIES.map((category) =>
+          baseQuery({ url: platformUrl("/trend-reports"), method: "POST", body: trendMomentRequest(category) })));
+        const failed = results.find((result) => result.error);
+        return failed ? { error: failed.error } : { data: trendMomentsFromReports(results.map((result) => result.data)) };
+      },
       invalidatesTags: ["CreatorTrends"],
     }),
     getCreatorPlatforms: builder.query({
@@ -309,7 +318,7 @@ export const creatorApi = apiSlice.injectEndpoints({
     getTrends: builder.query({
       query: () => ({ url: platformUrl("/trend-reports") }),
       transformResponse: (reports, _meta, { page = 0, size = 8 } = {}) => {
-        const all = trendsFromReports(reports);
+        const all = trendsFromReports((Array.isArray(reports) ? reports : []).filter((report) => !isTrendMomentReport(report)));
         return { content: all.slice(page * size, page * size + size), totalElements: all.length,
           totalPages: Math.max(1, Math.ceil(all.length / size)), number: page, size };
       },

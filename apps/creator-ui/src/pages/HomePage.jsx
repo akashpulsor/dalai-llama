@@ -21,7 +21,6 @@ import { selectTenantId, showFlash, useGetWalletBalanceQuery } from "@dalaillama
 import {
   useCreateProjectRequirementMutation,
   useGenerateTrendReportMutation,
-  useGetVideoPricingQuoteQuery,
   useListBrandsQuery,
   useListPreProductionProjectsQuery,
   useListProjectRequirementsQuery,
@@ -149,13 +148,6 @@ export default function HomePage() {
   const [languages, setLanguages] = useState(["English"]);
   const durationSecondsNumber = Number(durationSeconds);
   const validDuration = Number.isFinite(durationSecondsNumber) && durationSecondsNumber > 0;
-  // Live estimate (platform per-second rate x seconds, plus the creator's own marginPercent from
-  // Wallet & Billing) shown while typing -- the real, authoritative price is snapshotted server-
-  // side when the requirement is actually created.
-  const { data: priceQuote } = useGetVideoPricingQuoteQuery(
-    { tenantId, durationSeconds: durationSecondsNumber },
-    { skip: !tenantId || !validDuration },
-  );
   const toggleLanguage = (language) => {
     setLanguages((current) =>
       current.includes(language) ? current.filter((entry) => entry !== language) : [...current, language],
@@ -489,14 +481,6 @@ export default function HomePage() {
                   />
                 </div>
 
-                {validDuration && priceQuote?.totalPrice != null && (
-                  <p className="mb-3 text-xs font-semibold text-emerald-300">
-                    Your cost estimate: {priceQuote.currency} {Number(priceQuote.platformCost).toFixed(2)}
-                    <span className="ml-1 font-medium text-slate-500">
-                      (for you only — the client is asked for their budget, and you set the price on the brief)
-                    </span>
-                  </p>
-                )}
 
                 <p className="mb-2 text-xs font-bold text-slate-300">Languages</p>
                 <div className="mb-3 flex flex-wrap gap-1.5">

@@ -29,6 +29,7 @@ import MotionGraphicPanel from "./MotionGraphicPanel.jsx";
 import CritiqueFindingsPanel from "./CritiqueFindingsPanel.jsx";
 import VideoStudioPanel from "../videoStudio/VideoStudioPanel.jsx";
 import ShotControlsPanel from "../videoStudio/ShotControlsPanel.jsx";
+import PromptInputsChecklist from "../videoStudio/PromptInputsChecklist.jsx";
 import ConformPanel from "../videoStudio/ConformPanel.jsx";
 import { castReaders } from "../videoStudio/castReaders.js";
 import ShotThoughtLog from "./ShotThoughtLog.jsx";
@@ -1125,6 +1126,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               under it, generating, then cutting what came back. Tools the studio and the conform
               step have replaced stay reachable, folded at the bottom. */}
           <CardGroup title="Shot">
+            <PromptInputsChecklist projectId={projectId} shotId={shot.id} />
             {isMotionGraphic && <MotionGraphicPanel shotId={shot.id} />}
             {/* The one comparison that decides whether this shot is right, stated before any panel is
                 opened: how long the shot is meant to run against how long the voice actually takes.

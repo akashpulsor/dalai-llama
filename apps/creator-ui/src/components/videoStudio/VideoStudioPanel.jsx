@@ -1,6 +1,6 @@
 import React from "react";
 import { useDispatch } from "react-redux";
-import { AlertTriangle, CheckCircle2, Circle, Clapperboard, Film, Link2, ListChecks, Loader2, RefreshCw, RotateCcw, Save, ScanSearch, ShieldCheck, Sparkles, Wand2, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clapperboard, Film, Link2, Loader2, RefreshCw, RotateCcw, Save, ScanSearch, ShieldCheck, Sparkles, Wand2, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useAnalyzeShotGenerationPlanMutation,
@@ -10,7 +10,6 @@ import {
   useDetachShotContinuationFrameMutation,
   useGenerateShotFromPlanMutation,
   useGetShotGenerationPlanQuery,
-  useGetShotPromptInputsQuery,
   useResetShotGenerationDraftMutation,
   useRetimeShotDialogueMutation,
   useSaveShotGenerationDraftMutation,
@@ -49,7 +48,6 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
   React.useEffect(() => {
     setExtracting(plan?.continuationFrame?.status === "EXTRACTING");
   }, [plan?.continuationFrame?.status]);
-  const { data: inputs, isFetching: inputsLoading, refetch: refetchInputs } = useGetShotPromptInputsQuery(args);
 
   const [analyze, analyzeState] = useAnalyzeShotGenerationPlanMutation();
   const [selectSettings, settingsState] = useSelectShotGenerationSettingsMutation();
@@ -174,27 +172,6 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
         {duration != null && <Chip tone="purple">Generating {duration}s{fps ? ` · ${fps} fps` : ""}</Chip>}
         <Chip>{plan.modelId}{caps.declared === false ? " (limits not declared)" : ""}</Chip>
       </div>
-
-      {/* What the prompt is built from */}
-      <Section title="What the prompt is built from" hint="Everything the video model is given for this shot. Missing items are simply not in the prompt.">
-        {inputsLoading && !inputs && <p className="flex items-center gap-2 text-[10px] text-slate-400"><Loader2 size={11} className="animate-spin" /> Checking…</p>}
-        {inputs && (
-          <ul className="grid grid-cols-1 gap-1 md:grid-cols-2">
-            {inputs.map((item) => (
-              <li key={item.key} className="flex gap-1.5 text-[11px]" title={item.detail}>
-                {item.present ? <CheckCircle2 size={12} className="mt-0.5 shrink-0 text-emerald-300" /> : <Circle size={12} className="mt-0.5 shrink-0 text-slate-600" />}
-                <span>
-                  <span className={item.present ? "font-bold text-slate-200" : "font-bold text-slate-500"}>{item.label}</span>
-                  <span className="block text-[10px] text-slate-500 line-clamp-2">{item.detail}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {!inputs && !inputsLoading && (
-          <button type="button" onClick={refetchInputs} className="flex items-center gap-1 text-[10px] font-bold text-purple-300"><ListChecks size={11} /> Check inputs</button>
-        )}
-      </Section>
 
       {/* B. AI recommendation */}
       <Section title="1 · Analyse the shot" hint="Finds every planned action and how short the clip can be without losing any.">

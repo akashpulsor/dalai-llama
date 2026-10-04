@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { trendsFromReports } from "./trendsFromReports.js";
+import { isTrendMomentReport, trendMomentRequest, trendMomentsFromReports, trendsFromReports } from "./trendsFromReports.js";
 
 const report = {
   id: "r1",
@@ -29,4 +29,22 @@ test("no reports, or a bad payload, is no trends", () => {
   assert.deepEqual(trendsFromReports([]), []);
   assert.deepEqual(trendsFromReports(undefined), []);
   assert.deepEqual(trendsFromReports([{ id: "r2" }]), []);
+});
+
+test("trend moments: newest report per category, empty where none was generated", () => {
+  const older = { id: "old", industry: "trend-moments:sports", createdAt: "2026-10-01T00:00:00Z", predictions: [{ title: "Old" }] };
+  const newer = { id: "new", industry: "trend-moments:sports", createdAt: "2026-10-04T00:00:00Z",
+    predictions: [{ title: "Asia Cup final", summary: "Fans react", suggestedTags: ["#AsiaCup"] }] };
+
+  const { categories } = trendMomentsFromReports([older, newer, report]);
+
+  const sports = categories.find((c) => c.category === "sports");
+  assert.deepEqual(sports.ideas, [{ id: "new:0", title: "Asia Cup final", prompt: "Fans react", tags: ["#AsiaCup"] }]);
+  assert.deepEqual(categories.find((c) => c.category === "history").ideas, []);
+  assert.equal(categories.length, 5);
+});
+
+test("a trend-moment report is told apart from a planner trend report", () => {
+  assert.equal(isTrendMomentReport(trendMomentRequest({ category: "bollywood", label: "Bollywood" })), true);
+  assert.equal(isTrendMomentReport(report), false);
 });
