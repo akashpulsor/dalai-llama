@@ -25,7 +25,6 @@ import {
 } from "../../api/creatorEndpoints.js";
 import ShotVideoCard from "./ShotVideoCard.jsx";
 import FilmAssemblyBar from "./FilmAssemblyBar.jsx";
-import GenerationControlsConsole from "../videoStudio/GenerationControlsConsole.jsx";
 
 const dialogueTextForShot = (shot) => (
   shot?.voiceOver || (shot?.shotType === "DIALOGUE" ? shot?.scriptLine : "") || ""
@@ -744,8 +743,6 @@ export default function VideoGenerationSection({ projectId }) {
           Voice: ElevenLabs — cloned automatically when a character has an uploaded actor sample, otherwise direct TTS with the built-in voice you picked in Cast.
         </p>
       </div>
-
-      <GenerationControlsConsole projectId={projectId} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {shots.map((shot, index) => (

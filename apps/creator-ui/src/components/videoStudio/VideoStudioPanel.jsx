@@ -28,7 +28,6 @@ import {
   savedPromptText,
   staleness,
 } from "./studioState.js";
-import ShotControlsPanel from "./ShotControlsPanel.jsx";
 
 /**
  * The video studio for one shot: analyse it, choose how long to generate it for, lay its action out
@@ -175,8 +174,6 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
         {duration != null && <Chip tone="purple">Generating {duration}s{fps ? ` · ${fps} fps` : ""}</Chip>}
         <Chip>{plan.modelId}{caps.declared === false ? " (limits not declared)" : ""}</Chip>
       </div>
-
-      <ShotControlsPanel projectId={projectId} shotId={shot.id} />
 
       {/* What the prompt is built from */}
       <Section title="What the prompt is built from" hint="Everything the video model is given for this shot. Missing items are simply not in the prompt.">

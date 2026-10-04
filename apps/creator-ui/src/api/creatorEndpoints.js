@@ -4086,6 +4086,15 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: ({ projectId, shotId }) => ({ url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-plan/inputs`) }),
       providesTags: (_r, _e, { shotId }) => [{ type: "CreatorHomeProjects", id: `prompt-inputs-${shotId}` }],
     }),
+    // Slow (with frame interpolation) or trim the shot's newest clip to a length, in post-production.
+    // Queued; poll getShotConform with the returned requestId.
+    requestShotConform: builder.mutation({
+      query: ({ projectId, shotId, targetSeconds, interpolate }) => ({
+        url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/conform`),
+        method: "POST",
+        body: { targetSeconds, interpolate },
+      }),
+    }),
     // A post-production conform: the clip slowed (with frame interpolation) or trimmed to its planned
     // length. Queued; COMPLETED means the planned-length cut is now the shot's clip.
     getShotConform: builder.query({
@@ -4838,6 +4847,7 @@ export const {
   useGenerateShotFromPlanMutation,
   useGetShotPromptInputsQuery,
   useLazyGetShotConformQuery,
+  useRequestShotConformMutation,
   useGetGenerationControlsQuery,
   useGetShotGenerationControlsQuery,
   useUpdateShotGenerationControlsMutation,

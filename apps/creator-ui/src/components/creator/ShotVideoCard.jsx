@@ -28,6 +28,8 @@ import ShotCanvasPlayer from "./ShotCanvasPlayer.jsx";
 import MotionGraphicPanel from "./MotionGraphicPanel.jsx";
 import CritiqueFindingsPanel from "./CritiqueFindingsPanel.jsx";
 import VideoStudioPanel from "../videoStudio/VideoStudioPanel.jsx";
+import ShotControlsPanel from "../videoStudio/ShotControlsPanel.jsx";
+import ConformPanel from "../videoStudio/ConformPanel.jsx";
 import { castReaders } from "../videoStudio/castReaders.js";
 import ShotThoughtLog from "./ShotThoughtLog.jsx";
 import ProCta from "../common/ProCta.jsx";
@@ -1178,6 +1180,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
           </CardGroup>
 
           <CardGroup title="Generate" hint={hasClip && !regenerating ? "This shot has a clip. Regenerate to open the video studio again." : undefined}>
+            <ShotControlsPanel projectId={projectId} shotId={shot.id} />
             {/* The video studio replaces prepare-then-approve for a shot with no clip yet, or one being
                 redone: analyse, choose settings, build the timeline, read and correct the prompt, then
                 generate exactly that text. Every step is its own button, so no failure leaves the shot
@@ -1216,7 +1219,8 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
           </CardGroup>
 
           {hasClip && (
-            <CardGroup title="After generation" hint="Cuts of the clip, and repairs.">
+            <CardGroup title="After generation" hint="Slow it to length, cuts of the clip, and repairs.">
+              <ConformPanel shot={shot} projectId={projectId} clipSeconds={activeClip?.durationSeconds ?? video?.durationSeconds} />
               {/* A generated shot was a dead end: the card showed the clip and nothing else, so a shot
                   that came back wrong -- the line cut off, the wrong duration, a rewritten line since
                   saved -- could only be fixed by never having generated it. Regenerating builds a fresh
