@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { selectTenantId, showFlash, useGetWalletBalanceQuery } from "@dalaillama/shared-store";
 import {
+  useGetProductionCostEstimateQuery,
   useCreateProjectRequirementMutation,
   useGenerateTrendReportMutation,
   useListBrandsQuery,
@@ -148,6 +149,11 @@ export default function HomePage() {
   const [languages, setLanguages] = useState(["English"]);
   const durationSecondsNumber = Number(durationSeconds);
   const validDuration = Number.isFinite(durationSecondsNumber) && durationSecondsNumber > 0;
+  // Tentative production cost for this length, at the models' real rates -- for the creator only.
+  const { data: costEstimate } = useGetProductionCostEstimateQuery(
+    { tenantId, durationSeconds: durationSecondsNumber },
+    { skip: !tenantId || !validDuration },
+  );
   const toggleLanguage = (language) => {
     setLanguages((current) =>
       current.includes(language) ? current.filter((entry) => entry !== language) : [...current, language],
@@ -481,6 +487,14 @@ export default function HomePage() {
                   />
                 </div>
 
+                {validDuration && costEstimate?.low != null && (
+                  <p className="mb-3 text-xs font-semibold text-emerald-300">
+                    Tentative production cost: {costEstimate.currency} {Number(costEstimate.low).toFixed(0)}–{Number(costEstimate.high).toFixed(0)}
+                    <span className="ml-1 font-medium text-slate-500">
+                      (for you only -- what this length takes to make at the models' rates; the client gives a budget and you set the price)
+                    </span>
+                  </p>
+                )}
 
                 <p className="mb-2 text-xs font-bold text-slate-300">Languages</p>
                 <div className="mb-3 flex flex-wrap gap-1.5">

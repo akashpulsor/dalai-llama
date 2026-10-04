@@ -270,19 +270,7 @@ export default function ClientFundingPage() {
                         <p className="text-[13px] font-bold text-slate-100">{data.languages.join(", ")}</p>
                       </div>
                     )}
-                    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-3">
-                      <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Your budget</p>
-                      {data.clientBudget != null ? (
-                        <p className="text-[13px] font-bold text-slate-100">{rupee(data.clientBudget, data.clientBudgetCurrency)}</p>
-                      ) : (
-                        <button type="button" onClick={startEditing} className="text-[12px] font-bold text-purple-300 underline">
-                          Tell your creator what you want to spend
-                        </button>
-                      )}
-                      {data.quotedTotalPrice == null && (
-                        <p className="mt-1 text-[10px] font-semibold text-slate-500">Your creator sets the price from your budget. You can pay once they have.</p>
-                      )}
-                    </div>
+                    <BudgetQuote shareToken={shareToken} data={data} />
                     {data.quotedTotalPrice != null && (
                       <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-3">
                         {/* Show the amount actually charged as the prominent number -- the client
@@ -491,6 +479,62 @@ export default function ClientFundingPage() {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/** The client's quote for the video: one box and a Save button, always on the page -- not behind
+ * the edit form. The creator reads it and sets the price; read-only once the brief is funded. */
+function BudgetQuote({ shareToken, data }) {
+  const dispatch = useDispatch();
+  const [updateFromClient, { isLoading: saving }] = useUpdateRequirementFromClientMutation();
+  const [budget, setBudget] = useState(data.clientBudget ?? "");
+  React.useEffect(() => { setBudget(data.clientBudget ?? ""); }, [data.clientBudget]);
+  const amount = Number(budget);
+  const changed = amount > 0 && amount !== Number(data.clientBudget);
+
+  const save = async () => {
+    try {
+      await updateFromClient({ shareToken, clientBudget: amount }).unwrap();
+      dispatch(showFlash({ message: "Saved — your creator will set the price from your budget", type: "success" }));
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not save your budget", type: "error" }));
+    }
+  };
+
+  return (
+    <div className="col-span-2 rounded-lg border border-purple-400/30 bg-purple-500/[0.06] px-3.5 py-3">
+      <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-purple-200">Your quote for this video</p>
+      {data.funded ? (
+        <p className="text-[13px] font-bold text-slate-100">{data.clientBudget != null ? rupee(data.clientBudget, data.clientBudgetCurrency) : "—"}</p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[13px] font-bold text-slate-300">₹</span>
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={budget}
+            onChange={(event) => setBudget(event.target.value)}
+            placeholder="What you want to pay"
+            className="creator-input w-44 px-3 py-2 text-[13px] font-bold"
+          />
+          <button
+            type="button"
+            onClick={save}
+            disabled={!changed || saving}
+            className="creator-primary flex items-center gap-1.5 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50"
+          >
+            {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+            {data.clientBudget != null ? "Update quote" : "Save quote"}
+          </button>
+        </div>
+      )}
+      <p className="mt-1.5 text-[10px] font-semibold text-slate-400">
+        {data.quotedTotalPrice == null
+          ? "Your creator sets the price from your quote. You can pay once they have."
+          : `Your creator's price is ${rupee(data.quotedTotalPrice, data.quotedCurrency)}.`}
+      </p>
     </div>
   );
 }

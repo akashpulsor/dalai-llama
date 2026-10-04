@@ -255,6 +255,13 @@ export const creatorApi = apiSlice.injectEndpoints({
     // live price estimate (platform per-second rate x seconds, plus this creator's own
     // marginPercent, same field updateOrganization above writes) shown while a creator is
     // typing a duration into the Start New Idea modal, before they submit.
+    // Tentative production cost range for a length, priced at the models' real rates (billing
+    // reads llm-gateway's rate card). Creator-only guidance; the client is asked for a budget.
+    getProductionCostEstimate: builder.query({
+      query: ({ tenantId, durationSeconds }) => ({
+        url: `/billing/${tenantId}/video-pricing/estimate?durationSeconds=${durationSeconds}`,
+      }),
+    }),
     getVideoPricingQuote: builder.query({
       query: ({ tenantId, durationSeconds }) => ({
         url: `/billing/${tenantId}/video-pricing/quote?durationSeconds=${durationSeconds}`,
@@ -4437,6 +4444,7 @@ export const {
   useUpdateOrganizationMutation,
   useListWalletTransactionsQuery,
   useGetVideoPricingQuoteQuery,
+  useGetProductionCostEstimateQuery,
   useListProjectRequirementsQuery,
   useGetProjectRequirementProductQuery,
   useListProjectRequirementProductImagesQuery,
