@@ -37,7 +37,7 @@ export default function ShotControlsPanel({ projectId, shotId }) {
   };
 
   return (
-    <details className="rounded-md border border-white/10 bg-white/[0.02] p-2.5">
+    <details open className="rounded-md border border-white/10 bg-white/[0.02] p-2.5">
       <summary className="flex cursor-pointer items-center gap-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">
         <SlidersHorizontal size={11} /> This shot's generation controls
         {data && (
