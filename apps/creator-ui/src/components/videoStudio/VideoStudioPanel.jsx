@@ -251,7 +251,11 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
         </div>
         {caps.supportedFps.length === 1 && <p className="text-[10px] text-slate-500">{plan.modelId} renders at {caps.supportedFps[0]} fps only; it takes no frame rate as input.</p>}
         {duration != null && plan.plannedDurationSeconds != null && duration < Number(plan.plannedDurationSeconds) && (
-          <p className="text-[10px] text-slate-400">Generated shorter than its planned {formatSeconds(plan.plannedDurationSeconds)}s. Every action is still in the clip; bring it back to length later in post-production.</p>
+          <p className="text-[10px] text-slate-400">
+            Generated at {duration}s, then slowed to the planned {formatSeconds(plan.plannedDurationSeconds)}s in post-production
+            ({(Number(plan.plannedDurationSeconds) / duration).toFixed(1)}× slower, frames interpolated) with the line and music laid on at normal speed.
+            {Number(plan.plannedDurationSeconds) / duration > 2 && " More than 2× slower can look unnatural even with interpolation."}
+          </p>
         )}
         <IssueList tone="amber" issues={settings.warnings} />
         <ErrorLine message={stepError.settings} />

@@ -19,6 +19,7 @@ import {
   useListProjectClipsQuery,
   useListProjectShotVideosQuery,
   useLazyGetVideoGenJobQuery,
+  useLazyGetShotConformQuery,
   useUpdateProjectConfigMutation,
   useUpdateShotScenePromptMutation,
 } from "../../api/creatorEndpoints.js";
@@ -157,7 +158,7 @@ export default function VideoGenerationSection({ projectId }) {
   // for it. A shot slowed to fit, dubbed, mixed or hand-edited lives in post-production-service;
   // video-generation-service still reports the file it rendered and has no way to know it was
   // superseded. The card plays this when there is one, so accepting a cut is visible immediately.
-  const { data: projectClips = [] } = useListProjectClipsQuery(projectId, { skip: !projectId });
+  const { data: projectClips = [], refetch: refetchProjectClips } = useListProjectClipsQuery(projectId, { skip: !projectId });
   const activeClips = React.useMemo(
     () => Object.fromEntries(projectClips.filter((clip) => clip?.shotId).map((clip) => [clip.shotId, clip])),
     [projectClips],
@@ -194,6 +195,7 @@ export default function VideoGenerationSection({ projectId }) {
   const [approveJob] = useApproveVideoGenJobMutation();
   const [rejectJob] = useRejectVideoGenJobMutation();
   const [triggerGetVideoGenJob] = useLazyGetVideoGenJobQuery();
+  const [triggerGetShotConform] = useLazyGetShotConformQuery();
 
   // FeatureFlags on the wire is FlagState ("ON"/"OFF") per field, not a boolean map -- undefined
   // stays undefined so the backend falls back to the project/effective default instead of forcing
@@ -343,6 +345,35 @@ export default function VideoGenerationSection({ projectId }) {
     setOpenShotId(shotId);
   };
 
+  /** A clip generated shorter (or longer) than planned is conformed in post-production; this watches
+   * that until the planned-length cut is the shot's clip, then refreshes the player. */
+  const followConform = async (shotId, job) => {
+    dispatch(showFlash({
+      message: `Generated ${job.durationSeconds}s — slowing it to the planned ${job.plannedDurationSeconds}s in post-production…`,
+      type: "info",
+    }));
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => { setTimeout(resolve, 5000); });
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const conform = await triggerGetShotConform({ projectId, shotId, requestId: job.conformRequestId }).unwrap();
+        if (conform.status === "COMPLETED") {
+          dispatch(showFlash({ message: `Conformed to ${job.plannedDurationSeconds}s`, type: "success" }));
+          refetchShotVideos();
+          refetchProjectClips();
+          return;
+        }
+        if (conform.status === "FAILED") {
+          dispatch(showFlash({ message: `Kept the ${job.durationSeconds}s clip — conforming failed: ${conform.error}`, type: "error" }));
+          return;
+        }
+      } catch {
+        // A blip while polling is not an answer; keep watching.
+      }
+    }
+  };
+
   /** The studio queued a render. Watch it the same way an approved job is watched, so the card
    * shows it working and then plays it. */
   const handleStudioGenerated = async (shotId, job) => {
@@ -355,6 +386,9 @@ export default function VideoGenerationSection({ projectId }) {
       if (settled) {
         if (settled.status === "COMPLETED") setRegenerating((r) => ({ ...r, [shotId]: false }));
         reportJobOutcome(settled);
+        if (settled.status === "COMPLETED" && settled.conformRequestId) {
+          await followConform(shotId, settled);
+        }
       } else {
         dispatch(showFlash({
           message: "Still rendering — this shot is taking a while. It will appear here when it finishes.",

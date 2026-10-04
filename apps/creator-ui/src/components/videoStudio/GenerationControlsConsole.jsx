@@ -35,6 +35,18 @@ const SWITCHES = [
     off: "You can queue the same shot again -- each render is billed.",
   },
   {
+    key: "conformToPlannedDuration",
+    label: "Conform clips to the planned length",
+    on: "A clip generated shorter is slowed to the planned length in post-production (longer ones are trimmed), with its line and music laid on.",
+    off: "Clips stay at the length they were generated.",
+  },
+  {
+    key: "interpolateWhenSlowing",
+    label: "Interpolate frames when slowing down",
+    on: "New in-between frames are synthesised, so slowed motion stays smooth.",
+    off: "Frames are held longer -- cheaper to process, but motion judders.",
+  },
+  {
     key: "attachPreviousLastFrame",
     label: "Start each shot from the previous shot's last frame",
     on: "Attaches the previous shot's last frame when it has a video; skipped for the first shot.",
