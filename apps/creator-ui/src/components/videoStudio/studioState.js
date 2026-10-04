@@ -60,6 +60,9 @@ export function generateBlockers(plan, editorText) {
   if (plan.settings?.generationDurationSeconds == null) reasons.push("Choose a generation duration.");
   const text = editorText ?? "";
   if (!text.trim()) reasons.push("Write or compose a prompt first.");
+  if (plan.continuationFrame?.status === "EXTRACTING") {
+    reasons.push("The previous shot's last frame is still being taken -- a few seconds.");
+  }
   const max = plan.prompt?.maxChars;
   if (max && text.length > max) reasons.push(`The prompt is ${text.length} characters; the model takes ${max}.`);
   return reasons;

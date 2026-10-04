@@ -1,6 +1,6 @@
 import React from "react";
 import { useDispatch } from "react-redux";
-import { AlertTriangle, CheckCircle2, Clapperboard, Film, Link2, Loader2, RefreshCw, RotateCcw, Save, ScanSearch, ShieldCheck, Sparkles, Wand2, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Circle, Clapperboard, Film, Link2, ListChecks, Loader2, RefreshCw, RotateCcw, Save, ScanSearch, ShieldCheck, Sparkles, Wand2, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useAnalyzeShotGenerationPlanMutation,
@@ -10,6 +10,7 @@ import {
   useDetachShotContinuationFrameMutation,
   useGenerateShotFromPlanMutation,
   useGetShotGenerationPlanQuery,
+  useGetShotPromptInputsQuery,
   useResetShotGenerationDraftMutation,
   useRetimeShotDialogueMutation,
   useSaveShotGenerationDraftMutation,
@@ -39,7 +40,16 @@ import {
 export default function VideoStudioPanel({ shot, projectId, previousShot, generating, onGenerated }) {
   const dispatch = useDispatch();
   const args = { projectId, shotId: shot.id };
-  const { data: plan, isLoading, isFetching, error: loadError, refetch } = useGetShotGenerationPlanQuery(args);
+  // Polled only while post-production is taking the previous shot's last frame; reading the plan is
+  // what picks the finished frame up.
+  const [extracting, setExtracting] = React.useState(false);
+  const { data: plan, isLoading, isFetching, error: loadError, refetch } = useGetShotGenerationPlanQuery(args, {
+    pollingInterval: extracting ? 3000 : 0,
+  });
+  React.useEffect(() => {
+    setExtracting(plan?.continuationFrame?.status === "EXTRACTING");
+  }, [plan?.continuationFrame?.status]);
+  const { data: inputs, isFetching: inputsLoading, refetch: refetchInputs } = useGetShotPromptInputsQuery(args);
 
   const [analyze, analyzeState] = useAnalyzeShotGenerationPlanMutation();
   const [selectSettings, settingsState] = useSelectShotGenerationSettingsMutation();
@@ -71,6 +81,8 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
     try {
       const result = await action().unwrap();
       if (success) dispatch(showFlash({ message: success, type: "success" }));
+      // Every step can change what the prompt is built from.
+      refetchInputs();
       return result;
     } catch (error) {
       const message = error?.data?.message || error?.data?.error || "That did not work -- try again.";
@@ -163,6 +175,27 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
         <Chip>{plan.modelId}{caps.declared === false ? " (limits not declared)" : ""}</Chip>
       </div>
 
+      {/* What the prompt is built from */}
+      <Section title="What the prompt is built from" hint="Everything the video model is given for this shot. Missing items are simply not in the prompt.">
+        {inputsLoading && !inputs && <p className="flex items-center gap-2 text-[10px] text-slate-400"><Loader2 size={11} className="animate-spin" /> Checking…</p>}
+        {inputs && (
+          <ul className="grid grid-cols-1 gap-1 md:grid-cols-2">
+            {inputs.map((item) => (
+              <li key={item.key} className="flex gap-1.5 text-[11px]" title={item.detail}>
+                {item.present ? <CheckCircle2 size={12} className="mt-0.5 shrink-0 text-emerald-300" /> : <Circle size={12} className="mt-0.5 shrink-0 text-slate-600" />}
+                <span>
+                  <span className={item.present ? "font-bold text-slate-200" : "font-bold text-slate-500"}>{item.label}</span>
+                  <span className="block text-[10px] text-slate-500 line-clamp-2">{item.detail}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {!inputs && !inputsLoading && (
+          <button type="button" onClick={refetchInputs} className="flex items-center gap-1 text-[10px] font-bold text-purple-300"><ListChecks size={11} /> Check inputs</button>
+        )}
+      </Section>
+
       {/* B. AI recommendation */}
       <Section title="1 · Analyse the shot" hint="Finds every planned action and how short the clip can be without losing any.">
         <div className="flex flex-wrap items-center gap-2">
@@ -228,13 +261,11 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
           {line && duration != null && (
             <StepButton subtle onClick={handleRephrase} busy={retimeState.isLoading} icon={Wand2}>Rephrase line to fit {duration}s</StepButton>
           )}
-          {previousShot ? (
-            plan.continuationFrame ? null : (
-              <StepButton subtle onClick={() => run("continuation", () => attachFrame(args), "Last frame attached")} busy={attachState.isLoading} icon={Link2}>
-                Continue from shot {previousShot.shotNumber}'s last frame
-              </StepButton>
-            )
-          ) : null}
+          {previousShot && !plan.continuationFrame && (
+            <StepButton subtle onClick={() => run("continuation", () => attachFrame(args))} busy={attachState.isLoading} icon={Link2}>
+              Continue from shot {previousShot.shotNumber}'s last frame
+            </StepButton>
+          )}
         </div>
         <ErrorLine message={stepError.rephrase} />
         <ErrorLine message={stepError.continuation} />
@@ -249,7 +280,21 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
             </div>
           </div>
         )}
-        {plan.continuationFrame && (
+        {plan.continuationFrame?.status === "EXTRACTING" && (
+          <p className="flex items-center gap-2 text-[10px] font-semibold text-slate-300">
+            <Loader2 size={12} className="animate-spin" /> Taking the previous shot's last frame… this usually takes a few seconds.
+          </p>
+        )}
+        {plan.continuationFrame?.status === "FAILED" && (
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-400/25 bg-amber-500/[0.06] p-2 text-[10px] text-amber-100">
+            <span className="flex-1">Could not take the last frame: {plan.continuationFrame.error}</span>
+            <button type="button" className="font-bold underline" disabled={attachState.isLoading}
+              onClick={() => run("continuation", () => attachFrame({ ...args, sourceShotId: plan.continuationFrame.sourceShotId }))}>Try again</button>
+            <button type="button" className="font-bold underline" disabled={detachState.isLoading}
+              onClick={() => run("continuation", () => detachFrame(args))}>Dismiss</button>
+          </div>
+        )}
+        {plan.continuationFrame?.status === "READY" && (
           <div className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] p-2">
             {plan.continuationFrame.imageUrl && <img src={plan.continuationFrame.imageUrl} alt="Previous shot's last frame" className="h-14 w-auto rounded" />}
             <p className="flex-1 text-[10px] text-slate-300">Opens on the previous shot's last frame ({formatSeconds((plan.continuationFrame.timestampMs ?? 0) / 1000)}s) and finishes that movement first.</p>

@@ -82,6 +82,11 @@ test("generate is blocked only by what would certainly fail", () => {
   assert.deepEqual(generateBlockers(stale, "0-4s he stands."), []);
 });
 
+test("a last frame still being taken holds generation until it arrives; a failed one does not", () => {
+  assert.ok(generateBlockers(plan({ continuationFrame: { status: "EXTRACTING" } }), "0-6s.").some((r) => r.includes("last frame")));
+  assert.deepEqual(generateBlockers(plan({ continuationFrame: { status: "FAILED", error: "no video" } }), "0-6s."), []);
+});
+
 test("seconds read as the timeline shows them", () => {
   assert.equal(formatSeconds(3), "3");
   assert.equal(formatSeconds("3.500"), "3.5");

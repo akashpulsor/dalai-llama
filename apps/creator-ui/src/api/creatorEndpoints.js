@@ -4069,6 +4069,31 @@ export const creatorApi = apiSlice.injectEndpoints({
       }),
       onQueryStarted: cacheGenerationPlan,
     }),
+    // What the shot's video prompt is built from, item by item (creative direction, script, frames,
+    // lighting...), each present or not with what it says.
+    getShotPromptInputs: builder.query({
+      query: ({ projectId, shotId }) => ({ url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-plan/inputs`) }),
+      providesTags: (_r, _e, { shotId }) => [{ type: "CreatorHomeProjects", id: `prompt-inputs-${shotId}` }],
+    }),
+    // The project's generation controls console: each render-path step as a switch.
+    getGenerationControls: builder.query({
+      query: (projectId) => ({ url: platformUrl(`/scenes/projects/${projectId}/generation-controls`) }),
+    }),
+    updateGenerationControls: builder.mutation({
+      query: ({ projectId, ...controls }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/generation-controls`),
+        method: "PUT",
+        body: controls,
+      }),
+      async onQueryStarted({ projectId }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(creatorApi.util.upsertQueryData("getGenerationControls", projectId, data));
+        } catch {
+          // The caller reports the error.
+        }
+      },
+    }),
     // Sends `prompt` exactly as typed. Answers once the render is queued, with the job to poll.
     generateShotFromPlan: builder.mutation({
       query: ({ projectId, shotId, prompt }) => ({
@@ -4774,6 +4799,9 @@ export const {
   useAttachShotContinuationFrameMutation,
   useDetachShotContinuationFrameMutation,
   useGenerateShotFromPlanMutation,
+  useGetShotPromptInputsQuery,
+  useGetGenerationControlsQuery,
+  useUpdateGenerationControlsMutation,
 } = creatorApi;
  
  
