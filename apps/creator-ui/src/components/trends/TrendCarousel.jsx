@@ -313,7 +313,7 @@ export default function TrendCarousel({
           <div className="rounded-lg border border-white/10 bg-black/20 p-4">
             {trends.length === 0 && (
               <p className="text-xs font-semibold text-slate-400">
-                No live trends to show for this platform and category -- write your own idea instead.
+                No trend reports yet. Use Predict trends to generate one for this category, or write your own idea.
               </p>
             )}
             <div className="flex flex-wrap items-center gap-2.5">

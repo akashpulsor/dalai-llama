@@ -3654,7 +3654,6 @@ export default function PlannerPage() {
       return;
     }
     if (!canRunPaidModelAction("AI trend prediction")) return;
-    let usedFallbackJob = false;
     try {
       const result = await predictTrends({
         platform: normalizedFilters.platform,
@@ -3683,21 +3682,17 @@ export default function PlannerPage() {
         ]);
         setPredictionJobId(null);
       } else {
-        setPredictionJobId(result.jobId || "job-predict-trends-mock");
+        flash("The trend report came back with no predictions -- try a broader category", "error");
       }
     } catch (error) {
       if (isInsufficientBalanceError(error)) {
         openRechargeForPaidAction("AI trend prediction");
         return;
       }
-      usedFallbackJob = true;
-      setPredictionJobId("job-predict-trends-mock");
+      flash(error?.data?.message || "Could not generate a trend report", "error");
+      return;
     }
-    addActivity("Trend prediction started", `${filterLabels.category[normalizedFilters.category] || normalizedFilters.category} - ${country.label}`);
-    flash(
-      usedFallbackJob ? "Trend prediction API failed; using mock trend job." : "Predicting trends from recent signal dumps",
-      usedFallbackJob ? "warning" : "info"
-    );
+    addActivity("Trend report generated", `${filterLabels.category[normalizedFilters.category] || normalizedFilters.category} - ${country.label}`);
   };
 
   const handleFilterChange = (nextFilters) => {
@@ -10965,9 +10960,8 @@ function normalizeTrendResult(data, fallbackPage = 0, fallbackSize = 8) {
 
 function normalizeTrend(trend) {
   const id = String(trend?.id || trend?.trendId || `trend-${Math.random().toString(36).slice(2)}`);
-  const score = numberValue(trend?.score ?? trend?.confidenceScore, 62);
-  const velocity = numberValue(trend?.velocity, Math.max(7, Math.round(score / 8)));
-  const hashtags = trend?.hashtags || trend?.tags || trend?.suggestedTags || buildHashtags(trend?.category, trend?.title);
+  const score = numberValue(trend?.score ?? trend?.confidenceScore, 0);
+  const hashtags = trend?.hashtags || trend?.tags || trend?.suggestedTags || [];
 
   return {
     ...trend,
@@ -10978,10 +10972,10 @@ function normalizeTrend(trend) {
     status: trend?.status || statusFromScore(score),
     hashtags,
     tags: trend?.tags || hashtags,
-    reels: trend?.reels || formatCompactNumber(score * 140),
-    reelsGrowth: trend?.reelsGrowth || `+${Math.max(4, Math.round(velocity))}%`,
-    engagement: trend?.engagement || `${Math.max(3.8, Math.min(12.5, score / 10)).toFixed(1)}%`,
-    engagementGrowth: trend?.engagementGrowth || `+${Math.max(3, Math.round(velocity / 1.4))}%`,
+    reels: trend?.reels,
+    reelsGrowth: trend?.reelsGrowth,
+    engagement: trend?.engagement,
+    engagementGrowth: trend?.engagementGrowth,
     imageUrl: trend?.imageUrl || trend?.thumbnailUrl || trend?.mediaUrl,
   };
 }
@@ -15492,12 +15486,6 @@ function buildPendingTrendInsight(trend) {
   };
 }
 
-function buildHashtags(category, title) {
-  const safeCategory = category ? String(category).replace(/[^a-z0-9]/gi, "") : "CreatorTrend";
-  const safeTitle = title ? String(title).split(/\s+/).slice(0, 2).join("").replace(/[^a-z0-9]/gi, "") : "Shorts";
-  return [`#${safeCategory}`, `#${safeTitle}`, "#Trend"];
-}
-
 function statusFromScore(score) {
   if (score >= 82) return "Very Hot";
   if (score >= 68) return "Hot";
@@ -15507,12 +15495,6 @@ function statusFromScore(score) {
 function numberValue(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
-}
-
-function formatCompactNumber(value) {
-  const number = Math.max(0, Number(value) || 0);
-  if (number >= 1000) return `${(number / 1000).toFixed(1)}K`;
-  return `${Math.round(number)}`;
 }
 
 function timeframeToDays(timeframe) {

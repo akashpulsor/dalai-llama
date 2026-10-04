@@ -52,12 +52,12 @@ export default function TrendCard({ trend, selected, onClick }) {
         <div className="metric-tile p-2">
           <p className="text-[10px] font-medium text-slate-400">Trend Score</p>
           <p className="text-sm font-bold text-white">{score ? score.toFixed(0) : trend.reels}</p>
-          <p className="flex items-center gap-1 text-[10px] font-semibold text-emerald-300"><TrendingUp size={10} /> {trend.reelsGrowth}</p>
+          {trend.reelsGrowth && <p className="flex items-center gap-1 text-[10px] font-semibold text-emerald-300"><TrendingUp size={10} /> {trend.reelsGrowth}</p>}
         </div>
         <div className="metric-tile p-2">
-          <p className="text-[10px] font-medium text-slate-400">Velocity</p>
-          <p className="text-sm font-bold text-white">{velocity ? velocity.toFixed(1) : trend.engagement}</p>
-          <p className="flex items-center gap-1 text-[10px] font-semibold text-emerald-300"><TrendingUp size={10} /> {trend.engagementGrowth}</p>
+          <p className="text-[10px] font-medium text-slate-400">{velocity ? "Velocity" : "Evidence"}</p>
+          <p className="text-sm font-bold text-white">{velocity ? velocity.toFixed(1) : trend.engagement || (trend.evidenceType === "EVIDENCE_BACKED" ? "Backed" : trend.evidenceType ? "Heuristic" : "—")}</p>
+          {trend.engagementGrowth && <p className="flex items-center gap-1 text-[10px] font-semibold text-emerald-300"><TrendingUp size={10} /> {trend.engagementGrowth}</p>}
         </div>
       </div>
     </button>

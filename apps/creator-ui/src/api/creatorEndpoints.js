@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { api as apiSlice } from "@dalaillama/shared-store";
 import { appConfig } from "@dalaillama/shared-config";
+import { trendsFromReports } from "./trendsFromReports.js";
 
 /**
  * The 9 real backend services (creative-planning-service, pre-production-service,
@@ -303,11 +304,15 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: () => "/creator/ai-pricing/provider-credits",
       providesTags: ["CreatorAiProviders"],
     }),
+    // Trends come from trend-intelligence-service: the tenant's trend reports (GET /v1/trend-reports,
+    // newest first), each prediction shown as one trend. Paged here; the service returns all reports.
     getTrends: builder.query({
-      query: ({ platform = "instagram_reels", category = "fitness", timeframe = "7d", days, country = "IN", page = 0, size = 8 } = {}) => ({
-        url: "/creator/trends",
-        params: { platform, category, timeframe, days, country, page, size },
-      }),
+      query: () => ({ url: platformUrl("/trend-reports") }),
+      transformResponse: (reports, _meta, { page = 0, size = 8 } = {}) => {
+        const all = trendsFromReports(reports);
+        return { content: all.slice(page * size, page * size + size), totalElements: all.length,
+          totalPages: Math.max(1, Math.ceil(all.length / size)), number: page, size };
+      },
       providesTags: ["CreatorTrends"],
     }),
     getTrendInsight: builder.query({
@@ -317,8 +322,19 @@ export const creatorApi = apiSlice.injectEndpoints({
       }),
       providesTags: (_result, _error, args) => [{ type: "CreatorTrends", id: args?.trendId || "insight" }],
     }),
+    // "Predict trends" asks trend-intelligence-service for a new report (POST /v1/trend-reports,
+    // LLM-backed) on the chosen category, platform and country.
     predictTrends: builder.mutation({
-      query: (body) => ({ url: "/creator/trends/predict", method: "POST", body }),
+      query: ({ platform, category, country, userSignals = [] }) => ({
+        url: platformUrl("/trend-reports"),
+        method: "POST",
+        body: {
+          topic: [category, platform && `on ${String(platform).replace(/_/g, " ")}`, country && `in ${country}`].filter(Boolean).join(" ") || "short-form video",
+          industry: category || undefined,
+          targetAudience: userSignals.length ? userSignals.join(" ") : undefined,
+        },
+      }),
+      transformResponse: (report) => ({ predictions: trendsFromReports(report ? [report] : []) }),
       invalidatesTags: ["CreatorTrends"],
     }),
     generateProductAdPipeline: builder.mutation({
