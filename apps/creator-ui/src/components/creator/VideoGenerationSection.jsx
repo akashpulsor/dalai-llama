@@ -332,13 +332,37 @@ export default function VideoGenerationSection({ projectId }) {
    * prompt history are untouched server-side; this adds a version rather than overwriting one. The
    * usual approve step follows, so the new render is costed and confirmed exactly like the first.
    */
-  const handleRegenerate = async (shotId) => {
+  const handleRegenerate = (shotId) => {
     // Marked rather than deleted. Dropping the clip from state would fight the server's own view --
     // the project's shot-videos query would put it straight back on the next refetch, and the old
     // clip is worth keeping on screen anyway so the new one can be compared against it. The flag is
-    // what tells the card to offer Approve again despite a rendered clip already existing.
+    // what opens the video studio on a shot that already has a clip. Nothing is prepared or paid
+    // for here: the studio's own steps do that, each when the creator asks.
     setRegenerating((r) => ({ ...r, [shotId]: true }));
-    await handlePrepare(shotId);
+    setOpenShotId(shotId);
+  };
+
+  /** The studio queued a render. Watch it the same way an approved job is watched, so the card
+   * shows it working and then plays it. */
+  const handleStudioGenerated = async (shotId, job) => {
+    if (!job?.jobId) return;
+    setVideos((v) => ({ ...v, [shotId]: job }));
+    setPreparing((s) => ({ ...s, [shotId]: true }));
+    try {
+      const settled = await pollJobUntilSettled(job.jobId, shotId);
+      refetchShotVideos();
+      if (settled) {
+        if (settled.status === "COMPLETED") setRegenerating((r) => ({ ...r, [shotId]: false }));
+        reportJobOutcome(settled);
+      } else {
+        dispatch(showFlash({
+          message: "Still rendering — this shot is taking a while. It will appear here when it finishes.",
+          type: "info",
+        }));
+      }
+    } finally {
+      setPreparing((s) => ({ ...s, [shotId]: false }));
+    }
   };
 
   /** Save an edited prompt. Returns true so the card can leave edit mode only on success --
@@ -687,7 +711,7 @@ export default function VideoGenerationSection({ projectId }) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {shots.map((shot) => (
+        {shots.map((shot, index) => (
           <ShotVideoCard
             key={shot.id}
             shot={shot}
@@ -708,6 +732,8 @@ export default function VideoGenerationSection({ projectId }) {
             onSavePrompt={(positive) => handleSavePrompt(shot.id, positive)}
             onApprove={(options) => handleApprove(shot.id, options)}
             onReject={() => handleReject(shot.id)}
+            previousShot={index > 0 ? shots[index - 1] : null}
+            onStudioGenerated={(job) => handleStudioGenerated(shot.id, job)}
           />
         ))}
       </div>

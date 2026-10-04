@@ -24,6 +24,7 @@ import BuiltinVoicePicker from "./BuiltinVoicePicker.jsx";
 import ShotCanvasPlayer from "./ShotCanvasPlayer.jsx";
 import MotionGraphicPanel from "./MotionGraphicPanel.jsx";
 import CritiqueFindingsPanel from "./CritiqueFindingsPanel.jsx";
+import VideoStudioPanel from "../videoStudio/VideoStudioPanel.jsx";
 import ShotThoughtLog from "./ShotThoughtLog.jsx";
 import ProCta from "../common/ProCta.jsx";
 import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
@@ -867,7 +868,7 @@ function PromptVersionHistory({ shotId, onUse, canEdit }) {
   );
 }
 
-export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info, busy, video, activeClip, dubbed, onDubbed, selected, onSelectToggle, onPrepare, onSavePrompt, onApprove, onReject, onAutoFix, onRegenerate, regenerating }) {
+export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info, busy, video, activeClip, dubbed, onDubbed, selected, onSelectToggle, onPrepare, onSavePrompt, onApprove, onReject, onAutoFix, onRegenerate, regenerating, previousShot, onStudioGenerated }) {
   // Prompt editing is local to the open card: the draft only leaves here on an explicit Save, so
   // collapsing the card or wandering off never silently rewrites what will be generated.
   const [editing, setEditing] = React.useState(false);
@@ -1147,34 +1148,18 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
           <BackgroundMusicControl shotId={shot.id} plannedSeconds={shot.durationSeconds} />
           <ShotThoughtLog shotId={shot.id} />
 
-          {!info && !hasClip && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={onPrepare}
-              className="creator-primary flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-bold text-white disabled:opacity-60"
-            >
-              {busy ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-              {busy ? "Preparing…" : "Prepare shot for video"}
-            </button>
-          )}
-
-          {/* A shot that is prepared but not yet generated had no way to rebuild its prompt: the
-              Prepare button only appeared when there was no prompt at all, so changing the shot's
-              line, its length or its plan left the old prompt sitting there with only Approve and
-              Reject. That is how both motion graphics ended up stuck showing prompts built before
-              they could be generated at all. Preparing again writes a new version; the old one
-              stays in history. */}
-          {info && !hasClip && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={onPrepare}
-              className="flex items-center gap-1.5 self-start rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-slate-200 hover:border-purple-400/40 hover:text-purple-200 disabled:opacity-50"
-            >
-              {busy ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-              {busy ? "Preparing…" : "Prepare again (rebuild the prompt)"}
-            </button>
+          {/* The video studio replaces prepare-then-approve for a shot with no clip yet, or one being
+              redone: analyse, choose settings, build the timeline, read and correct the prompt, then
+              generate exactly that text. Every step is its own button, so no failure leaves the shot
+              with nothing to do. */}
+          {(!hasClip || regenerating) && (
+            <VideoStudioPanel
+              shot={shot}
+              projectId={projectId}
+              previousShot={previousShot}
+              generating={busy}
+              onGenerated={(job) => onStudioGenerated?.(job)}
+            />
           )}
 
           {/* A generated shot was a dead end: the card showed the clip and nothing else, so a shot
@@ -1238,7 +1223,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               prompt version "did nothing": the Use button sets the draft, and the Save that would
               commit it lives in here. Approve itself still needs a job id and says so below. */}
           {info && (
-            <>
+            <LegacyPromptFold folded={!hasClip || regenerating}>
               <div className="flex flex-wrap gap-2">
                 {info.recommendedModel && (
                   <span className="rounded-full border border-purple-400/20 bg-purple-500/10 px-2.5 py-1 text-[11px] font-bold text-purple-200">
@@ -1417,10 +1402,22 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
                   </button>
                 </div>
               )}
-            </>
+            </LegacyPromptFold>
           )}
         </div>
       )}
     </div>
+  );
+}
+
+/** The prepare-and-approve block, folded away while the video studio is the way to generate. A job
+ * prepared before the studio existed can still be approved from here. */
+function LegacyPromptFold({ folded, children }) {
+  if (!folded) return <>{children}</>;
+  return (
+    <details className="rounded-md border border-white/10 bg-white/[0.02] p-2.5">
+      <summary className="cursor-pointer text-[10px] font-bold text-slate-400">Earlier prepared prompt (previous flow)</summary>
+      <div className="mt-2 flex flex-col gap-3">{children}</div>
+    </details>
   );
 }

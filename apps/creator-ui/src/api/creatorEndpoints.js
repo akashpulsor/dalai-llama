@@ -25,6 +25,17 @@ const platformApiOrigin = (() => {
 })();
 const platformUrl = (path) => `${platformApiOrigin}/v1${path}`;
 
+/** Writes a generation-plan mutation's answer into getShotGenerationPlan's cache for that shot. */
+async function cacheGenerationPlan({ projectId, shotId }, { dispatch, queryFulfilled }) {
+  try {
+    const { data } = await queryFulfilled;
+    // eslint-disable-next-line no-use-before-define
+    dispatch(creatorApi.util.upsertQueryData("getShotGenerationPlan", { projectId, shotId }, data));
+  } catch {
+    // The mutation's own error reaches the caller through unwrap(); nothing to cache.
+  }
+}
+
 /**
  * Same-origin URL for admin ops endpoints. Uses window.location.origin explicitly rather than
  * a leading-slash relative path because RTK Query's baseUrl (`platformApiOrigin/api/v1`) prepends
@@ -3983,6 +3994,90 @@ export const creatorApi = apiSlice.injectEndpoints({
       }),
     }),
 
+    // ---- Video studio: one shot's path from approved plan to source clip ------------------------
+    // Every step is its own call and only generateShotFromPlan spends on a render. Each mutation
+    // answers with the whole plan, written straight into the plan query's cache -- refetching would
+    // re-assemble the shot from pre-production for no new information.
+    getShotGenerationPlan: builder.query({
+      query: ({ projectId, shotId }) => ({ url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-plan`) }),
+    }),
+    analyzeShotGenerationPlan: builder.mutation({
+      query: ({ projectId, shotId }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-plan/analyze`),
+        method: "POST",
+      }),
+      onQueryStarted: cacheGenerationPlan,
+    }),
+    selectShotGenerationSettings: builder.mutation({
+      query: ({ projectId, shotId, generationDurationSeconds, generationFps }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-plan/settings`),
+        method: "PUT",
+        body: { generationDurationSeconds, generationFps },
+      }),
+      onQueryStarted: cacheGenerationPlan,
+    }),
+    buildShotGenerationTimeline: builder.mutation({
+      query: ({ projectId, shotId }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-plan/timeline`),
+        method: "POST",
+      }),
+      onQueryStarted: cacheGenerationPlan,
+    }),
+    composeShotGenerationPrompt: builder.mutation({
+      query: ({ projectId, shotId }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-plan/prompt`),
+        method: "POST",
+      }),
+      onQueryStarted: cacheGenerationPlan,
+    }),
+    // expectedRevision is the draftRevision the edit was made on; the server answers 409 if another
+    // tab saved in between, rather than one edit silently replacing the other.
+    saveShotGenerationDraft: builder.mutation({
+      query: ({ projectId, shotId, prompt, expectedRevision }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-plan/prompt/draft`),
+        method: "PUT",
+        body: { prompt, expectedRevision },
+      }),
+      onQueryStarted: cacheGenerationPlan,
+    }),
+    resetShotGenerationDraft: builder.mutation({
+      query: ({ projectId, shotId }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-plan/prompt/draft`),
+        method: "DELETE",
+      }),
+      onQueryStarted: cacheGenerationPlan,
+    }),
+    validateShotGenerationPrompt: builder.mutation({
+      query: ({ projectId, shotId, prompt }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-plan/prompt/validate`),
+        method: "POST",
+        body: { prompt },
+      }),
+    }),
+    attachShotContinuationFrame: builder.mutation({
+      query: ({ projectId, shotId, sourceShotId }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-plan/continuation-frame`),
+        method: "POST",
+        body: sourceShotId ? { sourceShotId } : {},
+      }),
+      onQueryStarted: cacheGenerationPlan,
+    }),
+    detachShotContinuationFrame: builder.mutation({
+      query: ({ projectId, shotId }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-plan/continuation-frame`),
+        method: "DELETE",
+      }),
+      onQueryStarted: cacheGenerationPlan,
+    }),
+    // Sends `prompt` exactly as typed. Answers once the render is queued, with the job to poll.
+    generateShotFromPlan: builder.mutation({
+      query: ({ projectId, shotId, prompt }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-plan/generate`),
+        method: "POST",
+        body: { prompt },
+      }),
+    }),
+
     // All prepared shot prompts for a project, one row per shot (latest version wins). Video
     // workspace calls this once on page load to render the full editable list -- this is what
     // makes a prepared prompt survive a refresh instead of living only in component state.
@@ -4668,6 +4763,17 @@ export const {
   useListShotAssetDeadLettersQuery,
   useRetryShotAssetDeadLetterMutation,
   useListShotPlanIssuesQuery,
+  useGetShotGenerationPlanQuery,
+  useAnalyzeShotGenerationPlanMutation,
+  useSelectShotGenerationSettingsMutation,
+  useBuildShotGenerationTimelineMutation,
+  useComposeShotGenerationPromptMutation,
+  useSaveShotGenerationDraftMutation,
+  useResetShotGenerationDraftMutation,
+  useValidateShotGenerationPromptMutation,
+  useAttachShotContinuationFrameMutation,
+  useDetachShotContinuationFrameMutation,
+  useGenerateShotFromPlanMutation,
 } = creatorApi;
  
  
