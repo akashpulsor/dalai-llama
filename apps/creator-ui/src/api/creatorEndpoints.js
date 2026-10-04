@@ -2776,6 +2776,21 @@ export const creatorApi = apiSlice.injectEndpoints({
       ],
     }),
 
+    // "Step shot" -- POST /v1/shots/{shotId}/images/{kind}/step-from/{sourceShotId}: this shot's
+    // image made as the next moment of an earlier shot, by editing that shot's image. Characters
+    // who stay keep their look; ones this shot does not include leave the frame.
+    stepPreProductionShotImage: builder.mutation({
+      query: ({ shotId, kind, sourceShotId, note }) => ({
+        url: platformUrl(`/shots/${shotId}/images/${kind}/step-from/${sourceShotId}`),
+        method: "POST",
+        params: note ? { note } : undefined,
+      }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorHomeProjects", id: `shot-images-${args?.shotId}` },
+        { type: "CreatorHomeProjects", id: "shot-asset-completion" },
+      ],
+    }),
+
     listPreProductionShotImages: builder.query({
       query: (shotId) => ({ url: platformUrl(`/shots/${shotId}/images`) }),
       providesTags: (_result, _error, shotId) => [{ type: "CreatorHomeProjects", id: `shot-images-${shotId}` }],
@@ -4670,6 +4685,7 @@ export const {
   useGeneratePreProductionShotImageMutation,
   useGeneratePreProductionShotImageWithInspirationMutation,
   useReplacePreProductionShotImageMutation,
+  useStepPreProductionShotImageMutation,
   useListPreProductionShotImagesQuery,
   useReanalyzePreProductionShotImageMutation,
   useReanalyzePreProductionShotImagesForProjectMutation,

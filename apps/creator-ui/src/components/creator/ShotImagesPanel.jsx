@@ -11,6 +11,7 @@ import {
   useListPreProductionShotImagesQuery,
   useReanalyzePreProductionShotImageMutation,
   useReplacePreProductionShotImageMutation,
+  useStepPreProductionShotImageMutation,
 } from "../../api/creatorEndpoints.js";
 
 const LIVE_ACTION_KINDS = [
@@ -74,13 +75,14 @@ const ASPECT_RATIO_CSS = {
  * cast assignment or a confirmed product reference; nothing here has to know that. Tiles render in
  * the shot's own aspect ratio (the same one the video model actually generates at) instead of a
  * fixed square, so what's shown matches what the project is set up to produce. */
-export default function ShotImagesPanel({ shotId, shotRef, projectId, aspectRatio, shotType }) {
+export default function ShotImagesPanel({ shotId, shotRef, projectId, aspectRatio, shotType, earlierShots = [] }) {
   const kinds = kindsForShotType(shotType);
   const dispatch = useDispatch();
   const { data: images = [] } = useListPreProductionShotImagesQuery(shotId, { skip: !shotId });
   const [generate, { isLoading: generating }] = useGeneratePreProductionShotImageMutation();
   const [generateWithInspiration, { isLoading: uploadingInspiration }] = useGeneratePreProductionShotImageWithInspirationMutation();
   const [replaceImage, { isLoading: replacingImage }] = useReplacePreProductionShotImageMutation();
+  const [stepImage, { isLoading: stepping }] = useStepPreProductionShotImageMutation();
   // Pending SHOT_IMAGE change requests targeting this shot, indexed by kind -- same data source
   // the project-level ShotChatPanel polls, so the two surfaces stay in sync automatically.
   const { data: changeRequests = [] } = useListChangeRequestsQuery(projectId, { skip: !projectId || !shotRef });
@@ -93,7 +95,9 @@ export default function ShotImagesPanel({ shotId, shotRef, projectId, aspectRati
   const [pendingKind, setPendingKind] = React.useState(null);
   const [zoomedKind, setZoomedKind] = React.useState(null);
   const [uploadKind, setUploadKind] = React.useState(null); // {kind, label} when upload dialog is open
-  const [uploadMode, setUploadMode] = React.useState("same"); // "same" | "inspired"
+  const [uploadMode, setUploadMode] = React.useState("same"); // "same" | "inspired" | "step"
+  // Step mode: the earlier shot whose image this one continues from (the one just before, by default).
+  const [stepSourceId, setStepSourceId] = React.useState("");
   const [uploadFile, setUploadFile] = React.useState(null);
   const [uploadNote, setUploadNote] = React.useState("");
 
@@ -166,6 +170,7 @@ export default function ShotImagesPanel({ shotId, shotRef, projectId, aspectRati
   const openUploadDialog = (kind) => {
     setUploadKind(kind);
     setUploadMode("same");
+    setStepSourceId(earlierShots.length ? earlierShots[earlierShots.length - 1].id : "");
     setUploadFile(null);
     setUploadNote("");
   };
@@ -178,10 +183,13 @@ export default function ShotImagesPanel({ shotId, shotRef, projectId, aspectRati
   };
 
   const handleUpload = async () => {
-    if (!uploadKind || !uploadFile) return;
+    if (!uploadKind || (uploadMode === "step" ? !stepSourceId : !uploadFile)) return;
     const kind = uploadKind;
     try {
-      if (uploadMode === "same") {
+      if (uploadMode === "step") {
+        await stepImage({ shotId, kind, sourceShotId: stepSourceId, note: uploadNote || undefined }).unwrap();
+        dispatch(showFlash({ message: "Made the next frame from the earlier shot.", type: "success" }));
+      } else if (uploadMode === "same") {
         await replaceImage({ shotId, kind, file: uploadFile }).unwrap();
         dispatch(showFlash({ message: "Image replaced.", type: "success" }));
       } else {
@@ -310,7 +318,7 @@ export default function ShotImagesPanel({ shotId, shotRef, projectId, aspectRati
       )}
 
       {uploadKind && (() => {
-        const uploading = replacingImage || uploadingInspiration;
+        const uploading = replacingImage || uploadingInspiration || stepping;
         const label = ALL_KIND_LABELS.get(uploadKind) || uploadKind;
         return (
           <div
@@ -350,20 +358,47 @@ export default function ShotImagesPanel({ shotId, shotRef, projectId, aspectRati
                     <p className="mt-0.5 text-[10px] font-medium text-slate-500">AI analyses the upload and regenerates keeping the shot plan intact. Best for style/lighting/composition inspiration.</p>
                   </div>
                 </label>
+                <label className={`flex items-start gap-2 rounded-md border border-white/10 bg-white/5 p-2.5 ${earlierShots.length ? "cursor-pointer hover:border-purple-400/30" : "opacity-50"}`}>
+                  <input type="radio" name="upload-mode" value="step" checked={uploadMode === "step"} onChange={() => setUploadMode("step")}
+                    disabled={!earlierShots.length} className="mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-[11px] font-bold text-slate-100">Step shot — the next frame of an earlier shot</p>
+                    <p className="mt-0.5 text-[10px] font-medium text-slate-500">
+                      {earlierShots.length
+                        ? "Edits the earlier shot's image into this shot: the characters who stay keep their exact look, the place and light carry over, and anyone not in this shot leaves the frame."
+                        : "This is the first shot, so there is no earlier shot to step from."}
+                    </p>
+                  </div>
+                </label>
               </fieldset>
 
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
-                className="mb-3 w-full rounded-md border border-white/10 bg-white/5 p-2 text-[11px] text-slate-200 file:mr-2 file:rounded file:border-0 file:bg-purple-500/20 file:px-2 file:py-1 file:text-[10px] file:font-bold file:text-purple-200"
-              />
+              {uploadMode === "step" ? (
+                <label className="mb-3 block text-[10px] font-bold text-slate-400">Step from
+                  <select value={stepSourceId} onChange={(event) => setStepSourceId(event.target.value)}
+                    className="creator-input mt-1 w-full px-2 py-1.5 text-[11px]">
+                    {earlierShots.map((other) => (
+                      <option key={other.id} value={other.id}>
+                        {other.shotRef || `Shot ${other.shotNumber}`}{other.action ? ` — ${other.action.slice(0, 60)}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
+                  className="mb-3 w-full rounded-md border border-white/10 bg-white/5 p-2 text-[11px] text-slate-200 file:mr-2 file:rounded file:border-0 file:bg-purple-500/20 file:px-2 file:py-1 file:text-[10px] file:font-bold file:text-purple-200"
+                />
+              )}
 
-              {uploadMode === "inspired" && (
+              {uploadMode !== "same" && (
                 <textarea
                   value={uploadNote}
                   onChange={(event) => setUploadNote(event.target.value)}
-                  placeholder="Optional note: e.g. 'match this lighting mood' or 'keep the pose but change the setting to a kitchen'"
+                  placeholder={uploadMode === "step"
+                    ? "Optional note: e.g. 'only Priya stays, she turns to the door'"
+                    : "Optional note: e.g. 'match this lighting mood' or 'keep the pose but change the setting to a kitchen'"}
                   rows={2}
                   className="mb-3 w-full resize-y rounded-md border border-white/10 bg-white/5 p-2 text-[11px] text-slate-200 placeholder:text-slate-500"
                 />
@@ -381,11 +416,11 @@ export default function ShotImagesPanel({ shotId, shotRef, projectId, aspectRati
                 <button
                   type="button"
                   onClick={handleUpload}
-                  disabled={!uploadFile || uploading}
+                  disabled={(uploadMode === "step" ? !stepSourceId : !uploadFile) || uploading}
                   className="flex items-center gap-1.5 rounded-md border border-purple-400/40 bg-purple-500/20 px-3 py-1.5 text-[11px] font-black text-purple-100 hover:border-purple-400/60 disabled:opacity-55"
                 >
                   {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-                  {uploadMode === "same" ? "Replace image" : "Regenerate"}
+                  {uploadMode === "same" ? "Replace image" : uploadMode === "step" ? "Make next frame" : "Regenerate"}
                 </button>
               </div>
             </div>

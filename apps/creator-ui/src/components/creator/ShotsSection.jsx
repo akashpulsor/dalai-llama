@@ -783,7 +783,8 @@ export default function ShotsSection({ projectId }) {
                       ["Sketch prompt", shot.sketchPrompt],
                     ]}
                   />
-                  <ShotImagesPanel shotId={shot.id} shotRef={shot.shotRef} projectId={projectId} aspectRatio={shot.aspectRatio} shotType={shot.shotType} />
+                  <ShotImagesPanel shotId={shot.id} shotRef={shot.shotRef} projectId={projectId} aspectRatio={shot.aspectRatio} shotType={shot.shotType}
+                    earlierShots={shots.filter((other) => other.shotNumber < shot.shotNumber)} />
                   <ShotReferenceImagesPanel shot={shot} />
                   <LightingCameraPlanPanel shotId={shot.id} />
                   <ShotProductReferencePanel shotId={shot.id} />
