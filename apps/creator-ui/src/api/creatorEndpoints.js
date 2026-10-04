@@ -25,6 +25,17 @@ const platformApiOrigin = (() => {
 })();
 const platformUrl = (path) => `${platformApiOrigin}/v1${path}`;
 
+/** Writes a shot-controls mutation's answer into getShotGenerationControls' cache for that shot. */
+async function cacheShotControls({ projectId, shotId }, { dispatch, queryFulfilled }) {
+  try {
+    const { data } = await queryFulfilled;
+    // eslint-disable-next-line no-use-before-define
+    dispatch(creatorApi.util.upsertQueryData("getShotGenerationControls", { projectId, shotId }, data));
+  } catch {
+    // The caller reports the error.
+  }
+}
+
 /** Writes a generation-plan mutation's answer into getShotGenerationPlan's cache for that shot. */
 async function cacheGenerationPlan({ projectId, shotId }, { dispatch, queryFulfilled }) {
   try {
@@ -4082,6 +4093,25 @@ export const creatorApi = apiSlice.injectEndpoints({
         url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/conform/${requestId}`),
       }),
     }),
+    // One shot's generation controls: its own set, or (custom: false) the project's defaults.
+    getShotGenerationControls: builder.query({
+      query: ({ projectId, shotId }) => ({ url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-controls`) }),
+    }),
+    updateShotGenerationControls: builder.mutation({
+      query: ({ projectId, shotId, ...controls }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-controls`),
+        method: "PUT",
+        body: controls,
+      }),
+      onQueryStarted: cacheShotControls,
+    }),
+    resetShotGenerationControls: builder.mutation({
+      query: ({ projectId, shotId }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-controls`),
+        method: "DELETE",
+      }),
+      onQueryStarted: cacheShotControls,
+    }),
     // The project's generation controls console: each render-path step as a switch.
     getGenerationControls: builder.query({
       query: (projectId) => ({ url: platformUrl(`/scenes/projects/${projectId}/generation-controls`) }),
@@ -4809,6 +4839,9 @@ export const {
   useGetShotPromptInputsQuery,
   useLazyGetShotConformQuery,
   useGetGenerationControlsQuery,
+  useGetShotGenerationControlsQuery,
+  useUpdateShotGenerationControlsMutation,
+  useResetShotGenerationControlsMutation,
   useUpdateGenerationControlsMutation,
 } = creatorApi;
  

@@ -9,7 +9,7 @@ import { useGetGenerationControlsQuery, useUpdateGenerationControlsMutation } fr
  * defaults are the path that always lets a shot be generated; each switch says what turning it on
  * costs or risks, so the trade is visible where it is made.
  */
-const SWITCHES = [
+export const SWITCHES = [
   {
     key: "fitDurationToDialogue",
     label: "Fit duration to dialogue",
@@ -54,10 +54,39 @@ const SWITCHES = [
   },
 ];
 
+/** The switch list itself, shared by the project defaults and each shot's own set. */
+export function ControlSwitches({ controls, saving, onToggle }) {
+  return (
+    <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
+      {SWITCHES.map((item) => {
+        const on = !!controls[item.key];
+        return (
+          <li key={item.key} className="flex items-start gap-2.5 rounded-md border border-white/5 bg-white/[0.02] p-2">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={on}
+              disabled={saving}
+              onClick={() => onToggle(item.key)}
+              className={`relative mt-0.5 h-4 w-7 shrink-0 rounded-full transition ${on ? "bg-purple-500" : "bg-white/15"} disabled:opacity-60`}
+            >
+              <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition ${on ? "left-3.5" : "left-0.5"}`} />
+            </button>
+            <div>
+              <p className="text-[11px] font-bold text-slate-200">{item.label}</p>
+              <p className="text-[10px] text-slate-500">{on ? item.on : item.off}</p>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export default function GenerationControlsConsole({ projectId }) {
   const dispatch = useDispatch();
   const { data: controls, isLoading, error, refetch } = useGetGenerationControlsQuery(projectId, { skip: !projectId });
-  const [update, { isLoading: saving, originalArgs }] = useUpdateGenerationControlsMutation();
+  const [update, { isLoading: saving }] = useUpdateGenerationControlsMutation();
 
   const toggle = async (key) => {
     try {
@@ -70,8 +99,8 @@ export default function GenerationControlsConsole({ projectId }) {
   return (
     <details className="rounded-lg border border-white/10 bg-white/[0.02] p-3" open>
       <summary className="flex cursor-pointer items-center gap-2 text-[11px] font-extrabold uppercase tracking-wide text-slate-300">
-        <SlidersHorizontal size={12} /> Generation controls
-        <span className="font-semibold normal-case tracking-normal text-slate-500">— apply to every shot in this project</span>
+        <SlidersHorizontal size={12} /> Default generation controls
+        <span className="font-semibold normal-case tracking-normal text-slate-500">— for every shot without its own (set those in each shot's video studio)</span>
       </summary>
       {isLoading && <p className="mt-2 flex items-center gap-2 text-[11px] text-slate-400"><Loader2 size={12} className="animate-spin" /> Loading…</p>}
       {error && (
@@ -80,32 +109,9 @@ export default function GenerationControlsConsole({ projectId }) {
         </p>
       )}
       {controls && (
-        <ul className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
-          {SWITCHES.map((item) => {
-            const on = !!controls[item.key];
-            const busy = saving && originalArgs && originalArgs[item.key] !== controls[item.key];
-            return (
-              <li key={item.key} className="flex items-start gap-2.5 rounded-md border border-white/5 bg-white/[0.02] p-2">
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={on}
-                  disabled={saving}
-                  onClick={() => toggle(item.key)}
-                  className={`relative mt-0.5 h-4 w-7 shrink-0 rounded-full transition ${on ? "bg-purple-500" : "bg-white/15"} disabled:opacity-60`}
-                >
-                  <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition ${on ? "left-3.5" : "left-0.5"}`} />
-                </button>
-                <div>
-                  <p className="flex items-center gap-1.5 text-[11px] font-bold text-slate-200">
-                    {item.label} {busy && <Loader2 size={10} className="animate-spin" />}
-                  </p>
-                  <p className="text-[10px] text-slate-500">{on ? item.on : item.off}</p>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="mt-2">
+          <ControlSwitches controls={controls} saving={saving} onToggle={toggle} />
+        </div>
       )}
     </details>
   );

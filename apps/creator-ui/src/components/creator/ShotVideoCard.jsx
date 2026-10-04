@@ -8,6 +8,9 @@ import {
   useUploadShotBackgroundMusicMutation,
   useGetShotBackgroundMusicQuery,
   useListBuiltinVoicesQuery,
+  useListCastProfilesQuery,
+  useListCastAssignmentsQuery,
+  useGetScriptQuery,
   useListPreProductionShotImagesQuery,
   useListShotPromptVersionsQuery,
   useLazyGetDubJobQuery,
@@ -25,6 +28,7 @@ import ShotCanvasPlayer from "./ShotCanvasPlayer.jsx";
 import MotionGraphicPanel from "./MotionGraphicPanel.jsx";
 import CritiqueFindingsPanel from "./CritiqueFindingsPanel.jsx";
 import VideoStudioPanel from "../videoStudio/VideoStudioPanel.jsx";
+import { castReaders } from "../videoStudio/castReaders.js";
 import ShotThoughtLog from "./ShotThoughtLog.jsx";
 import ProCta from "../common/ProCta.jsx";
 import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
@@ -129,22 +133,28 @@ function BackgroundMusicControl({ shotId, plannedSeconds }) {
  * <p>The pick is auditioned before it costs anything: the picker plays each voice's own sample
  * clip, so choosing is free and only the dub afterwards is billable.
  */
-function ShotVoiceControl({ shotId, projectId, dubVoiceId, takeVoiceId, hasTake, disabled }) {
+function ShotVoiceControl({ shotId, projectId, dubVoiceId, dubCastProfileId, takeVoiceId, hasTake, disabled }) {
   const dispatch = useDispatch();
   const [saveShot, { isLoading: saving }] = useUpdatePreProductionShotMutation();
   const { data: voices = [] } = useListBuiltinVoicesQuery();
+  const { data: profiles = [] } = useListCastProfilesQuery({ projectId }, { skip: !projectId });
+  const { data: assignments = [] } = useListCastAssignmentsQuery(projectId, { skip: !projectId });
+  const { data: script } = useGetScriptQuery(projectId, { skip: !projectId });
   const [open, setOpen] = React.useState(false);
+  const [tab, setTab] = React.useState("characters");
 
-  const chosen = dubVoiceId ? voices.find((voice) => voice.providerVoiceId === dubVoiceId) : null;
+  const readers = castReaders(profiles, assignments, script?.characters ?? []);
+  const chosenReader = dubCastProfileId ? readers.find((reader) => reader.id === dubCastProfileId) : null;
+  const chosenVoice = dubVoiceId ? voices.find((voice) => voice.providerVoiceId === dubVoiceId) : null;
   // The take on file was recorded in a different voice than the shot now asks for. Same shape of
   // problem as a take of the previous line, and worth saying for the same reason: nothing
   // downstream re-records on its own, so the clip would be mixed with the old read.
   const takeIsOtherVoice = hasTake && !!dubVoiceId && !!takeVoiceId && takeVoiceId !== dubVoiceId;
 
-  const save = async (voiceId, message) => {
+  /** Choosing a character and choosing a built-in voice are alternatives; the server clears the other. */
+  const save = async (change, message) => {
     try {
-      // Empty string clears it on the server, which is how the shot is handed back to the cast.
-      await saveShot({ projectId, shotId, dubVoiceId: voiceId ?? "" }).unwrap();
+      await saveShot({ projectId, shotId, ...change }).unwrap();
       setOpen(false);
       dispatch(showFlash({ message, type: "success" }));
     } catch (error) {
@@ -155,31 +165,32 @@ function ShotVoiceControl({ shotId, projectId, dubVoiceId, takeVoiceId, hasTake,
     }
   };
 
+  const current = chosenReader
+    ? `${chosenReader.name}${chosenReader.plays.length ? ` (${chosenReader.plays.join(", ")})` : ""}`
+    : dubVoiceId ? (chosenVoice?.displayName || dubVoiceId) : "the shot's own character, else the narrator";
+
   return (
     <div className="mt-2.5 border-t border-white/10 pt-2.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[10px] font-medium text-slate-400">
-          Voice:{" "}
-          <span className="font-bold text-slate-200">
-            {dubVoiceId ? (chosen?.displayName || dubVoiceId) : "whoever the cast says"}
-          </span>
+          Read by: <span className="font-bold text-slate-200">{current}</span>
         </p>
         <div className="flex items-center gap-2">
           <button
             type="button"
             disabled={disabled || saving}
-            onClick={() => setOpen((current) => !current)}
+            onClick={() => setOpen((value) => !value)}
             className="flex items-center gap-1 text-[10px] font-bold text-purple-300 hover:text-purple-200 disabled:opacity-60"
           >
             <Mic size={11} />
-            {open ? "Close" : dubVoiceId ? "Change" : "Pick a voice"}
+            {open ? "Close" : "Choose who reads it"}
           </button>
-          {dubVoiceId && (
+          {(dubVoiceId || dubCastProfileId) && (
             <button
               type="button"
               disabled={disabled || saving}
-              onClick={() => save(null, "Back to the cast's voice for this shot.")}
-              title="Drop the override and let the cast decide again"
+              onClick={() => save({ dubVoiceId: "", dubCastProfileId: "" }, "Back to the cast for this shot.")}
+              title="Let the shot's own character -- or the narrator -- read it again"
               className="text-[10px] font-bold text-slate-500 hover:text-slate-300 disabled:opacity-60"
             >
               Use the cast
@@ -196,17 +207,55 @@ function ShotVoiceControl({ shotId, projectId, dubVoiceId, takeVoiceId, hasTake,
 
       {open && (
         <div className="mt-2 rounded-md border border-white/10 bg-black/20 p-2.5">
-          <BuiltinVoicePicker
-            label={null}
-            showFaceImage={false}
-            selectedVoiceId={dubVoiceId || ""}
-            onSelect={(voice) => save(voice.providerVoiceId,
-              `This shot will be read by ${voice.displayName}. Dub again to hear it.`)}
-          />
-          <p className="mt-2 text-[10px] font-medium text-slate-500">
-            Press play to hear a voice before you choose it — auditioning is free, only the dub
-            afterwards costs anything. This changes this shot only.
-          </p>
+          <div className="mb-2 flex gap-1">
+            {[["characters", "Characters"], ["builtin", "Built-in voices"]].map(([key, label]) => (
+              <button key={key} type="button" onClick={() => setTab(key)}
+                className={`rounded px-2 py-1 text-[10px] font-bold ${tab === key ? "bg-purple-500/20 text-purple-100" : "text-slate-400 hover:text-slate-200"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {tab === "characters" ? (
+            readers.length === 0 ? (
+              <p className="text-[10px] text-slate-500">No one is cast in this project yet — add the cast in the Characters tab.</p>
+            ) : (
+              <ul className="space-y-1">
+                {readers.map((reader) => (
+                  <li key={reader.id}>
+                    <button
+                      type="button"
+                      disabled={saving || !reader.voice}
+                      onClick={() => save({ dubCastProfileId: reader.id },
+                        `${reader.name} will read this shot. Dub again to hear it.`)}
+                      className={`flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left text-[11px] disabled:opacity-50 ${reader.id === dubCastProfileId ? "border-purple-400/40 bg-purple-500/10" : "border-white/10 hover:border-purple-400/30"}`}
+                    >
+                      <span>
+                        <span className="font-bold text-slate-200">{reader.name}</span>
+                        {reader.plays.length > 0 && <span className="text-slate-400"> as {reader.plays.join(", ")}</span>}
+                        {reader.narrator && <span className="text-slate-400"> · narrator</span>}
+                      </span>
+                      <span className="shrink-0 text-[10px] text-slate-500">{reader.voice || "no voice yet — set one in Characters"}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : (
+            <>
+              <BuiltinVoicePicker
+                label={null}
+                showFaceImage={false}
+                selectedVoiceId={dubVoiceId || ""}
+                onSelect={(voice) => save({ dubVoiceId: voice.providerVoiceId },
+                  `This shot will be read by ${voice.displayName}. Dub again to hear it.`)}
+              />
+              <p className="mt-2 text-[10px] font-medium text-slate-500">
+                Press play to hear a voice before you choose it — auditioning is free, only the dub
+                afterwards costs anything.
+              </p>
+            </>
+          )}
+          <p className="mt-2 text-[10px] font-medium text-slate-500">This changes who reads this shot only.</p>
         </div>
       )}
     </div>
@@ -226,7 +275,7 @@ function ShotVoiceControl({ shotId, projectId, dubVoiceId, takeVoiceId, hasTake,
  * time), so the previous recording is gone once this runs. That is worth knowing before pressing it,
  * and worth hearing the current one first.
  */
-function DubbedVoiceControl({ shotId, projectId, line, dubbed, dubVoiceId, onDubbed }) {
+function DubbedVoiceControl({ shotId, projectId, line, dubbed, dubVoiceId, dubCastProfileId, onDubbed }) {
   const dispatch = useDispatch();
   // Queued, not waited on. Recording a line takes seconds to tens of seconds, and while the request
   // held the connection there was nothing on screen saying so -- which is exactly why pressing the
@@ -464,6 +513,7 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed, dubVoiceId, onDub
         shotId={shotId}
         projectId={projectId}
         dubVoiceId={dubVoiceId}
+        dubCastProfileId={dubCastProfileId}
         takeVoiceId={dubbed?.providerVoiceId}
         hasTake={!!audioUrl}
         disabled={isLoading || editing}
@@ -1069,355 +1119,379 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
           prepare/approve/regenerate flow runs underneath it. */}
       {isOpen && (
         <div className="space-y-3 border-t border-white/10 px-4 py-3.5">
-          {isMotionGraphic && <MotionGraphicPanel shotId={shot.id} />}
-          {/* The one comparison that decides whether this shot is right, stated before any panel is
-              opened: how long the shot is meant to run against how long the voice actually takes.
-              It was only visible inside the fit panel, which appears when something is already
-              wrong -- so a shot could look fine and not be. */}
-          {(shot.durationSeconds || dubSeconds != null) && (
-            <ShotLengthRow
-              shot={shot}
+          {/* One shot, in the order the work happens: the shot itself, who speaks and what plays
+              under it, generating, then cutting what came back. Tools the studio and the conform
+              step have replaced stay reachable, folded at the bottom. */}
+          <CardGroup title="Shot">
+            {isMotionGraphic && <MotionGraphicPanel shotId={shot.id} />}
+            {/* The one comparison that decides whether this shot is right, stated before any panel is
+                opened: how long the shot is meant to run against how long the voice actually takes.
+                It was only visible inside the fit panel, which appears when something is already
+                wrong -- so a shot could look fine and not be. */}
+            {(shot.durationSeconds || dubSeconds != null) && (
+              <ShotLengthRow
+                shot={shot}
+                projectId={projectId}
+                dubSeconds={dubSeconds}
+                mismatch={dubMismatch}
+                overruns={dubOverruns}
+                onChanged={!hasClip ? onPrepare : undefined}
+              />
+            )}
+
+            {playableUrl && (
+              <ShotCanvasPlayer
+                // Keyed on the URL so accepting a cut swaps the source instead of leaving the
+                // element on the file it already decoded. Without it the player kept the old clip
+                // and sat on its loading label, which read as the accept having hung.
+                key={playableUrl}
+                src={playableUrl}
+                aspectRatio={shot.aspectRatio}
+                className="mx-auto w-full max-w-md"
+                label="Loading the clip…"
+              />
+            )}
+
+          </CardGroup>
+
+          <CardGroup title="Voice & music" hint="Who reads the line, the recorded take, and the music bed under the shot.">
+            {(!hasClip || regenerating) && <DialogueBeatsEditor shot={shot} projectId={projectId} />}
+            {/* Not gated on !info. video-generation-service was changed specifically so a bed
+                generated after a shot was prepared still gets mixed in -- when the prompt carries
+                no music reference it reads the shot's current track from pre-production. Hiding
+                the control once prepared took away the case that fix exists to serve, and left
+                no way to add or replace music on a shot you had already prepared. */}
+            {/* Not gated on shot type: a motion graphic is as likely as any other shot to carry a
+                narrator over it, and the control already renders nothing when the shot has no line.
+                Deciding by type would hide the dub -- and with it the dialogue-fit remedy -- from a
+                graphic that does have one. */}
+            <DubbedVoiceControl
+              shotId={shot.id}
               projectId={projectId}
-              dubSeconds={dubSeconds}
-              mismatch={dubMismatch}
-              overruns={dubOverruns}
-              onChanged={!hasClip ? onPrepare : undefined}
+              line={dialogueVoiceText}
+              dubbed={dubbed}
+              dubVoiceId={shot.dubVoiceId}
+              dubCastProfileId={shot.dubCastProfileId}
+              onDubbed={onDubbed}
             />
-          )}
+            <BackgroundMusicControl shotId={shot.id} plannedSeconds={shot.durationSeconds} />
+          </CardGroup>
 
-          {playableUrl && (
-            <ShotCanvasPlayer
-              // Keyed on the URL so accepting a cut swaps the source instead of leaving the
-              // element on the file it already decoded. Without it the player kept the old clip
-              // and sat on its loading label, which read as the accept having hung.
-              key={playableUrl}
-              src={playableUrl}
-              aspectRatio={shot.aspectRatio}
-              className="mx-auto w-full max-w-md"
-              label="Loading the clip…"
-            />
-          )}
+          <CardGroup title="Generate" hint={hasClip && !regenerating ? "This shot has a clip. Regenerate to open the video studio again." : undefined}>
+            {/* The video studio replaces prepare-then-approve for a shot with no clip yet, or one being
+                redone: analyse, choose settings, build the timeline, read and correct the prompt, then
+                generate exactly that text. Every step is its own button, so no failure leaves the shot
+                with nothing to do. */}
+            {(!hasClip || regenerating) && (
+              <VideoStudioPanel
+                shot={shot}
+                projectId={projectId}
+                previousShot={previousShot}
+                generating={busy}
+                onGenerated={(job) => onStudioGenerated?.(job)}
+              />
+            )}
 
-          {/* Shown before the prompt is built -- the mismatch is knowable from the plan and the
-              dubbed audio alone, and that is the cheapest moment to find it -- and shown again on a
-              shot that has ALREADY been generated, which is the case this most needs to cover: a
-              clip that shipped with its line cut looks finished, and without this there is nothing
-              on the card saying why it is wrong or offering to put it right. */}
-          <DialogueFitPanel
-            shot={shot}
-            projectId={projectId}
-            onResized={onPrepare}
-            // Swaps the spoken line inside the prompt that already exists and saves it as a new
-            // version. Accepting a rewrite used to trigger a full re-prepare, which rebuilds
-            // everything -- model recommendation, cost estimate, compression -- when the only thing
-            // that changed was the words. Changing the dialogue should change the dialogue.
-            onDialogueReplaced={info?.prompt && onSavePrompt ? async (oldLine, newLine) => {
-              // The text that will actually be sent: the compressed one when compression ran,
-              // since that is what dispatch picks. Swapping the line in the other one would edit a
-              // prompt nobody uses and look like it had worked.
-              const current = info.prompt.compressionApplied
-                ? (info.prompt.promptCompressed || info.prompt.promptOriginal || "")
-                : (info.prompt.promptOriginal || info.prompt.promptCompressed || "");
-              const swapped = replaceDialogueLine(current, oldLine, newLine);
-              if (!swapped) return false;
-              return onSavePrompt(swapped.text);
-            } : undefined}
-            // Only offered once there is a job to approve -- "go with the original" is a way of
-            // generating, so before prepare there is nothing for it to act on.
-            onKeepOriginal={info?.externalJobId && !hasClip ? () => onApprove?.({ dialogueFit: "KEEP_PLANNED" }) : undefined}
-          />
+            {hasClip && !regenerating && onRegenerate && (
+              <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+                <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                  Not right?
+                </p>
+                <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-400">
+                  Regenerating rebuilds the prompt from this shot as it stands now — including any
+                  change to its length or its line — and asks you to approve before spending again.
+                </p>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={onRegenerate}
+                  className="mt-2 flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-slate-200 hover:border-purple-400/40 hover:text-purple-200 disabled:opacity-50"
+                >
+                  {busy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                  {busy ? "Preparing…" : "Regenerate this shot"}
+                </button>
+              </div>
+            )}
 
-          {!info && <DialogueBeatsEditor shot={shot} projectId={projectId} />}
-          {/* Not gated on !info. video-generation-service was changed specifically so a bed
-              generated after a shot was prepared still gets mixed in -- when the prompt carries
-              no music reference it reads the shot's current track from pre-production. Hiding
-              the control once prepared took away the case that fix exists to serve, and left
-              no way to add or replace music on a shot you had already prepared. */}
-          {/* Not gated on shot type: a motion graphic is as likely as any other shot to carry a
-              narrator over it, and the control already renders nothing when the shot has no line.
-              Deciding by type would hide the dub -- and with it the dialogue-fit remedy -- from a
-              graphic that does have one. */}
-          <DubbedVoiceControl
-            shotId={shot.id}
-            projectId={projectId}
-            line={dialogueVoiceText}
-            dubbed={dubbed}
-            dubVoiceId={shot.dubVoiceId}
-            onDubbed={onDubbed}
-          />
-          <BackgroundMusicControl shotId={shot.id} plannedSeconds={shot.durationSeconds} />
-          <ShotThoughtLog shotId={shot.id} />
-
-          {/* The video studio replaces prepare-then-approve for a shot with no clip yet, or one being
-              redone: analyse, choose settings, build the timeline, read and correct the prompt, then
-              generate exactly that text. Every step is its own button, so no failure leaves the shot
-              with nothing to do. */}
-          {(!hasClip || regenerating) && (
-            <VideoStudioPanel
-              shot={shot}
-              projectId={projectId}
-              previousShot={previousShot}
-              generating={busy}
-              onGenerated={(job) => onStudioGenerated?.(job)}
-            />
-          )}
-
-          {/* A generated shot was a dead end: the card showed the clip and nothing else, so a shot
-              that came back wrong -- the line cut off, the wrong duration, a rewritten line since
-              saved -- could only be fixed by never having generated it. Regenerating builds a fresh
-              prompt from the shot as it stands now, then goes through the same approve step, so the
-              new clip is costed and confirmed exactly like the first one. */}
-          {hasClip && (
-            // No onChanged. It used to be wired to onPrepare, so accepting a cut kicked off a
-            // prompt REBUILD of the shot -- the card went busy, the spinner never resolved into
-            // the new clip, and a model call was paid for that nobody asked for. Accepting
-            // invalidates the project's current cuts, and the player reads them, so the swap
-            // happens on its own.
-            <ClipCutsPanel
-              shot={shot}
-              projectId={projectId}
-              aspectRatio={shot.aspectRatio}
-            />
-          )}
+          </CardGroup>
 
           {hasClip && (
-            <ClipRepairPanel shot={shot} projectId={projectId} />
+            <CardGroup title="After generation" hint="Cuts of the clip, and repairs.">
+              {/* A generated shot was a dead end: the card showed the clip and nothing else, so a shot
+                  that came back wrong -- the line cut off, the wrong duration, a rewritten line since
+                  saved -- could only be fixed by never having generated it. Regenerating builds a fresh
+                  prompt from the shot as it stands now, then goes through the same approve step, so the
+                  new clip is costed and confirmed exactly like the first one. */}
+              {hasClip && (
+                // No onChanged. It used to be wired to onPrepare, so accepting a cut kicked off a
+                // prompt REBUILD of the shot -- the card went busy, the spinner never resolved into
+                // the new clip, and a model call was paid for that nobody asked for. Accepting
+                // invalidates the project's current cuts, and the player reads them, so the swap
+                // happens on its own.
+                <ClipCutsPanel
+                  shot={shot}
+                  projectId={projectId}
+                  aspectRatio={shot.aspectRatio}
+                />
+              )}
+
+              {hasClip && (
+                <ClipRepairPanel shot={shot} projectId={projectId} />
+              )}
+
+            </CardGroup>
           )}
 
-          {hasClip && !regenerating && onRegenerate && (
-            <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
-              <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-                Not right?
-              </p>
-              <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-400">
-                Regenerating rebuilds the prompt from this shot as it stands now — including any
-                change to its length or its line — and asks you to approve before spending again.
-              </p>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={onRegenerate}
-                className="mt-2 flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-slate-200 hover:border-purple-400/40 hover:text-purple-200 disabled:opacity-50"
-              >
-                {busy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                {busy ? "Preparing…" : "Regenerate this shot"}
-              </button>
-            </div>
-          )}
-
-          {info && info.critiqueVerdict === "NEEDS_HUMAN_REVIEW" && (
-            <CritiqueFindingsPanel
-              findings={info.findings}
-              fixing={busy}
-              onAutoFix={onAutoFix}
-              onReject={onReject}
+          <CardGroup title="Older tools & diagnostics" defaultOpen={false}
+            hint="The previous dialogue-fit and prepare/approve flow, critic findings, and the shot's thought log.">
+            {/* Shown before the prompt is built -- the mismatch is knowable from the plan and the
+                dubbed audio alone, and that is the cheapest moment to find it -- and shown again on a
+                shot that has ALREADY been generated, which is the case this most needs to cover: a
+                clip that shipped with its line cut looks finished, and without this there is nothing
+                on the card saying why it is wrong or offering to put it right. */}
+            <DialogueFitPanel
+              shot={shot}
+              projectId={projectId}
+              onResized={onPrepare}
+              // Swaps the spoken line inside the prompt that already exists and saves it as a new
+              // version. Accepting a rewrite used to trigger a full re-prepare, which rebuilds
+              // everything -- model recommendation, cost estimate, compression -- when the only thing
+              // that changed was the words. Changing the dialogue should change the dialogue.
+              onDialogueReplaced={info?.prompt && onSavePrompt ? async (oldLine, newLine) => {
+                // The text that will actually be sent: the compressed one when compression ran,
+                // since that is what dispatch picks. Swapping the line in the other one would edit a
+                // prompt nobody uses and look like it had worked.
+                const current = info.prompt.compressionApplied
+                  ? (info.prompt.promptCompressed || info.prompt.promptOriginal || "")
+                  : (info.prompt.promptOriginal || info.prompt.promptCompressed || "");
+                const swapped = replaceDialogueLine(current, oldLine, newLine);
+                if (!swapped) return false;
+                return onSavePrompt(swapped.text);
+              } : undefined}
+              // Only offered once there is a job to approve -- "go with the original" is a way of
+              // generating, so before prepare there is nothing for it to act on.
+              onKeepOriginal={info?.externalJobId && !hasClip ? () => onApprove?.({ dialogueFit: "KEEP_PLANNED" }) : undefined}
             />
-          )}
 
-          {/* Gated on the PROMPT, not on the job.
+            {info && info.critiqueVerdict === "NEEDS_HUMAN_REVIEW" && (
+              <CritiqueFindingsPanel
+                findings={info.findings}
+                fixing={busy}
+                onAutoFix={onAutoFix}
+                onReject={onReject}
+              />
+            )}
 
-              This used to require info.externalJobId, so a shot that had been prepared but had no
-              job row rendered none of this: no prompt, no version history, no Save -- and the card
-              fell through to a bare "Prepare shot for video" as though nothing had ever been built
-              for it. That is why Approve was missing on so many shots, and why restoring an older
-              prompt version "did nothing": the Use button sets the draft, and the Save that would
-              commit it lives in here. Approve itself still needs a job id and says so below. */}
-          {info && (
-            <LegacyPromptFold folded={!hasClip || regenerating}>
-              <div className="flex flex-wrap gap-2">
-                {info.recommendedModel && (
-                  <span className="rounded-full border border-purple-400/20 bg-purple-500/10 px-2.5 py-1 text-[11px] font-bold text-purple-200">
-                    Suggested model: {info.recommendedModel}
-                  </span>
+            {/* Gated on the PROMPT, not on the job.
+
+                This used to require info.externalJobId, so a shot that had been prepared but had no
+                job row rendered none of this: no prompt, no version history, no Save -- and the card
+                fell through to a bare "Prepare shot for video" as though nothing had ever been built
+                for it. That is why Approve was missing on so many shots, and why restoring an older
+                prompt version "did nothing": the Use button sets the draft, and the Save that would
+                commit it lives in here. Approve itself still needs a job id and says so below. */}
+            {info && (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap gap-2">
+                  {info.recommendedModel && (
+                    <span className="rounded-full border border-purple-400/20 bg-purple-500/10 px-2.5 py-1 text-[11px] font-bold text-purple-200">
+                      Suggested model: {info.recommendedModel}
+                    </span>
+                  )}
+                  {info.estimatedCost != null && (
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-bold text-slate-300">
+                      {/* On a shot already rendered this is what generating it AGAIN would cost, not
+                          what was spent -- saying "Est. cost" there would read as a bill already paid. */}
+                      {hasClip && !regenerating ? "Regenerating costs: " : "Est. cost: "}
+                      {formatCost(info.estimatedCost, info.costCurrency)}
+                    </span>
+                  )}
+                </div>
+                {info.recommendationReasoning && (
+                  <p className="text-[11px] font-medium italic text-slate-400">"{info.recommendationReasoning}"</p>
                 )}
-                {info.estimatedCost != null && (
-                  <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-bold text-slate-300">
-                    {/* On a shot already rendered this is what generating it AGAIN would cost, not
-                        what was spent -- saying "Est. cost" there would read as a bill already paid. */}
-                    {hasClip && !regenerating ? "Regenerating costs: " : "Est. cost: "}
-                    {formatCost(info.estimatedCost, info.costCurrency)}
-                  </span>
+                {info.prompt && (
+                  <div className="rounded-md border border-white/10 bg-white/[0.03] p-3">
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                        Prompt
+                        {/* The length this prompt will actually be generated at. Editing a shot's
+                            length changes the plan immediately, but the prepared prompt keeps the
+                            length it was built with until the shot is prepared again -- and it is the
+                            prompt that gets sent. Without this there was no way to tell from the page
+                            whether a change to 8s had reached the thing about to be generated. */}
+                        {info.prompt.durationSeconds != null && (
+                          <span className="ml-1.5 font-bold normal-case tracking-normal text-slate-400">
+                            · will generate {info.prompt.durationSeconds}s
+                            {shot.durationSeconds != null && shot.durationSeconds !== info.prompt.durationSeconds
+                              ? `, but the shot is now ${shot.durationSeconds}s — prepare again`
+                              : ""}
+                          </span>
+                        )}
+                      </p>
+                      {!editing && onSavePrompt && (
+                        <ProCta
+                          unlocked={entitlements.editsEnabled}
+                          feature="Editing the prompt"
+                          onClick={() => {
+                            setDraft(info.prompt.promptCompressed || info.prompt.promptOriginal || "");
+                            setEditing(true);
+                          }}
+                          className="flex items-center gap-1 text-[10px] font-bold text-purple-300 hover:text-purple-200"
+                        >
+                          <Pencil size={10} />
+                          Edit
+                        </ProCta>
+                      )}
+                    </div>
+                    {editing ? (
+                      <>
+                        <textarea
+                          value={draft}
+                          onChange={(event) => setDraft(event.target.value)}
+                          rows={8}
+                          className="creator-input w-full text-[11px] font-medium leading-relaxed"
+                        />
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            type="button"
+                            disabled={saving || !draft.trim()}
+                            onClick={handleSave}
+                            className="flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/15 px-3 py-1.5 text-[11px] font-bold text-purple-200 disabled:opacity-50"
+                          >
+                            {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                            {saving ? "Saving…" : "Save prompt"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => setEditing(false)}
+                            className="rounded-md border border-white/10 px-3 py-1.5 text-[11px] font-bold text-slate-400 disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        <p className="mt-1.5 text-[10px] font-medium text-slate-500">
+                          Saving keeps a new version — the original stays in this shot's history, and the reference
+                          images below carry over unchanged.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="whitespace-pre-wrap text-[11px] font-medium leading-relaxed text-slate-300">
+                        {info.prompt.promptCompressed || info.prompt.promptOriginal}
+                      </p>
+                    )}
+                    {info.prompt.negativePrompt && (
+                      <p className="mt-2 text-[10px] font-medium text-slate-500">Negative: {info.prompt.negativePrompt}</p>
+                    )}
+                    <PromptAttachments info={info} shotImages={images} />
+                    <PromptVersionHistory
+                      shotId={shot.id}
+                      canEdit={entitlements.editsEnabled && !!onSavePrompt}
+                      onUse={(text) => {
+                        setDraft(text);
+                        setEditing(true);
+                      }}
+                    />
+                  </div>
+                )}
+                {/* Approve and reject belong to a shot that has not been rendered yet. Once a clip
+                    exists the prompt above it is a record of what produced it, and the action that
+                    makes sense is to generate again -- which is the Regenerate control below. */}
+                {/* A prompt with no job behind it cannot be approved -- approve acts on the job, not
+                    the text. Say that, and offer the thing that creates one, instead of rendering
+                    nothing and leaving the shot looking unprepared. */}
+                {(!hasClip || regenerating) && !info.externalJobId && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-400/25 bg-amber-400/[0.06] p-2.5">
+                    <p className="flex-1 text-[10px] font-semibold text-amber-100">
+                      This prompt has no render job behind it yet, so there is nothing to approve.
+                      Preparing again builds one from the shot as it stands now — your saved prompt
+                      edits stay in the history.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={onPrepare}
+                      className="flex items-center gap-1.5 rounded-md border border-amber-400/30 bg-amber-500/10 px-2.5 py-1.5 text-[10px] font-bold text-amber-100 disabled:opacity-50"
+                    >
+                      {busy ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                      {busy ? "Preparing…" : "Prepare again"}
+                    </button>
+                  </div>
+                )}
+
+                {jobFailed && !regenerating && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-md border border-rose-400/25 bg-rose-500/[0.07] p-2.5">
+                    <p className="flex-1 text-[10px] font-semibold text-rose-100">
+                      This shot's render failed, so there is no clip. That job cannot be approved
+                      again — prepare it again to build a fresh prompt and try once more.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={onPrepare}
+                      className="flex items-center gap-1.5 rounded-md border border-rose-400/30 bg-rose-500/10 px-2.5 py-1.5 text-[10px] font-bold text-rose-100 disabled:opacity-50"
+                    >
+                      {busy ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                      {busy ? "Preparing…" : "Prepare again"}
+                    </button>
+                  </div>
+                )}
+
+                {(!hasClip || regenerating) && info.externalJobId && !jobFailed && (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleReject}
+                      className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-bold text-slate-300"
+                    >
+                      <X size={13} />
+                      Reject & rewrite
+                    </button>
+                    <select
+                      value={dialogueFitChoice}
+                      onChange={(event) => setDialogueFitChoice(event.target.value)}
+                      disabled={busy || editing}
+                      title="Choose whether generation may resize/refuse the shot for dialogue fit, or must keep the planned duration even if the voice is cut."
+                      className="creator-input min-w-44 px-2.5 py-2 text-[11px] font-bold text-slate-200 disabled:opacity-60"
+                    >
+                      <option value="">Fit dialogue automatically</option>
+                      <option value="KEEP_PLANNED">As planned — keep short clip</option>
+                    </select>
+                    <button
+                      type="button"
+                      disabled={busy || editing}
+                      title={editing ? "Save or cancel your prompt edit first." : undefined}
+                      onClick={() => onApprove?.({ dialogueFit: dialogueFitChoice || undefined })}
+                      className="creator-primary flex flex-1 items-center justify-center gap-2 py-2 text-xs font-bold text-white disabled:opacity-60"
+                    >
+                      {busy && <Loader2 size={13} className="animate-spin" />}
+                      {busy ? "Generating… (can take a few minutes)" : "Approve & generate"}
+                    </button>
+                  </div>
                 )}
               </div>
-              {info.recommendationReasoning && (
-                <p className="text-[11px] font-medium italic text-slate-400">"{info.recommendationReasoning}"</p>
-              )}
-              {info.prompt && (
-                <div className="rounded-md border border-white/10 bg-white/[0.03] p-3">
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-                      Prompt
-                      {/* The length this prompt will actually be generated at. Editing a shot's
-                          length changes the plan immediately, but the prepared prompt keeps the
-                          length it was built with until the shot is prepared again -- and it is the
-                          prompt that gets sent. Without this there was no way to tell from the page
-                          whether a change to 8s had reached the thing about to be generated. */}
-                      {info.prompt.durationSeconds != null && (
-                        <span className="ml-1.5 font-bold normal-case tracking-normal text-slate-400">
-                          · will generate {info.prompt.durationSeconds}s
-                          {shot.durationSeconds != null && shot.durationSeconds !== info.prompt.durationSeconds
-                            ? `, but the shot is now ${shot.durationSeconds}s — prepare again`
-                            : ""}
-                        </span>
-                      )}
-                    </p>
-                    {!editing && onSavePrompt && (
-                      <ProCta
-                        unlocked={entitlements.editsEnabled}
-                        feature="Editing the prompt"
-                        onClick={() => {
-                          setDraft(info.prompt.promptCompressed || info.prompt.promptOriginal || "");
-                          setEditing(true);
-                        }}
-                        className="flex items-center gap-1 text-[10px] font-bold text-purple-300 hover:text-purple-200"
-                      >
-                        <Pencil size={10} />
-                        Edit
-                      </ProCta>
-                    )}
-                  </div>
-                  {editing ? (
-                    <>
-                      <textarea
-                        value={draft}
-                        onChange={(event) => setDraft(event.target.value)}
-                        rows={8}
-                        className="creator-input w-full text-[11px] font-medium leading-relaxed"
-                      />
-                      <div className="mt-2 flex gap-2">
-                        <button
-                          type="button"
-                          disabled={saving || !draft.trim()}
-                          onClick={handleSave}
-                          className="flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/15 px-3 py-1.5 text-[11px] font-bold text-purple-200 disabled:opacity-50"
-                        >
-                          {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                          {saving ? "Saving…" : "Save prompt"}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={saving}
-                          onClick={() => setEditing(false)}
-                          className="rounded-md border border-white/10 px-3 py-1.5 text-[11px] font-bold text-slate-400 disabled:opacity-50"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                      <p className="mt-1.5 text-[10px] font-medium text-slate-500">
-                        Saving keeps a new version — the original stays in this shot's history, and the reference
-                        images below carry over unchanged.
-                      </p>
-                    </>
-                  ) : (
-                    <p className="whitespace-pre-wrap text-[11px] font-medium leading-relaxed text-slate-300">
-                      {info.prompt.promptCompressed || info.prompt.promptOriginal}
-                    </p>
-                  )}
-                  {info.prompt.negativePrompt && (
-                    <p className="mt-2 text-[10px] font-medium text-slate-500">Negative: {info.prompt.negativePrompt}</p>
-                  )}
-                  <PromptAttachments info={info} shotImages={images} />
-                  <PromptVersionHistory
-                    shotId={shot.id}
-                    canEdit={entitlements.editsEnabled && !!onSavePrompt}
-                    onUse={(text) => {
-                      setDraft(text);
-                      setEditing(true);
-                    }}
-                  />
-                </div>
-              )}
-              {/* Approve and reject belong to a shot that has not been rendered yet. Once a clip
-                  exists the prompt above it is a record of what produced it, and the action that
-                  makes sense is to generate again -- which is the Regenerate control below. */}
-              {/* A prompt with no job behind it cannot be approved -- approve acts on the job, not
-                  the text. Say that, and offer the thing that creates one, instead of rendering
-                  nothing and leaving the shot looking unprepared. */}
-              {(!hasClip || regenerating) && !info.externalJobId && (
-                <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-400/25 bg-amber-400/[0.06] p-2.5">
-                  <p className="flex-1 text-[10px] font-semibold text-amber-100">
-                    This prompt has no render job behind it yet, so there is nothing to approve.
-                    Preparing again builds one from the shot as it stands now — your saved prompt
-                    edits stay in the history.
-                  </p>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={onPrepare}
-                    className="flex items-center gap-1.5 rounded-md border border-amber-400/30 bg-amber-500/10 px-2.5 py-1.5 text-[10px] font-bold text-amber-100 disabled:opacity-50"
-                  >
-                    {busy ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
-                    {busy ? "Preparing…" : "Prepare again"}
-                  </button>
-                </div>
-              )}
-
-              {jobFailed && !regenerating && (
-                <div className="flex flex-wrap items-center gap-2 rounded-md border border-rose-400/25 bg-rose-500/[0.07] p-2.5">
-                  <p className="flex-1 text-[10px] font-semibold text-rose-100">
-                    This shot's render failed, so there is no clip. That job cannot be approved
-                    again — prepare it again to build a fresh prompt and try once more.
-                  </p>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={onPrepare}
-                    className="flex items-center gap-1.5 rounded-md border border-rose-400/30 bg-rose-500/10 px-2.5 py-1.5 text-[10px] font-bold text-rose-100 disabled:opacity-50"
-                  >
-                    {busy ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
-                    {busy ? "Preparing…" : "Prepare again"}
-                  </button>
-                </div>
-              )}
-
-              {(!hasClip || regenerating) && info.externalJobId && !jobFailed && (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={handleReject}
-                    className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-bold text-slate-300"
-                  >
-                    <X size={13} />
-                    Reject & rewrite
-                  </button>
-                  <select
-                    value={dialogueFitChoice}
-                    onChange={(event) => setDialogueFitChoice(event.target.value)}
-                    disabled={busy || editing}
-                    title="Choose whether generation may resize/refuse the shot for dialogue fit, or must keep the planned duration even if the voice is cut."
-                    className="creator-input min-w-44 px-2.5 py-2 text-[11px] font-bold text-slate-200 disabled:opacity-60"
-                  >
-                    <option value="">Fit dialogue automatically</option>
-                    <option value="KEEP_PLANNED">As planned — keep short clip</option>
-                  </select>
-                  <button
-                    type="button"
-                    disabled={busy || editing}
-                    title={editing ? "Save or cancel your prompt edit first." : undefined}
-                    onClick={() => onApprove?.({ dialogueFit: dialogueFitChoice || undefined })}
-                    className="creator-primary flex flex-1 items-center justify-center gap-2 py-2 text-xs font-bold text-white disabled:opacity-60"
-                  >
-                    {busy && <Loader2 size={13} className="animate-spin" />}
-                    {busy ? "Generating… (can take a few minutes)" : "Approve & generate"}
-                  </button>
-                </div>
-              )}
-            </LegacyPromptFold>
-          )}
+            )}
+            <ShotThoughtLog shotId={shot.id} />
+          </CardGroup>
         </div>
       )}
     </div>
   );
 }
 
-/** The prepare-and-approve block, folded away while the video studio is the way to generate. A job
- * prepared before the studio existed can still be approved from here. */
-function LegacyPromptFold({ folded, children }) {
-  if (!folded) return <>{children}</>;
+/** A labelled, collapsible group of a shot's panels. */
+function CardGroup({ title, hint, defaultOpen = true, children }) {
   return (
-    <details className="rounded-md border border-white/10 bg-white/[0.02] p-2.5">
-      <summary className="cursor-pointer text-[10px] font-bold text-slate-400">Earlier prepared prompt (previous flow)</summary>
-      <div className="mt-2 flex flex-col gap-3">{children}</div>
+    <details open={defaultOpen} className="group/section rounded-lg border border-white/10 bg-white/[0.015]">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2">
+        <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-300">{title}</span>
+        <ChevronDown size={13} className="text-slate-500 transition-transform group-open/section:rotate-180" />
+      </summary>
+      <div className="flex flex-col gap-3 border-t border-white/5 px-3 pb-3 pt-2.5">
+        {hint && <p className="text-[10px] font-medium text-slate-500">{hint}</p>}
+        {children}
+      </div>
     </details>
   );
 }
