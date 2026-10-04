@@ -311,6 +311,11 @@ export default function TrendCarousel({
       {mode === "trend" && !trendsDisabled ? (
         <>
           <div className="rounded-lg border border-white/10 bg-black/20 p-4">
+            {trends.length === 0 && (
+              <p className="text-xs font-semibold text-slate-400">
+                No live trends to show for this platform and category -- write your own idea instead.
+              </p>
+            )}
             <div className="flex flex-wrap items-center gap-2.5">
               {trends.map((trend, index) => {
                 const selected = selectedTrendId === trend.id;

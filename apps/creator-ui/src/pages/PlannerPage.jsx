@@ -359,59 +359,6 @@ function labelForRegion(regionCode = "IN") {
   return REGION_CURRENCY[normalizeRegionCode(regionCode)]?.label || "India";
 }
 
-const fallbackTrends = [
-  {
-    id: "trend-she-almost",
-    title: "She Almost Didn't Go",
-    status: "Very Hot",
-    hashtags: ["#gymmotivation", "#transformation"],
-    reels: "12.4K",
-    reelsGrowth: "+38%",
-    engagement: "9.1%",
-    engagementGrowth: "+21%",
-  },
-  {
-    id: "trend-wife-gym",
-    title: "POV: Indian Wife Starts Gym",
-    status: "Hot",
-    hashtags: ["#relatable", "#couplegoals"],
-    reels: "9.8K",
-    reelsGrowth: "+27%",
-    engagement: "8.7%",
-    engagementGrowth: "+18%",
-  },
-  {
-    id: "trend-study-late",
-    title: "Study With Me - Late Nights",
-    status: "Hot",
-    hashtags: ["#studygram", "#motivation"],
-    reels: "8.7K",
-    reelsGrowth: "+16%",
-    engagement: "7.2%",
-    engagementGrowth: "+14%",
-  },
-  {
-    id: "trend-skin-routine",
-    title: "Glowing Skin Real Routine",
-    status: "Trending",
-    hashtags: ["#skincare", "#glowup"],
-    reels: "7.1K",
-    reelsGrowth: "+13%",
-    engagement: "6.3%",
-    engagementGrowth: "+14%",
-  },
-  {
-    id: "trend-protein-meals",
-    title: "High Protein Indian Meals",
-    status: "Trending",
-    hashtags: ["#highprotein", "#healthy"],
-    reels: "6.3K",
-    reelsGrowth: "+11%",
-    engagement: "5.8%",
-    engagementGrowth: "+9%",
-  },
-];
-
 const fallbackAiProviderCatalog = [
   {
     code: "openai",
@@ -1525,7 +1472,7 @@ export default function PlannerPage() {
 
   const trendResult = useMemo(() => normalizeTrendResult(trendsData, trendPage, trendPageSize), [trendPage, trendsData]);
   const apiTrends = TREND_DISCOVERY_ENABLED
-    ? trendResult.items.length ? trendResult.items : fallbackTrends.map(normalizeTrend)
+    ? trendResult.items
     : [];
   const trends = useMemo(() => {
     if (!TREND_DISCOVERY_ENABLED) return [];
