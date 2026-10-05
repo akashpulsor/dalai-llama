@@ -2819,6 +2819,28 @@ export const creatorApi = apiSlice.injectEndpoints({
       ],
     }),
 
+    // POST .../step-from/{sourceShotId}/bundle -- the same step as a zip (prompt.txt, the images
+    // numbered in send order, README) for running it in an outside image tool. Answers a Blob;
+    // the result comes back through replacePreProductionShotImage ("Same").
+    downloadStepShotBundle: builder.mutation({
+      query: ({ shotId, kind, sourceShotId, note }) => ({
+        url: platformUrl(`/shots/${shotId}/images/${kind}/step-from/${sourceShotId}/bundle`),
+        method: "POST",
+        params: note ? { note } : undefined,
+        responseHandler: (response) => (response.ok ? response.blob() : response.json()),
+        cache: "no-cache",
+      }),
+    }),
+
+    // DELETE /v1/shots/{shotId}/images/{kind} -- clears one image kind so it can be made again.
+    deletePreProductionShotImage: builder.mutation({
+      query: ({ shotId, kind }) => ({ url: platformUrl(`/shots/${shotId}/images/${kind}`), method: "DELETE" }),
+      invalidatesTags: (_result, _error, args) => [
+        { type: "CreatorHomeProjects", id: `shot-images-${args?.shotId}` },
+        { type: "CreatorHomeProjects", id: "shot-asset-completion" },
+      ],
+    }),
+
     listPreProductionShotImages: builder.query({
       query: (shotId) => ({ url: platformUrl(`/shots/${shotId}/images`) }),
       providesTags: (_result, _error, shotId) => [{ type: "CreatorHomeProjects", id: `shot-images-${shotId}` }],
@@ -4716,6 +4738,8 @@ export const {
   useGeneratePreProductionShotImageWithInspirationMutation,
   useReplacePreProductionShotImageMutation,
   useStepPreProductionShotImageMutation,
+  useDownloadStepShotBundleMutation,
+  useDeletePreProductionShotImageMutation,
   useListPreProductionShotImagesQuery,
   useReanalyzePreProductionShotImageMutation,
   useReanalyzePreProductionShotImagesForProjectMutation,

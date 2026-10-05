@@ -1,10 +1,12 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { Download, ImageIcon, Loader2, RefreshCw, Sparkles, Upload, X } from "lucide-react";
+import { Download, FileArchive, ImageIcon, Loader2, RefreshCw, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useApplyChangeRequestMutation,
+  useDeletePreProductionShotImageMutation,
+  useDownloadStepShotBundleMutation,
   useGeneratePreProductionShotImageMutation,
   useGeneratePreProductionShotImageWithInspirationMutation,
   useListChangeRequestsQuery,
@@ -48,18 +50,21 @@ const hasRenderedText = (image) => Boolean(image?.onScreenText && image.onScreen
  * browsers cross-origin -- the browser navigates instead of saving. Fetch the bytes and hand
  * back a same-origin blob URL, which honors download. Kind name becomes the filename so
  * exports don't all collide. */
-async function downloadImage(url, kind) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Download failed: HTTP ${response.status}`);
-  const blob = await response.blob();
+function saveBlob(blob, fileName) {
   const objectUrl = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = objectUrl;
-  link.download = `${kind.toLowerCase()}.png`;
+  link.download = fileName;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(objectUrl);
+}
+
+async function downloadImage(url, kind) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Download failed: HTTP ${response.status}`);
+  saveBlob(await response.blob(), `${kind.toLowerCase()}.png`);
 }
 
 const ASPECT_RATIO_CSS = {
@@ -83,6 +88,8 @@ export default function ShotImagesPanel({ shotId, shotRef, projectId, aspectRati
   const [generateWithInspiration, { isLoading: uploadingInspiration }] = useGeneratePreProductionShotImageWithInspirationMutation();
   const [replaceImage, { isLoading: replacingImage }] = useReplacePreProductionShotImageMutation();
   const [stepImage, { isLoading: stepping }] = useStepPreProductionShotImageMutation();
+  const [downloadStepBundle, { isLoading: bundling }] = useDownloadStepShotBundleMutation();
+  const [deleteImage, { isLoading: deletingImage }] = useDeletePreProductionShotImageMutation();
   // Pending SHOT_IMAGE change requests targeting this shot, indexed by kind -- same data source
   // the project-level ShotChatPanel polls, so the two surfaces stay in sync automatically.
   const { data: changeRequests = [] } = useListChangeRequestsQuery(projectId, { skip: !projectId || !shotRef });
@@ -164,6 +171,31 @@ export default function ShotImagesPanel({ shotId, shotRef, projectId, aspectRati
       await downloadImage(image.signedUrl, kind);
     } catch (error) {
       dispatch(showFlash({ message: error?.message || "Could not download the image", type: "error" }));
+    }
+  };
+
+  const handleDeleteImage = async (kind, label) => {
+    if (!window.confirm(`Delete the ${label.toLowerCase()} image? You can generate or upload a new one afterwards.`)) return;
+    try {
+      await deleteImage({ shotId, kind }).unwrap();
+      dispatch(showFlash({ message: `${label} image deleted.`, type: "success" }));
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not delete the image", type: "error" }));
+    }
+  };
+
+  // The step as a zip -- the exact prompt and numbered images the app would send -- for running it
+  // in an outside image tool. The result comes back through "Same" in this same dialog.
+  const handleDownloadStepBundle = async () => {
+    if (!uploadKind || !stepSourceId) return;
+    const source = earlierShots.find((other) => other.id === stepSourceId);
+    const sourceLabel = source?.shotRef || source?.shotNumber || "earlier";
+    try {
+      const blob = await downloadStepBundle({ shotId, kind: uploadKind, sourceShotId: stepSourceId, note: uploadNote || undefined }).unwrap();
+      saveBlob(blob, `shot-${shotRef || "this"}-step-from-${sourceLabel}-${uploadKind.toLowerCase()}.zip`);
+      dispatch(showFlash({ message: "Bundle downloaded. Upload the result here with \"Same — use this exact image\".", type: "success" }));
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not build the bundle", type: "error" }));
     }
   };
 
@@ -276,6 +308,17 @@ export default function ShotImagesPanel({ shotId, shotRef, projectId, aspectRati
                   >
                     <Upload size={11} />
                   </button>
+                  {image && (
+                    <button
+                      type="button"
+                      disabled={deletingImage}
+                      onClick={() => handleDeleteImage(kind, label)}
+                      title="Delete this image"
+                      className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-slate-400 hover:border-red-400/40 hover:text-red-300 disabled:opacity-40"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -402,6 +445,19 @@ export default function ShotImagesPanel({ shotId, shotRef, projectId, aspectRati
                   rows={2}
                   className="mb-3 w-full resize-y rounded-md border border-white/10 bg-white/5 p-2 text-[11px] text-slate-200 placeholder:text-slate-500"
                 />
+              )}
+
+              {uploadMode === "step" && (
+                <button
+                  type="button"
+                  onClick={handleDownloadStepBundle}
+                  disabled={!stepSourceId || bundling || uploading}
+                  title="The exact prompt and images this step would send, to run in another image tool"
+                  className="mb-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 py-1.5 text-[11px] font-bold text-slate-200 hover:border-purple-400/30 disabled:opacity-55"
+                >
+                  {bundling ? <Loader2 size={12} className="animate-spin" /> : <FileArchive size={12} />}
+                  {bundling ? "Preparing…" : "Download prompt + images (zip) to generate outside"}
+                </button>
               )}
 
               <div className="flex items-center justify-end gap-2">
