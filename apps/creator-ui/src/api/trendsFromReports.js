@@ -38,11 +38,22 @@ export function trendMomentRequest({ category, label }) {
   };
 }
 
-/** Newest report per category -> { categories: [{ category, label, ideas }] }, the shape the idea
- * panel reads. Categories with no report yet come back empty. */
+/** Trends are only generated when the creator asks (each run is charged to the wallet), so the
+ * last run is shown until then -- flagged stale once it is older than this. */
+export const TRENDS_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+
+export function isTrendsStale(updatedAt, now = Date.now()) {
+  const time = updatedAt ? new Date(updatedAt).getTime() : NaN;
+  return !Number.isNaN(time) && now - time > TRENDS_STALE_AFTER_MS;
+}
+
+/** Newest report per category -> { updatedAt, categories: [{ category, label, ideas }] }, the shape
+ * the idea panel and home page read. updatedAt is when moments were last generated (null if never);
+ * categories with no report yet come back empty. */
 export function trendMomentsFromReports(reports) {
   const moments = (Array.isArray(reports) ? reports : []).filter(isTrendMomentReport);
   return {
+    updatedAt: moments.map((report) => String(report.createdAt || "")).sort().pop() || null,
     categories: TREND_MOMENT_CATEGORIES.map(({ category, label }) => {
       const newest = moments
         .filter((report) => report.industry === `${TREND_MOMENT_PREFIX}${category}`)

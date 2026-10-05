@@ -1,7 +1,8 @@
 // @ts-nocheck
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import { Check, ChevronLeft, ChevronRight, FileText, Loader2, RefreshCw, Save, Sparkles } from "lucide-react";
 import AiProviderSelect from "../ai/AiProviderSelect.jsx";
+import { isTrendsStale } from "../../api/trendsFromReports.js";
 
 export default function IdeaCandidatesPanel({
   lockedBrief,
@@ -61,12 +62,10 @@ export default function IdeaCandidatesPanel({
   projectMode = false,
   weeklyIdeaTags = {},
   weeklyIdeaTagsLoading = false,
-  onLoadWeeklyIdeaTags,
   onSelectWeeklyIdeaTag,
   onRefreshWeeklyIdeaTags,
 }) {
   const [expandedIdeaIds, setExpandedIdeaIds] = useState(() => new Set());
-  const weeklyTagsAutoLoadRef = useRef(false);
   const page = pageInfo?.number || 0;
   const totalPages = Math.max(1, pageInfo?.totalPages || 1);
   const totalElements = pageInfo?.totalElements || ideas.length;
@@ -89,12 +88,6 @@ export default function IdeaCandidatesPanel({
     if (!prompt) return;
     onSelectWeeklyIdeaTag?.({ ...tag, prompt });
   };
-
-  useEffect(() => {
-    if (lockedBrief || projectMode || weeklyIdeaTagsLoading || hasWeeklyIdeaTags || weeklyTagsAutoLoadRef.current) return;
-    weeklyTagsAutoLoadRef.current = true;
-    onLoadWeeklyIdeaTags?.();
-  }, [hasWeeklyIdeaTags, lockedBrief, onLoadWeeklyIdeaTags, projectMode, weeklyIdeaTagsLoading]);
 
   return (
     <section className="creator-panel flex h-full min-h-0 flex-col p-4">
@@ -135,6 +128,7 @@ export default function IdeaCandidatesPanel({
                 cloud={weeklyIdeaCloud}
                 isLoading={weeklyIdeaTagsLoading}
                 hasTags={hasWeeklyIdeaTags}
+                updatedAt={weeklyIdeaTags?.updatedAt}
                 onRefresh={onRefreshWeeklyIdeaTags}
                 onSelectTag={handleWeeklyIdeaTagClick}
               />
@@ -760,7 +754,8 @@ const hookLensOptions = [
   { value: "economics", label: "Economics" },
 ];
 
-function WeeklyIdeaCloud({ cloud, isLoading, hasTags, onRefresh, onSelectTag }) {
+function WeeklyIdeaCloud({ cloud, isLoading, hasTags, updatedAt, onRefresh, onSelectTag }) {
+  const stale = isTrendsStale(updatedAt);
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4 text-left">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -771,6 +766,11 @@ function WeeklyIdeaCloud({ cloud, isLoading, hasTags, onRefresh, onSelectTag }) 
             <p className="mt-1 text-xs font-medium text-slate-500">
               Pick a tag to copy its brief into the Creative Brief topic box.
             </p>
+            {stale ? (
+              <p className="mt-1 text-xs font-semibold text-amber-300">
+                Stale — last updated {new Date(updatedAt).toLocaleDateString()}. Refresh moments to update them.
+              </p>
+            ) : null}
           </div>
         </div>
         <button
@@ -778,7 +778,7 @@ function WeeklyIdeaCloud({ cloud, isLoading, hasTags, onRefresh, onSelectTag }) 
           onClick={onRefresh}
           disabled={isLoading}
           className="creator-control inline-flex shrink-0 items-center justify-center gap-2 px-3 py-2 text-[11px] font-bold text-slate-100 disabled:opacity-50"
-          title="Refresh trend moments"
+          title="Generates fresh trend moments; charged to your wallet"
         >
           <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
           Refresh moments
@@ -814,7 +814,7 @@ function WeeklyIdeaCloud({ cloud, isLoading, hasTags, onRefresh, onSelectTag }) 
         })}
         {!isLoading && !hasTags ? (
           <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs font-semibold text-slate-400">
-            Trend moments are not loaded yet. Refresh moments to create the first marketing cloud.
+            No trend moments yet. Refresh moments to generate them (charged to your wallet).
           </p>
         ) : null}
       </div>

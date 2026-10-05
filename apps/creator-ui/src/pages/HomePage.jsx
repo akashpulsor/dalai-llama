@@ -21,18 +21,13 @@ import { selectTenantId, showFlash, useGetWalletBalanceQuery } from "@dalaillama
 import {
   useGetProductionCostEstimateQuery,
   useCreateProjectRequirementMutation,
-  useGenerateTrendReportMutation,
   useListBrandsQuery,
   useListPreProductionProjectsQuery,
   useListProjectRequirementsQuery,
-  useListTrendReportsQuery,
+  useGetWeeklyIdeaTagsQuery,
+  useRefreshWeeklyIdeaTagsMutation,
 } from "../api/creatorEndpoints.js";
-
-// Auto-generated once per tenant (only when they have zero trend reports yet) so the home page
-// cloud has real content without asking the creator to pick a topic first -- trend-intelligence-
-// service's /v1/trend-reports is topic-scoped generation, not a generic "what's trending" feed
-// the way creator-service's (currently un-deployed) /creator/trends was meant to be.
-const DEFAULT_TREND_TOPIC = "Trending short-form video ad ideas in India right now";
+import TrendMomentSections from "../components/trends/TrendMomentSections.jsx";
 
 // The 6 real values of pre-production-service's ProjectStatus enum -- no "needs review" or
 // "failed" project-level status exists; that lives one level down on ShotStatus. CLIENT_LOCKED
@@ -107,31 +102,18 @@ export default function HomePage() {
     () => requirements.filter((requirement) => !requirement.funded).length,
     [requirements],
   );
-  const { data: trendReports = [], isFetching: trendReportsLoading } = useListTrendReportsQuery();
-  const [generateTrendReport, { isLoading: generatingTrendReport }] = useGenerateTrendReportMutation();
-  const trendsLoading = trendReportsLoading || generatingTrendReport;
-  // A ref, not mutation/query loading state, gates this -- generateTrendReport's own invalidatesTags
-  // refetches the list on every attempt (success OR failure), which flips trendReportsLoading and
-  // re-runs an effect keyed on it. Gating on that loading state alone caused a runaway retry loop
-  // (a real LLM call fired on every refetch cycle, dozens of times a minute) the first time this
-  // shipped. A ref set synchronously before the call, checked before anything else, guarantees at
-  // most one generation attempt per mount no matter how the query/mutation state churns afterward.
-  const attemptedTrendGeneration = useRef(false);
-
-  useEffect(() => {
-    if (attemptedTrendGeneration.current) return;
-    if (trendReportsLoading || trendReports.length > 0) return;
-    // Wait for a real balance reading, and don't spend a paid generation call when there's
-    // nothing to pay for it -- leaves attemptedTrendGeneration unset so this re-checks (and
-    // fires) automatically once the tenant recharges, same as any other deps change.
-    if (!tenantId || walletLoading) return;
-    if (walletBalance <= 0) return;
-    attemptedTrendGeneration.current = true;
-    generateTrendReport({ topic: DEFAULT_TREND_TOPIC }).catch(() => {
-      // Silent -- the "Trending now" section just stays hidden if generation fails, same as any
-      // other optional home-page widget with no data yet.
-    });
-  }, [trendReportsLoading, trendReports.length, generateTrendReport, tenantId, walletLoading, walletBalance]);
+  // Trend moments are generated only when the creator presses Update trends (charged to the
+  // wallet); until then the last run is shown.
+  const { data: trendMoments, isFetching: trendMomentsLoading } = useGetWeeklyIdeaTagsQuery(undefined, { skip: !tenantId });
+  const [refreshTrendMoments, { isLoading: updatingTrends }] = useRefreshWeeklyIdeaTagsMutation();
+  const updateTrends = async () => {
+    try {
+      await refreshTrendMoments().unwrap();
+      dispatch(showFlash({ message: "Trends updated", type: "success" }));
+    } catch {
+      dispatch(showFlash({ message: "Could not update trends — some categories may not have refreshed", type: "error" }));
+    }
+  };
 
   const [brief, setBrief] = useState("");
   const [projectsModalOpen, setProjectsModalOpen] = useState(false);
@@ -192,17 +174,8 @@ export default function HomePage() {
 
   const [createProjectRequirement, { isLoading: creating }] = useCreateProjectRequirementMutation();
 
-  const trendCloud = useMemo(() => {
-    const predictions = trendReports[0]?.predictions || [];
-    return predictions.map((prediction, index) => ({
-      id: `trend-${index}`,
-      title: prediction?.title || "Trend",
-      score: Math.round(Number(prediction?.confidenceScore || 0) * 100),
-    }));
-  }, [trendReports]);
-
   const pickTrend = (trend) => {
-    setBrief(trend.title);
+    setBrief(trend.prompt || trend.title);
     openModal();
   };
 
@@ -328,38 +301,15 @@ export default function HomePage() {
           className="creator-input mb-3.5 w-full resize-y px-3 py-3 text-[13px]"
         />
 
-        {(trendsLoading || trendCloud.length > 0) && (
-          <div className="mb-3.5 border-t border-white/10 pt-3.5">
-            <p className="mb-2.5 flex items-center gap-1.5 text-[11px] font-bold text-amber-300">
-              <TrendingUp size={13} />
-              Trending now — tap one to start a video
-            </p>
-            {trendsLoading && trendCloud.length === 0 ? (
-              <p className="text-xs font-semibold text-slate-500">Loading trends…</p>
-            ) : (
-              <div className="flex flex-wrap items-center gap-2">
-                {trendCloud.map((trend, index) => {
-                  const sizeClass = index % 5 === 0 ? "text-sm px-4 py-2.5" : index % 3 === 0 ? "text-xs px-3.5 py-2" : "text-[11px] px-3 py-1.5";
-                  return (
-                    <button
-                      key={trend.id}
-                      type="button"
-                      onClick={() => pickTrend(trend)}
-                      className={`inline-flex max-w-full items-center gap-2 rounded-full border font-extrabold transition ${sizeClass} border-amber-400/20 bg-amber-400/10 text-amber-200 hover:border-amber-400/40 hover:bg-amber-400/15`}
-                    >
-                      <span className="truncate">{trend.title}</span>
-                      {trend.score > 0 && (
-                        <span className="shrink-0 rounded-full bg-black/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-300/80">
-                          {trend.score.toFixed(0)}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
+        <TrendMomentSections
+          moments={trendMoments}
+          lastRun={relativeTime(trendMoments?.updatedAt)}
+          isLoading={trendMomentsLoading}
+          isUpdating={updatingTrends}
+          canUpdate={!walletLoading && walletBalance > 0}
+          onUpdate={updateTrends}
+          onPick={pickTrend}
+        />
 
         <div className="flex justify-end">
           <button type="button" onClick={openModal} className="creator-primary flex items-center gap-2 px-5 py-2.5 text-[13px] font-bold text-white">

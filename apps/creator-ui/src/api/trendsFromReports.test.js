@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isTrendMomentReport, trendMomentRequest, trendMomentsFromReports, trendsFromReports } from "./trendsFromReports.js";
+import { isTrendMomentReport, isTrendsStale, trendMomentRequest, trendMomentsFromReports, trendsFromReports } from "./trendsFromReports.js";
 
 const report = {
   id: "r1",
@@ -36,12 +36,25 @@ test("trend moments: newest report per category, empty where none was generated"
   const newer = { id: "new", industry: "trend-moments:sports", createdAt: "2026-10-04T00:00:00Z",
     predictions: [{ title: "Asia Cup final", summary: "Fans react", suggestedTags: ["#AsiaCup"] }] };
 
-  const { categories } = trendMomentsFromReports([older, newer, report]);
+  const { categories, updatedAt } = trendMomentsFromReports([older, newer, report]);
 
   const sports = categories.find((c) => c.category === "sports");
   assert.deepEqual(sports.ideas, [{ id: "new:0", title: "Asia Cup final", prompt: "Fans react", tags: ["#AsiaCup"] }]);
   assert.deepEqual(categories.find((c) => c.category === "history").ideas, []);
   assert.equal(categories.length, 5);
+  assert.equal(updatedAt, "2026-10-04T00:00:00Z");
+});
+
+test("never generated is no last-run time, not stale", () => {
+  assert.equal(trendMomentsFromReports([report]).updatedAt, null);
+  assert.equal(isTrendsStale(null), false);
+});
+
+test("trends are stale a day after the last run", () => {
+  const ranAt = "2026-10-04T00:00:00Z";
+  const hour = 60 * 60 * 1000;
+  assert.equal(isTrendsStale(ranAt, Date.parse(ranAt) + 23 * hour), false);
+  assert.equal(isTrendsStale(ranAt, Date.parse(ranAt) + 25 * hour), true);
 });
 
 test("a trend-moment report is told apart from a planner trend report", () => {

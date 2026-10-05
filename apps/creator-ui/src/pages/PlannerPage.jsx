@@ -6316,25 +6316,6 @@ export default function PlannerPage() {
     flash("Idea copied into the topic box.", "success");
   };
 
-  const handleLoadWeeklyIdeaTags = async () => {
-    if (!tenantId) return;
-    let latestTags = weeklyIdeaTags;
-    try {
-      const result = await refetchWeeklyIdeaTags?.();
-      latestTags = result?.data || result?.currentData || latestTags;
-    } catch {
-      // If cached lookup fails, fall through to refresh so API errors surface normally.
-    }
-    if (hasWeeklyIdeaTagsPayload(latestTags)) return;
-    try {
-      await refreshWeeklyIdeaTags().unwrap();
-      await refetchWeeklyIdeaTags?.();
-      addActivity("Trend moments loaded", "Next 7 days");
-    } catch (error) {
-      handlePaidModelError(error, "Could not load trend moments.", "trend moment refresh");
-    }
-  };
-
   const handleRefreshWeeklyIdeaTags = async () => {
     try {
       await refreshWeeklyIdeaTags().unwrap();
@@ -9067,7 +9048,6 @@ export default function PlannerPage() {
           projectMode={projectWorkspaceMode}
           weeklyIdeaTags={weeklyIdeaTags}
           weeklyIdeaTagsLoading={weeklyIdeaTagsLoading || refreshWeeklyIdeaTagsState.isLoading}
-          onLoadWeeklyIdeaTags={handleLoadWeeklyIdeaTags}
           onSelectWeeklyIdeaTag={handleSelectWeeklyIdeaTag}
           onRefreshWeeklyIdeaTags={handleRefreshWeeklyIdeaTags}
         />
@@ -11061,25 +11041,6 @@ function normalizeGeneratedIdea(idea) {
     adConceptStrategy: idea?.adConceptStrategy || creativeNotes?.adConceptStrategy || creativeNotes?.campaignStrategy || {},
     creativeNotes,
   };
-}
-
-function hasWeeklyIdeaTagsPayload(payload = {}) {
-  const hasText = (item = {}) => Boolean(String(
-    item?.title
-    || item?.label
-    || item?.tag
-    || item?.topic
-    || item?.prompt
-    || item?.creatorPrompt
-    || item?.brief
-    || ""
-  ).trim());
-  const categories = Array.isArray(payload?.categories) ? payload.categories : [];
-  if (categories.some((category) => Array.isArray(category?.ideas) && category.ideas.some(hasText))) {
-    return true;
-  }
-  const tags = Array.isArray(payload?.tags) ? payload.tags : [];
-  return tags.some(hasText);
 }
 
 function buildLocalGeneratedIdeasFromBrief(brief, context = {}) {
