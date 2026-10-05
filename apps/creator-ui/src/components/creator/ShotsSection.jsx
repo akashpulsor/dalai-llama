@@ -3,7 +3,7 @@ import ProCta from "../common/ProCta.jsx";
 import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Film, FileDown, Loader2, MessageSquareQuote, Mic, Pencil, Plus, RefreshCw, Save, Sparkles, Trash2, X } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, ChevronDown, ChevronUp, Film, FileDown, ImageIcon, Loader2, MessageSquareQuote, Mic, Pencil, Plus, RefreshCw, Save, Sparkles, Trash2, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useCreatePreProductionShotMutation,
@@ -352,6 +352,8 @@ export default function ShotsSection({ projectId }) {
     reanalyzeMissing(projectId).unwrap().catch(() => {});
   }, [projectId, reanalyzeMissing]);
   const completeShotIds = new Set(completion.filter((c) => c.complete).map((c) => c.shotId));
+  // Shots whose final photoreal frame exists (generated or uploaded) -- the ones not to revisit.
+  const framedShotIds = new Set(completion.filter((c) => c.hasProductionFrame).map((c) => c.shotId));
   const [generateList, { isLoading: submitting }] = useGeneratePreProductionShotListMutation();
   // Opt-in cache bypass. The backend idempotency key covers the screenplay + script but not the
   // prompt-template version, so after a template change the same inputs replay the old answer.
@@ -690,6 +692,12 @@ export default function ShotsSection({ projectId }) {
                   <div className="min-w-0">
                     <p className="text-xs font-bold text-white">
                       Shot {shot.shotNumber} <span className="ml-1.5 font-medium text-slate-500">{shot.shotType}</span>
+                      {framedShotIds.has(shot.id) && (
+                        <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-1.5 py-0.5 align-text-bottom text-[9px] font-bold text-emerald-200"
+                          title="Production frame ready">
+                          <ImageIcon size={9} /> Frame <Check size={9} />
+                        </span>
+                      )}
                       {completeShotIds.has(shot.id) && (
                         <CheckCircle2 size={13} className="ml-1.5 inline-block shrink-0 align-text-bottom text-emerald-400" title="All assets generated" />
                       )}
