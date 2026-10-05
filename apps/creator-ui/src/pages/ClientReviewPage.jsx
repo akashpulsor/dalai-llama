@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Circle, CreditCard, Download, FileText, ImageIcon, ImagePlus, Loader2, Lock, PlayCircle, Send, Sparkles, User2, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Circle, CreditCard, Download, FileText, ImageIcon, ImagePlus, Loader2, Lock, PlayCircle, Send, Sparkles, User2, Video, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import CanvasVideoPlayer from "../components/review/CanvasVideoPlayer.jsx";
 import {
@@ -328,8 +328,25 @@ export default function ClientReviewPage() {
                     <div key={shot.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-3.5">
                       <p className="mb-2 text-xs font-bold text-white">
                         Shot {shot.shotNumber} <span className="ml-1.5 font-medium text-slate-500">{shot.shotType}</span>
+                        {shot.clientFootage && (
+                          <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-amber-400/40 bg-amber-500/15 px-2 py-0.5 align-middle text-[10px] font-extrabold text-amber-200">
+                            <Video size={10} /> Your footage
+                          </span>
+                        )}
                       </p>
                       {shot.action && <p className="mb-3 text-[11px] font-medium text-slate-400">{shot.action}</p>}
+                      {/* The client supplies this shot themselves -- say so plainly, with what is
+                          needed, so they know where their footage goes in the film. */}
+                      {shot.clientFootage && (
+                        <div className="mb-3 rounded-lg border border-dashed border-amber-400/40 bg-amber-500/[0.06] p-3">
+                          <p className="flex items-center gap-1.5 text-[11px] font-extrabold text-amber-200">
+                            <Video size={12} /> Your own footage goes here
+                          </p>
+                          <p className="mt-1 text-[11px] font-medium text-amber-100/80">
+                            {shot.clientFootageNote || "This shot uses footage you provide instead of a generated frame."}
+                          </p>
+                        </div>
+                      )}
                       {/* Client review is the CLIENT's view. Only show frames that were actually
                           generated (truthy signedUrl) -- placeholders for pending/failed rows are
                           creator-side signal and don't belong here. The PRODUCTION frame is the

@@ -3,7 +3,7 @@ import ProCta from "../common/ProCta.jsx";
 import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
-import { AlertTriangle, Check, CheckCircle2, ChevronDown, ChevronUp, Film, FileDown, ImageIcon, Loader2, MessageSquareQuote, Mic, Pencil, Plus, RefreshCw, Save, Sparkles, Trash2, X } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, ChevronDown, ChevronUp, Film, FileDown, ImageIcon, Loader2, MessageSquareQuote, Mic, Pencil, Plus, RefreshCw, Save, Sparkles, Trash2, Video, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useCreatePreProductionShotMutation,
@@ -100,6 +100,36 @@ const TIME_OF_DAY_OPTIONS = [
   { value: "MAGIC_HOUR", label: "Magic hour" },
   { value: "NIGHT", label: "Night" },
 ];
+
+/** One-click tag for a shot the client supplies themselves. The note says what footage is needed
+ * and is what the client sees on the review page next to "Your own footage goes here". */
+function ClientFootageControl({ shot, onSave, saving }) {
+  const [note, setNote] = useState(shot.clientFootageNote || "");
+  React.useEffect(() => { setNote(shot.clientFootageNote || ""); }, [shot.clientFootageNote]);
+  const noteDirty = (note || "") !== (shot.clientFootageNote || "");
+
+  return (
+    <div className={`rounded-md border p-2.5 ${shot.clientFootage ? "border-amber-400/30 bg-amber-500/[0.06]" : "border-white/10 bg-white/[0.02]"}`}>
+      <label className="flex cursor-pointer items-center gap-2 text-[11px] font-bold text-slate-200">
+        <input type="checkbox" checked={Boolean(shot.clientFootage)} disabled={saving}
+          onChange={(e) => onSave({ clientFootage: e.target.checked }).catch(() => {})} />
+        <Video size={12} className={shot.clientFootage ? "text-amber-300" : "text-slate-500"} />
+        Client footage — the client supplies this shot
+      </label>
+      {shot.clientFootage && (
+        <div className="mt-2 flex gap-2">
+          <input value={note} onChange={(e) => setNote(e.target.value)}
+            placeholder="What footage is needed, e.g. real travellers speaking to camera about their stay"
+            className="creator-input flex-1 px-2.5 py-1.5 text-[11px]" />
+          <button type="button" disabled={!noteDirty || saving} onClick={() => onSave({ clientFootageNote: note }).catch(() => {})}
+            className="rounded-md border border-amber-400/40 bg-amber-500/15 px-2.5 py-1 text-[10px] font-bold text-amber-100 disabled:opacity-50">
+            Save note
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Hand-edit a shot's plan -- same click-pencil-to-edit pattern as the Lighting/Camera plan
  * panels below (LightingCameraPlanPanel): a compact read summary by default, and clicking the
@@ -713,6 +743,12 @@ export default function ShotsSection({ projectId }) {
                         </span>
                       )}
                       <SpeechChip line={spoken} />
+                      {shot.clientFootage && (
+                        <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full border border-amber-400/30 bg-amber-500/10 px-1.5 py-0.5 align-text-bottom text-[9px] font-bold text-amber-200"
+                          title={shot.clientFootageNote || "The client supplies this shot"}>
+                          <Video size={9} /> Client footage
+                        </span>
+                      )}
                     </p>
                     {spoken ? (
                       <p className={`mt-0.5 line-clamp-1 text-[11px] font-semibold ${spoken.kind === "DIALOGUE" ? "text-sky-200" : "text-purple-200"}`}>
@@ -785,6 +821,11 @@ export default function ShotsSection({ projectId }) {
                       </div>
                     </div>
                   )}
+                  <ClientFootageControl
+                    shot={shot}
+                    saving={updatingShot}
+                    onSave={(patch) => handleUpdateShot(shot.id, patch)}
+                  />
                   <EditShotFields
                     shot={shot}
                     saving={updatingShot}
