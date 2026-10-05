@@ -4405,6 +4405,15 @@ export const creatorApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-tenants" }],
     }),
+    // Ops: what each project actually cost at the providers (Google, fal.ai, ElevenLabs), per model,
+    // in USD -- llm-gateway's per-call cost, recorded when each call finished.
+    listAdminProviderCosts: builder.query({
+      query: (tenantId) => ({ url: opsAdminUrl(`/llm-jobs/project-costs?tenantId=${tenantId}`) }),
+    }),
+    // Ops: the tenant's projects by name, so cost and P&L views can say which film an id is.
+    listAdminProjects: builder.query({
+      query: (tenantId) => ({ url: opsAdminUrl(`/production/projects?tenantId=${tenantId}`) }),
+    }),
     // Ops: provider cost vs charged vs client paid, with creator and platform profit.
     listAdminProjectEconomics: builder.query({
       query: (tenantId) => ({ url: opsAdminUrl(`/billing/tenants/${tenantId}/projects/economics`) }),
@@ -4807,6 +4816,8 @@ export const {
   useStartNextBriefMutation,
   useListProjectEconomicsQuery,
   useListAdminProjectEconomicsQuery,
+  useListAdminProviderCostsQuery,
+  useListAdminProjectsQuery,
   useGetAdminVideoPricingQuery,
   useGetAdminProductionCriticsQuery,
   useUpdateAdminProductionCriticsMutation,

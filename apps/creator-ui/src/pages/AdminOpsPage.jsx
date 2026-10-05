@@ -23,6 +23,8 @@ import {
   useDeactivateAdminTenantMutation,
   useGetAdminWalletQuery,
   useListAdminProjectEconomicsQuery,
+  useListAdminProjectsQuery,
+  useListAdminProviderCostsQuery,
   useGetAdminVideoPricingQuery,
   useGetAdminProductionCriticsQuery,
   useUpdateAdminProductionCriticsMutation,
@@ -36,6 +38,7 @@ import {
   useDeactivateAdminPlanMutation,
 } from "../api/creatorEndpoints.js";
 import { ProductionChargeLines, ProjectEconomicsCard, money } from "../components/billing/ProjectEconomics.jsx";
+import { ProviderCostCard, groupProviderCosts, usd } from "../components/billing/ProviderCosts.jsx";
 
 const OPS_HOST_HINT = "ops.dalaillama.in";
 
@@ -87,6 +90,7 @@ export default function AdminOpsPage() {
     { key: "tenants", label: "Tenants", component: <TenantsTab /> },
     { key: "wallets", label: "Wallets", component: <WalletsTab /> },
     { key: "projects", label: "Project P&L", component: <ProjectEconomicsTab /> },
+    { key: "costs", label: "Provider costs", component: <ProviderCostsTab /> },
     { key: "pricing", label: "Pricing", component: <PricingTab /> },
     { key: "plans", label: "Plans", component: <PlansTab /> },
   ];
@@ -558,6 +562,52 @@ function ProductionCriticsCard() {
   );
 }
 
+// ------- Provider costs tab ---------------------------------------------------
+
+/** What each project actually cost at the providers -- Google, fal.ai, ElevenLabs -- per model, in
+ * USD, from llm-gateway's per-call cost (recorded as each call finished, at the rate card's prices
+ * for the tokens/images/seconds the provider reported). Picks the tenant itself when there is one. */
+function ProviderCostsTab() {
+  const { data: tenants = [] } = useListAdminTenantsQuery();
+  const [tenantId, setTenantId] = useState("");
+  useEffect(() => {
+    if (!tenantId && tenants.length === 1) setTenantId(tenants[0].id);
+  }, [tenantId, tenants]);
+  const { data: rows = [], isFetching, isError, error } = useListAdminProviderCostsQuery(tenantId, { skip: !tenantId });
+  const { data: projects = [] } = useListAdminProjectsQuery(tenantId, { skip: !tenantId });
+  const groups = React.useMemo(() => groupProviderCosts(rows, projects), [rows, projects]);
+  const total = groups.reduce((sum, g) => sum + g.total, 0);
+
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <label className="text-slate-500">Tenant:</label>
+        <select value={tenantId} onChange={(e) => setTenantId(e.target.value)}
+          className="creator-input flex-1 px-2.5 py-1.5 text-[11px] font-semibold">
+          <option value="">— pick a tenant —</option>
+          {tenants.map((t) => (
+            <option key={t.id} value={t.id}>{t.name} ({t.primaryContactEmail})</option>
+          ))}
+        </select>
+        {tenantId && !isFetching && <span className="font-bold text-slate-200">All projects: {usd(total)}</span>}
+      </div>
+      <p className="text-[10px] text-slate-500">
+        Actual usage priced at each provider's list rate when the call ran (USD). Calls that came back with no result
+        (e.g. Gemini refusing an image) are counted under "No result".
+      </p>
+      {!tenantId ? null : isFetching ? (
+        <p className="text-xs text-slate-500">Loading…</p>
+      ) : isError ? (
+        <p className="text-xs text-rose-300">{error?.data?.message || "Could not load provider costs"}</p>
+      ) : groups.length === 0 ? (
+        <p className="text-xs text-slate-500">No provider calls recorded for this tenant yet.</p>
+      ) : (
+        groups.map((group) => <ProviderCostCard key={group.projectId || "none"} group={group} />)
+      )}
+    </section>
+  );
+}
+
 // ------- Project P&L tab -----------------------------------------------------
 
 /** Per project for one tenant: actual provider charges vs what the creator was charged vs what
@@ -567,6 +617,8 @@ function ProjectEconomicsTab() {
   const { data: tenants = [] } = useListAdminTenantsQuery();
   const [tenantId, setTenantId] = useState("");
   const { data: statements = [], isFetching, isError, error } = useListAdminProjectEconomicsQuery(tenantId, { skip: !tenantId });
+  const { data: projects = [] } = useListAdminProjectsQuery(tenantId, { skip: !tenantId });
+  const projectName = (id) => projects.find((p) => p.id === id)?.name || `Project ${id}`;
 
   return (
     <section className="space-y-4">
@@ -591,7 +643,7 @@ function ProjectEconomicsTab() {
         <p className="text-xs text-slate-500">This tenant has no charged or paid projects yet.</p>
       ) : (
         statements.map((economics) => (
-          <ProjectEconomicsCard key={economics.projectId} economics={economics} title={`Project ${economics.projectId}`} />
+          <ProjectEconomicsCard key={economics.projectId} economics={economics} title={projectName(economics.projectId)} />
         ))
       )}
     </section>
