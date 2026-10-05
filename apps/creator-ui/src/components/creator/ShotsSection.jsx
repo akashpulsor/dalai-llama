@@ -1,9 +1,9 @@
 // @ts-nocheck
 import ProCta from "../common/ProCta.jsx";
 import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Film, FileDown, Loader2, Pencil, Plus, RefreshCw, Save, Sparkles, Trash2, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Film, FileDown, Loader2, MessageSquareQuote, Mic, Pencil, Plus, RefreshCw, Save, Sparkles, Trash2, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useCreatePreProductionShotMutation,
@@ -13,6 +13,7 @@ import {
   useGetAnimatedPreviewHtmlMutation,
   useGetLatestPreProductionShotListJobQuery,
   useGetPreProductionShotListJobQuery,
+  useGetScreenplayQuery,
   useListPreProductionShotsQuery,
   useListShotAssetCompletionQuery,
   useListShotPlanIssuesQuery,
@@ -20,6 +21,8 @@ import {
   useUpdatePreProductionShotMutation,
 } from "../../api/creatorEndpoints.js";
 import ShotImagesPanel from "./ShotImagesPanel.jsx";
+import VoiceTimeline, { SpeechChip } from "./VoiceTimeline.jsx";
+import { buildVoiceTimeline, formatTime } from "../../utils/voiceTimeline.js";
 import ShotReferenceImagesPanel from "./ShotReferenceImagesPanel.jsx";
 import ShotReorderControl from "./ShotReorderControl.jsx";
 import ShotProductReferencePanel from "./ShotProductReferencePanel.jsx";
@@ -316,9 +319,19 @@ function EditShotFields({ shot, onSave, saving }) {
 export default function ShotsSection({ projectId }) {
   const dispatch = useDispatch();
   const [openShotId, setOpenShotId] = useState(null);
+  const openShotFromTimeline = (shotId) => {
+    setOpenShotId(shotId);
+    requestAnimationFrame(() => document.getElementById(`shot-row-${shotId}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
 
   const [showIssues, setShowIssues] = useState(false);
   const { data: shots = [], isLoading, refetch: refetchShots } = useListPreProductionShotsQuery(projectId, { skip: !projectId });
+  const { data: screenplay } = useGetScreenplayQuery(projectId, { skip: !projectId });
+  // The spoken track, read off the shots: sections by screenplay scene, timed by shot durations.
+  const voiceTimeline = useMemo(() => buildVoiceTimeline(shots, screenplay?.scenes || []), [shots, screenplay]);
+  const spokenLineByShot = useMemo(() => new Map(
+    voiceTimeline.sections.flatMap((section) => section.lines).map((line) => [line.shotId, line])
+  ), [voiceTimeline]);
   const { data: issues = [] } = useListShotPlanIssuesQuery(projectId, { skip: !projectId });
   const { data: completion = [] } = useListShotAssetCompletionQuery(projectId, { skip: !projectId });
   const [reanalyzeMissing] = useReanalyzePreProductionShotImagesForProjectMutation();
@@ -652,11 +665,14 @@ export default function ShotsSection({ projectId }) {
         </div>
       )}
 
+      <VoiceTimeline timeline={voiceTimeline} onOpenShot={openShotFromTimeline} />
+
       <div className="space-y-2.5">
         {shots.map((shot) => {
           const isOpen = openShotId === shot.id;
+          const spoken = spokenLineByShot.get(shot.id);
           return (
-            <div key={shot.id} className="rounded-lg border border-white/10 bg-white/[0.02]">
+            <div key={shot.id} id={`shot-row-${shot.id}`} className="scroll-mt-4 rounded-lg border border-white/10 bg-white/[0.02]">
               <button
                 type="button"
                 onClick={() => setOpenShotId(isOpen ? null : shot.id)}
@@ -687,8 +703,15 @@ export default function ShotsSection({ projectId }) {
                           {shot.cast.castDisplayName}
                         </span>
                       )}
+                      <SpeechChip line={spoken} />
                     </p>
-                    <p className="mt-0.5 line-clamp-1 text-[11px] font-medium text-slate-400">{shot.scriptLine || shot.cameraNote}</p>
+                    {spoken ? (
+                      <p className={`mt-0.5 line-clamp-1 text-[11px] font-semibold ${spoken.kind === "DIALOGUE" ? "text-sky-200" : "text-purple-200"}`}>
+                        {spoken.kind === "DIALOGUE" ? `“${spoken.text}”` : spoken.text}
+                      </p>
+                    ) : (
+                      <p className="mt-0.5 line-clamp-1 text-[11px] font-medium text-slate-400">{shot.scriptLine || shot.cameraNote}</p>
+                    )}
                     {/* Reordering belongs here, on the shot list, because this is where the edit
                         is decided -- and it says what the move would do before it does it. */}
                     <div className="mt-1.5 flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
@@ -714,6 +737,21 @@ export default function ShotsSection({ projectId }) {
 
               {isOpen && (
                 <div className="space-y-3 border-t border-white/10 px-4 py-3.5">
+                  {spoken && (
+                    <div className={`rounded-md border p-2.5 ${spoken.kind === "DIALOGUE"
+                      ? "border-sky-400/25 bg-sky-500/[0.06]" : "border-purple-400/25 bg-purple-500/[0.06]"}`}>
+                      <p className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-300">
+                        {spoken.kind === "DIALOGUE" ? <MessageSquareQuote size={11} /> : <Mic size={11} />}
+                        {spoken.kind === "DIALOGUE" ? `Dialogue${spoken.speaker ? ` · ${spoken.speaker}` : ""}` : "Voice-over"}
+                        <span className="font-semibold normal-case tracking-normal text-slate-500">
+                          {formatTime(spoken.start)}–{formatTime(spoken.end)} in the film
+                        </span>
+                      </p>
+                      <p className="mt-1 text-xs font-medium leading-relaxed text-slate-100">
+                        {spoken.kind === "DIALOGUE" ? `“${spoken.text}”` : spoken.text}
+                      </p>
+                    </div>
+                  )}
                   {shot.cast && (
                     <div className="flex items-center gap-3 rounded-md border border-emerald-400/20 bg-emerald-500/[0.04] p-2.5">
                       {shot.cast.castFaceImageUrl ? (
