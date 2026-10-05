@@ -25,6 +25,7 @@ const platformApiOrigin = (() => {
   }
 })();
 const platformUrl = (path) => `${platformApiOrigin}/v1${path}`;
+const CAST_PROFILES_TAG = { type: "CreatorHomeProjects", id: "cast-profiles" };
 
 /** Writes a shot-controls mutation's answer into getShotGenerationControls' cache for that shot. */
 async function cacheShotControls({ projectId, shotId }, { dispatch, queryFulfilled }) {
@@ -2534,16 +2535,21 @@ export const creatorApi = apiSlice.injectEndpoints({
         const qs = params.toString();
         return { url: platformUrl(`/cast-profiles${qs ? `?${qs}` : ""}`) };
       },
-      providesTags: (_result, _error, args) => [{ type: "CreatorHomeProjects", id: `cast-profiles-${args?.projectId || "library"}-${args?.profileType || "all"}` }],
+      // One tag for every scope: actors are library-wide, so a create/edit/voice/face change on one
+      // must refresh the Cast Library and every project's Cast tab alike.
+      providesTags: [CAST_PROFILES_TAG],
     }),
 
     createCastProfile: builder.mutation({
       query: (body) => ({ url: platformUrl("/cast-profiles"), method: "POST", body }),
-      invalidatesTags: (_result, _error, args) => [
-        { type: "CreatorHomeProjects", id: `cast-profiles-${args?.projectId || "library"}-${args?.profileType || "all"}` },
-        { type: "CreatorHomeProjects", id: `cast-profiles-${args?.projectId || "library"}-all` },
-        { type: "CreatorHomeProjects", id: "cast-profiles-library-all" },
-      ],
+      invalidatesTags: [CAST_PROFILES_TAG],
+    }),
+
+    // PUT /v1/cast-profiles/{id} -- edits name/description/age/gender, and the face when a new
+    // {faceRefBucket, faceRefObjectKey} from uploadCastMedia is sent (omitted keeps the current one).
+    updateCastProfile: builder.mutation({
+      query: ({ castProfileId, ...body }) => ({ url: platformUrl(`/cast-profiles/${castProfileId}`), method: "PUT", body }),
+      invalidatesTags: [CAST_PROFILES_TAG],
     }),
 
     // PUT /v1/cast-profiles/{id}/voice -- attaches (or replaces) a voice sample on a cast profile
@@ -2556,11 +2562,7 @@ export const creatorApi = apiSlice.injectEndpoints({
         method: "PUT",
         body: { castProfileId, ...(projectId ? { projectId } : {}), voiceIdentityType: "HUMAN", voiceRefBucket, voiceRefObjectKey },
       }),
-      invalidatesTags: (_result, _error, args) => [
-        { type: "CreatorHomeProjects", id: `cast-profiles-${args?.projectId || "library"}-${args?.profileType || "all"}` },
-        { type: "CreatorHomeProjects", id: `cast-profiles-${args?.projectId || "library"}-all` },
-        { type: "CreatorHomeProjects", id: "cast-profiles-library-all" },
-      ],
+      invalidatesTags: [CAST_PROFILES_TAG],
     }),
 
     // PUT /v1/cast-profiles/{id}/voice -- store the provider-qualified identity returned
@@ -2577,11 +2579,7 @@ export const creatorApi = apiSlice.injectEndpoints({
           providerId,
         },
       }),
-      invalidatesTags: (_result, _error, args) => [
-        { type: "CreatorHomeProjects", id: `cast-profiles-${args?.projectId || "library"}-${args?.profileType || "all"}` },
-        { type: "CreatorHomeProjects", id: `cast-profiles-${args?.projectId || "library"}-all` },
-        { type: "CreatorHomeProjects", id: "cast-profiles-library-all" },
-      ],
+      invalidatesTags: [CAST_PROFILES_TAG],
     }),
 
     // POST /v1/cast-profiles/media (multipart) -- uploads a raw face image or voice sample to
@@ -2661,9 +2659,7 @@ export const creatorApi = apiSlice.injectEndpoints({
         url: platformUrl(`/cast-profiles/${castProfileId}/generate-face`),
         method: "POST",
       }),
-      invalidatesTags: (_result, _error, args) => [
-        { type: "CreatorHomeProjects", id: `cast-profiles-${args?.projectId || "current"}` },
-      ],
+      invalidatesTags: [CAST_PROFILES_TAG],
     }),
 
     listCastAssignments: builder.query({
@@ -4684,6 +4680,7 @@ export const {
   useSaveScreenplayEditMutation,
   useListCastProfilesQuery,
   useCreateCastProfileMutation,
+  useUpdateCastProfileMutation,
   useUpdateCastProfileVoiceMutation,
   useSelectCastProfileBuiltinVoiceMutation,
   useUploadCastMediaMutation,

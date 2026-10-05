@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
-import { Mic, Plus, Save, User2, Users } from "lucide-react";
+import { Mic, Pencil, Plus, Save, User2, Users } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useListCastProfilesQuery,
@@ -10,6 +10,7 @@ import {
   useUploadCastMediaMutation,
 } from "../api/creatorEndpoints.js";
 import BuiltinVoicePicker from "../components/creator/BuiltinVoicePicker.jsx";
+import CastProfileEditForm from "../components/creator/CastProfileEditForm.jsx";
 import CastProfileQuickCreate from "../components/creator/CastProfileQuickCreate.jsx";
 import VoiceSampleField from "../components/creator/VoiceSampleField.jsx";
 import FeatureLock from "../components/billing/FeatureLock.jsx";
@@ -30,6 +31,7 @@ export default function CastLibraryPage() {
   const { entitlements } = useCreatorVideoEntitlements();
   const [creating, setCreating] = useState(false);
   const [voiceEditId, setVoiceEditId] = useState(null);
+  const [detailEditId, setDetailEditId] = useState(null);
   const [voiceEditMode, setVoiceEditMode] = useState("upload"); // "upload" | "builtin"
   const [voiceFile, setVoiceFile] = useState(null);
   const [pendingBuiltinVoice, setPendingBuiltinVoice] = useState(null);
@@ -133,14 +135,27 @@ export default function CastLibraryPage() {
                     <p className="text-[11px] font-medium text-slate-400">
                       {[actor.gender, actor.age ? `${actor.age}` : null].filter(Boolean).join(" · ") || "Actor"}
                     </p>
+                    {actor.description && (
+                      <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-500">{actor.description}</p>
+                    )}
                   </div>
                   <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold text-slate-400">
                     {actor.projectCount || 0} project{actor.projectCount === 1 ? "" : "s"}
                   </span>
                   <button
                     type="button"
+                    onClick={() => { setDetailEditId(detailEditId === actor.id ? null : actor.id); setVoiceEditId(null); }}
+                    title="Edit name, age, gender, description and face"
+                    className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold text-slate-300 hover:border-purple-400/30"
+                  >
+                    <Pencil size={11} />
+                    Edit
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => {
                       setVoiceEditId(voiceEditId === actor.id ? null : actor.id);
+                      setDetailEditId(null);
                       setVoiceEditMode(actor.builtinVoiceId ? "builtin" : "upload");
                       setVoiceFile(null);
                       setPendingBuiltinVoice(null);
@@ -164,6 +179,10 @@ export default function CastLibraryPage() {
                       : "Add voice"}
                   </button>
                 </div>
+
+                {detailEditId === actor.id && (
+                  <CastProfileEditForm profile={actor} onDone={() => setDetailEditId(null)} />
+                )}
 
                 {voiceEditId === actor.id && (
                   <div className="mt-3 space-y-2.5 border-t border-white/10 pt-3">

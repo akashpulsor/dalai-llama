@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
-import { Check, ChevronDown, Info, Loader2, Mic, Pencil, Plus, Save, User2, X } from "lucide-react";
+import { Info, Loader2, Mic, Pencil, Save, User2, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useCreateCastAssignmentMutation,
@@ -48,6 +48,8 @@ const CHARACTER_TYPE_LABEL = { HUMAN: "Character", PRODUCT: "Product", NARRATOR:
 // separate, single-use "narrator" profile when one doesn't already exist.
 const toProfileType = (characterType) => (characterType === "PRODUCT" ? "PRODUCT" : "ACTOR");
 
+const NEW_PROFILE_OPTION = "__new__";
+
 /** Cast tab, as a section on the project page: one row per narrative character (human or
  * product) from the script, each either already assigned to a real CastProfile or offering a
  * pick-existing / create-new flow to assign one. This is what CastAssignment ultimately feeds --
@@ -56,7 +58,6 @@ const toProfileType = (characterType) => (characterType === "PRODUCT" ? "PRODUCT
 export default function CastSection({ projectId, characters }) {
   const dispatch = useDispatch();
   const { entitlements } = useCreatorVideoEntitlements();
-  const [openCharacterId, setOpenCharacterId] = useState(null);
   const [creatingCharacterId, setCreatingCharacterId] = useState(null);
   const [detailCharacterId, setDetailCharacterId] = useState(null);
   const [editCharacterId, setEditCharacterId] = useState(null);
@@ -118,7 +119,6 @@ export default function CastSection({ projectId, characters }) {
         }
       }
       dispatch(showFlash({ message: `${character.characterName} cast`, type: "success" }));
-      setOpenCharacterId(null);
     } catch (error) {
       dispatch(showFlash({ message: error?.data?.message || "Could not assign this cast profile", type: "error" }));
     }
@@ -198,7 +198,6 @@ export default function CastSection({ projectId, characters }) {
         {characters.map((character) => {
           const assignment = assignmentByCharacter.get(character.id);
           const profile = assignment ? profileById.get(assignment.castProfileId) : null;
-          const isOpen = openCharacterId === character.id;
           const isCreating = creatingCharacterId === character.id;
           const matchingProfiles = profiles.filter((p) => p.profileType === toProfileType(character.characterType));
           const hasDetail = character.characterType !== "PRODUCT"
@@ -264,13 +263,31 @@ export default function CastSection({ projectId, characters }) {
                   </div>
                 </div>
 
-                {profile ? (
-                  <div className="flex items-center gap-1.5">
-                    <span className="flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-200">
-                      <Check size={12} />
-                      {profile.displayName}
-                    </span>
-                    {speaks ? (
+                <div className="flex items-center gap-1.5">
+                  {/* Every actor in the library, from any project -- pick to assign, re-pick to recast. */}
+                  <select
+                    value={isCreating ? NEW_PROFILE_OPTION : profile?.id || ""}
+                    disabled={assigning}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (value === NEW_PROFILE_OPTION) {
+                        setCreatingCharacterId(character.id);
+                      } else if (value && value !== profile?.id) {
+                        setCreatingCharacterId(null);
+                        handlePickExisting(character, value);
+                      }
+                    }}
+                    className={`creator-input max-w-[11rem] px-2 py-1 text-[11px] font-bold ${
+                      profile ? "border-emerald-400/25 text-emerald-200" : "text-slate-200"
+                    }`}
+                  >
+                    {!profile && <option value="">{character.characterType === "PRODUCT" ? "Choose product…" : "Choose actor…"}</option>}
+                    {matchingProfiles.map((p) => (
+                      <option key={p.id} value={p.id}>{p.displayName}</option>
+                    ))}
+                    <option value={NEW_PROFILE_OPTION}>{character.characterType === "PRODUCT" ? "+ New product…" : "+ New actor…"}</option>
+                  </select>
+                  {profile && (speaks ? (
                       <button
                         type="button"
                         onClick={() => {
@@ -303,21 +320,8 @@ export default function CastSection({ projectId, characters }) {
                       >
                         Voice not required
                       </span>
-                    )}
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOpenCharacterId(isOpen ? null : character.id);
-                      setCreatingCharacterId(null);
-                    }}
-                    className="flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-slate-200 hover:border-purple-400/30"
-                  >
-                    Assign
-                    <ChevronDown size={12} className={isOpen ? "rotate-180 transition-transform" : "transition-transform"} />
-                  </button>
-                )}
+                    ))}
+                </div>
               </div>
 
               {voiceEditCharacterId === character.id && profile && (
@@ -465,46 +469,17 @@ export default function CastSection({ projectId, characters }) {
                 </div>
               )}
 
-              {isOpen && !profile && (
+              {isCreating && (
                 <div className="mt-3 border-t border-white/10 pt-3">
-                  {!isCreating && (
-                    <>
-                      {matchingProfiles.length > 0 && (
-                        <div className="mb-2.5 space-y-1.5">
-                          {matchingProfiles.map((p) => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              disabled={assigning}
-                              onClick={() => handlePickExisting(character, p.id)}
-                              className="flex w-full items-center justify-between rounded-md border border-white/10 bg-white/5 px-2.5 py-2 text-left text-xs font-semibold text-slate-200 hover:border-purple-400/30 disabled:opacity-60"
-                            >
-                              {p.displayName}
-                              <span className="text-[10px] font-medium text-slate-500">Use</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setCreatingCharacterId(character.id)}
-                        className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-white/15 py-2 text-xs font-bold text-slate-300 hover:border-purple-400/40 hover:text-purple-200"
-                      >
-                        <Plus size={12} />
-                        {character.characterType === "PRODUCT" ? "New product" : "New actor"}
-                      </button>
-                    </>
-                  )}
-
-                  {isCreating && (
-                    <CastProfileQuickCreate
-                      profileType={toProfileType(character.characterType)}
-                      projectId={projectId}
-                      characterGender={character.gender}
-                      onCreated={(profile) => handleCreated(character, profile)}
-                      onCancel={() => setCreatingCharacterId(null)}
-                    />
-                  )}
+                  {/* Actors go to the library (no projectId) so they're reusable in every project;
+                      products stay scoped to this project. */}
+                  <CastProfileQuickCreate
+                    profileType={toProfileType(character.characterType)}
+                    projectId={character.characterType === "PRODUCT" ? projectId : undefined}
+                    characterGender={character.gender}
+                    onCreated={(profile) => handleCreated(character, profile)}
+                    onCancel={() => setCreatingCharacterId(null)}
+                  />
                 </div>
               )}
             </div>
