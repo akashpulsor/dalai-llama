@@ -3,6 +3,7 @@ import React from "react";
 import { useDispatch } from "react-redux";
 import { Download, FileArchive, ImageIcon, Loader2, RefreshCw, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
+import StepContinuityPanel from "./StepContinuityPanel.jsx";
 import {
   useApplyChangeRequestMutation,
   useDeletePreProductionShotImageMutation,
@@ -426,7 +427,13 @@ export default function ShotImagesPanel({ shotId, shotRef, projectId, aspectRati
                     ))}
                   </select>
                 </label>
-              ) : (
+              ) : null}
+
+              {uploadMode === "step" && stepSourceId ? (
+                <StepContinuityPanel shotId={shotId} kind={uploadKind} sourceShotId={stepSourceId} />
+              ) : null}
+
+              {uploadMode === "step" ? null : (
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/webp"

@@ -2832,6 +2832,31 @@ export const creatorApi = apiSlice.injectEndpoints({
       }),
     }),
 
+    // POST .../step-from/{sourceShotId}/continuity -- what a step will do before doing it: the resolved
+    // visual state (value + source per field), the overrides worth showing (original -> resolved,
+    // reason, whether the user can override), warnings, what is kept and what changes, and the
+    // exact final prompt. The backend caches the analysis, so re-asking after an override is cheap.
+    previewStepContinuity: builder.mutation({
+      query: ({ shotId, kind, sourceShotId }) => ({
+        url: platformUrl(`/shots/${shotId}/images/${kind}/step-from/${sourceShotId}/continuity`),
+        method: "POST",
+      }),
+    }),
+
+    // PUT/DELETE /v1/shots/{shotId}/continuity-overrides/{field} -- the user's own value for one
+    // visual field, deliberately winning over continuity; DELETE restores the automatic decision.
+    // The caller re-runs previewStepContinuity: the backend recomputes the whole state and prompt.
+    setContinuityOverride: builder.mutation({
+      query: ({ shotId, field, value }) => ({
+        url: platformUrl(`/shots/${shotId}/continuity-overrides/${field}`),
+        method: "PUT",
+        body: { value },
+      }),
+    }),
+    clearContinuityOverride: builder.mutation({
+      query: ({ shotId, field }) => ({ url: platformUrl(`/shots/${shotId}/continuity-overrides/${field}`), method: "DELETE" }),
+    }),
+
     // DELETE /v1/shots/{shotId}/images/{kind} -- clears one image kind so it can be made again.
     deletePreProductionShotImage: builder.mutation({
       query: ({ shotId, kind }) => ({ url: platformUrl(`/shots/${shotId}/images/${kind}`), method: "DELETE" }),
@@ -4740,6 +4765,9 @@ export const {
   useStepPreProductionShotImageMutation,
   useDownloadStepShotBundleMutation,
   useDeletePreProductionShotImageMutation,
+  usePreviewStepContinuityMutation,
+  useSetContinuityOverrideMutation,
+  useClearContinuityOverrideMutation,
   useListPreProductionShotImagesQuery,
   useReanalyzePreProductionShotImageMutation,
   useReanalyzePreProductionShotImagesForProjectMutation,
