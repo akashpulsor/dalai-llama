@@ -3,7 +3,7 @@ import ProCta from "../common/ProCta.jsx";
 import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
-import { AlertTriangle, Check, CheckCircle2, ChevronDown, ChevronUp, Film, FileDown, ImageIcon, Loader2, MessageSquareQuote, Mic, Pencil, Plus, RefreshCw, Save, Sparkles, Trash2, Video, X } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, ChevronDown, ChevronUp, Film, FileDown, ImageIcon, Loader2, MessageSquareQuote, Mic, Pencil, Plus, RefreshCw, Save, Sparkles, Trash2, Upload, Video, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useCreatePreProductionShotMutation,
@@ -14,7 +14,9 @@ import {
   useGetLatestPreProductionShotListJobQuery,
   useGetPreProductionShotListJobQuery,
   useGetScreenplayQuery,
+  useListClipVersionsQuery,
   useListPreProductionShotsQuery,
+  useUploadClientFootageMutation,
   useListShotAssetCompletionQuery,
   useListShotPlanIssuesQuery,
   useReanalyzePreProductionShotImagesForProjectMutation,
@@ -101,9 +103,55 @@ const TIME_OF_DAY_OPTIONS = [
   { value: "NIGHT", label: "Night" },
 ];
 
+/** Upload of the client's actual footage for a tagged shot. It becomes the shot's clip in the film
+ * straight away (post-production's client-footage cut); the status line reads the shot's current
+ * cut, so it says plainly whether the film has the footage yet. */
+function ClientFootageUpload({ shot, projectId }) {
+  const dispatch = useDispatch();
+  const fileRef = React.useRef(null);
+  const { data: cuts = [] } = useListClipVersionsQuery({ projectId, shotId: shot.id }, { skip: !projectId });
+  const [upload, { isLoading: uploading }] = useUploadClientFootageMutation();
+  const current = cuts.find((cut) => cut.status === "ACTIVE" && cut.origin === "CLIENT_FOOTAGE");
+
+  const handleFile = async (file) => {
+    if (!file) return;
+    try {
+      await upload({ projectId, shotId: shot.id, shotRef: shot.shotRef, file }).unwrap();
+      dispatch(showFlash({ message: "Client footage added -- the film will use it for this shot", type: "success" }));
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || "Could not use that file", type: "error" }));
+    } finally {
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <input ref={fileRef} type="file" accept="video/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
+      <button type="button" disabled={uploading} onClick={() => fileRef.current?.click()}
+        className="flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-500/15 px-2.5 py-1 text-[10px] font-bold text-amber-100 disabled:opacity-50">
+        {uploading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
+        {uploading ? "Uploading…" : current ? "Replace client footage" : "Upload client footage"}
+      </button>
+      {current ? (
+        <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-300">
+          <CheckCircle2 size={11} /> Footage in the film
+          {current.durationSeconds ? ` · ${Number(current.durationSeconds).toFixed(1)}s` : ""}
+          {current.width && current.height ? ` · ${current.width}×${current.height}` : ""}
+          {current.videoUrl && (
+            <a href={current.videoUrl} target="_blank" rel="noreferrer" className="ml-1 text-amber-200 underline">watch</a>
+          )}
+        </span>
+      ) : (
+        <span className="text-[10px] font-semibold text-amber-300">Waiting for the client's footage</span>
+      )}
+    </div>
+  );
+}
+
 /** One-click tag for a shot the client supplies themselves. The note says what footage is needed
  * and is what the client sees on the review page next to "Your own footage goes here". */
-function ClientFootageControl({ shot, onSave, saving }) {
+function ClientFootageControl({ shot, onSave, saving, projectId }) {
   const [note, setNote] = useState(shot.clientFootageNote || "");
   React.useEffect(() => { setNote(shot.clientFootageNote || ""); }, [shot.clientFootageNote]);
   const noteDirty = (note || "") !== (shot.clientFootageNote || "");
@@ -127,6 +175,7 @@ function ClientFootageControl({ shot, onSave, saving }) {
           </button>
         </div>
       )}
+      {shot.clientFootage && <ClientFootageUpload shot={shot} projectId={projectId} />}
     </div>
   );
 }
@@ -823,6 +872,7 @@ export default function ShotsSection({ projectId }) {
                   )}
                   <ClientFootageControl
                     shot={shot}
+                    projectId={projectId}
                     saving={updatingShot}
                     onSave={(patch) => handleUpdateShot(shot.id, patch)}
                   />

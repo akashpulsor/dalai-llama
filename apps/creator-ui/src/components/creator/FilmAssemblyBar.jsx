@@ -99,10 +99,17 @@ export default function FilmAssemblyBar({ projectId, aspectRatio }) {
 
   const ready = readiness?.ready === true;
   const missing = readiness?.missingShotRefs || [];
+  // Shots the client films need their footage uploaded, not generating -- said separately so the
+  // creator knows which ones are waiting on someone else.
+  const awaitingClient = readiness?.awaitingClientFootageShotRefs || [];
+  const toGenerate = missing.filter((ref) => !awaitingClient.includes(ref));
   const disabledReason = ready
     ? null
     : missing.length
-      ? `Please generate all shots — still missing: ${missing.join(", ")}`
+      ? [
+          toGenerate.length ? `Please generate: ${toGenerate.join(", ")}` : null,
+          awaitingClient.length ? `Waiting for client footage: ${awaitingClient.join(", ")}` : null,
+        ].filter(Boolean).join(" · ")
       : "Please generate all shots";
 
   const handleAssemble = async () => {

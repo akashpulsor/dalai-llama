@@ -3883,6 +3883,27 @@ export const creatorApi = apiSlice.injectEndpoints({
       invalidatesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `clip-cuts-${a?.shotId}` }],
     }),
 
+    // POST .../clip-versions/client-footage -- the client's own footage for a shot tagged client
+    // footage. Not a cut of a generated clip (that shot has none): stored and made the shot's cut
+    // in one step, so the film can use it straight away.
+    uploadClientFootage: builder.mutation({
+      query: ({ projectId, shotId, shotRef, file }) => {
+        const body = new FormData();
+        body.append("file", file);
+        return {
+          url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/clip-versions/client-footage`),
+          method: "POST",
+          params: shotRef ? { shotRef } : undefined,
+          body,
+        };
+      },
+      invalidatesTags: (_r, _e, a) => [
+        { type: "CreatorHomeProjects", id: `clip-cuts-${a?.shotId}` },
+        { type: "CreatorHomeProjects", id: `project-clips-${a?.projectId}` },
+        { type: "CreatorHomeProjects", id: `film-${a?.projectId}` },
+      ],
+    }),
+
     // Make this cut the one the film uses. The cut it replaces is kept, so this goes both ways.
     acceptClipCut: builder.mutation({
       query: ({ projectId, shotId, versionId }) => ({
@@ -4876,6 +4897,7 @@ export const {
   useGetShotClipSourcesQuery,
   useExtendShotTailMutation,
   useAcceptClipCutMutation,
+  useUploadClientFootageMutation,
   useRejectClipCutMutation,
   useLazyGetShotReorderImpactQuery,
   useReorderShotMutation,
