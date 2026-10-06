@@ -4,9 +4,6 @@ import { useDispatch } from "react-redux";
 import { AudioLines, Check, ChevronDown, History, Loader2, Mic, Music, Pencil, PlayCircle, RefreshCw, Save, Sparkles, Upload, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
-  useGenerateShotBackgroundMusicMutation,
-  useUploadShotBackgroundMusicMutation,
-  useGetShotBackgroundMusicQuery,
   useListBuiltinVoicesQuery,
   useListCastProfilesQuery,
   useListCastAssignmentsQuery,
@@ -33,96 +30,11 @@ import PromptInputsChecklist from "../videoStudio/PromptInputsChecklist.jsx";
 import ConformPanel from "../videoStudio/ConformPanel.jsx";
 import { castReaders } from "../videoStudio/castReaders.js";
 import ShotThoughtLog from "./ShotThoughtLog.jsx";
+import SoundLayersPanel from "./SoundLayersPanel.jsx";
 import ProCta from "../common/ProCta.jsx";
 import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
 import { useCachedImageUrl } from "../../utils/cachedImageUrl.js";
 import replaceDialogueLine from "../../utils/replaceDialogueLine.js";
-
-/** On-demand only -- never auto-generated as part of dispatch, one track per shot.
- *
- * <p>The prompt box matters more than it looks. Left empty, the backend derives a prompt from the
- * shot's sound design -- prose about the whole soundscape ("gentle ambient office sounds; subtle
- * music begins to swell") which, handed to a music model verbatim, produces a room rather than a
- * score. Writing "indian tense bgm, taut strings, no vocals" is how you get music. Or skip
- * generation entirely and upload your own track. */
-function BackgroundMusicControl({ shotId, plannedSeconds }) {
-  const dispatch = useDispatch();
-  const { data: music } = useGetShotBackgroundMusicQuery(shotId, { skip: !shotId });
-  const [generate, { isLoading }] = useGenerateShotBackgroundMusicMutation();
-  const [uploadMusic, { isLoading: uploading }] = useUploadShotBackgroundMusicMutation();
-  const [prompt, setPrompt] = React.useState("");
-  const [lengthSeconds, setLengthSeconds] = React.useState(plannedSeconds || "");
-  const musicFileRef = React.useRef(null);
-  // Seeded from whatever produced the current track, so "Regenerate" edits the real prompt
-  // rather than starting blank. Upload clears it server-side, hence the ?? "".
-  React.useEffect(() => { setPrompt(music?.prompt ?? ""); }, [music?.prompt]);
-
-  const handleGenerate = async () => {
-    try {
-      await generate({ shotId, prompt, lengthSeconds: lengthSeconds ? Number(lengthSeconds) : undefined }).unwrap();
-    } catch (error) {
-      dispatch(showFlash({ message: error?.data?.message || "Could not generate background music for this shot", type: "error" }));
-    }
-  };
-
-  const handleUpload = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    try {
-      await uploadMusic({ shotId, file }).unwrap();
-      dispatch(showFlash({ message: "Using your own track for this shot.", type: "success" }));
-    } catch (error) {
-      dispatch(showFlash({ message: error?.data?.message || "Could not upload that track", type: "error" }));
-    }
-  };
-
-  return (
-    <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
-      <div className="mb-2 flex items-center gap-1.5">
-        <Music size={13} className="text-purple-300" />
-        <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Background music</p>
-      </div>
-      {music?.signedUrl && <audio controls src={music.signedUrl} className="mb-2 h-9 w-full" />}
-      <textarea
-        rows={2}
-        value={prompt}
-        onChange={(event) => setPrompt(event.target.value)}
-        placeholder="Describe the music — e.g. indian tense bgm, taut strings, no vocals"
-        className="creator-input mb-2 w-full resize-y px-2.5 py-1.5 text-[11px]"
-      />
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          type="number"
-          min={1}
-          value={lengthSeconds}
-          onChange={(event) => setLengthSeconds(event.target.value)}
-          title="Length in seconds. The music model's floor is 3s, so a shorter ask is trimmed at mix time."
-          className="creator-input w-16 px-2 py-1.5 text-[11px]"
-        />
-        <button
-          type="button"
-          disabled={isLoading || uploading}
-          onClick={handleGenerate}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/10 py-1.5 text-[11px] font-bold text-purple-200 hover:bg-purple-500/20 disabled:opacity-60"
-        >
-          {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Music size={12} />}
-          {isLoading ? "Generating…" : music?.signedUrl ? "Regenerate" : "Generate"}
-        </button>
-        <button
-          type="button"
-          disabled={isLoading || uploading}
-          onClick={() => musicFileRef.current?.click()}
-          className="flex items-center gap-1.5 rounded-md border border-white/15 px-2.5 py-1.5 text-[11px] font-bold text-slate-300 hover:text-slate-100 disabled:opacity-60"
-        >
-          {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-          {uploading ? "Uploading…" : "Upload"}
-        </button>
-        <input ref={musicFileRef} type="file" accept="audio/*" onChange={handleUpload} className="hidden" />
-      </div>
-    </div>
-  );
-}
 
 /**
  * Who speaks this shot.
@@ -1178,7 +1090,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               dubCastProfileId={shot.dubCastProfileId}
               onDubbed={onDubbed}
             />
-            <BackgroundMusicControl shotId={shot.id} plannedSeconds={shot.durationSeconds} />
+            <SoundLayersPanel projectId={projectId} shot={shot} />
           </CardGroup>
 
           <CardGroup title="Generate" hint={hasClip && !regenerating ? "This shot has a clip. Regenerate to open the video studio again." : undefined}>

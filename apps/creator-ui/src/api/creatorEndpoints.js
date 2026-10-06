@@ -3841,14 +3841,13 @@ export const creatorApi = apiSlice.injectEndpoints({
     // background music. Returns a previewKey + a URL to play. No version row is written, so a
     // combination that doesn't work costs nothing to discard.
     previewClipMix: builder.mutation({
-      query: ({ projectId, shotId, shotRef, targetSeconds, withDub, withMusic }) => ({
+      query: ({ projectId, shotId, shotRef, targetSeconds, withDub }) => ({
         url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/clip-versions/preview-mix`),
         method: "POST",
         params: {
           ...(shotRef ? { shotRef } : {}),
           ...(targetSeconds ? { targetSeconds } : {}),
           withDub: Boolean(withDub),
-          withMusic: Boolean(withMusic),
         },
       }),
     }),
@@ -3902,6 +3901,50 @@ export const creatorApi = apiSlice.injectEndpoints({
         { type: "CreatorHomeProjects", id: `project-clips-${a?.projectId}` },
         { type: "CreatorHomeProjects", id: `film-${a?.projectId}` },
       ],
+    }),
+
+    // --- Sound layers (post-production): music cues and sound effects on the film's timeline,
+    // each anchored to a shot. Mixed into the film when it renders, so moving one or switching it
+    // off never remakes a clip -- just render the film again.
+    listSoundLayers: builder.query({
+      query: (projectId) => ({ url: platformUrl(`/post-production/projects/${projectId}/sound-layers`) }),
+      providesTags: (_r, _e, projectId) => [{ type: "CreatorHomeProjects", id: `sound-layers-${projectId}` }],
+    }),
+    generateSoundLayer: builder.mutation({
+      query: ({ projectId, ...body }) => ({
+        url: platformUrl(`/post-production/projects/${projectId}/sound-layers`),
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `sound-layers-${a?.projectId}` }],
+    }),
+    uploadSoundLayer: builder.mutation({
+      query: ({ projectId, shotId, kind, offsetMs, file }) => {
+        const body = new FormData();
+        body.append("file", file);
+        return {
+          url: platformUrl(`/post-production/projects/${projectId}/sound-layers/upload`),
+          method: "POST",
+          params: { shotId, kind, ...(offsetMs != null ? { offsetMs } : {}) },
+          body,
+        };
+      },
+      invalidatesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `sound-layers-${a?.projectId}` }],
+    }),
+    updateSoundLayer: builder.mutation({
+      query: ({ projectId, layerId, ...patch }) => ({
+        url: platformUrl(`/post-production/projects/${projectId}/sound-layers/${layerId}`),
+        method: "PATCH",
+        body: patch,
+      }),
+      invalidatesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `sound-layers-${a?.projectId}` }],
+    }),
+    deleteSoundLayer: builder.mutation({
+      query: ({ projectId, layerId }) => ({
+        url: platformUrl(`/post-production/projects/${projectId}/sound-layers/${layerId}`),
+        method: "DELETE",
+      }),
+      invalidatesTags: (_r, _e, a) => [{ type: "CreatorHomeProjects", id: `sound-layers-${a?.projectId}` }],
     }),
 
     // Make this cut the one the film uses. The cut it replaces is kept, so this goes both ways.
@@ -4898,6 +4941,11 @@ export const {
   useExtendShotTailMutation,
   useAcceptClipCutMutation,
   useUploadClientFootageMutation,
+  useListSoundLayersQuery,
+  useGenerateSoundLayerMutation,
+  useUploadSoundLayerMutation,
+  useUpdateSoundLayerMutation,
+  useDeleteSoundLayerMutation,
   useRejectClipCutMutation,
   useLazyGetShotReorderImpactQuery,
   useReorderShotMutation,

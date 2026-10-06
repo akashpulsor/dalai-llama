@@ -1,7 +1,8 @@
 // @ts-nocheck
 import React from "react";
-import { AudioLines, ChevronDown, ChevronUp, MessageSquareQuote, Mic } from "lucide-react";
+import { AudioLines, Bell, ChevronDown, ChevronUp, MessageSquareQuote, Mic, Music } from "lucide-react";
 import { formatTime } from "../../utils/voiceTimeline.js";
+import { placeSoundLayers } from "../../utils/soundLayers.js";
 
 const KIND_STYLE = {
   VOICE_OVER: { bar: "bg-purple-400/70", chip: "border-purple-400/30 bg-purple-500/10 text-purple-200", label: "Voice-over", Icon: Mic },
@@ -11,13 +12,14 @@ const KIND_STYLE = {
 /** The film's spoken track at a glance, the way a script reads: a header with words and running
  * time, then each screenplay section numbered with its time range and what is said in it. A strip
  * above shows the whole film's length -- voice-over, dialogue and silent picture -- shot by shot. */
-export default function VoiceTimeline({ timeline, onOpenShot }) {
+export default function VoiceTimeline({ timeline, soundLayers = [], onOpenShot }) {
   const [open, setOpen] = React.useState(true);
   const spoken = timeline.voiceOverLines + timeline.dialogueLines;
   if (!timeline.sections.length) return null;
   const title = timeline.dialogueLines && timeline.voiceOverLines ? "Voice-over & dialogue"
     : timeline.dialogueLines ? "Dialogue" : "Voice-over";
   const total = timeline.totalSeconds || 1;
+  const placedSound = placeSoundLayers(timeline, soundLayers);
 
   return (
     <div className="mb-4 rounded-lg border border-purple-400/20 bg-purple-500/[0.03]">
@@ -53,6 +55,27 @@ export default function VoiceTimeline({ timeline, onOpenShot }) {
               </span>
               <span>{formatTime(timeline.totalSeconds)}</span>
             </div>
+            {placedSound.length > 0 && (
+              <div className="mt-2">
+                <p className="mb-1 text-[9px] font-extrabold uppercase tracking-wide text-slate-500">Sound</p>
+                {/* Each layer where the film render will mix it; switched-off ones dimmed. */}
+                <div className="relative h-4 w-full rounded bg-white/[0.03]">
+                  {placedSound.map(({ layer, start, end, included }) => {
+                    const music = layer.kind === "MUSIC";
+                    const Icon = music ? Music : Bell;
+                    return (
+                      <button key={layer.layerId} type="button" onClick={() => onOpenShot?.(layer.shotId)}
+                        title={`${music ? "Music" : "Sound effect"}${layer.prompt ? `: ${layer.prompt}` : ""} · ${formatTime(start)}–${formatTime(end)}${included ? "" : " · switched off"}`}
+                        style={{ left: `${(start / total) * 100}%`, width: `${Math.max(((end - start) / total) * 100, 0.8)}%` }}
+                        className={`absolute top-0 flex h-4 items-center overflow-hidden rounded px-0.5 ${
+                          music ? "bg-emerald-400/50" : "bg-amber-400/60"} ${included ? "" : "opacity-30"}`}>
+                        <Icon size={9} className="shrink-0 text-black/70" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {timeline.untimedShots > 0 && (
               <p className="mt-1 text-[10px] font-semibold text-amber-300">
                 {timeline.untimedShots} shot{timeline.untimedShots === 1 ? " has" : "s have"} no duration yet, so the times below are short.

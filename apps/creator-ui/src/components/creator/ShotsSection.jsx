@@ -15,6 +15,7 @@ import {
   useGetPreProductionShotListJobQuery,
   useGetScreenplayQuery,
   useListClipVersionsQuery,
+  useListSoundLayersQuery,
   useListPreProductionShotsQuery,
   useUploadClientFootageMutation,
   useListShotAssetCompletionQuery,
@@ -24,6 +25,7 @@ import {
 } from "../../api/creatorEndpoints.js";
 import ShotImagesPanel from "./ShotImagesPanel.jsx";
 import VoiceTimeline, { SpeechChip } from "./VoiceTimeline.jsx";
+import SoundLayersPanel from "./SoundLayersPanel.jsx";
 import { buildVoiceTimeline, formatTime } from "../../utils/voiceTimeline.js";
 import ShotReferenceImagesPanel from "./ShotReferenceImagesPanel.jsx";
 import ShotReorderControl from "./ShotReorderControl.jsx";
@@ -406,6 +408,7 @@ export default function ShotsSection({ projectId }) {
   const [showIssues, setShowIssues] = useState(false);
   const { data: shots = [], isLoading, refetch: refetchShots } = useListPreProductionShotsQuery(projectId, { skip: !projectId });
   const { data: screenplay } = useGetScreenplayQuery(projectId, { skip: !projectId });
+  const { data: soundLayers = [] } = useListSoundLayersQuery(projectId, { skip: !projectId });
   // The spoken track, read off the shots: sections by screenplay scene, timed by shot durations.
   const voiceTimeline = useMemo(() => buildVoiceTimeline(shots, screenplay?.scenes || []), [shots, screenplay]);
   const spokenLineByShot = useMemo(() => new Map(
@@ -747,7 +750,7 @@ export default function ShotsSection({ projectId }) {
         </div>
       )}
 
-      <VoiceTimeline timeline={voiceTimeline} onOpenShot={openShotFromTimeline} />
+      <VoiceTimeline timeline={voiceTimeline} soundLayers={soundLayers} onOpenShot={openShotFromTimeline} />
 
       <div className="space-y-2.5">
         {shots.map((shot) => {
@@ -876,6 +879,7 @@ export default function ShotsSection({ projectId }) {
                     saving={updatingShot}
                     onSave={(patch) => handleUpdateShot(shot.id, patch)}
                   />
+                  <SoundLayersPanel projectId={projectId} shot={shot} />
                   <EditShotFields
                     shot={shot}
                     saving={updatingShot}

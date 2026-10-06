@@ -23,12 +23,6 @@ export const SWITCHES = [
     off: "The video model performs the line itself.",
   },
   {
-    key: "mixBackgroundMusic",
-    label: "Mix the shot's music bed",
-    on: "Lays the shot's music under the finished clip.",
-    off: "The clip keeps only its own audio.",
-  },
-  {
     key: "preventDuplicateRenders",
     label: "Prevent duplicate renders",
     on: "A shot already rendering, or already rendered from that prompt, is not queued again.",

@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
-import { AudioLines, Check, Download, Gauge, Loader2, Music, RotateCcw, Send, Upload, VolumeX, X } from "lucide-react";
+import { AudioLines, Check, Download, Gauge, Loader2, RotateCcw, Send, Upload, VolumeX, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import ShotCanvasPlayer from "./ShotCanvasPlayer.jsx";
 import {
@@ -60,12 +60,13 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
   // this -- the object on the server ages out on its own, so nothing has to be cleaned up.
   const [preview, setPreview] = useState(null);
 
-  const runPreview = async (withDub, withMusic, label) => {
+  // Music is never part of a cut: shot music is a sound layer, mixed into the film when it renders.
+  const runPreview = async (withDub, label) => {
     try {
       const made = await previewMix({
         projectId, shotId, shotRef: shot?.shotRef,
         targetSeconds: Number(retimeTo) || undefined,
-        withDub, withMusic,
+        withDub,
       }).unwrap();
       setPreview({ ...made, label });
     } catch (error) {
@@ -320,29 +321,11 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
         <button
           type="button"
           disabled={busy || previewState.isLoading}
-          onClick={() => runPreview(true, false, "with the dubbed voice")}
+          onClick={() => runPreview(true, "with the dubbed voice")}
           className="flex items-center gap-1.5 rounded-md border border-sky-400/30 bg-sky-500/10 px-2.5 py-1.5 text-[10px] font-bold text-sky-200 disabled:opacity-50"
         >
           {previewState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <AudioLines size={11} />}
           Try with dub
-        </button>
-        <button
-          type="button"
-          disabled={busy || previewState.isLoading}
-          onClick={() => runPreview(false, true, "with the background music")}
-          className="flex items-center gap-1.5 rounded-md border border-sky-400/30 bg-sky-500/10 px-2.5 py-1.5 text-[10px] font-bold text-sky-200 disabled:opacity-50"
-        >
-          <Music size={11} />
-          Try with music
-        </button>
-        <button
-          type="button"
-          disabled={busy || previewState.isLoading}
-          onClick={() => runPreview(true, true, "with dub and music")}
-          className="flex items-center gap-1.5 rounded-md border border-sky-400/30 bg-sky-500/10 px-2.5 py-1.5 text-[10px] font-bold text-sky-200 disabled:opacity-50"
-        >
-          <Music size={11} />
-          Try with both
         </button>
         <button
           type="button"
