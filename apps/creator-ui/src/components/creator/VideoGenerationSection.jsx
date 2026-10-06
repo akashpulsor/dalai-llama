@@ -565,7 +565,8 @@ export default function VideoGenerationSection({ projectId }) {
     const shotIds = selectedShotIds;
     // Which cards show a spinner while the batch runs. `shots` is already in shotNumber order,
     // the same order the backend walks the bundle in.
-    const busyIds = shotIds.length ? shotIds : shots.map((shot) => shot.id);
+    // Client-footage shots are skipped server-side when nothing is ticked, so they get no spinner.
+    const busyIds = shotIds.length ? shotIds : shots.filter((shot) => !shot.clientFootage).map((shot) => shot.id);
     if (!busyIds.length) return;
     busyIds.forEach((id) => setPreparing((s) => ({ ...s, [id]: true })));
     try {
@@ -593,7 +594,8 @@ export default function VideoGenerationSection({ projectId }) {
     }
   };
 
-  const dialogueShots = shots.filter((shot) => dialogueTextForShot(shot));
+  // The client's own footage carries its own sound, so it is never voiced (CloneVoiceService skips it too).
+  const dialogueShots = shots.filter((shot) => !shot.clientFootage && dialogueTextForShot(shot));
 
   const handlePrepareAllDialogues = async () => {
     if (preparingDialogues || !dialogueShots.length) return;
