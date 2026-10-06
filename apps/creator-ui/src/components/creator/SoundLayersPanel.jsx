@@ -10,7 +10,7 @@ import {
   useUpdateSoundLayerMutation,
   useUploadSoundLayerMutation,
 } from "../../api/creatorEndpoints.js";
-import { msToSeconds, secondsToMs } from "../../utils/soundLayers.js";
+import { isSoundLayerPending, msToSeconds, secondsToMs } from "../../utils/soundLayers.js";
 
 const KIND = {
   SOUND_EFFECT: { label: "Sound effect", Icon: Bell, tone: "text-amber-200", placeholder: "e.g. a single temple bell, long ring" },
@@ -22,7 +22,11 @@ const KIND = {
  * the shot's clip -- the film render mixes whatever is switched on, where it is placed. */
 export default function SoundLayersPanel({ projectId, shot }) {
   const dispatch = useDispatch();
-  const { data: allLayers = [] } = useListSoundLayersQuery(projectId, { skip: !projectId });
+  // Sounds are made on the server's worker queue, one at a time; poll only while one is waiting.
+  const [pollMs, setPollMs] = React.useState(0);
+  const { data: allLayers = [] } = useListSoundLayersQuery(projectId, { skip: !projectId, pollingInterval: pollMs });
+  const anyPending = allLayers.some(isSoundLayerPending);
+  React.useEffect(() => { setPollMs(anyPending ? 4000 : 0); }, [anyPending]);
   const layers = allLayers.filter((layer) => layer.shotId === shot.id);
   const [generate, { isLoading: generating }] = useGenerateSoundLayerMutation();
   const [uploadLayer, { isLoading: uploading }] = useUploadSoundLayerMutation();
@@ -50,7 +54,7 @@ export default function SoundLayersPanel({ projectId, shot }) {
         offsetMs,
         durationSeconds: kind === "MUSIC" && lengthSeconds ? Number(lengthSeconds) : undefined,
       }).unwrap();
-      dispatch(showFlash({ message: `${KIND[kind].label} added to shot ${shot.shotNumber}`, type: "success" }));
+      dispatch(showFlash({ message: `${KIND[kind].label} queued for shot ${shot.shotNumber} -- it appears here when ready`, type: "success" }));
       setPrompt("");
     } catch (error) {
       flashError(error, "Could not generate that sound");
@@ -62,7 +66,7 @@ export default function SoundLayersPanel({ projectId, shot }) {
     if (!file || offsetMs == null) return;
     try {
       await uploadLayer({ projectId, shotId: shot.id, kind, offsetMs, file }).unwrap();
-      dispatch(showFlash({ message: `${KIND[kind].label} added to shot ${shot.shotNumber}`, type: "success" }));
+      dispatch(showFlash({ message: `File received -- checking it for sound`, type: "success" }));
     } catch (error) {
       flashError(error, "Could not use that file");
     } finally {
@@ -103,6 +107,7 @@ export default function SoundLayersPanel({ projectId, shot }) {
                     <Trash2 size={11} />
                   </button>
                 </div>
+                <LayerStatus layer={layer} />
                 <div className="mt-1.5 flex flex-wrap items-center gap-3">
                   {layer.audioUrl && <audio controls preload="none" src={layer.audioUrl} className="h-7 max-w-[14rem]" />}
                   <LayerNumber
@@ -156,6 +161,22 @@ export default function SoundLayersPanel({ projectId, shot }) {
       </div>
     </div>
   );
+}
+
+/** While the worker makes or checks a sound, say so; if it failed, say why. */
+function LayerStatus({ layer }) {
+  if (isSoundLayerPending(layer)) {
+    return (
+      <p className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-sky-200">
+        <Loader2 size={10} className="animate-spin" />
+        {layer.source === "UPLOADED" ? "Checking the file…" : "Generating…"}
+      </p>
+    );
+  }
+  if (layer.status === "FAILED") {
+    return <p className="mt-1 text-[10px] font-semibold text-red-300">Failed: {layer.error || "unknown reason"} -- delete it and try again.</p>;
+  }
+  return null;
 }
 
 /** A small number box. Controlled (onChange) for the add form; commit-on-blur (onCommit) for a

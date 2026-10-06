@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildVoiceTimeline } from "./voiceTimeline.js";
-import { msToSeconds, placeSoundLayers, secondsToMs } from "./soundLayers.js";
+import { isSoundLayerPending, msToSeconds, placeSoundLayers, secondsToMs } from "./soundLayers.js";
 
 const shots = [
   { id: "a", shotNumber: 1, screenplaySceneId: "s1", durationSeconds: 4 },
@@ -30,6 +30,18 @@ test("switched-off layers stay on the lane, flagged; layers of missing shots are
   ]);
 
   assert.deepEqual(placed.map((p) => [p.layer.layerId, p.included]), [["off", false]]);
+});
+
+test("sounds still queued or failed on the worker are not placed", () => {
+  const placed = placeSoundLayers(timeline, [
+    { layerId: "ready", shotId: "a", status: "COMPLETED", durationSeconds: 1, included: true },
+    { layerId: "queued", shotId: "a", status: "QUEUED", included: true },
+    { layerId: "failed", shotId: "a", status: "FAILED", included: true },
+  ]);
+
+  assert.deepEqual(placed.map((p) => p.layer.layerId), ["ready"]);
+  assert.equal(isSoundLayerPending({ status: "PROCESSING" }), true);
+  assert.equal(isSoundLayerPending({ status: "FAILED" }), false);
 });
 
 test("start times read and parse as seconds", () => {
