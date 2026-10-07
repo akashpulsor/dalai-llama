@@ -4419,6 +4419,11 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: (token) => ({ url: platformUrl(`/public/projects/${token}/published-shots`) }),
     }),
 
+    // The score plan for the client review page; 204 (null data) until one is planned.
+    getPublicMusicPlan: builder.query({
+      query: (token) => ({ url: platformUrl(`/public/projects/${token}/music-plan`) }),
+    }),
+
     getPublicFinalVideo: builder.query({
       query: (token) => ({ url: platformUrl(`/public/projects/${token}/final-video`) }),
     }),
@@ -4988,6 +4993,7 @@ export const {
   useUpdateFinalVideoLockMutation,
   useGetPublicFinalVideoQuery,
   useGetPublicPublishedShotsQuery,
+  useGetPublicMusicPlanQuery,
   useExportShotsPdfMutation,
   useGetAnimatedPreviewHtmlMutation,
   useListShotTypesQuery,

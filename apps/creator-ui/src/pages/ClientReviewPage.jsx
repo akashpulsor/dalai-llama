@@ -5,6 +5,7 @@ import { useDispatch } from "react-redux";
 import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Circle, CreditCard, Download, FileText, ImageIcon, ImagePlus, Loader2, Lock, PlayCircle, Send, Sparkles, User2, Video, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import CanvasVideoPlayer from "../components/review/CanvasVideoPlayer.jsx";
+import ClientMusicPlan from "../components/review/ClientMusicPlan.jsx";
 import {
   useAddPublicReviewCommentMutation,
   useEndReviewMutation,
@@ -416,6 +417,8 @@ export default function ClientReviewPage() {
 
               </div>
             )}
+
+            <ClientMusicPlan token={token} />
 
             <ClientCreativeDirections token={token} />
 
