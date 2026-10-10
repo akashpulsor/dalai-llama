@@ -8,7 +8,7 @@ import { opsAdminUrl } from "./creatorEndpoints.js";
 const showcaseBase = apiSlice.enhanceEndpoints({
   addTagTypes: ["ShowcaseProfile", "ShowcaseChannel", "ShowcaseVideos", "ShowcaseItems", "ShowcaseVisibility", "ShowcaseUpload",
     "ShowcaseAdmin", "ShowcaseRequests", "Outreach", "EmailTemplates", "Audiences", "AudienceLeads", "YouTubeConnection", "YouTubeJobs",
-    "YouTubeAnalytics", "ExtensionTokens", "PlatformYouTube"],
+    "YouTubeAnalytics", "ExtensionTokens", "PlatformYouTube", "YouTubeQuota", "BrandCredits"],
 });
 
 export const showcaseApi = showcaseBase.injectEndpoints({
@@ -293,6 +293,32 @@ export const showcaseApi = showcaseBase.injectEndpoints({
       query: () => ({ url: opsAdminUrl("/tenants/youtube/platform-connection"), method: "DELETE" }),
       invalidatesTags: ["PlatformYouTube"],
     }),
+
+    // ---- Rules 41-42: shared YouTube quota (ops) and the brand directory ----
+    searchBrands: builder.query({
+      query: ({ industry, country, q }) => ({
+        url: "/tenants/me/outreach/brand-search",
+        params: { industry, ...(country ? { country } : {}), ...(q ? { q } : {}) },
+      }),
+    }),
+    addCompaniesToAudience: builder.mutation({
+      query: ({ audienceId, companyIds }) => ({
+        url: `/tenants/me/outreach/audiences/${audienceId}/add-companies`, method: "POST", body: { companyIds },
+      }),
+      invalidatesTags: ["Audiences", "AudienceLeads", "BrandCredits"],
+    }),
+    adminYouTubeQuota: builder.query({
+      query: () => ({ url: opsAdminUrl("/tenants/youtube/quota") }),
+      providesTags: ["YouTubeQuota"],
+    }),
+    adminSetYouTubeQuota: builder.mutation({
+      query: (body) => ({ url: opsAdminUrl("/tenants/youtube/quota"), method: "PUT", body }),
+      invalidatesTags: ["YouTubeQuota"],
+    }),
+    adminBrandCredits: builder.query({
+      query: () => ({ url: opsAdminUrl("/tenants/outreach/brand-directory/credits") }),
+      providesTags: ["BrandCredits"],
+    }),
   }),
   overrideExisting: false,
 });
@@ -362,4 +388,9 @@ export const {
   useAdminStartPlatformYouTubeMutation,
   useAdminDisconnectPlatformYouTubeMutation,
   useBuyMailPackMutation,
+  useLazySearchBrandsQuery,
+  useAddCompaniesToAudienceMutation,
+  useAdminYouTubeQuotaQuery,
+  useAdminSetYouTubeQuotaMutation,
+  useAdminBrandCreditsQuery,
 } = showcaseApi;

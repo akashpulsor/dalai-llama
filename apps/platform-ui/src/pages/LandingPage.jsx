@@ -471,6 +471,9 @@ const LandingPage = () => {
         <AudioPlayer />
         <PricingSection onStart={handleLogin} />
       </main>
+      <footer className="py-8 text-center text-xs text-slate-500">
+        <a href="/privacy" className="underline">Privacy Policy</a> · <a href="/terms" className="underline">Terms of Service</a>
+      </footer>
 
       <FloatingContactButton onClick={openContactModal} />
       <ContactModal isOpen={showContactModal} onClose={closeContactModal} />

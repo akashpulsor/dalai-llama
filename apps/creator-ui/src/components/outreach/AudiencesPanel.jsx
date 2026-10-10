@@ -14,6 +14,7 @@ import {
 } from "../../api/showcaseEndpoints.js";
 import { errorMessage, INDUSTRY_LABEL } from "../showcase/showcaseLabels.js";
 import { CONTACT_STATUS } from "./outreachLabels.js";
+import BrandFinder from "./BrandFinder.jsx";
 
 /** Audiences tab (rules 21–25): upload a CSV into a named audience; rows for the same person (any
  * shared email or phone) become one lead. Contact points are checked continuously: once one is
@@ -78,6 +79,7 @@ export default function AudiencesPanel() {
           </ul>
         )}
       </section>
+      <BrandFinder />
       {openId && <AudienceDetail audience={audiences.find((a) => a.id === openId)} onFail={fail} />}
     </div>
   );

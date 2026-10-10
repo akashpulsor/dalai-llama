@@ -13,6 +13,7 @@ import {
   useAdminShowcaseReportsQuery,
   useAdminShowcaseRescoreMutation,
 } from "../../api/showcaseEndpoints.js";
+import QuotaAdminCard from "./QuotaAdminCard.jsx";
 
 /** Ops tools for the Creator Showcase: re-score, reported videos, the kill switch, the
  * video-host health panel and the one-time onboarding backfill. No alerting by design: this
@@ -43,6 +44,7 @@ export default function ShowcaseAdminTab() {
 
   return (
     <section className="space-y-5 text-sm">
+      <QuotaAdminCard />
       {message && (
         <p className={`rounded-md border px-3 py-2 text-xs font-semibold ${message.ok ? "border-emerald-400/30 text-emerald-200" : "border-rose-400/30 text-rose-200"}`}>
           {message.text}
