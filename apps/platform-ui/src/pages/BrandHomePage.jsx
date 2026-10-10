@@ -29,7 +29,7 @@ export default function BrandHomePage() {
       .catch((e) => (e instanceof SignInRequired ? window.location.replace("/brands/sign-in") : setError(e.message)));
   }, []);
 
-  const leave = () => { signOut(); window.location.assign("/"); };
+  const leave = async () => { await signOut(); window.location.assign("/"); };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">

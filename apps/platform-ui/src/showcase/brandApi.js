@@ -1,43 +1,46 @@
 // @ts-nocheck
 // Brand-side calls (sign in by email link, follow, request a video, brand home). The brand session
-// is a signed token from tenant-service, sent as X-Brand-Session; it lives in this browser only.
+// is an HttpOnly cookie set by tenant-service: this code never sees it, it only asks the browser
+// to send it (credentials: "include"). platform.dalaillama.in and api.dalaillama.in are the same
+// site, so the SameSite=Lax cookie goes along.
 import { appConfig } from "@dalaillama/shared-config";
 import { visitorId } from "./showcaseApi.js";
 
-const SESSION_KEY = "dl_brand_session";
+// Not the session: only "this browser signed in until <expiresAt>", so the header can say
+// "Your brand" without a request. The server stays the judge (401 clears it).
+const SIGNED_IN_KEY = "dl_brand_signed_in_until";
 const base = () => `${appConfig.API_BASE_URL}/public`;
 
 export class SignInRequired extends Error {}
 
-export function brandSession() {
+export function isSignedIn() {
   try {
-    const raw = window.localStorage.getItem(SESSION_KEY);
-    if (!raw) return null;
-    const session = JSON.parse(raw);
-    return new Date(session.expiresAt) > new Date() ? session.token : null;
+    const until = window.localStorage.getItem(SIGNED_IN_KEY);
+    return Boolean(until) && new Date(until) > new Date();
   } catch {
-    return null;
+    return false;
   }
 }
 
-export const isSignedIn = () => Boolean(brandSession());
-
-function keepSession(token, expiresAt) {
-  try { window.localStorage.setItem(SESSION_KEY, JSON.stringify({ token, expiresAt })); } catch { /* private mode */ }
+function rememberSignedIn(expiresAt) {
+  try { window.localStorage.setItem(SIGNED_IN_KEY, expiresAt); } catch { /* private mode: header just says "Brand sign in" */ }
 }
 
-export function signOut() {
-  try { window.localStorage.removeItem(SESSION_KEY); } catch { /* nothing kept */ }
+function forgetSignedIn() {
+  try { window.localStorage.removeItem(SIGNED_IN_KEY); } catch { /* nothing kept */ }
 }
 
 async function call(method, path, body) {
   const headers = { Accept: "application/json", "X-Visitor-Id": visitorId() };
-  const session = brandSession();
-  if (session) headers["X-Brand-Session"] = session;
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  const response = await fetch(`${base()}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const response = await fetch(`${base()}${path}`, {
+    method,
+    headers,
+    credentials: "include",
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
   if (response.status === 401) {
-    signOut();
+    forgetSignedIn();
     throw new SignInRequired();
   }
   if (!response.ok) {
@@ -51,10 +54,17 @@ async function call(method, path, body) {
 /** Emails a one-time sign-in link. Same answer whether or not the email is known. */
 export const requestSignIn = (form) => call("POST", "/brands/sign-in", form);
 
+/** The server sets the session cookie; the body says where to go next. */
 export async function completeSignIn(token) {
   const signedIn = await call("POST", `/brands/sign-in/${encodeURIComponent(token)}`);
-  keepSession(signedIn.sessionToken, signedIn.expiresAt);
+  rememberSignedIn(signedIn.expiresAt);
   return signedIn;
+}
+
+/** The cookie is HttpOnly, so only the server can clear it. */
+export async function signOut() {
+  forgetSignedIn();
+  try { await call("POST", "/brands/sign-out"); } catch { /* already signed out */ }
 }
 
 export const getMe = () => call("GET", "/brands/me");

@@ -7,11 +7,30 @@ import {
   useSendCreatorEmailMutation,
 } from "../api/leadEndpoints.js";
 import TemplateOutreach from "../components/outreach/TemplateOutreach.jsx";
+import TemplatesPanel from "../components/outreach/TemplatesPanel.jsx";
+import AudiencesPanel from "../components/outreach/AudiencesPanel.jsx";
+import AnalyticsPanel from "../components/outreach/AnalyticsPanel.jsx";
+import ChannelLinkWizard from "../components/showcase/ChannelLinkWizard.jsx";
+import ShowcaseManager from "../components/showcase/ShowcaseManager.jsx";
+import VideoPickerGrid from "../components/showcase/VideoPickerGrid.jsx";
 
-/** Marketing: the creator's business email identity (with rotate), template mail to brands
- * (TemplateOutreach: mailable films only, one mail per brand per day, weekly allowance + packs),
- * and a free-form composer for one-to-one mail, sent from their creator identity. */
+const TABS = [
+  ["send", "Send"],
+  ["templates", "Templates"],
+  ["audiences", "Audiences"],
+  ["videos", "Videos"],
+  ["analytics", "Analytics"],
+  ["email", "Business email"],
+];
+
+/** Marketing (CREATOR_SHOWCASE.md rules 21-29): everything outreach in one place. Send (template +
+ * film + audience or typed addresses), Templates (Dalai Llama's and your own), Audiences (CSV upload,
+ * de-duplicated leads, validated contact points), Videos (the channel films templates carry),
+ * Analytics, and the business email identity with a free-form composer for one-to-one mail. */
 export default function MarketingPage() {
+  const [tab, setTab] = useState("send");
+  const [templateId, setTemplateId] = useState(null);
+  const chooseTemplate = (id) => { setTemplateId(id); setTab("send"); };
   const {
     data: identity,
     isLoading: identityLoading,
@@ -82,7 +101,7 @@ export default function MarketingPage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 sm:py-8">
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
       <div className="mb-6 flex items-center gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-500/20 text-purple-100">
           <Mail size={22} />
@@ -90,11 +109,43 @@ export default function MarketingPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Marketing</h1>
           <p className="text-sm font-medium text-slate-400">
-            Your business email, and sending your work to brands.
+            Send your work to brands, manage who you reach, and see what works.
           </p>
         </div>
       </div>
 
+      <div role="tablist" aria-label="Marketing sections" className="mb-5 flex flex-wrap gap-2">
+        {TABS.map(([id, text]) => (
+          <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
+                  className={`rounded-lg px-4 py-2 text-sm font-bold ${tab === id ? "bg-purple-600 text-white" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+            {text}
+          </button>
+        ))}
+      </div>
+
+      {tab === "send" && <TemplateOutreach templateId={templateId} onTemplateChange={setTemplateId} />}
+      {tab === "templates" && <TemplatesPanel onUse={chooseTemplate} />}
+      {tab === "audiences" && <AudiencesPanel />}
+      {tab === "analytics" && <AnalyticsPanel />}
+      {tab === "videos" && (
+        <div className="space-y-6">
+          <p className="text-xs text-slate-400">
+            Films made on Dalai Llama that your client paid for and agreed to marketing use of are what templates can send.
+            Your channel's own videos show on your public profile.
+          </p>
+          <ChannelLinkWizard />
+          <section>
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-normal text-slate-300">On your profile</h2>
+            <ShowcaseManager />
+          </section>
+          <section>
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-normal text-slate-300">Your channel's videos</h2>
+            <VideoPickerGrid />
+          </section>
+        </div>
+      )}
+
+      {tab === "email" && (<>
       {/* ---- Business email identity card ---- */}
       <section className="creator-panel mb-6 p-5">
         <div className="mb-3 flex items-center justify-between gap-2">
@@ -189,8 +240,6 @@ export default function MarketingPage() {
         )}
       </section>
 
-      <TemplateOutreach />
-
       {/* ---- Free-form composer (one-to-one mail) ---- */}
       <section className="creator-panel p-5">
         <h2 className="mb-3 text-sm font-bold uppercase tracking-normal text-slate-300">
@@ -271,6 +320,7 @@ export default function MarketingPage() {
           address as the sender; replies route back to it via Cloudflare Email Routing.
         </p>
       </section>
+      </>)}
     </div>
   );
 }

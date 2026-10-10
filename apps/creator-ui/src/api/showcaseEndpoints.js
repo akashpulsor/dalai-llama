@@ -7,7 +7,7 @@ import { opsAdminUrl } from "./creatorEndpoints.js";
 
 const showcaseBase = apiSlice.enhanceEndpoints({
   addTagTypes: ["ShowcaseProfile", "ShowcaseChannel", "ShowcaseVideos", "ShowcaseItems", "ShowcaseVisibility", "ShowcaseUpload",
-    "ShowcaseAdmin", "ShowcaseRequests", "Outreach"],
+    "ShowcaseAdmin", "ShowcaseRequests", "Outreach", "EmailTemplates", "Audiences", "AudienceLeads"],
 });
 
 export const showcaseApi = showcaseBase.injectEndpoints({
@@ -158,6 +158,69 @@ export const showcaseApi = showcaseBase.injectEndpoints({
       query: (idempotencyKey) => ({ url: "/tenants/me/outreach/packs", method: "POST", body: { idempotencyKey } }),
       invalidatesTags: ["Outreach"],
     }),
+
+    // ---- Phase E: templates, audiences, audience sends, analytics (CREATOR_SHOWCASE.md rules 21-28) ----
+    getEmailTemplates: builder.query({
+      query: () => ({ url: "/tenants/me/outreach/templates" }),
+      providesTags: ["EmailTemplates"],
+    }),
+    createEmailTemplate: builder.mutation({
+      query: (body) => ({ url: "/tenants/me/outreach/templates", method: "POST", body }),
+      invalidatesTags: ["EmailTemplates", "Outreach"],
+    }),
+    updateEmailTemplate: builder.mutation({
+      query: ({ id, ...body }) => ({ url: `/tenants/me/outreach/templates/${id}`, method: "PUT", body }),
+      invalidatesTags: ["EmailTemplates", "Outreach"],
+    }),
+    deleteEmailTemplate: builder.mutation({
+      query: (id) => ({ url: `/tenants/me/outreach/templates/${id}`, method: "DELETE" }),
+      invalidatesTags: ["EmailTemplates", "Outreach"],
+    }),
+    getAudiences: builder.query({
+      query: () => ({ url: "/tenants/me/outreach/audiences" }),
+      providesTags: ["Audiences"],
+    }),
+    createAudience: builder.mutation({
+      query: (name) => ({ url: "/tenants/me/outreach/audiences", method: "POST", body: { name } }),
+      invalidatesTags: ["Audiences"],
+    }),
+    deleteAudience: builder.mutation({
+      query: (id) => ({ url: `/tenants/me/outreach/audiences/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Audiences", "AudienceLeads", "Outreach"],
+    }),
+    uploadAudienceCsv: builder.mutation({
+      query: ({ audienceId, file }) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        return { url: `/tenants/me/outreach/audiences/${audienceId}/upload`, method: "POST", body: formData };
+      },
+      invalidatesTags: ["Audiences", "AudienceLeads"],
+    }),
+    getAudienceLeads: builder.query({
+      query: ({ audienceId, q, page = 0 }) => ({
+        url: `/tenants/me/outreach/audiences/${audienceId}/leads`,
+        params: { page, ...(q ? { q } : {}) },
+      }),
+      providesTags: ["AudienceLeads"],
+    }),
+    removeLeadFromAudience: builder.mutation({
+      query: ({ audienceId, leadId }) => ({ url: `/tenants/me/outreach/audiences/${audienceId}/leads/${leadId}`, method: "DELETE" }),
+      invalidatesTags: ["Audiences", "AudienceLeads"],
+    }),
+    discardContactPoint: builder.mutation({
+      query: ({ leadId, contactPointId }) => ({
+        url: `/tenants/me/outreach/leads/${leadId}/contact-points/${contactPointId}`, method: "DELETE",
+      }),
+      invalidatesTags: ["Audiences", "AudienceLeads"],
+    }),
+    sendToAudience: builder.mutation({
+      query: (body) => ({ url: "/tenants/me/outreach/send-to-audience", method: "POST", body }),
+      invalidatesTags: ["Outreach", "Audiences"],
+    }),
+    getOutreachAnalytics: builder.query({
+      query: (days = 30) => ({ url: "/tenants/me/outreach/analytics", params: { days } }),
+      providesTags: ["Outreach"],
+    }),
   }),
   overrideExisting: false,
 });
@@ -196,5 +259,18 @@ export const {
   useSendOutreachMutation,
   useGetOutreachHistoryQuery,
   useGetOutreachReachQuery,
+  useGetEmailTemplatesQuery,
+  useCreateEmailTemplateMutation,
+  useUpdateEmailTemplateMutation,
+  useDeleteEmailTemplateMutation,
+  useGetAudiencesQuery,
+  useCreateAudienceMutation,
+  useDeleteAudienceMutation,
+  useUploadAudienceCsvMutation,
+  useGetAudienceLeadsQuery,
+  useRemoveLeadFromAudienceMutation,
+  useDiscardContactPointMutation,
+  useSendToAudienceMutation,
+  useGetOutreachAnalyticsQuery,
   useBuyMailPackMutation,
 } = showcaseApi;
