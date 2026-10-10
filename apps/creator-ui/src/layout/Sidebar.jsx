@@ -8,8 +8,10 @@ import {
   CreditCard,
   FolderOpen,
   Home,
+  Inbox,
   Mail,
   Sparkles,
+  UserCircle,
   Users,
   Wand2,
 } from "lucide-react";
@@ -33,6 +35,9 @@ const navItems = [
   // uses the shared Hostinger relay; recipient-facing sender is the creator's own
   // partner.dalaillama.in identity via display-name aliasing on the From header.
   { id: "marketing", label: "Marketing", icon: Mail, path: "/marketing" },
+  // Creator Showcase: the public profile brands see, the YouTube channel and showcase videos.
+  { id: "profile", label: "Public profile", icon: UserCircle, path: "/profile" },
+  { id: "requests", label: "Requests", icon: Inbox, path: "/requests" },
 ];
 
 export default function Sidebar() {
@@ -118,7 +123,7 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-6 border-t border-white/10 bg-[#05070d]/95 px-2 py-2 backdrop-blur lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-9 border-t border-white/10 bg-[#05070d]/95 px-2 py-2 backdrop-blur lg:hidden">
         {navItems.map((item) => (
           <a
             key={item.id}

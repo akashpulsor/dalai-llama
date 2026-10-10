@@ -63,6 +63,10 @@ async function saveFilm(url) {
   }
 }
 
+/** Version of the marketing-use terms the lock checkbox agrees to; stored with the payment. Bump it
+ * when the wording at /terms changes. */
+const MARKETING_TERMS_VERSION = "2026-10";
+
 export default function ClientReviewPage() {
   const { token } = useParams();
   const navigate = useNavigate();
@@ -76,6 +80,7 @@ export default function ClientReviewPage() {
   const [startPayment] = useStartLockPaymentMutation();
   const [verifyPayment] = useVerifyLockPaymentMutation();
   const [lockSettled] = useLockSettledMutation();
+  const [marketingConsent, setMarketingConsent] = useState(false);
   const [startNextBrief, { isLoading: startingNextBrief }] = useStartNextBriefMutation();
   const [quote, setQuote] = useState(null);
   const [paying, setPaying] = useState(false);
@@ -101,9 +106,9 @@ export default function ClientReviewPage() {
     setPaying(true);
     try {
       if (settled) {
-        await lockSettled(token).unwrap();
+        await lockSettled({ token, acceptedTermsVersion: MARKETING_TERMS_VERSION }).unwrap();
       } else {
-        const order = await startPayment(token).unwrap();
+        const order = await startPayment({ token, acceptedTermsVersion: MARKETING_TERMS_VERSION }).unwrap();
         await runRazorpayCheckout(
           { ...order, name: "Dalai Llama Studio", description: `Lock: ${data?.name || "creative package"}` },
           (response) => verifyPayment({
@@ -509,6 +514,20 @@ export default function ClientReviewPage() {
               </div>
             </div>
 
+            <label className="mt-4 flex items-start gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+              <input
+                id="marketingConsent"
+                type="checkbox"
+                checked={marketingConsent}
+                onChange={(e) => setMarketingConsent(e.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-purple-500"
+              />
+              <span className="text-xs leading-relaxed text-slate-300">
+                I agree to the <a href="https://dalaillama.in/terms" target="_blank" rel="noreferrer" className="font-bold text-purple-200">terms</a>,
+                including that the finished film may be used to promote the creator and Dalaillama.
+              </span>
+            </label>
+
             <div className="mt-5 flex gap-2">
               <button
                 type="button"
@@ -520,7 +539,7 @@ export default function ClientReviewPage() {
               </button>
               <button
                 type="button"
-                disabled={paying}
+                disabled={paying || !marketingConsent}
                 onClick={handlePayAndLock}
                 className="creator-primary flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold text-white disabled:opacity-60"
               >

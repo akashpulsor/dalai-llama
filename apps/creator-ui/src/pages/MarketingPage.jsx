@@ -6,11 +6,11 @@ import {
   useRotateMyEmailPasswordMutation,
   useSendCreatorEmailMutation,
 } from "../api/leadEndpoints.js";
+import TemplateOutreach from "../components/outreach/TemplateOutreach.jsx";
 
-/** Phase-1 marketing surface: shows the creator their business email identity + login
- * password (with rotate), and a free-form composer that sends via the shared Hostinger SMTP
- * relay using their creator identity on the From header. Templates are inline free-form for
- * this phase -- persisted templates land in a later ticket. */
+/** Marketing: the creator's business email identity (with rotate), template mail to brands
+ * (TemplateOutreach: mailable films only, one mail per brand per day, weekly allowance + packs),
+ * and a free-form composer for one-to-one mail, sent from their creator identity. */
 export default function MarketingPage() {
   const {
     data: identity,
@@ -90,7 +90,7 @@ export default function MarketingPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Marketing</h1>
           <p className="text-sm font-medium text-slate-400">
-            Your business email + outreach composer.
+            Your business email, and sending your work to brands.
           </p>
         </div>
       </div>
@@ -189,10 +189,12 @@ export default function MarketingPage() {
         )}
       </section>
 
-      {/* ---- Composer ---- */}
+      <TemplateOutreach />
+
+      {/* ---- Free-form composer (one-to-one mail) ---- */}
       <section className="creator-panel p-5">
         <h2 className="mb-3 text-sm font-bold uppercase tracking-normal text-slate-300">
-          Compose &amp; send
+          Write your own email
         </h2>
 
         <label className="mb-3 block">

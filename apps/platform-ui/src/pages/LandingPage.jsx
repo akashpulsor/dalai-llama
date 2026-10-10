@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useInitiateLoginMutation } from "@dalaillama/shared-hooks/keycloakApi";
 import { appConfig } from "@dalaillama/shared-config";
+import LandingShowcaseSection from "../showcase/LandingShowcaseSection.jsx";
 
 /**
  * @typedef {Object} AnimatedCardProps
@@ -444,6 +445,12 @@ const LandingPage = () => {
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <a
+            href="/creators"
+            className="rounded-lg px-4 py-2 text-center text-sm font-bold text-slate-700 transition-colors hover:bg-white/70 hover:text-slate-950"
+          >
+            Creators
+          </a>
+          <a
             href="#pricing"
             className="rounded-lg px-4 py-2 text-center text-sm font-bold text-slate-700 transition-colors hover:bg-white/70 hover:text-slate-950"
           >
@@ -460,6 +467,7 @@ const LandingPage = () => {
 
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pb-24 sm:px-6 lg:px-8">
         <HeroSection />
+        <LandingShowcaseSection />
         <AudioPlayer />
         <PricingSection onStart={handleLogin} />
       </main>

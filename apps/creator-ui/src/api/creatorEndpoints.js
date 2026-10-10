@@ -59,7 +59,7 @@ async function cacheGenerationPlan({ projectId, shotId }, { dispatch, queryFulfi
  * window.location.origin is always the ops hostname when these endpoints are called; the ops
  * VirtualService then routes /api/v1/internal/admin/** to the owning backend service.
  */
-const opsAdminUrl = (path) => {
+export const opsAdminUrl = (path) => {
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   return `${origin}/api/v1/internal/admin${path}`;
 };
@@ -3203,8 +3203,14 @@ export const creatorApi = apiSlice.injectEndpoints({
     getLockQuote: builder.mutation({
       query: (token) => ({ url: platformUrl(`/public/projects/${token}/lock/quote`), method: "POST" }),
     }),
+    // { token, acceptedTermsVersion }: the client's tick on marketing use is recorded with the
+    // payment (Creator Showcase rule 10). A bare token string still works.
     startLockPayment: builder.mutation({
-      query: (token) => ({ url: platformUrl(`/public/projects/${token}/lock/payment`), method: "POST" }),
+      query: (arg) => {
+        const { token, acceptedTermsVersion } = typeof arg === "string" ? { token: arg } : arg;
+        return { url: platformUrl(`/public/projects/${token}/lock/payment`), method: "POST",
+          body: acceptedTermsVersion ? { acceptedTermsVersion } : undefined };
+      },
     }),
     // After this video is locked: opens the client's next brief, pre-filled from this one.
     startNextBrief: builder.mutation({
@@ -3212,8 +3218,14 @@ export const creatorApi = apiSlice.injectEndpoints({
     }),
     // Brief already paid in full -> nothing to charge; the server re-checks the balance is zero.
     lockSettled: builder.mutation({
-      query: (token) => ({ url: platformUrl(`/public/projects/${token}/lock/settled`), method: "POST" }),
-      invalidatesTags: (_result, _error, token) => [{ type: "CreatorHomeProjects", id: `public-project-${token}` }],
+      query: (arg) => {
+        const { token, acceptedTermsVersion } = typeof arg === "string" ? { token: arg } : arg;
+        return { url: platformUrl(`/public/projects/${token}/lock/settled`), method: "POST",
+          body: acceptedTermsVersion ? { acceptedTermsVersion } : undefined };
+      },
+      invalidatesTags: (_result, _error, arg) => [
+        { type: "CreatorHomeProjects", id: `public-project-${typeof arg === "string" ? arg : arg?.token}` },
+      ],
     }),
     verifyLockPayment: builder.mutation({
       query: ({ token, ...body }) => ({ url: platformUrl(`/public/projects/${token}/lock/verify`), method: "POST", body }),

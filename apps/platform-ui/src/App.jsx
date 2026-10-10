@@ -11,6 +11,11 @@ import { appConfig } from "@dalaillama/shared-config";
 import { useExchangeTokenMutation } from "@dalaillama/shared-hooks/keycloakApi";
 
 import LandingPage from "./pages/LandingPage.jsx";
+import DiscoverPage from "./pages/DiscoverPage.jsx";
+import CreatorPublicPage from "./pages/CreatorPublicPage.jsx";
+import BrandSignInPage from "./pages/BrandSignInPage.jsx";
+import BrandHomePage from "./pages/BrandHomePage.jsx";
+import UnsubscribePage from "./pages/UnsubscribePage.jsx";
 
 /* ------------------------------------------------------------
  * OAuth Callback Handler
@@ -81,6 +86,13 @@ function AppRoutes() {
     <>
       <Routes>
         <Route path={R.ROOT} element={<LandingPage />} />
+        {/* Creator Showcase: public, no login. */}
+        <Route path="/creators" element={<DiscoverPage />} />
+        <Route path="/c/:handle" element={<CreatorPublicPage />} />
+        <Route path="/brands/sign-in" element={<BrandSignInPage />} />
+        <Route path="/brands/sign-in/:token" element={<BrandSignInPage />} />
+        <Route path="/brands/home" element={<BrandHomePage />} />
+        <Route path="/unsubscribe/:token" element={<UnsubscribePage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path={R.LOGIN} element={<AuthCallback />} />
         <Route path={R.PLATFORM} element={<div>Platform Home</div>} />

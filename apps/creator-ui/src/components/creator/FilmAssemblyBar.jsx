@@ -1,9 +1,10 @@
 // @ts-nocheck
-import React from "react";
+import React, { useState } from "react";
 import { useDispatch } from "react-redux";
-import { AlertTriangle, Download, Film, Loader2, Send, Upload } from "lucide-react";
+import { AlertTriangle, Download, Film, Loader2, Send, Upload, UserCircle } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import ShotCanvasPlayer from "./ShotCanvasPlayer.jsx";
+import PublishToShowcaseDialog from "../showcase/PublishToShowcaseDialog.jsx";
 import {
   useAssembleFilmMutation,
   useGetFilmReadinessQuery,
@@ -29,6 +30,7 @@ const POLL_INTERVAL_MS = 4000;
 const POLL_MAX_ATTEMPTS = 225; // ~15 minutes, an ffmpeg join of a long project
 
 export default function FilmAssemblyBar({ projectId, aspectRatio }) {
+  const [showcaseOpen, setShowcaseOpen] = useState(false);
   const dispatch = useDispatch();
   const { data: readiness } = useGetFilmReadinessQuery(projectId, { skip: !projectId });
   const { data: film, refetch: refetchFilm } = useGetLatestFilmQuery(projectId, { skip: !projectId });
@@ -226,7 +228,18 @@ export default function FilmAssemblyBar({ projectId, aspectRatio }) {
             {film.published ? "Take down from review page" : "Publish to review page"}
           </button>
         )}
+
+        {film?.status === "COMPLETED" && film?.published && (
+          <button
+            type="button"
+            onClick={() => setShowcaseOpen(true)}
+            className="flex min-h-9 items-center justify-center gap-2 rounded-md border border-emerald-400/30 bg-emerald-500/10 px-4 text-xs font-black text-emerald-100"
+          >
+            <UserCircle size={14} /> Publish to my profile
+          </button>
+        )}
       </div>
+      {showcaseOpen && <PublishToShowcaseDialog projectId={projectId} onClose={() => setShowcaseOpen(false)} />}
 
       {!ready && disabledReason && (
         <p className="mt-1.5 text-[10px] font-bold text-amber-200/90">{disabledReason}</p>

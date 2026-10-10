@@ -12,6 +12,8 @@ import SubscriptionPage from "./pages/SubscriptionPage.jsx";
 import CastLibraryPage from "./pages/CastLibraryPage.jsx";
 import AdminOpsPage from "./pages/AdminOpsPage.jsx";
 import MarketingPage from "./pages/MarketingPage.jsx";
+import CreatorProfilePage from "./pages/CreatorProfilePage.jsx";
+import RequestsPage from "./pages/RequestsPage.jsx";
 
 const routes = [
   { index: true, element: <HomePage /> },
@@ -22,6 +24,10 @@ const routes = [
   { path: "cast-library", element: <CastLibraryPage /> },
   // Lead management / creator outbound email (business identity + composer).
   { path: "marketing", element: <MarketingPage /> },
+  // Creator Showcase: public profile, YouTube channel, showcase videos, visibility ladder.
+  { path: "profile", element: <CreatorProfilePage /> },
+  // Brand requests from the public profile; the alert email links here.
+  { path: "requests", element: <RequestsPage /> },
   // Ops dashboard. Component enforces both host (ops.dalaillama.in) and role (dalai_admin);
   // adding the route unconditionally keeps routes.jsx simple and defers gating to the page.
   { path: "admin", element: <AdminOpsPage /> },
