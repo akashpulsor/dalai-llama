@@ -5,11 +5,12 @@ FROM node:20-alpine AS builder
 RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /app
 
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY shared ./shared
-COPY apps/platform-ui ./apps/platform-ui
+# shared/store imports creator-ui's slices, so the whole apps tree is needed (as creator-ui does).
+COPY apps ./apps
 
-RUN pnpm install --no-frozen-lockfile --filter platform-ui...
+RUN pnpm install --no-frozen-lockfile
 
 WORKDIR /app/apps/platform-ui
 RUN pnpm build
