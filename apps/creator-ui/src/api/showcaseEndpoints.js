@@ -7,7 +7,8 @@ import { opsAdminUrl } from "./creatorEndpoints.js";
 
 const showcaseBase = apiSlice.enhanceEndpoints({
   addTagTypes: ["ShowcaseProfile", "ShowcaseChannel", "ShowcaseVideos", "ShowcaseItems", "ShowcaseVisibility", "ShowcaseUpload",
-    "ShowcaseAdmin", "ShowcaseRequests", "Outreach", "EmailTemplates", "Audiences", "AudienceLeads"],
+    "ShowcaseAdmin", "ShowcaseRequests", "Outreach", "EmailTemplates", "Audiences", "AudienceLeads", "YouTubeConnection", "YouTubeJobs",
+    "YouTubeAnalytics", "ExtensionTokens", "PlatformYouTube"],
 });
 
 export const showcaseApi = showcaseBase.injectEndpoints({
@@ -221,6 +222,77 @@ export const showcaseApi = showcaseBase.injectEndpoints({
       query: (days = 30) => ({ url: "/tenants/me/outreach/analytics", params: { days } }),
       providesTags: ["Outreach"],
     }),
+
+    // ---- Phase Y: YouTube OAuth, publishing, analytics, extension (CREATOR_SHOWCASE.md rules 31-40) ----
+    getYouTubeConnection: builder.query({
+      query: () => ({ url: "/tenants/me/youtube/connection" }),
+      providesTags: ["YouTubeConnection"],
+    }),
+    startYouTubeConnect: builder.mutation({
+      query: () => ({ url: "/tenants/me/youtube/connection/start", method: "POST" }),
+    }),
+    disconnectYouTube: builder.mutation({
+      query: () => ({ url: "/tenants/me/youtube/connection", method: "DELETE" }),
+      invalidatesTags: ["YouTubeConnection", "YouTubeAnalytics"],
+    }),
+    getPublishableFilms: builder.query({
+      query: () => ({ url: "/tenants/me/youtube/films" }),
+    }),
+    getPublishJobs: builder.query({
+      query: () => ({ url: "/tenants/me/youtube/publish-jobs" }),
+      providesTags: ["YouTubeJobs"],
+    }),
+    publishToYouTube: builder.mutation({
+      query: (body) => ({ url: "/tenants/me/youtube/publish-jobs", method: "POST", body }),
+      invalidatesTags: ["YouTubeJobs"],
+    }),
+    editYouTubeVideo: builder.mutation({
+      query: ({ id, ...body }) => ({ url: `/tenants/me/youtube/publish-jobs/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["YouTubeJobs"],
+    }),
+    setYouTubeThumbnail: builder.mutation({
+      query: ({ id, file }) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        return { url: `/tenants/me/youtube/publish-jobs/${id}/thumbnail`, method: "PUT", body: formData };
+      },
+      invalidatesTags: ["YouTubeJobs"],
+    }),
+    cancelPublishJob: builder.mutation({
+      query: (id) => ({ url: `/tenants/me/youtube/publish-jobs/${id}/cancel`, method: "POST" }),
+      invalidatesTags: ["YouTubeJobs"],
+    }),
+    retryPublishJob: builder.mutation({
+      query: (id) => ({ url: `/tenants/me/youtube/publish-jobs/${id}/retry`, method: "POST" }),
+      invalidatesTags: ["YouTubeJobs"],
+    }),
+    getYouTubeAnalytics: builder.query({
+      query: (days = 28) => ({ url: "/tenants/me/youtube/analytics", params: { days } }),
+      providesTags: ["YouTubeAnalytics"],
+    }),
+    getExtensionTokens: builder.query({
+      query: () => ({ url: "/tenants/me/extension/tokens" }),
+      providesTags: ["ExtensionTokens"],
+    }),
+    pairExtension: builder.mutation({
+      query: (label) => ({ url: "/tenants/me/extension/tokens", method: "POST", body: { label } }),
+      invalidatesTags: ["ExtensionTokens"],
+    }),
+    revokeExtensionToken: builder.mutation({
+      query: (id) => ({ url: `/tenants/me/extension/tokens/${id}`, method: "DELETE" }),
+      invalidatesTags: ["ExtensionTokens"],
+    }),
+    adminPlatformYouTube: builder.query({
+      query: () => ({ url: opsAdminUrl("/tenants/youtube/platform-connection") }),
+      providesTags: ["PlatformYouTube"],
+    }),
+    adminStartPlatformYouTube: builder.mutation({
+      query: () => ({ url: opsAdminUrl("/tenants/youtube/platform-connection/start"), method: "POST" }),
+    }),
+    adminDisconnectPlatformYouTube: builder.mutation({
+      query: () => ({ url: opsAdminUrl("/tenants/youtube/platform-connection"), method: "DELETE" }),
+      invalidatesTags: ["PlatformYouTube"],
+    }),
   }),
   overrideExisting: false,
 });
@@ -272,5 +344,22 @@ export const {
   useDiscardContactPointMutation,
   useSendToAudienceMutation,
   useGetOutreachAnalyticsQuery,
+  useGetYouTubeConnectionQuery,
+  useStartYouTubeConnectMutation,
+  useDisconnectYouTubeMutation,
+  useGetPublishableFilmsQuery,
+  useGetPublishJobsQuery,
+  usePublishToYouTubeMutation,
+  useEditYouTubeVideoMutation,
+  useSetYouTubeThumbnailMutation,
+  useCancelPublishJobMutation,
+  useRetryPublishJobMutation,
+  useGetYouTubeAnalyticsQuery,
+  useGetExtensionTokensQuery,
+  usePairExtensionMutation,
+  useRevokeExtensionTokenMutation,
+  useAdminPlatformYouTubeQuery,
+  useAdminStartPlatformYouTubeMutation,
+  useAdminDisconnectPlatformYouTubeMutation,
   useBuyMailPackMutation,
 } = showcaseApi;

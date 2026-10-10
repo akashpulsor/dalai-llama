@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Dalai Llama</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <strong>Dalai Llama</strong>
+    <span id="who" class="muted"></span>
+  </header>
+
+  <section id="unpaired" hidden>
+    <p>Connect this browser from Dalai Llama: open Marketing → YouTube and choose "Connect the extension in this browser".</p>
+    <button id="open-app" type="button">Open Dalai Llama</button>
+  </section>
+
+  <main id="paired" hidden>
+    <section>
+      <h2>This YouTube video</h2>
+      <p id="video-none" class="muted">Open one of your videos on youtube.com, then click the extension.</p>
+      <form id="import-form" hidden>
+        <p class="muted">Video: <code id="video-id"></code></p>
+        <label>Industry <select id="industry" required></select></label>
+        <label>Format <select id="format" required></select></label>
+        <label class="check"><input id="rights" type="checkbox" required> I may show this video publicly</label>
+        <button type="submit">Add to my profile</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>Publish a film</h2>
+      <p id="publish-off" class="muted" hidden>Connect your YouTube channel in Dalai Llama first.</p>
+      <form id="publish-form" hidden>
+        <label>Film <select id="film" required></select></label>
+        <label>Title <input id="title" maxlength="100" required></label>
+        <label>Visibility
+          <select id="privacy">
+            <option value="PRIVATE">Private</option>
+            <option value="UNLISTED">Unlisted</option>
+            <option value="PUBLIC">Public</option>
+          </select>
+        </label>
+        <label id="confirm-row" class="check" hidden><input id="confirm" type="checkbox"> I understand this video will be public</label>
+        <button type="submit">Publish</button>
+      </form>
+      <ul id="jobs"></ul>
+    </section>
+
+    <footer><button id="unpair" type="button" class="link">Disconnect this browser</button></footer>
+  </main>
+
+  <p id="message" role="status"></p>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

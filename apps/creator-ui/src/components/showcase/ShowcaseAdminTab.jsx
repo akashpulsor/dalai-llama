@@ -2,7 +2,10 @@
 import React, { useState } from "react";
 import { Loader2 } from "lucide-react";
 import {
+  useAdminDisconnectPlatformYouTubeMutation,
   useAdminOnboardingBackfillMutation,
+  useAdminPlatformYouTubeQuery,
+  useAdminStartPlatformYouTubeMutation,
   useAdminShowcaseHealthQuery,
   useAdminShowcaseHideItemMutation,
   useAdminShowcaseProbeMutation,
@@ -22,6 +25,9 @@ export default function ShowcaseAdminTab() {
   const [hideItem] = useAdminShowcaseHideItemMutation();
   const [setProfileStatus, profileState] = useAdminShowcaseProfileStatusMutation();
   const [backfill, backfillState] = useAdminOnboardingBackfillMutation();
+  const { data: platformChannel } = useAdminPlatformYouTubeQuery();
+  const [startPlatform, startPlatformState] = useAdminStartPlatformYouTubeMutation();
+  const [disconnectPlatform] = useAdminDisconnectPlatformYouTubeMutation();
   const [handle, setHandle] = useState("");
   const [message, setMessage] = useState(null);
 
@@ -42,6 +48,30 @@ export default function ShowcaseAdminTab() {
           {message.text}
         </p>
       )}
+
+      <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
+        <p className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">Official Dalaillama YouTube channel</p>
+        <p className="mt-1 text-xs text-slate-500">Sign in as the channel's owner (a Google account with access to the brand channel). Official uploads use it.</p>
+        {platformChannel && (
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="font-bold text-slate-200">
+              {!platformChannel.oauthConfigured ? "Google OAuth client not configured"
+                : platformChannel.channelId ? `${platformChannel.channelTitle} · ${platformChannel.connected ? "connected" : "access expired"}` : "Not connected"}
+            </span>
+            <div className="flex gap-2">
+              <button type="button" disabled={!platformChannel.oauthConfigured || startPlatformState.isLoading}
+                      onClick={() => run(startPlatform, (r) => { window.location.assign(r.authorizationUrl); return "Opening Google…"; })}
+                      className="creator-primary px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50">
+                {platformChannel.channelId ? "Reconnect" : "Connect"}
+              </button>
+              {platformChannel.channelId && (
+                <button type="button" onClick={() => window.confirm("Disconnect the official channel?") && run(disconnectPlatform, () => "Disconnected")}
+                        className="creator-control px-3 py-1.5 text-[11px] font-bold text-slate-200">Disconnect</button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
         <p className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">Video host</p>

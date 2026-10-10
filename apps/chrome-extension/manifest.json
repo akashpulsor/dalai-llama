@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Dalai Llama",
+  "version": "0.1.0",
+  "description": "Add your YouTube videos to your Dalai Llama profile and publish your films to YouTube.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApfv3OMSC4mkeuuzrcLSPVQKMNCmBjZN1iqOYynCaywnt98+JijMzxXNyFPT7XvLIfrwKo8YsNUqeeP3oa/IXtHnDoAlcYFZHY1Oy051bmR9km8LG9E/cij497HFgLvPIkA59W6wySLVGonAunH8Yjllw8a0StfPQK9YdrXvbqxyIvLzpPL5ISsavJd/LZ4C/TY4htFMu8ZQ6gJqHyD9z1m4nirwZZyZY8L5meOel50IMsyTxfEHmva3j0nQ9a6CEIQFBoT2qz1F3H4ekChZVJoohq0nC8aIeldfB/WAKd4kt9x6+Dji3MeE+HIC5fe0CqbcoVHwj+ZPVOiehnw3LXwIDAQAB",
+  "minimum_chrome_version": "116",
+  "action": {
+    "default_popup": "src/popup.html",
+    "default_title": "Dalai Llama"
+  },
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://api.dalaillama.in/*"
+  ],
+  "externally_connectable": {
+    "matches": [
+      "https://creator.dalaillama.in/*",
+      "http://localhost:5173/*"
+    ]
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src https://api.dalaillama.in"
+  }
+}

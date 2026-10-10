@@ -19,11 +19,6 @@ export const leadApi = apiSlice.injectEndpoints({
       invalidatesTags: ["CreatorEmailIdentity"],
     }),
 
-    // POST /api/v1/tenants/me/email/send -- send from the caller's identity via the SMTP
-    // relay. body: { to: string[], subject, bodyText, bodyHtml? }.
-    sendCreatorEmail: builder.mutation({
-      query: (body) => ({ url: "/tenants/me/email/send", method: "POST", body }),
-    }),
   }),
   overrideExisting: false,
 });
@@ -31,5 +26,4 @@ export const leadApi = apiSlice.injectEndpoints({
 export const {
   useGetMyEmailIdentityQuery,
   useRotateMyEmailPasswordMutation,
-  useSendCreatorEmailMutation,
 } = leadApi;
