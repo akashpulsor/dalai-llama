@@ -199,14 +199,15 @@ function AnalyticsCard() {
 
 const newKey = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
 
-function PublishCard() {
+/** {@code projectId} preselects a film (the project page's Publish button). */
+export function PublishCard({ projectId = "" }) {
   const fail = useFail();
   const dispatch = useDispatch();
   const { data: films = [], isLoading: filmsLoading } = useGetPublishableFilmsQuery();
   const [polling, setPolling] = useState(0);
   const { data: jobs = [] } = useGetPublishJobsQuery(undefined, { pollingInterval: polling });
   const [publish, publishState] = usePublishToYouTubeMutation();
-  const [form, setForm] = useState({ projectId: "", title: "", description: "", tags: "", privacy: "PRIVATE", publishAt: "", confirmPublic: false });
+  const [form, setForm] = useState({ projectId, title: "", description: "", tags: "", privacy: "PRIVATE", publishAt: "", confirmPublic: false });
   const [key, setKey] = useState(newKey);
 
   useEffect(() => {
@@ -214,8 +215,8 @@ function PublishCard() {
   }, [jobs]);
   const film = films.find((f) => f.projectId === form.projectId) || films[0];
   useEffect(() => {
-    if (film && !form.projectId) setForm((f) => ({ ...f, projectId: film.projectId, title: film.name?.slice(0, 100) || "" }));
-  }, [film, form.projectId]);
+    if (film && !form.title) setForm((f) => ({ ...f, projectId: film.projectId, title: film.name?.slice(0, 100) || "" }));
+  }, [film, form.title]);
 
   const goesPublic = form.privacy === "PUBLIC" || Boolean(form.publishAt);
   const submit = async (event) => {
