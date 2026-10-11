@@ -24,7 +24,7 @@ const platformApiOrigin = (() => {
     return "https://api.dalaillama.in";
   }
 })();
-const platformUrl = (path) => `${platformApiOrigin}/v1${path}`;
+export const platformUrl = (path) => `${platformApiOrigin}/v1${path}`;
 const CAST_PROFILES_TAG = { type: "CreatorHomeProjects", id: "cast-profiles" };
 
 /** Writes a shot-controls mutation's answer into getShotGenerationControls' cache for that shot. */

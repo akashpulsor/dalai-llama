@@ -3,12 +3,12 @@
 // platform films and the visibility ladder. Own file, like leadEndpoints.js, so creatorEndpoints.js
 // doesn't grow another block. Contract: dallai-llama-backend/docs/lead-management/CREATOR_SHOWCASE.md
 import { api as apiSlice } from "@dalaillama/shared-store";
-import { opsAdminUrl } from "./creatorEndpoints.js";
+import { opsAdminUrl, platformUrl } from "./creatorEndpoints.js";
 
 const showcaseBase = apiSlice.enhanceEndpoints({
   addTagTypes: ["ShowcaseProfile", "ShowcaseChannel", "ShowcaseVideos", "ShowcaseItems", "ShowcaseVisibility", "ShowcaseUpload",
     "ShowcaseAdmin", "ShowcaseRequests", "Outreach", "EmailTemplates", "Audiences", "AudienceLeads", "YouTubeConnection", "YouTubeJobs",
-    "YouTubeAnalytics", "ExtensionTokens", "PlatformYouTube", "YouTubeQuota", "BrandCredits"],
+    "YouTubeAnalytics", "ExtensionTokens", "PlatformYouTube", "YouTubeQuota", "BrandCredits", "FilmConsent"],
 });
 
 export const showcaseApi = showcaseBase.injectEndpoints({
@@ -73,6 +73,12 @@ export const showcaseApi = showcaseBase.injectEndpoints({
     // ---- Films made on Dalaillama ----
     getYouTubeKit: builder.query({
       query: (projectId) => ({ url: `/tenants/me/showcase/projects/${projectId}/youtube-kit` }),
+      providesTags: ["FilmConsent"],
+    }),
+    // The creator confirms their client agreed to marketing use (pre-production records it as creator-attested).
+    recordMarketingConsent: builder.mutation({
+      query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/marketing-consent`), method: "POST" }),
+      invalidatesTags: ["FilmConsent"],
     }),
     linkPlatformFilm: builder.mutation({
       query: ({ projectId, ...body }) => ({ url: `/tenants/me/showcase/projects/${projectId}/youtube-link`, method: "POST", body }),
@@ -245,6 +251,7 @@ export const showcaseApi = showcaseBase.injectEndpoints({
     }),
     getPublishableFilms: builder.query({
       query: () => ({ url: "/tenants/me/youtube/films" }),
+      providesTags: ["FilmConsent"],
     }),
     getPublishJobs: builder.query({
       query: () => ({ url: "/tenants/me/youtube/publish-jobs" }),
@@ -372,6 +379,7 @@ export const {
   useRemoveShowcaseItemMutation,
   useReorderShowcaseMutation,
   useGetYouTubeKitQuery,
+  useRecordMarketingConsentMutation,
   useLinkPlatformFilmMutation,
   useRequestOfficialUploadMutation,
   useGetOfficialUploadQuery,

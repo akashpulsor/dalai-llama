@@ -2,7 +2,7 @@
 import React from "react";
 import { Loader2, X } from "lucide-react";
 import { useGetOfficialUploadQuery, useGetYouTubeConnectionQuery, useGetYouTubeKitQuery } from "../../api/showcaseEndpoints.js";
-import { ConnectionCard, PublishCard } from "../outreach/YouTubePanel.jsx";
+import { ConnectionCard, ConsentCard, PublishCard } from "../outreach/YouTubePanel.jsx";
 import { errorMessage } from "./showcaseLabels.js";
 
 const OFFICIAL_STATUS = {
@@ -44,16 +44,12 @@ export default function PublishToShowcaseDialog({ projectId, onClose }) {
             {!connected && <ConnectionCard connection={connection} />}
             {connected && (
               <p className="rounded-lg border border-purple-400/30 bg-purple-500/10 px-3 py-2 text-xs text-purple-100">
-                Once the upload finishes, this film appears on your profile as "Made on Dalaillama". It shows to brands only when
-                it's <b>Public</b> on YouTube; Private and Unlisted stay off your profile.
+                Once the upload finishes, this film appears on your profile as "Made on Dalaillama", whatever its YouTube setting:
+                your profile plays our own copy. <b>Private</b> keeps it off YouTube for everyone else; <b>Public</b> also promotes it
+                on YouTube.
               </p>
             )}
-            {connected && !kit.marketingConsent && (
-              <p className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-                Your client hasn't agreed to marketing use of this film yet, so it can only go up as Private. They agree on the review
-                page when they approve it; then publish it as Public here.
-              </p>
-            )}
+            {connected && !kit.marketingConsent && <ConsentCard projectId={projectId} />}
             {connected && <PublishCard projectId={projectId} defaultPrivacy={kit.marketingConsent ? "PUBLIC" : "PRIVATE"} />}
             <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-slate-300">
               {official

@@ -4,6 +4,7 @@ import { useDispatch } from "react-redux";
 import { ExternalLink, ImagePlus, Loader2, Puzzle, RotateCw, Upload, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
+  useRecordMarketingConsentMutation,
   useCancelPublishJobMutation,
   useDisconnectYouTubeMutation,
   useEditYouTubeVideoMutation,
@@ -272,7 +273,7 @@ export function PublishCard({ projectId = "", defaultPrivacy = "PRIVATE" }) {
                 </label>
               ))}
             </div>
-            {!film?.clientConsented && <p className="mt-2 text-[11px] text-slate-500">Your client hasn't agreed to marketing use of this film, so it can only be private.</p>}
+            {film && !film.clientConsented && <div className="mt-2"><ConsentCard projectId={film.projectId} /></div>}
           </fieldset>
           {goesPublic && (
             <label className="flex items-start gap-2 rounded-lg border border-amber-300/30 bg-amber-500/10 p-3 text-sm text-amber-100 sm:col-span-2">
@@ -439,5 +440,28 @@ function ExtensionCard() {
         </ul>
       )}
     </section>
+  );
+}
+
+/** No consent on the film yet: the client gives it when they lock on the review page, or the creator confirms they have it. */
+export function ConsentCard({ projectId }) {
+  const [agreed, setAgreed] = useState(false);
+  const [record, state] = useRecordMarketingConsentMutation();
+  return (
+    <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+      <p>
+        Your client hasn't agreed to marketing use of this film yet, so it can only go up as Private. They agree on the review page
+        when they lock it, or you can confirm it here.
+      </p>
+      <label className="mt-2 flex items-start gap-2">
+        <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-0.5" />
+        <span>I have my client's permission to use this film for marketing (or the film is my own).</span>
+      </label>
+      <button type="button" disabled={!agreed || state.isLoading} onClick={() => record(projectId)}
+              className="mt-2 rounded-md bg-amber-300 px-3 py-1 font-bold text-slate-900 disabled:opacity-50">
+        {state.isLoading ? "Saving…" : "Record consent"}
+      </button>
+      {state.isError && <p className="mt-1 text-rose-300">{state.error?.data?.message || "Could not record consent -- try again."}</p>}
+    </div>
   );
 }
