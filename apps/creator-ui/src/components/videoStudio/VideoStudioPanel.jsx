@@ -106,6 +106,8 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
   const settings = plan.settings ?? {};
   const duration = settings.generationDurationSeconds;
   const fps = settings.generationFps;
+  // A model with one frame rate takes no fps setting; frames are still counted at that rate.
+  const frameRate = fps || (plan.capabilities?.supportedFps?.length === 1 ? plan.capabilities.supportedFps[0] : null);
   const caps = plan.capabilities ?? { supportedDurationsSeconds: [], supportedFps: [] };
   const assessment = plan.assessment;
   const unsaved = hasUnsavedEdits(editorText, plan);
@@ -313,7 +315,10 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
           <ol className={`space-y-1 ${flags.timelineStale ? "opacity-60" : ""}`}>
             {plan.timeline.map((interval, i) => (
               <li key={i} className="flex gap-2 text-[11px]">
-                <span className="w-16 shrink-0 font-mono text-slate-400">{formatSeconds(interval.startSeconds)}–{formatSeconds(interval.endSeconds)}s</span>
+                <span className="w-24 shrink-0 font-mono text-slate-400">
+                  {formatSeconds(interval.startSeconds)}–{formatSeconds(interval.endSeconds)}s
+                  {frameRate ? <span className="block text-[9px] text-slate-500">frames {Math.round(Number(interval.startSeconds) * frameRate)}–{Math.round(Number(interval.endSeconds) * frameRate)}</span> : null}
+                </span>
                 <span className="w-10 shrink-0 font-mono text-purple-300">{interval.actionId}</span>
                 <span className="text-slate-200">{interval.action}
                   {interval.subjectState && <span className="text-slate-400"> · {interval.subjectState}</span>}
