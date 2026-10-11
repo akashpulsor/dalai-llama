@@ -1,5 +1,6 @@
 // @ts-nocheck
-// Brand sign-in and registration with Keycloak (realm dalai-llama, public client platform-ui):
+// Brand sign-in and registration with Keycloak -- the separate "brands" realm (public client brands-ui),
+// so brand accounts never share usernames or passwords with creators:
 // authorization code + PKCE, no client secret. Watching films never needs this; following a
 // creator, requesting a video and the brand home do. Tokens live in localStorage for this origin
 // only and go to tenant-service as a Bearer token.
@@ -11,8 +12,8 @@ const PENDING_KEY = "dl_brand_login";
 /** Runtime config, ignoring placeholders the container didn't fill in ("__KEYCLOAK_URL__"). */
 const setting = (value, fallback) => (value && !String(value).startsWith("__") ? value : fallback);
 const KEYCLOAK = () => setting(appConfig.KEYCLOAK_URL, "https://auth.dalaillama.in").replace(/\/$/, "");
-const REALM = () => setting(appConfig.KEYCLOAK_REALM, "dalai-llama");
-const CLIENT = () => setting(appConfig.KEYCLOAK_CLIENT_ID, "platform-ui");
+const REALM = () => "brands";
+const CLIENT = () => "brands-ui";
 const oidc = (path) => `${KEYCLOAK()}/realms/${REALM()}/protocol/openid-connect/${path}`;
 const redirectUri = () => `${window.location.origin}/brands/callback`;
 

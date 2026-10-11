@@ -63,7 +63,7 @@ export default function BrandFinder() {
         </div>
         {credits && (
           <p className="text-right text-[11px] text-slate-500">
-            {credits.configured ? `${credits.leftThisMonth} email lookups left this month (shared)` : "Showing brands already in the directory"}
+            {credits.configured ? `${credits.leftThisMonth} email lookups left this month (shared)` : "Add each brand's contact email after adding them"}
           </p>
         )}
       </div>
@@ -134,8 +134,7 @@ export default function BrandFinder() {
       {report && (
         <p className="mt-3 rounded-lg border border-white/10 bg-white/[0.04] p-3 text-xs text-slate-300">
           {report.companiesAdded} brands added · {report.contactsAdded} new contacts
-          {report.companiesWithoutContacts > 0 ? ` · ${report.companiesWithoutContacts} had no emails` : ""}
-          {report.skippedNoCredits > 0 ? ` · ${report.skippedNoCredits} skipped (this month's email lookups are used up)` : ""}
+          {report.companiesWithoutContacts > 0 ? ` · ${report.companiesWithoutContacts} need a contact email: open the audience and add it on each lead` : ""}
         </p>
       )}
     </section>

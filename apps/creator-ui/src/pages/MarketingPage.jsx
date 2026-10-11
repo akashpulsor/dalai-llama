@@ -8,7 +8,6 @@ import YouTubePanel, { useYouTubeResultFlash } from "../components/outreach/YouT
 
 const TABS = [
   ["send", "Send"],
-  ["audiences", "Audiences"],
   ["analytics", "Analytics"],
   ["youtube", "YouTube"],
 ];
@@ -43,8 +42,15 @@ export default function MarketingPage() {
         ))}
       </div>
 
-      {tab === "send" && <TemplateOutreach templateId={templateId} onTemplateChange={setTemplateId} />}
-      {tab === "audiences" && <AudiencesPanel />}
+      {tab === "send" && (
+        <div className="space-y-8">
+          <TemplateOutreach templateId={templateId} onTemplateChange={setTemplateId} />
+          <section aria-labelledby="audiences-h">
+            <h2 id="audiences-h" className="mb-3 text-sm font-bold uppercase tracking-normal text-slate-300">Your audiences</h2>
+            <AudiencesPanel />
+          </section>
+        </div>
+      )}
       {tab === "analytics" && <AnalyticsPanel />}
       {tab === "youtube" && <YouTubePanel />}
     </div>

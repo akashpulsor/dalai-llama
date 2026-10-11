@@ -95,6 +95,16 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
   const body = { templateId: template?.id, publicId: needsFilm ? film : null, note: note || null };
   const fail = (e, fallback) => dispatch(showFlash({ message: errorMessage(e, fallback), type: "error" }));
 
+  useEffect(() => {
+    if (!template) return undefined;
+    const timer = window.setTimeout(() => {
+      preview({ ...body, templateId: template.id, subject: draft.subject || null, intro: draft.intro || null,
+                recipientName: recipients[0]?.name || null })
+        .unwrap().then(setPreviewMail).catch(() => {});
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [template?.id, draft.subject, draft.intro, film, note]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const showPreview = async () => {
     try {
       const id = await templateToSend();
@@ -131,6 +141,7 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
   const sending = sendState.isLoading || audienceState.isLoading;
 
   return (
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_460px]">
     <section className="creator-panel p-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -248,19 +259,13 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={showPreview} disabled={previewState.isLoading || !template}
                     className="creator-control flex items-center gap-1.5 px-4 py-2.5 text-sm font-bold text-slate-200 disabled:opacity-50">
-              <Eye size={15} /> Preview
+              <Eye size={15} /> Refresh preview
             </button>
             <button type="button" onClick={doSend} disabled={sending || !canSend}
                     className="creator-primary flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
               {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Send
             </button>
           </div>
-          {previewMail && (
-            <div className="rounded-xl border border-white/10 bg-white p-0">
-              <p className="border-b border-slate-200 px-4 py-2 text-sm font-bold text-slate-900">{previewMail.subject}</p>
-              <iframe title="Email preview" srcDoc={previewMail.html} sandbox="" className="h-[480px] w-full rounded-b-xl" />
-            </div>
-          )}
           {audienceResult && (
             <dl className="grid grid-cols-2 gap-2 rounded-lg border border-white/10 p-3 text-xs sm:grid-cols-3">
               {[["Queued", audienceResult.queued], ["Emailed recently", audienceResult.cooldown],
@@ -296,5 +301,20 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
         </details>
       )}
     </section>
+
+    <aside className="lg:sticky lg:top-4">
+      <p className={label}>How it looks</p>
+      {previewMail ? (
+        <div className="overflow-hidden rounded-xl border border-white/10 bg-white">
+          <p className="border-b border-slate-200 px-4 py-2 text-sm font-bold text-slate-900">{previewMail.subject}</p>
+          <iframe title="Email preview" srcDoc={previewMail.html} sandbox="" className="h-[640px] w-full" />
+        </div>
+      ) : (
+        <p className="creator-panel p-5 text-sm text-slate-400">
+          {previewState.isLoading ? "Building the preview…" : "Choose a template to see the email."}
+        </p>
+      )}
+    </aside>
+    </div>
   );
 }
