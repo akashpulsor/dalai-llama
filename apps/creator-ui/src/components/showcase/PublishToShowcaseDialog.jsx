@@ -42,6 +42,12 @@ export default function PublishToShowcaseDialog({ projectId, onClose }) {
         {kit && kit.filmReady && (
           <div className="mt-4 space-y-4">
             {!connected && <ConnectionCard connection={connection} />}
+            {connected && (
+              <p className="rounded-lg border border-purple-400/30 bg-purple-500/10 px-3 py-2 text-xs text-purple-100">
+                Once the upload finishes, this film appears on your profile as "Made on Dalaillama". It shows to brands only when
+                it's <b>Public</b> on YouTube; Private and Unlisted stay off your profile.
+              </p>
+            )}
             {connected && <PublishCard projectId={projectId} />}
             <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-slate-300">
               {official
