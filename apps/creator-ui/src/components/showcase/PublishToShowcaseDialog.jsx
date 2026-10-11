@@ -48,7 +48,13 @@ export default function PublishToShowcaseDialog({ projectId, onClose }) {
                 it's <b>Public</b> on YouTube; Private and Unlisted stay off your profile.
               </p>
             )}
-            {connected && <PublishCard projectId={projectId} />}
+            {connected && !kit.marketingConsent && (
+              <p className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                Your client hasn't agreed to marketing use of this film yet, so it can only go up as Private. They agree on the review
+                page when they approve it; then publish it as Public here.
+              </p>
+            )}
+            {connected && <PublishCard projectId={projectId} defaultPrivacy={kit.marketingConsent ? "PUBLIC" : "PRIVATE"} />}
             <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-slate-300">
               {official
                 ? `${OFFICIAL_STATUS[official.status] || official.status}${official.error && official.status !== "DONE" ? ` · ${official.error}` : ""}`

@@ -94,16 +94,36 @@ export function RequestVideoButton({ profile, film }) {
   );
 }
 
+const DURATIONS = [[15, "15 seconds"], [30, "30 seconds"], [45, "45 seconds"], [60, "60 seconds"], [90, "90 seconds"]];
+const LANGUAGES = ["English", "Hindi", "Tamil", "Telugu", "Bengali", "Marathi", "Kannada", "Malayalam", "Gujarati", "Punjabi"];
+const field = "mt-1 w-full rounded-lg border border-white/15 bg-white/[0.04] p-2.5 text-sm font-normal text-white placeholder:text-slate-500";
+const labelCls = "block text-sm font-semibold text-slate-300";
+
+/** The request is the same brief a creator fills for a new project (rule 48): what the video is
+ * for, the product, who it's for, the direction, length and languages, plus budget and timing.
+ * When the creator makes it a brief, all of it carries over. */
 function RequestDialog({ profile, film, onClose }) {
-  const [form, setForm] = useState({ budgetBand: "NOT_SURE", timeline: "THIS_MONTH", message: "" });
+  const [form, setForm] = useState({
+    message: "", productName: "", productDescription: "", targetAudience: "", campaignDirection: "",
+    durationSeconds: 30, languages: ["English"], budgetBand: "NOT_SURE", timeline: "THIS_MONTH",
+  });
   const [state, setState] = useState("idle");
   const [error, setError] = useState("");
+  const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
+  const toggleLanguage = (l) => setForm({
+    ...form,
+    languages: form.languages.includes(l) ? form.languages.filter((x) => x !== l) : form.languages.length >= 6 ? form.languages : [...form.languages, l],
+  });
 
   const submit = async (event) => {
     event.preventDefault();
     setState("sending");
     try {
-      await requestVideo(profile.handle, { ...form, publicId: film?.publicId || null, attributionToken: attributionToken() });
+      await requestVideo(profile.handle, {
+        ...form, durationSeconds: Number(form.durationSeconds),
+        publicId: film?.publicId || new URLSearchParams(window.location.search).get("film") || null,
+        attributionToken: attributionToken(),
+      });
       setState("sent");
     } catch (e) {
       if (e instanceof SignInRequired) return goSignIn(`request:${profile.handle}`);
@@ -114,47 +134,77 @@ function RequestDialog({ profile, film, onClose }) {
 
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="request-title"
-         className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-2xl bg-white/[0.04] ring-1 ring-white/10 p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between">
-          <h2 id="request-title" className="text-lg font-bold text-white">Request a video from {profile.displayName}</h2>
+         className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4" onClick={onClose}>
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[#0B101C] p-6 ring-1 ring-white/10" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 id="request-title" className="text-xl font-bold text-white">New brief for {profile.displayName}</h2>
+            <p className="mt-1 text-sm text-slate-400">Tell them what you need. They turn it into a brief with a price for you to approve.</p>
+          </div>
           <button type="button" aria-label="Close" onClick={onClose} className="rounded p-1 text-slate-500 hover:bg-white/5"><X size={18} /></button>
         </div>
         {state === "sent" ? (
-          <div className="mt-4 space-y-3 text-sm text-slate-300">
-            <p>Sent. {profile.displayName} will reply by email, usually with a brief for you to review.</p>
+          <div className="mt-5 space-y-3 text-sm text-slate-300">
+            <p>Sent. {profile.displayName} will turn it into a brief and email you the link to review.</p>
             <a href="/brands/home" className="font-bold text-purple-300">See your requests</a>
           </div>
         ) : (
-          <form onSubmit={submit} className="mt-4 space-y-4">
-            {film && <p className="text-sm text-slate-400">About: <span className="font-semibold">{film.title}</span></p>}
-            <label className="block text-sm font-semibold text-slate-300">
-              What do you need?
-              <textarea required maxLength={1000} rows={4} value={form.message}
-                        onChange={(e) => setForm({ ...form, message: e.target.value })}
-                        placeholder="Product, where it will run, length, anything you liked in their work"
-                        className="mt-1 w-full rounded-lg border border-white/15 p-2 text-sm font-normal" />
+          <form onSubmit={submit} className="mt-5 space-y-5">
+            {film && <p className="text-sm text-slate-400">Inspired by: <span className="font-semibold text-slate-200">{film.title}</span></p>}
+            <label className={labelCls}>
+              What should the video do?
+              <textarea required maxLength={1000} rows={4} value={form.message} onChange={set("message")}
+                        placeholder="e.g. Launch our new ghee for Diwali, run as Instagram reels and YouTube shorts, drive store visits."
+                        className={field} />
             </label>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block text-sm font-semibold text-slate-300">
-                Budget
-                <select value={form.budgetBand} onChange={(e) => setForm({ ...form, budgetBand: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-white/15 p-2 text-sm font-normal">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className={labelCls}>Product
+                <input maxLength={160} value={form.productName} onChange={set("productName")} placeholder="e.g. A2 Desi Ghee" className={field} />
+              </label>
+              <label className={labelCls}>Who it's for
+                <input maxLength={500} value={form.targetAudience} onChange={set("targetAudience")} placeholder="e.g. Young parents in metro cities" className={field} />
+              </label>
+            </div>
+            <label className={labelCls}>About the product
+              <textarea maxLength={1000} rows={2} value={form.productDescription} onChange={set("productDescription")}
+                        placeholder="What it is, what makes it different" className={field} />
+            </label>
+            <label className={labelCls}>Look and feel
+              <textarea maxLength={1000} rows={2} value={form.campaignDirection} onChange={set("campaignDirection")}
+                        placeholder="e.g. Warm and homely, morning kitchen, no voice-over" className={field} />
+            </label>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <label className={labelCls}>Length
+                <select value={form.durationSeconds} onChange={set("durationSeconds")} className={field}>
+                  {DURATIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </label>
+              <label className={labelCls}>Budget
+                <select value={form.budgetBand} onChange={set("budgetBand")} className={field}>
                   {BUDGETS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </label>
-              <label className="block text-sm font-semibold text-slate-300">
-                When
-                <select value={form.timeline} onChange={(e) => setForm({ ...form, timeline: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-white/15 p-2 text-sm font-normal">
+              <label className={labelCls}>When
+                <select value={form.timeline} onChange={set("timeline")} className={field}>
                   {TIMELINES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </label>
             </div>
+            <fieldset>
+              <legend className="text-sm font-semibold text-slate-300">Languages</legend>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {LANGUAGES.map((l) => (
+                  <button key={l} type="button" onClick={() => toggleLanguage(l)} aria-pressed={form.languages.includes(l)}
+                          className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${form.languages.includes(l) ? "bg-purple-600 text-white ring-purple-500" : "text-slate-300 ring-white/15 hover:bg-white/5"}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
             {error && <p className="text-sm text-rose-300">{error}</p>}
-            <button type="submit" disabled={state === "sending" || !form.message.trim()}
-                    className="w-full rounded-lg bg-purple-600 py-2.5 text-sm font-bold text-white disabled:opacity-50">
-              {state === "sending" ? "Sending…" : "Send request"}
+            <button type="submit" disabled={state === "sending" || !form.message.trim() || form.languages.length === 0}
+                    className="w-full rounded-lg bg-purple-600 py-3 text-sm font-bold text-white hover:bg-purple-700 disabled:opacity-50">
+              {state === "sending" ? "Sending…" : "Send brief"}
             </button>
           </form>
         )}

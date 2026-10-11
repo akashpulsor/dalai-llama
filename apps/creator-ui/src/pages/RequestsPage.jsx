@@ -74,6 +74,16 @@ function RequestCard({ r }) {
         <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${tone}`}>{label}</span>
       </div>
       <p className="mt-3 whitespace-pre-line text-sm text-slate-200">{r.message}</p>
+      {r.brief && (r.brief.productName || r.brief.targetAudience || r.brief.campaignDirection || r.brief.durationSeconds) && (
+        <dl className="mt-3 grid gap-x-4 gap-y-1 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs sm:grid-cols-2">
+          {[["Product", [r.brief.productName, r.brief.productDescription].filter(Boolean).join(" · ")],
+            ["Who it's for", r.brief.targetAudience], ["Look and feel", r.brief.campaignDirection],
+            ["Length", r.brief.durationSeconds ? `${r.brief.durationSeconds}s` : null],
+            ["Languages", (r.brief.languages || []).join(", ")]]
+            .filter(([, v]) => v)
+            .map(([k, v]) => <div key={k}><dt className="text-slate-500">{k}</dt><dd className="text-slate-200">{v}</dd></div>)}
+        </dl>
+      )}
       <p className="mt-2 text-xs text-slate-500">
         {[BUDGET[r.budgetBand], TIMELINE[r.timeline], r.filmTitle && `about “${r.filmTitle}”`, r.cameFromMail && "came from your email",
           new Date(r.createdAt).toLocaleDateString()].filter(Boolean).join(" · ")}

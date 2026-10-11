@@ -200,14 +200,14 @@ function AnalyticsCard() {
 const newKey = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
 
 /** {@code projectId} preselects a film (the project page's Publish button). */
-export function PublishCard({ projectId = "" }) {
+export function PublishCard({ projectId = "", defaultPrivacy = "PRIVATE" }) {
   const fail = useFail();
   const dispatch = useDispatch();
   const { data: films = [], isLoading: filmsLoading } = useGetPublishableFilmsQuery();
   const [polling, setPolling] = useState(0);
   const { data: jobs = [] } = useGetPublishJobsQuery(undefined, { pollingInterval: polling });
   const [publish, publishState] = usePublishToYouTubeMutation();
-  const [form, setForm] = useState({ projectId, title: "", description: "", tags: "", privacy: "PRIVATE", publishAt: "", confirmPublic: false });
+  const [form, setForm] = useState({ projectId, title: "", description: "", tags: "", privacy: defaultPrivacy, publishAt: "", confirmPublic: false });
   const [key, setKey] = useState(newKey);
 
   useEffect(() => {
