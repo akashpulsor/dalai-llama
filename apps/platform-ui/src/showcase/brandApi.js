@@ -1,46 +1,29 @@
 // @ts-nocheck
-// Brand-side calls (sign in by email link, follow, request a video, brand home). The brand session
-// is an HttpOnly cookie set by tenant-service: this code never sees it, it only asks the browser
-// to send it (credentials: "include"). platform.dalaillama.in and api.dalaillama.in are the same
-// site, so the SameSite=Lax cookie goes along.
+// Brand-side calls (follow, request a video, brand home). Brands sign in with Keycloak
+// (brandAuth.js); the access token goes along as a Bearer token. Watching and liking need no sign-in.
 import { appConfig } from "@dalaillama/shared-config";
+import { brandAccessToken, brandSignOut, forgetBrandTokens, isBrandSignedIn } from "./brandAuth.js";
 import { visitorId } from "./showcaseApi.js";
 
-// Not the session: only "this browser signed in until <expiresAt>", so the header can say
-// "Your brand" without a request. The server stays the judge (401 clears it).
-const SIGNED_IN_KEY = "dl_brand_signed_in_until";
 const base = () => `${appConfig.API_BASE_URL}/public`;
 
 export class SignInRequired extends Error {}
 
-export function isSignedIn() {
-  try {
-    const until = window.localStorage.getItem(SIGNED_IN_KEY);
-    return Boolean(until) && new Date(until) > new Date();
-  } catch {
-    return false;
-  }
-}
-
-function rememberSignedIn(expiresAt) {
-  try { window.localStorage.setItem(SIGNED_IN_KEY, expiresAt); } catch { /* private mode: header just says "Brand sign in" */ }
-}
-
-function forgetSignedIn() {
-  try { window.localStorage.removeItem(SIGNED_IN_KEY); } catch { /* nothing kept */ }
-}
+/** Signed in with Keycloak (a usable token or refresh token here). */
+export const isSignedIn = () => isBrandSignedIn();
 
 async function call(method, path, body) {
   const headers = { Accept: "application/json", "X-Visitor-Id": visitorId() };
+  const token = await brandAccessToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
   if (body !== undefined) headers["Content-Type"] = "application/json";
   const response = await fetch(`${base()}${path}`, {
     method,
     headers,
-    credentials: "include",
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (response.status === 401) {
-    forgetSignedIn();
+    forgetBrandTokens();
     throw new SignInRequired();
   }
   if (!response.ok) {
@@ -51,20 +34,9 @@ async function call(method, path, body) {
   return response.status === 202 || response.status === 204 ? null : response.json();
 }
 
-/** Emails a one-time sign-in link. Same answer whether or not the email is known. */
-export const requestSignIn = (form) => call("POST", "/brands/sign-in", form);
-
-/** The server sets the session cookie; the body says where to go next. */
-export async function completeSignIn(token) {
-  const signedIn = await call("POST", `/brands/sign-in/${encodeURIComponent(token)}`);
-  rememberSignedIn(signedIn.expiresAt);
-  return signedIn;
-}
-
-/** The cookie is HttpOnly, so only the server can clear it. */
-export async function signOut() {
-  forgetSignedIn();
-  try { await call("POST", "/brands/sign-out"); } catch { /* already signed out */ }
+/** Ends the Keycloak session too. */
+export function signOut() {
+  brandSignOut();
 }
 
 export const getMe = () => call("GET", "/brands/me");

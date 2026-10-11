@@ -12,7 +12,7 @@ import { useExchangeTokenMutation } from "@dalaillama/shared-hooks/keycloakApi";
 
 import DiscoverPage from "./pages/DiscoverPage.jsx";
 import CreatorPublicPage from "./pages/CreatorPublicPage.jsx";
-import BrandSignInPage from "./pages/BrandSignInPage.jsx";
+import BrandSignInPage, { BrandCallbackPage } from "./pages/BrandSignInPage.jsx";
 import BrandHomePage from "./pages/BrandHomePage.jsx";
 import UnsubscribePage from "./pages/UnsubscribePage.jsx";
 import { PrivacyPage, TermsPage } from "./pages/LegalPage.jsx";
@@ -91,7 +91,9 @@ function AppRoutes() {
         <Route path="/creators" element={<DiscoverPage />} />
         <Route path="/c/:handle" element={<CreatorPublicPage />} />
         <Route path="/brands/sign-in" element={<BrandSignInPage />} />
+        {/* Old email-link URLs land on the Keycloak sign-in page. */}
         <Route path="/brands/sign-in/:token" element={<BrandSignInPage />} />
+        <Route path="/brands/callback" element={<BrandCallbackPage />} />
         <Route path="/brands/home" element={<BrandHomePage />} />
         <Route path="/unsubscribe/:token" element={<UnsubscribePage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
