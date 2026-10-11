@@ -36,8 +36,8 @@ export default function BrandHomePage() {
       <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 sm:px-6">
         <a href="/" className="text-lg font-bold">Dalai Llama</a>
         <nav className="flex items-center gap-2 text-sm font-semibold">
-          <a href="/creators" className="rounded-lg px-3 py-2 text-slate-300 hover:bg-slate-800">Find creators</a>
-          <button type="button" onClick={leave} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-slate-400 hover:bg-slate-800">
+          <a href="/creators" className="rounded-lg px-3 py-2 text-slate-300 hover:bg-purple-700">Find creators</a>
+          <button type="button" onClick={leave} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-slate-400 hover:bg-purple-700">
             <LogOut size={14} /> Sign out
           </button>
         </nav>
@@ -50,7 +50,7 @@ export default function BrandHomePage() {
             <h1 className="text-2xl font-bold">{me.companyName || me.contactName || me.email}</h1>
             <p className="text-sm text-slate-400">{me.email}</p>
             <div className="mt-8 grid gap-6 lg:grid-cols-3">
-              <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5 lg:col-span-2">
+              <section className="rounded-2xl border border-slate-800 bg-purple-600 p-5 lg:col-span-2">
                 <h2 className="font-bold">Your requests</h2>
                 {inquiries.length === 0 ? (
                   <p className="mt-3 text-sm text-slate-400">
@@ -103,7 +103,7 @@ function InquiryRow({ q }) {
 
 function Following({ list }) {
   return (
-    <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+    <section className="rounded-2xl border border-slate-800 bg-purple-600 p-5">
       <h2 className="font-bold">Following</h2>
       {list.length === 0 ? (
         <p className="mt-3 text-sm text-slate-400">Follow creators to find them here.</p>
@@ -141,7 +141,7 @@ function Preferences({ me, onSaved }) {
   };
   const control = "mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-sm font-normal text-slate-100";
   return (
-    <form onSubmit={save} className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900 p-5">
+    <form onSubmit={save} className="space-y-3 rounded-2xl border border-slate-800 bg-purple-600 p-5">
       <h2 className="font-bold">Picks by email</h2>
       <label className="flex items-start gap-2 text-sm text-slate-300">
         <input type="checkbox" checked={prefs.autoPicksOptIn} onChange={(e) => setPrefs({ ...prefs, autoPicksOptIn: e.target.checked })} className="mt-1" />
@@ -158,7 +158,7 @@ function Preferences({ me, onSaved }) {
           {[7, 14, 30, 60].map((d) => <option key={d} value={d}>{d} days</option>)}
         </select>
       </label>
-      <button type="submit" disabled={state === "saving"} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Save</button>
+      <button type="submit" disabled={state === "saving"} className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Save</button>
       {state === "saved" && <span className="ml-3 text-xs text-emerald-300">Saved</span>}
       {state === "error" && <span className="ml-3 text-xs text-rose-400">Couldn't save</span>}
     </form>

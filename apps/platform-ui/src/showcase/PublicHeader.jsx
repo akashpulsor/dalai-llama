@@ -1,23 +1,45 @@
 // @ts-nocheck
 import React from "react";
+import BrandLogo from "./BrandLogo.jsx";
 import { isSignedIn } from "./brandApi.js";
 
-/** Header for the public showcase pages, matching the landing page's. */
+const SITE = "https://dalaillama.in";
+
+/** The landing site's header (dalaillama.in), so creator and brand pages read as one site. */
 export default function PublicHeader({ right }) {
   return (
-    <header className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6 lg:px-8">
-      <a href="/" className="flex items-center gap-3">
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-200 text-2xl">DL</span>
-        <span className="text-xl font-bold text-slate-900">Dalai Llama</span>
-      </a>
-      <nav className="flex items-center gap-3">
-        <a href="/creators" className="rounded-lg px-3 py-2 text-sm font-bold text-slate-700 hover:bg-white/70">Creators</a>
-        {right}
-        <a href={isSignedIn() ? "/brands/home" : "/brands/sign-in"}
-           className="rounded-lg bg-indigo-900 px-3 py-2 text-sm font-bold text-white hover:bg-indigo-800">
-          {isSignedIn() ? "Your brand" : "Brand sign in"}
+    <div className="site-shell" style={{ paddingBottom: 24 }}>
+      <header className="topbar creator-panel-muted">
+        <a className="wordmark" href={SITE} aria-label="Dalaillama home">
+          <BrandLogo />
         </a>
-      </nav>
-    </header>
+        <nav className="nav-links" aria-label="Primary navigation">
+          <a href={SITE}>Home</a>
+          <a href="/creators">Creators</a>
+          <a href={`${SITE}/#pricing`}>Pricing</a>
+          <a href={`${SITE}/blog`}>Guides</a>
+          {right}
+          <a href={isSignedIn() ? "/brands/home" : "/brands/sign-in"} style={{ color: "#c4b5fd" }}>
+            {isSignedIn() ? "Your brand" : "For brands"}
+          </a>
+        </nav>
+      </header>
+    </div>
+  );
+}
+
+/** The landing site's footer. */
+export function PublicFooter() {
+  return (
+    <div className="site-shell" style={{ paddingTop: 0 }}>
+      <footer className="site-footer" aria-label="Dalaillama footer">
+        <span>Dalaillama</span>
+        <a href="/creators">Creators</a>
+        <a href={`${SITE}/#pricing`}>Pricing</a>
+        <a href={`${SITE}/blog`}>Blog</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+      </footer>
+    </div>
   );
 }

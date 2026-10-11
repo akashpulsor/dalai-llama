@@ -10,7 +10,6 @@ import store from "@dalaillama/shared-store";
 import { appConfig } from "@dalaillama/shared-config";
 import { useExchangeTokenMutation } from "@dalaillama/shared-hooks/keycloakApi";
 
-import LandingPage from "./pages/LandingPage.jsx";
 import DiscoverPage from "./pages/DiscoverPage.jsx";
 import CreatorPublicPage from "./pages/CreatorPublicPage.jsx";
 import BrandSignInPage from "./pages/BrandSignInPage.jsx";
@@ -86,7 +85,8 @@ function AppRoutes() {
   return (
     <>
       <Routes>
-        <Route path={R.ROOT} element={<LandingPage />} />
+        {/* The landing page is dalaillama.in (its own site); this app serves creators' and brands' pages. */}
+        <Route path={R.ROOT} element={<ExternalRedirect to="https://dalaillama.in" />} />
         {/* Creator Showcase: public, no login. */}
         <Route path="/creators" element={<DiscoverPage />} />
         <Route path="/c/:handle" element={<CreatorPublicPage />} />
@@ -104,7 +104,7 @@ function AppRoutes() {
         {REMOTE.dashboard && <Route path={`${R.DASHBOARD}/*`} element={<ExternalRedirect to={REMOTE.dashboard} />} />}
         {REMOTE.analytics && <Route path={`${R.ANALYTICS}/*`} element={<ExternalRedirect to={REMOTE.analytics} />} />}
         {REMOTE.subscription && <Route path={`${R.SUBSCRIPTION}/*`} element={<ExternalRedirect to={REMOTE.subscription} />} />}
-        <Route path="*" element={<Navigate to={R.ROOT} replace />} />
+        <Route path="*" element={<Navigate to="/creators" replace />} />
       </Routes>
       <Toaster />
     </>

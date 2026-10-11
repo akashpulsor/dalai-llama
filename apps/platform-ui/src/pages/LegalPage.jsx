@@ -1,23 +1,23 @@
 // @ts-nocheck
 import React from "react";
 import { Link } from "react-router-dom";
-import PublicHeader from "../showcase/PublicHeader.jsx";
+import PublicHeader, { PublicFooter } from "../showcase/PublicHeader.jsx";
 
 // Legal text for Google OAuth verification (YouTube API Services). Review before relying on it.
 const CONTACT = "admin@dalaillama.in";
 const UPDATED = "11 October 2026";
 
-const ext = (href, label) => <a href={href} target="_blank" rel="noreferrer" className="font-semibold text-indigo-700 underline">{label}</a>;
+const ext = (href, label) => <a href={href} target="_blank" rel="noreferrer" className="font-semibold text-purple-300 underline">{label}</a>;
 
 function Shell({ title, children }) {
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#eef4ff_0%,#f6f8fc_100%)]">
+    <div className="min-h-screen creator-app text-slate-100">
       <PublicHeader />
       <main className="mx-auto max-w-3xl px-4 pb-24">
-        <article className="rounded-2xl bg-white p-6 shadow-sm sm:p-10">
-          <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
+        <article className="rounded-2xl bg-white/[0.04] ring-1 ring-white/10 p-6 shadow-sm sm:p-10">
+          <h1 className="text-2xl font-bold text-white">{title}</h1>
           <p className="mt-1 text-xs text-slate-500">Last updated {UPDATED}</p>
-          <div className="mt-6 space-y-6 text-sm leading-6 text-slate-700 [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-slate-900 [&_ul]:list-disc [&_ul]:pl-5">
+          <div className="mt-6 space-y-6 text-sm leading-6 text-slate-300 [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-white [&_ul]:list-disc [&_ul]:pl-5">
             {children}
           </div>
           <p className="mt-10 border-t border-slate-100 pt-4 text-xs text-slate-500">
@@ -25,6 +25,7 @@ function Shell({ title, children }) {
           </p>
         </article>
       </main>
+      <PublicFooter />
     </div>
   );
 }

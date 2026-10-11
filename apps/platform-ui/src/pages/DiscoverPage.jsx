@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import ShowcaseGrid from "../showcase/ShowcaseGrid.jsx";
-import PublicHeader from "../showcase/PublicHeader.jsx";
+import PublicHeader, { PublicFooter } from "../showcase/PublicHeader.jsx";
 import { getFeed } from "../showcase/showcaseApi.js";
 import { FORMATS, INDUSTRIES } from "../showcase/labels.js";
 
@@ -23,6 +23,25 @@ export default function DiscoverPage() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  // Only filters that have films: an industry chip over an empty page reads as a dead site.
+  const [present, setPresent] = useState({ industries: new Set(), formats: new Set() });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const industries = new Set();
+      const formats = new Set();
+      for (let p = 0; p < 5; p++) {
+        const result = await getFeed({ tab: "ALL", industry: "", format: "", page: p }).catch(() => null);
+        (result?.items || []).forEach((c) => { if (c.industry) industries.add(c.industry); if (c.format) formats.add(c.format); });
+        if (!result?.hasMore) break;
+      }
+      if (!cancelled) setPresent({ industries, formats });
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const industryChips = INDUSTRIES.filter(([code]) => present.industries.has(code) || code === industry);
+  const formatOptions = FORMATS.filter(([code]) => present.formats.has(code) || code === format);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,52 +68,55 @@ export default function DiscoverPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#eef4ff_0%,#f6f8fc_100%)]">
+    <div className="min-h-screen creator-app text-slate-100">
       <PublicHeader />
       <main className="mx-auto w-full max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold tracking-tight text-indigo-900 sm:text-4xl">Work from our creators</h1>
-        <p className="mt-2 max-w-2xl text-slate-600">Films made by independent creators. Watch anything; ask a creator for one of your own.</p>
+        <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">Work from our creators</h1>
+        <p className="mt-2 max-w-2xl text-slate-400">Films made by independent creators. Watch anything; ask a creator for one of your own.</p>
 
         <div className="mt-6 flex flex-wrap items-center gap-2" role="tablist" aria-label="Sort">
           {TABS.map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
-                    className={`rounded-full px-4 py-1.5 text-sm font-bold ${tab === id ? "bg-indigo-900 text-white" : "bg-white text-slate-700 hover:bg-slate-100"}`}>
+                    className={`rounded-full px-4 py-1.5 text-sm font-bold ${tab === id ? "bg-purple-600 text-white" : "bg-white/[0.04] ring-1 ring-white/10 text-slate-300 hover:bg-white/5"}`}>
               {label}
             </button>
           ))}
           <label htmlFor="format" className="sr-only">Format</label>
           <select id="format" value={format} onChange={(e) => setFormat(e.target.value)}
-                  className="ml-auto rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700">
+                  className="ml-auto rounded-lg border border-white/15 bg-white/[0.04] ring-1 ring-white/10 px-3 py-2 text-sm text-slate-300">
             <option value="">All formats</option>
-            {FORMATS.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+            {formatOptions.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
           </select>
         </div>
 
+        {industryChips.length > 1 && (
         <div className="mt-3 flex flex-wrap gap-2" aria-label="Industry">
           <button type="button" onClick={() => setIndustry("")} aria-pressed={!industry}
-                  className={`rounded-full border px-3 py-1 text-xs font-bold ${!industry ? "border-indigo-600 bg-indigo-50 text-indigo-800" : "border-slate-300 bg-white text-slate-600"}`}>
+                  className={`rounded-full border px-3 py-1 text-xs font-bold ${!industry ? "border-purple-500 bg-purple-500/10 text-purple-200" : "border-white/15 bg-white/[0.04] ring-1 ring-white/10 text-slate-400"}`}>
             All industries
           </button>
-          {INDUSTRIES.map(([code, label]) => (
+          {industryChips.map(([code, label]) => (
             <button key={code} type="button" onClick={() => setIndustry(code)} aria-pressed={industry === code}
-                    className={`rounded-full border px-3 py-1 text-xs font-bold ${industry === code ? "border-indigo-600 bg-indigo-50 text-indigo-800" : "border-slate-300 bg-white text-slate-600"}`}>
+                    className={`rounded-full border px-3 py-1 text-xs font-bold ${industry === code ? "border-purple-500 bg-purple-500/10 text-purple-200" : "border-white/15 bg-white/[0.04] ring-1 ring-white/10 text-slate-400"}`}>
               {label}
             </button>
           ))}
         </div>
+        )}
 
         <div className="mt-8">
           {loading && <p className="flex items-center gap-2 text-slate-500"><Loader2 size={16} className="animate-spin" /> Loading films…</p>}
-          {error && <p className="text-rose-600">Films couldn't load. Try again in a moment.</p>}
-          {!loading && !error && cards.length === 0 && <p className="text-slate-500">No films here yet. Try another industry.</p>}
+          {error && <p className="text-rose-300">Films couldn't load. Try again in a moment.</p>}
+          {!loading && !error && cards.length === 0 && <p className="text-slate-500">No films here yet. New work from our creators shows up here as they publish.</p>}
           {!loading && cards.length > 0 && <ShowcaseGrid cards={cards} />}
           {hasMore && !loading && (
-            <button type="button" onClick={loadMore} className="mx-auto mt-6 block rounded-lg bg-white px-5 py-2.5 text-sm font-bold text-indigo-800 shadow-sm hover:bg-slate-50">
+            <button type="button" onClick={loadMore} className="mx-auto mt-6 block rounded-lg bg-white/[0.04] ring-1 ring-white/10 px-5 py-2.5 text-sm font-bold text-purple-200 shadow-sm hover:bg-white/5">
               Show more
             </button>
           )}
         </div>
       </main>
+      <PublicFooter />
     </div>
   );
 }
