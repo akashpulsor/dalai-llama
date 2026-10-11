@@ -6,7 +6,9 @@ import { showFlash } from "@dalaillama/shared-store";
 import {
   useCreateAudienceMutation,
   useDeleteAudienceMutation,
+  useAddLeadContactPointMutation,
   useDiscardContactPointMutation,
+  useGetDirectoriesQuery,
   useGetAudienceLeadsQuery,
   useGetAudiencesQuery,
   useRemoveLeadFromAudienceMutation,
@@ -15,6 +17,7 @@ import {
 import { errorMessage, INDUSTRY_LABEL } from "../showcase/showcaseLabels.js";
 import { CONTACT_STATUS } from "./outreachLabels.js";
 import BrandFinder from "./BrandFinder.jsx";
+import PeopleFinder from "./PeopleFinder.jsx";
 
 /** Audiences tab (rules 21–25): upload a CSV into a named audience; rows for the same person (any
  * shared email or phone) become one lead. Contact points are checked continuously: once one is
@@ -22,6 +25,7 @@ import BrandFinder from "./BrandFinder.jsx";
 export default function AudiencesPanel() {
   const dispatch = useDispatch();
   const { data: audiences = [], isLoading } = useGetAudiencesQuery();
+  const { data: directories } = useGetDirectoriesQuery();
   const [create, createState] = useCreateAudienceMutation();
   const [remove] = useDeleteAudienceMutation();
   const [name, setName] = useState("");
@@ -79,7 +83,11 @@ export default function AudiencesPanel() {
           </ul>
         )}
       </section>
-      <BrandFinder />
+      {directories?.people && <PeopleFinder />}
+      {directories?.companies && <BrandFinder />}
+      {directories && !directories.people && !directories.companies && (
+        <p className="creator-panel p-5 text-xs text-slate-400">Brand search isn't switched on yet. Upload a CSV meanwhile.</p>
+      )}
       {openId && <AudienceDetail audience={audiences.find((a) => a.id === openId)} onFail={fail} />}
     </div>
   );
@@ -148,7 +156,7 @@ function AudienceDetail({ audience, onFail }) {
                     {[...l.emails, ...l.phones].map((c) => (
                       <ContactChip key={c.id} c={c} onDiscard={() => discard({ leadId: l.id, contactPointId: c.id }).unwrap().catch((e) => onFail(e, "Couldn't remove"))} />
                     ))}
-                    {l.emails.length + l.phones.length === 0 && <span className="text-xs text-rose-300">No usable email or phone</span>}
+                    {l.emails.length + l.phones.length === 0 && <AddContact leadId={l.id} onFail={onFail} />}
                     {l.discarded > 0 && <span className="text-[11px] text-slate-500">{l.discarded} discarded</span>}
                   </div>
                 </div>
@@ -223,5 +231,23 @@ function CsvFormat() {
       </table>
       <button type="button" onClick={download} className="creator-control mt-3 px-3 py-1.5 text-xs font-bold text-slate-200">Download sample CSV</button>
     </details>
+  );
+}
+
+/** No email yet (Apollo's free lookups ran out, or none was found): the creator adds one they found. */
+function AddContact({ leadId, onFail }) {
+  const [value, setValue] = useState("");
+  const [add, state] = useAddLeadContactPointMutation();
+  const save = async (event) => {
+    event.preventDefault();
+    try { await add({ leadId, value: value.trim() }).unwrap(); setValue(""); } catch (e) { onFail(e, "Couldn't add that"); }
+  };
+  return (
+    <form onSubmit={save} className="flex items-center gap-1.5">
+      <span className="text-xs text-amber-200">No email yet</span>
+      <input value={value} onChange={(e) => setValue(e.target.value)} maxLength={254} placeholder="Add email or phone"
+             aria-label="Add email or phone" className="w-48 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-xs text-white" />
+      <button type="submit" disabled={!value.trim() || state.isLoading} className="creator-control px-2 py-1 text-xs font-bold text-slate-200 disabled:opacity-40">Add</button>
+    </form>
   );
 }

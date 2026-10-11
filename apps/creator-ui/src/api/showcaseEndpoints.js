@@ -315,6 +315,25 @@ export const showcaseApi = showcaseBase.injectEndpoints({
       query: (body) => ({ url: opsAdminUrl("/tenants/youtube/quota"), method: "PUT", body }),
       invalidatesTags: ["YouTubeQuota"],
     }),
+    getDirectories: builder.query({
+      query: () => ({ url: "/tenants/me/outreach/directories" }),
+    }),
+    searchPeople: builder.query({
+      query: ({ industry, country, title, q }) => ({
+        url: "/tenants/me/outreach/people-search",
+        params: { ...(industry ? { industry } : {}), ...(country ? { country } : {}), ...(title ? { title } : {}), ...(q ? { q } : {}) },
+      }),
+    }),
+    addPeopleToAudience: builder.mutation({
+      query: ({ audienceId, personIds }) => ({
+        url: `/tenants/me/outreach/audiences/${audienceId}/add-people`, method: "POST", body: { personIds },
+      }),
+      invalidatesTags: ["Audiences", "AudienceLeads"],
+    }),
+    addLeadContactPoint: builder.mutation({
+      query: ({ leadId, value }) => ({ url: `/tenants/me/outreach/leads/${leadId}/contact-points`, method: "POST", body: { value } }),
+      invalidatesTags: ["Audiences", "AudienceLeads"],
+    }),
     adminBrandCredits: builder.query({
       query: () => ({ url: opsAdminUrl("/tenants/outreach/brand-directory/credits") }),
       providesTags: ["BrandCredits"],
@@ -393,4 +412,8 @@ export const {
   useAdminYouTubeQuotaQuery,
   useAdminSetYouTubeQuotaMutation,
   useAdminBrandCreditsQuery,
+  useGetDirectoriesQuery,
+  useLazySearchPeopleQuery,
+  useAddPeopleToAudienceMutation,
+  useAddLeadContactPointMutation,
 } = showcaseApi;
