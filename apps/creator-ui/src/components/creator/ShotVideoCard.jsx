@@ -1132,6 +1132,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
                 previousShot={previousShot}
                 generating={busy}
                 onGenerated={(job) => onStudioGenerated?.(job)}
+                onRegeneratePrompt={onPrepare}
               />
             )}
 

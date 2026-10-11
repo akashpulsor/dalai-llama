@@ -37,7 +37,8 @@ import {
  * or the creator disagrees with it, they can still choose settings, write their own prompt and
  * generate. Nothing renders a video except "Generate video", and it sends the editor's text exactly.
  */
-export default function VideoStudioPanel({ shot, projectId, previousShot, generating, onGenerated }) {
+export default function VideoStudioPanel({ shot, projectId, previousShot, generating, onGenerated, onRegeneratePrompt }) {
+  const [regenerating, setRegenerating] = React.useState(false);
   const dispatch = useDispatch();
   const args = { projectId, shotId: shot.id };
   // Polled only while post-production is taking the previous shot's last frame; reading the plan is
@@ -118,6 +119,19 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
     () => selectSettings({ ...args, generationDurationSeconds: Number(nextDuration), generationFps: nextFps === "" || nextFps == null ? null : Number(nextFps) }));
 
   const handleCompose = async () => {
+    if (onRegeneratePrompt) {
+      // The shot's Prepare: redoes the analysis if the shot changed and the timeline if the seconds
+      // changed (or it fails its checks), writes the prompt and saves it as a new version.
+      setRegenerating(true);
+      try {
+        await onRegeneratePrompt();
+        await refetch();
+        dispatch(creatorApi.util.invalidateTags([{ type: "CreatorHomeProjects", id: `prompt-inputs-${args.shotId}` }]));
+      } finally {
+        setRegenerating(false);
+      }
+      return;
+    }
     const result = await run("prompt", () => composePrompt(args), "New AI recommendation ready");
     // The editor follows the recommendation only if the creator has no edit of their own in it.
     if (result && !editorTouched && result.prompt?.userEditedPrompt == null) setEditorText(result.prompt.aiRecommendedPrompt ?? "");
@@ -316,9 +330,10 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
       {/* E. Editable prompt */}
       <Section title="4 · Video prompt" hint="The AI writes a recommendation; you have the final word on every line of it.">
         <div className="flex flex-wrap items-center gap-2">
-          <StepButton onClick={handleCompose} busy={composeState.isLoading} icon={Sparkles} disabled={duration == null}>
-            {plan.prompt?.aiRecommendedPrompt ? "Regenerate recommendation" : "Write prompt"}
+          <StepButton onClick={handleCompose} busy={composeState.isLoading || regenerating} icon={Sparkles} disabled={duration == null}>
+            {plan.prompt?.aiRecommendedPrompt ? "Regenerate prompt" : "Write prompt"}
           </StepButton>
+          <span className="text-[10px] text-slate-500">Fixes the actions and timeline if they are out of date, then writes the prompt as a new version.</span>
           {flags.promptStale && <StaleNote>Recommendation was written for {plan.prompt.promptDurationSeconds}s{plan.prompt.promptFps ? ` · ${plan.prompt.promptFps} fps` : ""}.</StaleNote>}
           {flags.promptMissesContinuation && <StaleNote>Written before the last-frame change.</StaleNote>}
           {flags.promptOlderThanAnalysis && <StaleNote>Written before the latest analysis.</StaleNote>}
