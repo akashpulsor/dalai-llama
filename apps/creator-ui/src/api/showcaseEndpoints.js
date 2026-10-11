@@ -126,6 +126,14 @@ export const showcaseApi = showcaseBase.injectEndpoints({
       query: () => ({ url: "/tenants/me/inquiries" }),
       providesTags: ["ShowcaseRequests"],
     }),
+    // An image a brand attached to a request; fetched with the creator's token, shown via an object URL.
+    getInquiryImage: builder.query({
+      query: ({ inquiryId, imageId }) => ({
+        url: `/tenants/me/inquiries/${inquiryId}/images/${imageId}`,
+        responseHandler: async (response) => URL.createObjectURL(await response.blob()),
+      }),
+      keepUnusedDataFor: 3600,
+    }),
     setInquiryStatus: builder.mutation({
       query: ({ id, status }) => ({ url: `/tenants/me/inquiries/${id}`, method: "PATCH", body: { status } }),
       invalidatesTags: ["ShowcaseRequests"],
@@ -376,6 +384,7 @@ export const {
   useAdminShowcaseProbeMutation,
   useAdminOnboardingBackfillMutation,
   useGetMyInquiriesQuery,
+  useGetInquiryImageQuery,
   useSetInquiryStatusMutation,
   useConvertInquiryMutation,
   useGetOutreachOverviewQuery,

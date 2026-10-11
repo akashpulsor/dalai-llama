@@ -109,6 +109,8 @@ function RequestDialog({ profile, film, onClose }) {
   });
   const [state, setState] = useState("idle");
   const [error, setError] = useState("");
+  const [productImages, setProductImages] = useState([]);
+  const [referenceImages, setReferenceImages] = useState([]);
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
   const toggleLanguage = (l) => setForm({
     ...form,
@@ -123,7 +125,7 @@ function RequestDialog({ profile, film, onClose }) {
         ...form, durationSeconds: Number(form.durationSeconds),
         publicId: film?.publicId || new URLSearchParams(window.location.search).get("film") || null,
         attributionToken: attributionToken(),
-      });
+      }, productImages, referenceImages);
       setState("sent");
     } catch (e) {
       if (e instanceof SignInRequired) return goSignIn(`request:${profile.handle}`);
@@ -190,6 +192,12 @@ function RequestDialog({ profile, film, onClose }) {
                 </select>
               </label>
             </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <ImagePicker label="Product photos" files={productImages} onChange={setProductImages}
+                           hint={form.productName ? "Photos of the product" : "Name the product above to attach its photos"} disabled={!form.productName} />
+              <ImagePicker label="Reference images" files={referenceImages} onChange={setReferenceImages}
+                           hint="Looks, moods or ads you like" />
+            </div>
             <fieldset>
               <legend className="text-sm font-semibold text-slate-300">Languages</legend>
               <div className="mt-2 flex flex-wrap gap-2">
@@ -209,6 +217,40 @@ function RequestDialog({ profile, film, onClose }) {
           </form>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Up to 4 images, 3 MB each; previews with remove. */
+function ImagePicker({ label, hint, files, onChange, disabled = false }) {
+  const [problem, setProblem] = useState("");
+  const add = (event) => {
+    const picked = Array.from(event.target.files || []);
+    event.target.value = "";
+    const ok = picked.filter((f) => f.type.startsWith("image/") && f.size <= 3 * 1024 * 1024);
+    setProblem(ok.length < picked.length ? "Images only, up to 3 MB each." : "");
+    onChange([...files, ...ok].slice(0, 4));
+  };
+  return (
+    <div>
+      <p className="text-sm font-semibold text-slate-300">{label}</p>
+      <p className="text-xs text-slate-500">{hint}</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {files.map((f, i) => (
+          <span key={`${f.name}-${i}`} className="relative">
+            <img src={URL.createObjectURL(f)} alt={f.name} className="h-16 w-16 rounded-lg object-cover ring-1 ring-white/15" />
+            <button type="button" aria-label={`Remove ${f.name}`} onClick={() => onChange(files.filter((_, j) => j !== i))}
+                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-xs text-white ring-1 ring-white/30">×</button>
+          </span>
+        ))}
+        {files.length < 4 && (
+          <label className={`flex h-16 w-16 items-center justify-center rounded-lg text-2xl text-slate-400 ring-1 ring-dashed ring-white/20 ${disabled ? "opacity-40" : "cursor-pointer hover:bg-white/5"}`}>
+            +
+            <input type="file" accept="image/*" multiple disabled={disabled} onChange={add} className="hidden" aria-label={`Add ${label.toLowerCase()}`} />
+          </label>
+        )}
+      </div>
+      {problem && <p className="mt-1 text-xs text-rose-300">{problem}</p>}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useDispatch } from "react-redux";
 import { Navigate } from "react-router-dom";
 import { ExternalLink, Loader2, Mail } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
-import { useConvertInquiryMutation, useGetMyInquiriesQuery, useSetInquiryStatusMutation } from "../api/showcaseEndpoints.js";
+import { useConvertInquiryMutation, useGetInquiryImageQuery, useGetMyInquiriesQuery, useSetInquiryStatusMutation } from "../api/showcaseEndpoints.js";
 import { INDUSTRY_LABEL, errorMessage } from "../components/showcase/showcaseLabels.js";
 
 const BUDGET = { UNDER_50K: "Under ₹50k", FROM_50K_TO_2L: "₹50k – 2L", FROM_2L_TO_8L: "₹2L – 8L", OVER_8L: "Over ₹8L", NOT_SURE: "Budget not sure" };
@@ -84,6 +84,11 @@ function RequestCard({ r }) {
             .map(([k, v]) => <div key={k}><dt className="text-slate-500">{k}</dt><dd className="text-slate-200">{v}</dd></div>)}
         </dl>
       )}
+      {r.brief?.images?.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {r.brief.images.map((img) => <InquiryImage key={img.id} inquiryId={r.id} image={img} />)}
+        </div>
+      )}
       <p className="mt-2 text-xs text-slate-500">
         {[BUDGET[r.budgetBand], TIMELINE[r.timeline], r.filmTitle && `about “${r.filmTitle}”`, r.cameFromMail && "came from your email",
           new Date(r.createdAt).toLocaleDateString()].filter(Boolean).join(" · ")}
@@ -108,5 +113,19 @@ function RequestCard({ r }) {
         )}
       </div>
     </li>
+  );
+}
+
+/** A product or reference image the brand attached; opens full size in a new tab. */
+function InquiryImage({ inquiryId, image }) {
+  const { data: url } = useGetInquiryImageQuery({ inquiryId, imageId: image.id });
+  return (
+    <a href={url || undefined} target="_blank" rel="noreferrer" title={image.fileName || ""}
+       className="relative block h-20 w-20 overflow-hidden rounded-lg bg-white/5 ring-1 ring-white/10">
+      {url && <img src={url} alt={image.fileName || ""} className="h-full w-full object-cover" />}
+      <span className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 text-[9px] font-bold text-white">
+        {image.kind === "PRODUCT" ? "Product" : "Reference"}
+      </span>
+    </a>
   );
 }

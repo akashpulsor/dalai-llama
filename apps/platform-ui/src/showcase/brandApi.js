@@ -16,11 +16,13 @@ async function call(method, path, body) {
   const headers = { Accept: "application/json", "X-Visitor-Id": visitorId() };
   const token = await brandAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  // FormData sets its own multipart Content-Type (with the boundary); JSON bodies say so.
+  const form = typeof FormData !== "undefined" && body instanceof FormData;
+  if (body !== undefined && !form) headers["Content-Type"] = "application/json";
   const response = await fetch(`${base()}${path}`, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : form ? body : JSON.stringify(body),
   });
   if (response.status === 401) {
     forgetBrandTokens();
@@ -46,7 +48,17 @@ export const savePreferences = (prefs) => call("PATCH", "/brands/me/preferences"
 export const follow = (handle) => call("PUT", `/creators/${encodeURIComponent(handle)}/follow`);
 export const unfollow = (handle) => call("DELETE", `/creators/${encodeURIComponent(handle)}/follow`);
 
-export const requestVideo = (handle, request) => call("POST", `/creators/${encodeURIComponent(handle)}/inquiries`, request);
+/** The brief, with any product and reference images (sent as multipart when there are some). */
+export const requestVideo = (handle, request, productImages = [], referenceImages = []) => {
+  if (productImages.length === 0 && referenceImages.length === 0) {
+    return call("POST", `/creators/${encodeURIComponent(handle)}/inquiries`, request);
+  }
+  const body = new FormData();
+  body.append("data", new Blob([JSON.stringify(request)], { type: "application/json" }));
+  productImages.forEach((f) => body.append("productImages", f));
+  referenceImages.forEach((f) => body.append("referenceImages", f));
+  return call("POST", `/creators/${encodeURIComponent(handle)}/inquiries`, body);
+};
 
 // Likes are anonymous: the visitor id is enough. Which films this browser liked is remembered here
 // only to draw the button; the count comes from the server.
