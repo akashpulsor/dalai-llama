@@ -8,7 +8,7 @@ import {
   CreditCard,
   FolderOpen,
   Home,
-  Inbox,
+ 
   Mail,
   Sparkles,
   UserCircle,
@@ -31,13 +31,10 @@ const navItems = [
   { id: "cast", label: "Cast Library", icon: Users, path: "/cast-library" },
   { id: "ai-editor", label: "AI Editor", icon: Wand2, path: "/editor" },
   { id: "wallet-billing", label: "Wallet & Billing", icon: CreditCard, path: "/wallet-billing" },
-  // Lead management -- creator's business email identity + composer for outreach. Phase 1
-  // uses the shared Hostinger relay; recipient-facing sender is the creator's own
-  // partner.dalaillama.in identity via display-name aliasing on the From header.
+  // Creator Showcase: the public profile, YouTube channel, showcase videos and brand requests.
+  { id: "profile", label: "Profile", icon: UserCircle, path: "/profile" },
+  // Outreach to brands with templates, audiences, analytics and YouTube publishing.
   { id: "marketing", label: "Marketing", icon: Mail, path: "/marketing" },
-  // Creator Showcase: the public profile brands see, the YouTube channel and showcase videos.
-  { id: "profile", label: "Public profile", icon: UserCircle, path: "/profile" },
-  { id: "requests", label: "Requests", icon: Inbox, path: "/requests" },
 ];
 
 export default function Sidebar() {

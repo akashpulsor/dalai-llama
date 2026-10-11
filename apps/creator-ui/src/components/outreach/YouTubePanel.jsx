@@ -49,12 +49,38 @@ export default function YouTubePanel() {
   );
 }
 
+/** What Google's redirect (?youtube=...) means for the creator. */
+const YOUTUBE_RESULT = {
+  connected: ["Your YouTube channel is connected", "success"],
+  denied: ["You didn't allow access, so nothing changed", "error"],
+  expired: ["That sign-in took too long; please connect again", "error"],
+  missing_permission: ["Please allow YouTube access on Google's page to connect", "error"],
+  no_offline_access: ["Google didn't give lasting access; please connect again", "error"],
+  no_channel: ["That Google account has no YouTube channel", "error"],
+  taken: ["That channel is connected to another Dalai Llama account", "error"],
+  other_channel: ["Your account already uses a different channel; disconnect it first", "error"],
+  failed: ["Connecting YouTube failed; please try again", "error"],
+};
+
+/** Shows the result of Google's redirect once and removes it from the address bar. */
+export function useYouTubeResultFlash() {
+  const dispatch = useDispatch();
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const result = YOUTUBE_RESULT[params.get("youtube")];
+    if (!result) return;
+    dispatch(showFlash({ message: result[0], type: result[1] }));
+    params.delete("youtube");
+    window.history.replaceState(null, "", window.location.pathname + (params.toString() ? `?${params}` : "") + window.location.hash);
+  }, [dispatch]);
+}
+
 function useFail() {
   const dispatch = useDispatch();
   return (e, fallback) => dispatch(showFlash({ message: errorMessage(e, fallback), type: "error" }));
 }
 
-function ConnectionCard({ connection }) {
+export function ConnectionCard({ connection }) {
   const fail = useFail();
   const [start, startState] = useStartYouTubeConnectMutation();
   const [disconnect, disconnectState] = useDisconnectYouTubeMutation();

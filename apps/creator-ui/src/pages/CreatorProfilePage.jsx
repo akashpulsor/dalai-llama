@@ -1,59 +1,84 @@
 // @ts-nocheck
-import React, { useState } from "react";
-import { UserCircle } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { ChevronDown, ExternalLink, UserCircle } from "lucide-react";
 import ProfileForm from "../components/showcase/ProfileForm.jsx";
-import ChannelLinkWizard from "../components/showcase/ChannelLinkWizard.jsx";
 import VideoPickerGrid from "../components/showcase/VideoPickerGrid.jsx";
 import ShowcaseManager from "../components/showcase/ShowcaseManager.jsx";
 import LadderCard from "../components/showcase/LadderCard.jsx";
+import { ConnectionCard, useYouTubeResultFlash } from "../components/outreach/YouTubePanel.jsx";
+import { RequestsList } from "./RequestsPage.jsx";
+import { useGetMyPublicProfileQuery } from "../api/showcaseEndpoints.js";
+import { useGetYouTubeConnectionQuery } from "../api/showcaseEndpoints.js";
 
-const TABS = [
-  ["profile", "Profile"],
-  ["showcase", "Showcase"],
-  ["visibility", "Visibility"],
-];
+const heading = "mb-3 text-sm font-bold uppercase tracking-normal text-slate-300";
 
-/** The creator's public profile, their YouTube channel and showcase videos, and where they stand. */
+/** One page for the creator's public presence: the profile brands see, the YouTube channel
+ * (connected with Google, which also proves it is theirs), the videos shown, brand requests,
+ * and where they stand. */
 export default function CreatorProfilePage() {
-  const [tab, setTab] = useState("profile");
+  useYouTubeResultFlash();
+  const { data: profile } = useGetMyPublicProfileQuery();
+  const { data: connection } = useGetYouTubeConnectionQuery();
+  const [editing, setEditing] = useState(false);
+  const channelConnected = Boolean(connection?.channelId);
+
+  useEffect(() => {
+    const id = window.location.hash.replace("#", "");
+    if (id) window.requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: "start" }));
+  }, []);
+
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-500/20 text-purple-100">
-          <UserCircle size={22} />
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-500/20 text-purple-100"><UserCircle size={22} /></div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">{profile?.displayName || "Your profile"}</h1>
+            <p className="text-sm font-medium text-slate-400">What brands see: your videos, and the requests they send you.</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-white">Public profile</h1>
-          <p className="text-sm font-medium text-slate-400">What brands see, and the work you show them.</p>
-        </div>
+        {profile?.publicUrl && (
+          <a href={profile.publicUrl} target="_blank" rel="noreferrer" className="creator-control flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-200">
+            View public page <ExternalLink size={13} />
+          </a>
+        )}
       </div>
 
-      <div role="tablist" aria-label="Profile sections" className="mb-5 flex gap-2">
-        {TABS.map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
-                  className={`rounded-lg px-4 py-2 text-sm font-bold ${
-                    tab === id ? "bg-purple-600 text-white" : "text-slate-400 hover:bg-white/5 hover:text-white"
-                  }`}>
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {tab === "profile" && <ProfileForm />}
-      {tab === "showcase" && (
-        <div className="space-y-6">
-          <ChannelLinkWizard />
-          <section>
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-normal text-slate-300">On your profile</h2>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0 space-y-8">
+          <section id="videos">
+            <h2 className={heading}>On your profile</h2>
             <ShowcaseManager />
           </section>
           <section>
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-normal text-slate-300">Your channel's videos</h2>
-            <VideoPickerGrid />
+            <h2 className={heading}>Your channel's videos</h2>
+            {channelConnected
+              ? <VideoPickerGrid />
+              : <p className="creator-panel p-5 text-sm text-slate-400">Connect your YouTube channel to pick videos for your profile.</p>}
+          </section>
+          <section id="requests">
+            <h2 className={heading}>Requests from brands</h2>
+            <RequestsList />
           </section>
         </div>
-      )}
-      {tab === "visibility" && <LadderCard />}
+
+        <aside className="space-y-6">
+          <ConnectionCard connection={connection} />
+          <section className="creator-panel p-5">
+            <button type="button" onClick={() => setEditing((v) => !v)} className="flex w-full items-center justify-between text-left">
+              <span className="text-sm font-bold uppercase tracking-normal text-slate-300">Profile details</span>
+              <ChevronDown size={16} className={`text-slate-400 transition ${editing ? "rotate-180" : ""}`} />
+            </button>
+            {!editing && profile && (
+              <p className="mt-2 text-xs text-slate-400">
+                @{profile.handle}{profile.missing?.length ? ` · ${profile.missing.length} things to finish` : " · complete"}
+              </p>
+            )}
+            {editing && <div className="mt-4"><ProfileForm /></div>}
+          </section>
+          <LadderCard />
+        </aside>
+      </div>
     </div>
   );
 }

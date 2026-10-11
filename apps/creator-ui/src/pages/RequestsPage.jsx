@@ -1,7 +1,8 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { ExternalLink, Inbox, Loader2, Mail } from "lucide-react";
+import { Navigate } from "react-router-dom";
+import { ExternalLink, Loader2, Mail } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import { useConvertInquiryMutation, useGetMyInquiriesQuery, useSetInquiryStatusMutation } from "../api/showcaseEndpoints.js";
 import { INDUSTRY_LABEL, errorMessage } from "../components/showcase/showcaseLabels.js";
@@ -17,17 +18,15 @@ const STATUS = {
 
 /** Brands who asked for a video from the public profile. "Make a brief" creates the brief and
  * emails the brand its link; from there it is the normal brief, payment and review flow. */
+/** Requests now live on the Profile page; old links land there. */
 export default function RequestsPage() {
+  return <Navigate to="/profile#requests" replace />;
+}
+
+export function RequestsList() {
   const { data: requests = [], isLoading, isError } = useGetMyInquiriesQuery();
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 sm:py-8">
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-500/20 text-purple-100"><Inbox size={22} /></div>
-        <div>
-          <h1 className="text-2xl font-bold text-white">Requests</h1>
-          <p className="text-sm font-medium text-slate-400">Brands who asked you for a video from your public profile.</p>
-        </div>
-      </div>
+    <div>
       {isLoading && <p className="flex items-center gap-2 text-slate-400"><Loader2 size={16} className="animate-spin" /> Loading…</p>}
       {isError && <p className="text-rose-300">Requests couldn't load. Try again in a moment.</p>}
       {!isLoading && !isError && requests.length === 0 && (

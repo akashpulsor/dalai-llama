@@ -46,9 +46,9 @@ export default function AudiencesPanel() {
       <section className="creator-panel p-5">
         <h2 className="text-sm font-bold uppercase tracking-normal text-slate-300">Audiences</h2>
         <p className="mt-1 text-xs text-slate-400">
-          Upload brands you want to reach. CSV with a header row: email (more emails in email2… or separated by ;), phone, name,
-          company, industry, website. Up to 5,000 rows.
+          Upload the brand contacts you want to reach as a CSV file (up to 5,000 rows), or find brands below.
         </p>
+        <CsvFormat />
         <form onSubmit={add} className="mt-4 flex flex-wrap gap-2">
           <label htmlFor="new-audience" className="sr-only">New audience name</label>
           <input id="new-audience" required maxLength={80} value={name} onChange={(e) => setName(e.target.value)}
@@ -140,6 +140,7 @@ function AudienceDetail({ audience, onFail }) {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-white">
                     {l.name || l.company || "Unnamed"}
+                    {l.name && l.designation && <span className="font-normal text-slate-400"> · {l.designation}</span>}
                     {l.name && l.company && <span className="font-normal text-slate-400"> · {l.company}</span>}
                     {l.industry && <span className="font-normal text-slate-500"> · {INDUSTRY_LABEL[l.industry]}</span>}
                   </p>
@@ -180,5 +181,47 @@ function ContactChip({ c, onDiscard }) {
         <X size={11} />
       </button>
     </span>
+  );
+}
+
+const SAMPLE_CSV = [
+  "name,designation,company,email,email2,phone,industry,website",
+  "Asha Rao,Marketing Head,Hearth Foods,asha@hearthfoods.in,marketing@hearthfoods.in,+91 98765 43210,FOOD_BEVERAGE,https://hearthfoods.in",
+  "Vikram Shah,Brand Manager,Bolt Motors,vikram@boltmotors.in,,+91 91234 56789,AUTOMOTIVE,https://boltmotors.in",
+].join("\r\n");
+
+/** The CSV columns, with a sample to download. Rows for the same person (any shared email or
+ * phone) become one lead. */
+function CsvFormat() {
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([SAMPLE_CSV + "\r\n"], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "dalai-llama-audience-sample.csv";
+    a.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const cols = [
+    ["name", "Contact's full name (or first name + last name columns)"],
+    ["designation", "Their role, e.g. Marketing Head (also: title, position, role)"],
+    ["company", "Brand or company name"],
+    ["email", "Work email. More in email2, email3… or several separated by ;"],
+    ["phone", "With country code, e.g. +91 98765 43210"],
+    ["industry", "Optional: FASHION, BEAUTY, FOOD_BEVERAGE, TECH, FINANCE, …"],
+    ["website", "Optional, starting with https://"],
+  ];
+  return (
+    <details className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs text-slate-300">
+      <summary className="cursor-pointer font-bold text-slate-200">CSV format</summary>
+      <p className="mt-2 text-slate-400">First row must be the column names. Each row needs at least an email or a phone.</p>
+      <table className="mt-2 w-full text-left">
+        <tbody>
+          {cols.map(([c, d]) => (
+            <tr key={c} className="border-t border-white/5"><td className="py-1 pr-3 font-mono text-purple-200">{c}</td><td className="py-1 text-slate-400">{d}</td></tr>
+          ))}
+        </tbody>
+      </table>
+      <button type="button" onClick={download} className="creator-control mt-3 px-3 py-1.5 text-xs font-bold text-slate-200">Download sample CSV</button>
+    </details>
   );
 }
