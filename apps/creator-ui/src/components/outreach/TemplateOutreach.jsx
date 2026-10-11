@@ -1,10 +1,11 @@
 // @ts-nocheck
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { Eye, Loader2, Send, ShoppingCart } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useBuyMailPackMutation,
+  useCreateEmailTemplateMutation,
   useGetAudiencesQuery,
   useGetEmailTemplatesQuery,
   useGetOutreachHistoryQuery,
@@ -12,9 +13,10 @@ import {
   usePreviewOutreachMutation,
   useSendOutreachMutation,
   useSendToAudienceMutation,
+  useUpdateEmailTemplateMutation,
 } from "../../api/showcaseEndpoints.js";
 import { errorMessage } from "../showcase/showcaseLabels.js";
-import { LAYOUT_LABEL } from "./outreachLabels.js";
+import { LAYOUT_LABEL, PLACEHOLDERS } from "./outreachLabels.js";
 
 const OUTCOME = {
   SENT: ["Sent", "text-emerald-300"],
@@ -39,8 +41,8 @@ function parseRecipients(text) {
   });
 }
 
-/** Send tab: pick a template (Dalai Llama's or your own), a film, and who gets it (an audience or
- * typed addresses). Only films made on Dalai Llama that the client fully paid for and agreed to
+/** Send tab, one flow: pick a template (Dalai Llama's or your own), edit its subject and opening line
+ * right here (saved as your own template when you send), pick the film and the audience, send. Only films made on Dalai Llama that the client fully paid for and agreed to
  * marketing use of can be sent; each brand gets at most one email a day. */
 export default function TemplateOutreach({ templateId, onTemplateChange }) {
   const dispatch = useDispatch();
@@ -52,6 +54,9 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
   const [send, sendState] = useSendOutreachMutation();
   const [sendToAudience, audienceState] = useSendToAudienceMutation();
   const [buyPack, buyState] = useBuyMailPackMutation();
+  const [createTemplate] = useCreateEmailTemplateMutation();
+  const [updateTemplate] = useUpdateEmailTemplateMutation();
+  const [draft, setDraft] = useState({ subject: "", intro: "" });
 
   const [publicId, setPublicId] = useState("");
   const [note, setNote] = useState("");
@@ -63,6 +68,22 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
   const [audienceResult, setAudienceResult] = useState(null);
 
   const template = templates.find((t) => t.id === templateId) || templates[0];
+  useEffect(() => {
+    if (template) setDraft({ subject: template.subject, intro: template.intro });
+  }, [template?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const edited = template && (draft.subject !== template.subject || draft.intro !== template.intro);
+
+  /** The template to send: unchanged, or the edits saved (a copy of Dalai Llama's, or an update of yours). */
+  const templateToSend = async () => {
+    if (!edited) return template.id;
+    if (!template.global) {
+      await updateTemplate({ id: template.id, name: template.name, layout: template.layout, ...draft }).unwrap();
+      return template.id;
+    }
+    const copy = await createTemplate({ name: `${template.name} (my copy)`.slice(0, 80), layout: template.layout, ...draft }).unwrap();
+    onTemplateChange(copy.id);
+    return copy.id;
+  };
   const audience = audiences.find((a) => a.id === audienceId) || audiences[0];
   const recipients = useMemo(() => parseRecipients(recipientsText), [recipientsText]);
   const films = overview?.mailableFilms || [];
@@ -75,7 +96,10 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
   const fail = (e, fallback) => dispatch(showFlash({ message: errorMessage(e, fallback), type: "error" }));
 
   const showPreview = async () => {
-    try { setPreviewMail(await preview({ ...body, recipientName: recipients[0]?.name || null }).unwrap()); } catch (e) { fail(e, "Couldn't build the preview"); }
+    try {
+      const id = await templateToSend();
+      setPreviewMail(await preview({ ...body, templateId: id, recipientName: recipients[0]?.name || null }).unwrap());
+    } catch (e) { fail(e, "Couldn't build the preview"); }
   };
   const doSend = async () => {
     setResults(null);
@@ -83,9 +107,11 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
     try {
       if (mode === "audience") {
         if (!window.confirm(`Email up to ${audience.reachable} brands in "${audience.name}"?`)) return;
-        setAudienceResult(await sendToAudience({ ...body, audienceId: audience.id }).unwrap());
+        const id = await templateToSend();
+        setAudienceResult(await sendToAudience({ ...body, templateId: id, audienceId: audience.id }).unwrap());
       } else {
-        setResults((await send({ ...body, recipients }).unwrap()).results);
+        const id = await templateToSend();
+        setResults((await send({ ...body, templateId: id, recipients }).unwrap()).results);
         setRecipientsText("");
       }
     } catch (e) { fail(e, "Couldn't send"); }
@@ -128,6 +154,41 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
         )}
       </div>
 
+      <div className="mb-5">
+        <span className={label}>1 · Choose a template</span>
+        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {templates.map((t) => (
+            <li key={t.id}>
+              <button type="button" onClick={() => onTemplateChange(t.id)} aria-pressed={template?.id === t.id}
+                      className={`h-full w-full rounded-xl border p-3 text-left ${template?.id === t.id ? "border-purple-400 bg-purple-500/10" : "border-white/10 bg-white/[0.03] hover:border-white/25"}`}>
+                <span className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-bold text-white">{t.name}</span>
+                  <span className="text-[10px] font-bold text-purple-200">{t.global ? "Dalai Llama" : "Yours"}</span>
+                </span>
+                <span className="mt-1 block text-[11px] text-slate-500">{LAYOUT_LABEL[t.layout]}</span>
+                <span className="mt-1 line-clamp-2 block text-xs text-slate-300">{t.subject}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+      {template && (
+        <div className="mb-5 space-y-3 rounded-xl border border-white/10 p-4">
+          <span className={label}>2 · Make it yours</span>
+          <label className="block">
+            <span className="mb-1 block text-xs text-slate-400">Subject</span>
+            <input value={draft.subject} maxLength={200} onChange={(e) => setDraft({ ...draft, subject: e.target.value })} className={control} />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs text-slate-400">Opening line</span>
+            <textarea value={draft.intro} maxLength={1000} rows={3} onChange={(e) => setDraft({ ...draft, intro: e.target.value })} className={control} />
+          </label>
+          <p className="text-[11px] text-slate-500">
+            You can use {PLACEHOLDERS}.{edited ? (template.global ? " Your edits are saved as your own copy when you preview or send." : " Your edits are saved to this template when you preview or send.") : ""}
+          </p>
+        </div>
+      )}
+
       {films.length === 0 ? (
         <p className="rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">
           Nothing to send yet. Only films made on Dalai Llama that your client fully paid for, and agreed to marketing use of, can be
@@ -135,18 +196,9 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
         </p>
       ) : (
         <div className="space-y-4">
-          <label className="block">
-            <span className={label}>Template</span>
-            <select value={template?.id || ""} onChange={(e) => onTemplateChange(e.target.value)} className={control}>
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>{t.global ? "Dalai Llama · " : "Mine · "}{t.name} ({LAYOUT_LABEL[t.layout]})</option>
-              ))}
-            </select>
-            {template && <span className="mt-1 block text-[11px] text-slate-500">Subject: {template.subject}</span>}
-          </label>
           {needsFilm && (
             <label className="block">
-              <span className={label}>Film</span>
+              <span className={label}>3 · Film</span>
               <select value={film} onChange={(e) => setPublicId(e.target.value)} className={control}>
                 {films.map((f) => <option key={f.publicId} value={f.publicId}>{f.title}{f.clientLabel ? ` · ${f.clientLabel}` : ""}</option>)}
               </select>
@@ -159,7 +211,7 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
           </label>
 
           <div>
-            <span className={label}>Send to</span>
+            <span className={label}>4 · Send to</span>
             <div className="mb-2 flex gap-2" role="radiogroup" aria-label="Recipients">
               {[["audience", "An audience"], ["typed", "Type addresses"]].map(([id, text]) => (
                 <button key={id} type="button" role="radio" aria-checked={mode === id} onClick={() => setMode(id)}

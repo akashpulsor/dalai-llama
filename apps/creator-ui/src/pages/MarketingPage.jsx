@@ -2,7 +2,6 @@
 import React, { useState } from "react";
 import { Mail } from "lucide-react";
 import TemplateOutreach from "../components/outreach/TemplateOutreach.jsx";
-import TemplatesPanel from "../components/outreach/TemplatesPanel.jsx";
 import AudiencesPanel from "../components/outreach/AudiencesPanel.jsx";
 import AnalyticsPanel from "../components/outreach/AnalyticsPanel.jsx";
 import YouTubePanel, { useYouTubeResultFlash } from "../components/outreach/YouTubePanel.jsx";
@@ -10,7 +9,6 @@ import YouTubePanel, { useYouTubeResultFlash } from "../components/outreach/YouT
 const TABS = [
   ["send", "Send"],
   ["audiences", "Audiences"],
-  ["templates", "Templates"],
   ["analytics", "Analytics"],
   ["youtube", "YouTube"],
 ];
@@ -23,7 +21,6 @@ export default function MarketingPage() {
   useYouTubeResultFlash();
   const [tab, setTab] = useState(() => (new URLSearchParams(window.location.search).get("youtube") ? "youtube" : "send"));
   const [templateId, setTemplateId] = useState(null);
-  const chooseTemplate = (id) => { setTemplateId(id); setTab("send"); };
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
@@ -48,7 +45,6 @@ export default function MarketingPage() {
 
       {tab === "send" && <TemplateOutreach templateId={templateId} onTemplateChange={setTemplateId} />}
       {tab === "audiences" && <AudiencesPanel />}
-      {tab === "templates" && <TemplatesPanel onUse={chooseTemplate} />}
       {tab === "analytics" && <AnalyticsPanel />}
       {tab === "youtube" && <YouTubePanel />}
     </div>
