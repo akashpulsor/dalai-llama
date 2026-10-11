@@ -19,7 +19,7 @@ export default function ShowcaseCard({ card, onOpen, showCreator = true }) {
           <img src={card.thumbnailUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
         )}
         <span className="absolute inset-0 flex items-center justify-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 text-white shadow-lg transition group-hover:scale-110">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg transition group-hover:scale-110">
             <Play size={20} className="ml-0.5" fill="currentColor" />
           </span>
         </span>
@@ -39,6 +39,13 @@ export default function ShowcaseCard({ card, onOpen, showCreator = true }) {
           <a href={`/c/${card.creator.handle}`} className="flex items-center gap-2 pt-1 text-xs font-semibold text-purple-300 hover:text-white">
             {card.creator.avatarUrl && <img src={card.creator.avatarUrl} alt="" className="h-6 w-6 rounded-full object-cover" />}
             {card.creator.displayName}
+          </a>
+        )}
+        {/* Figma: every film can turn into a request to its creator (sign-in happens on the way if needed). */}
+        {card.creator?.handle && (
+          <a href={`/c/${card.creator.handle}?then=request${card.publicId ? `&film=${card.publicId}` : ""}`}
+             className="mt-2 flex h-9 items-center justify-center rounded-lg text-xs font-bold text-purple-200 ring-1 ring-purple-400/40 hover:bg-purple-500/10">
+            Request a video
           </a>
         )}
       </div>

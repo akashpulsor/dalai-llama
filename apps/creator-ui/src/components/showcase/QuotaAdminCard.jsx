@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from "react";
-import { useAdminBrandCreditsQuery, useAdminSetYouTubeQuotaMutation, useAdminYouTubeQuotaQuery } from "../../api/showcaseEndpoints.js";
+import { useAdminBrandCreditsQuery, useAdminImportBrandDirectoryMutation, useAdminSetYouTubeQuotaMutation, useAdminYouTubeQuotaQuery } from "../../api/showcaseEndpoints.js";
 
 /** Rules 41-42 for ops: the YouTube quota is shared by every creator (it belongs to our Google
  * Cloud project), so uploads queue once today's budget is spent and continue after the reset.
@@ -46,6 +46,7 @@ export default function QuotaAdminCard() {
         <span className="text-slate-500">Raise this only after Google approves more quota.</span>
       </form>
       {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
+      <DirectoryUpload />
       {credits && (
         <p className="mt-4 border-t border-white/10 pt-3 text-xs text-slate-400">
           Brand directory (Hunter.io): {credits.configured
@@ -53,6 +54,40 @@ export default function QuotaAdminCard() {
             : "no API key set, so searches only show brands already in the directory"}
         </p>
       )}
+    </div>
+  );
+}
+
+/** Bootstrapping: brand contacts every creator's Find brands shows first, with their emails. Same
+ * columns as an audience CSV, plus country. */
+function DirectoryUpload() {
+  const [upload, state] = useAdminImportBrandDirectoryMutation();
+  const [report, setReport] = useState(null);
+  const [error, setError] = useState("");
+  const onFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setError("");
+    try { setReport(await upload(file).unwrap()); } catch (e) { setError(e?.data?.message || "Couldn't import that file"); }
+  };
+  return (
+    <div className="mt-4 border-t border-white/10 pt-3 text-xs text-slate-300">
+      <p className="font-bold text-slate-200">Brand contacts for every creator</p>
+      <p className="mt-1 text-slate-400">
+        CSV with a header row: name, designation, company, email, phone, industry, website, country. Creators find these brands
+        first in Find brands, with the contacts ready to email.
+      </p>
+      <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-md border border-white/15 px-3 py-1.5 font-bold text-slate-200">
+        {state.isLoading ? "Importing…" : "Upload brand contacts CSV"}
+        <input type="file" accept=".csv,text/csv" onChange={onFile} className="hidden" />
+      </label>
+      {report && (
+        <p className="mt-2 text-slate-300">
+          {report.rows} rows · {report.companies} brands · {report.contacts} contacts{report.rejected ? ` · ${report.rejected} rows skipped (no company website or work email)` : ""}
+        </p>
+      )}
+      {error && <p className="mt-2 text-rose-300">{error}</p>}
     </div>
   );
 }

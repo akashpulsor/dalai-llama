@@ -88,6 +88,7 @@ export default function BrandFinder() {
         </button>
       </form>
       {error && <p className="mt-3 text-sm text-rose-300">{errorMessage(error, "Search failed")}</p>}
+      {data?.notice && <p className="mt-3 rounded-lg border border-amber-400/20 bg-amber-500/[0.06] px-3 py-2 text-xs text-amber-100">{data.notice}</p>}
       {data && (
         <>
           {data.companies.length === 0 ? <p className="mt-4 text-sm text-slate-400">No brands found. Try another industry or fewer keywords.</p> : (

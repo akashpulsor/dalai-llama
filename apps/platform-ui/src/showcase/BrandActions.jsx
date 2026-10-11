@@ -78,6 +78,10 @@ const TIMELINES = [
 
 export function RequestVideoButton({ profile, film }) {
   const [open, setOpen] = useState(() => new URLSearchParams(window.location.search).get("then") === "request" && isSignedIn());
+  // Arrived from a film's "Request a video" while signed out: sign in (or register), then come back here.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("then") === "request" && !isSignedIn()) goSignIn(`request:${profile.handle}`);
+  }, [profile.handle]); // eslint-disable-line react-hooks/exhaustive-deps
   const start = () => (isSignedIn() ? setOpen(true) : goSignIn(`request:${profile.handle}`));
   return (
     <>

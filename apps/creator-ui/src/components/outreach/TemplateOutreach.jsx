@@ -17,6 +17,7 @@ import {
 } from "../../api/showcaseEndpoints.js";
 import { errorMessage } from "../showcase/showcaseLabels.js";
 import { LAYOUT_LABEL, PLACEHOLDERS } from "./outreachLabels.js";
+import QuickAudience from "./QuickAudience.jsx";
 
 const OUTCOME = {
   SENT: ["Sent", "text-emerald-300"],
@@ -233,7 +234,7 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
             </div>
             {mode === "audience" ? (
               audiences.length === 0 ? (
-                <p className="text-xs text-slate-400">No audiences yet. On the Audiences tab, upload a CSV or use Find brands to add companies.</p>
+                <QuickAudience onCreated={setAudienceId} />
               ) : (
                 <>
                   <select value={audience?.id || ""} onChange={(e) => setAudienceId(e.target.value)} className={control}>
@@ -242,6 +243,7 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
                   <span className="mt-1 block text-[11px] text-slate-500">
                     One email per lead, to their best address. Queued mail goes out within a couple of minutes.
                   </span>
+                  <QuickAudience onCreated={setAudienceId} />
                 </>
               )
             ) : (

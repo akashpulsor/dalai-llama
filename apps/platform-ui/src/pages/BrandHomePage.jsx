@@ -29,6 +29,7 @@ export default function BrandHomePage() {
   const [me, setMe] = useState(null);
   const [inquiries, setInquiries] = useState([]);
   const [films, setFilms] = useState([]);
+  const [filmsForIndustry, setFilmsForIndustry] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -40,9 +41,15 @@ export default function BrandHomePage() {
 
   useEffect(() => {
     if (!me) return;
-    getFeed({ tab: "NEW", industry: me.industry || "", format: "", page: 0 })
-      .then((r) => setFilms((r?.items || []).slice(0, 8)))
-      .catch(() => setFilms([]));
+    // Their industry's films first; while there are none yet (bootstrapping), the newest from everyone,
+    // said plainly rather than passed off as theirs.
+    (async () => {
+      const mine = me.industry ? (await getFeed({ tab: "NEW", industry: me.industry, format: "", page: 0 }).catch(() => null))?.items || [] : [];
+      if (mine.length > 0) { setFilms(mine.slice(0, 8)); setFilmsForIndustry(true); return; }
+      const all = (await getFeed({ tab: "NEW", industry: "", format: "", page: 0 }).catch(() => null))?.items || [];
+      setFilms(all.slice(0, 8));
+      setFilmsForIndustry(!me.industry);
+    })();
   }, [me?.industry]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const name = me?.contactName?.split(" ")[0] || me?.companyName || "there";
@@ -71,8 +78,11 @@ export default function BrandHomePage() {
             <section aria-labelledby="picks-h" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 12 }}>
                 <h2 id="picks-h" style={{ margin: 0, fontSize: 19, fontWeight: 700 }}>
-                  {industryLabel ? `New films for ${industryLabel.toLowerCase()}` : "New films from our creators"}
+                  {industryLabel && filmsForIndustry ? `New films for ${industryLabel.toLowerCase()}` : "New films from our creators"}
                 </h2>
+                {industryLabel && !filmsForIndustry && (
+                  <span style={{ fontSize: 13, color: C.muted }}>No {industryLabel.toLowerCase()} films yet; ask any creator below for one.</span>
+                )}
                 <a href={`/creators${me.industry ? `?industry=${me.industry}` : ""}`} style={{ marginLeft: "auto", fontSize: 14, fontWeight: 600, color: "#C4B5FD" }}>See all</a>
               </div>
               {films.length === 0
@@ -138,6 +148,9 @@ function Requests({ inquiries }) {
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, padding: "18px 20px 14px" }}>
         <h2 id="req-h" style={{ margin: 0, fontSize: 19, fontWeight: 700 }}>Your requests</h2>
         <span style={{ color: C.muted, fontSize: 14 }}>{inquiries.length} sent</span>
+        <a href="/creators" style={{ marginLeft: "auto", height: 40, display: "inline-flex", alignItems: "center", padding: "0 16px", borderRadius: 10, background: "#7C3AED", color: "#FFFFFF", textDecoration: "none", fontWeight: 700 }}>
+          New request
+        </a>
       </div>
       {inquiries.length === 0 ? (
         <p style={{ margin: 0, padding: "14px 20px 20px", borderTop: `1px solid ${C.line}`, color: C.muted }}>

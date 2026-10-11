@@ -334,6 +334,13 @@ export const showcaseApi = showcaseBase.injectEndpoints({
       query: ({ leadId, value }) => ({ url: `/tenants/me/outreach/leads/${leadId}/contact-points`, method: "POST", body: { value } }),
       invalidatesTags: ["Audiences", "AudienceLeads"],
     }),
+    adminImportBrandDirectory: builder.mutation({
+      query: (file) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        return { url: opsAdminUrl("/tenants/outreach/brand-directory/import"), method: "POST", body: formData };
+      },
+    }),
     adminBrandCredits: builder.query({
       query: () => ({ url: opsAdminUrl("/tenants/outreach/brand-directory/credits") }),
       providesTags: ["BrandCredits"],
@@ -412,6 +419,7 @@ export const {
   useAdminYouTubeQuotaQuery,
   useAdminSetYouTubeQuotaMutation,
   useAdminBrandCreditsQuery,
+  useAdminImportBrandDirectoryMutation,
   useGetDirectoriesQuery,
   useLazySearchPeopleQuery,
   useAddPeopleToAudienceMutation,
