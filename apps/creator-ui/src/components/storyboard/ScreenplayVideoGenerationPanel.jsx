@@ -1125,7 +1125,7 @@ export default function ScreenplayVideoGenerationPanel({
       normalizeLanguageKey(candidate.language) === normalizeLanguageKey(option.value)
     ));
     onDialogueLanguageChange?.(option.value);
-    updateFounderAvatarProfile({
+    handleFounderAvatarChange({
       language: option.value,
       languageCode: option.languageCode,
       voiceLanguageMode: accentOption?.value || `multilingual_${option.languageCode}`,
@@ -1923,7 +1923,7 @@ export default function ScreenplayVideoGenerationPanel({
                     <input
                       type="checkbox"
                       checked={false}
-                      onChange={(event) => updateFounderAvatarProfile({ consentConfirmed: event.target.checked })}
+                      onChange={(event) => handleFounderAvatarChange({ consentConfirmed: event.target.checked })}
                       className="h-4 w-4 accent-cyan-400"
                     />
                     Creator consent

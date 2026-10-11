@@ -764,6 +764,23 @@ const ASPECT_RATIO_CSS = {
  *
  * Collapsed by default. A shot with one prompt has no history worth the space.
  */
+/** Where a prompt version came from (the backend's variantLabel). */
+const VERSION_SOURCE = {
+  planned: "From plan + timeline",
+  "studio-reviewed": "Generated from studio",
+};
+
+/** Three lines, or the whole version on click. */
+function VersionText({ text }) {
+  const [full, setFull] = React.useState(false);
+  return (
+    <button type="button" onClick={() => setFull((f) => !f)} title={full ? "Show less" : "Show the whole prompt"}
+            className={`block w-full text-left text-[11px] font-medium leading-relaxed text-slate-400 ${full ? "whitespace-pre-wrap" : "line-clamp-3"}`}>
+      {text || "—"}
+    </button>
+  );
+}
+
 function PromptVersionHistory({ shotId, onUse, canEdit }) {
   const [open, setOpen] = React.useState(false);
   const { data: versions = [], isFetching } = useListShotPromptVersionsQuery(shotId, { skip: !shotId || !open });
@@ -798,8 +815,17 @@ function PromptVersionHistory({ shotId, onUse, canEdit }) {
                 <div key={version.promptId} className="rounded border border-white/10 bg-black/20 p-2">
                   <div className="mb-1 flex items-center gap-1.5">
                     <span className="text-[9px] font-black uppercase tracking-wide text-slate-500">
-                      {index === 0 ? "Current" : `v${versions.length - index}`}
+                      {index === 0 ? `Current · v${versions.length}` : `v${versions.length - index}`}
                     </span>
+                    <span className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] font-bold text-slate-400">
+                      {VERSION_SOURCE[version.variantLabel] || (version.parentPromptId ? "Edited" : "Prepared")}
+                    </span>
+                    {version.durationSeconds && <span className="text-[9px] font-bold text-slate-500">{version.durationSeconds}s</span>}
+                    {version.createdAt && (
+                      <span className="text-[9px] font-semibold text-slate-600">
+                        {new Date(version.createdAt).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    )}
                     {version.approvalStatus && (
                       <span className={`rounded px-1.5 py-0.5 text-[9px] font-black uppercase ${
                         rejected ? "bg-rose-400/10 text-rose-300" : "bg-white/10 text-slate-400"
@@ -813,7 +839,7 @@ function PromptVersionHistory({ shotId, onUse, canEdit }) {
                       </span>
                     )}
                   </div>
-                  <p className="line-clamp-3 text-[11px] font-medium leading-relaxed text-slate-400">{text || "—"}</p>
+                  <VersionText text={text} />
                   {index > 0 && canEdit && onUse && (
                     <button
                       type="button"
