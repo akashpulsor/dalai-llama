@@ -16,6 +16,7 @@ import {
   useSelectShotGenerationSettingsMutation,
   useUpdatePreProductionShotMutation,
   useValidateShotGenerationPromptMutation,
+  creatorApi,
 } from "../../api/creatorEndpoints.js";
 import {
   coverageRows,
@@ -79,8 +80,8 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
     try {
       const result = await action().unwrap();
       if (success) dispatch(showFlash({ message: success, type: "success" }));
-      // Every step can change what the prompt is built from.
-      refetchInputs();
+      // Every step can change what the prompt is built from: the checklist (its own query) refreshes.
+      dispatch(creatorApi.util.invalidateTags([{ type: "CreatorHomeProjects", id: `prompt-inputs-${args.shotId}` }]));
       return result;
     } catch (error) {
       const message = error?.data?.message || error?.data?.error || "That did not work -- try again.";
