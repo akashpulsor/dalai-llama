@@ -94,7 +94,10 @@ export default function ShowcaseManager() {
             <IconButton label="Edit" onClick={() => setEditing({ ...item, clientLabel: item.clientLabel || "", titleOverride: item.titleOverride || "" })}>
               <Pencil size={14} />
             </IconButton>
-            <IconButton label="Remove" onClick={() => onRemove(item)}><Trash2 size={14} /></IconButton>
+            <button type="button" onClick={() => onRemove(item)}
+                    className="ml-1 flex items-center gap-1 rounded-md border border-rose-400/30 px-2.5 py-1.5 text-xs font-bold text-rose-200 hover:bg-rose-500/10">
+              <Trash2 size={13} /> Remove from profile
+            </button>
           </div>
         </div>
       ))}

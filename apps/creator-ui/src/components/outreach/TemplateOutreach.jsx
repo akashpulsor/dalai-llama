@@ -170,7 +170,7 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
             </div>
             {mode === "audience" ? (
               audiences.length === 0 ? (
-                <p className="text-xs text-slate-400">No audiences yet. Upload one on the Audiences tab.</p>
+                <p className="text-xs text-slate-400">No audiences yet. On the Audiences tab, upload a CSV or use Find brands to add companies.</p>
               ) : (
                 <>
                   <select value={audience?.id || ""} onChange={(e) => setAudienceId(e.target.value)} className={control}>

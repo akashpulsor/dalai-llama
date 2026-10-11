@@ -1,12 +1,13 @@
 // @ts-nocheck
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
-import { Pencil, Plus, Send, Trash2 } from "lucide-react";
+import { Eye, Loader2, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useCreateEmailTemplateMutation,
   useDeleteEmailTemplateMutation,
   useGetEmailTemplatesQuery,
+  usePreviewOutreachMutation,
   useUpdateEmailTemplateMutation,
 } from "../../api/showcaseEndpoints.js";
 import { errorMessage } from "../showcase/showcaseLabels.js";
@@ -106,6 +107,13 @@ export default function TemplatesPanel({ onUse }) {
 }
 
 function TemplateCard({ t, onUse, onCopy, onEdit, onDelete }) {
+  const dispatch = useDispatch();
+  const [preview, previewState] = usePreviewOutreachMutation();
+  const [mail, setMail] = useState(null);
+  const show = async () => {
+    try { setMail(await preview({ templateId: t.id }).unwrap()); }
+    catch (e) { dispatch(showFlash({ message: errorMessage(e, "Couldn't build the preview"), type: "error" })); }
+  };
   return (
     <li className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-4">
       <div className="flex items-start justify-between gap-2">
@@ -119,10 +127,24 @@ function TemplateCard({ t, onUse, onCopy, onEdit, onDelete }) {
         <button type="button" onClick={() => onUse(t.id)} className="creator-primary flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white">
           <Send size={12} /> Use
         </button>
+        <button type="button" onClick={show} disabled={previewState.isLoading} className="creator-control flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-slate-200">
+          {previewState.isLoading ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />} Preview
+        </button>
         {onCopy && <button type="button" onClick={onCopy} className="creator-control px-3 py-1.5 text-xs font-bold text-slate-200">Copy</button>}
         {onEdit && <button type="button" onClick={onEdit} aria-label={`Edit ${t.name}`} className="creator-control px-2 py-1.5 text-slate-200"><Pencil size={12} /></button>}
         {onDelete && <button type="button" onClick={onDelete} aria-label={`Delete ${t.name}`} className="creator-control px-2 py-1.5 text-rose-300"><Trash2 size={12} /></button>}
       </div>
+      {mail && (
+        <div role="dialog" aria-modal="true" aria-label={`Preview of ${t.name}`} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-2.5">
+              <p className="truncate text-sm font-bold text-slate-900">{mail.subject}</p>
+              <button type="button" onClick={() => setMail(null)} aria-label="Close preview" className="text-slate-500 hover:text-slate-900"><X size={18} /></button>
+            </div>
+            <iframe title="Email preview" srcDoc={mail.html} sandbox="" className="h-[80vh] w-full" />
+          </div>
+        </div>
+      )}
     </li>
   );
 }

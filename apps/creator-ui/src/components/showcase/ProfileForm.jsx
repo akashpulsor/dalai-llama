@@ -45,7 +45,7 @@ export default function ProfileForm() {
   if (error?.status === 404) {
     return (
       <p className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
-        Your public profile is created when you subscribe. Once your plan is active it will appear here.
+        Your public profile isn't available for this account right now.
       </p>
     );
   }

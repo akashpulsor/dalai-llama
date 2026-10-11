@@ -44,6 +44,24 @@ export default function CreatorProfilePage() {
         )}
       </div>
 
+      <section className="mb-6">
+        <button type="button" onClick={() => setEditing((v) => !v)} aria-expanded={editing}
+                className="creator-panel flex w-full items-center justify-between gap-3 px-5 py-4 text-left">
+          <span>
+            <span className="block text-sm font-bold uppercase tracking-normal text-slate-300">Profile details</span>
+            {profile && (
+              <span className="mt-0.5 block text-xs text-slate-400">
+                @{profile.handle}{profile.missing?.length ? ` · ${profile.missing.length} things to finish` : " · complete"}
+              </span>
+            )}
+          </span>
+          <span className="flex items-center gap-1.5 text-xs font-bold text-purple-200">
+            {editing ? "Close" : "Edit"} <ChevronDown size={16} className={`transition ${editing ? "rotate-180" : ""}`} />
+          </span>
+        </button>
+        {editing && <div className="mt-4"><ProfileForm /></div>}
+      </section>
+
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-8">
           <section id="videos">
@@ -64,18 +82,6 @@ export default function CreatorProfilePage() {
 
         <aside className="space-y-6">
           <ConnectionCard connection={connection} />
-          <section className="creator-panel p-5">
-            <button type="button" onClick={() => setEditing((v) => !v)} className="flex w-full items-center justify-between text-left">
-              <span className="text-sm font-bold uppercase tracking-normal text-slate-300">Profile details</span>
-              <ChevronDown size={16} className={`text-slate-400 transition ${editing ? "rotate-180" : ""}`} />
-            </button>
-            {!editing && profile && (
-              <p className="mt-2 text-xs text-slate-400">
-                @{profile.handle}{profile.missing?.length ? ` · ${profile.missing.length} things to finish` : " · complete"}
-              </p>
-            )}
-            {editing && <div className="mt-4"><ProfileForm /></div>}
-          </section>
           <LadderCard />
         </aside>
       </div>

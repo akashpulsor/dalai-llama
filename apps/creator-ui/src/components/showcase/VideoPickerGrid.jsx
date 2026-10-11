@@ -42,6 +42,10 @@ export default function VideoPickerGrid() {
 
   return (
     <div>
+      <p className="mb-3 rounded-lg border border-amber-400/20 bg-amber-500/[0.06] px-3 py-2 text-xs text-amber-100">
+        Dalai Llama showcases AI-made films. Videos you marked on YouTube as altered or synthetic content show an AI badge;
+        adding videos that aren't AI-made can lower your profile's visibility.
+      </p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {videos.map((v) => {
           const added = onShowcase.has(v.videoId);
@@ -52,6 +56,9 @@ export default function VideoPickerGrid() {
                 <span className="absolute left-1.5 top-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">
                   {v.vertical ? "Vertical" : "Wide"}
                 </span>
+                {v.aiDisclosed && (
+                  <span className="absolute right-1.5 top-1.5 rounded bg-purple-600 px-1.5 py-0.5 text-[10px] font-black text-white">AI</span>
+                )}
               </div>
               <div className="space-y-1.5 p-2.5">
                 <p className="line-clamp-2 text-xs font-semibold text-white">{v.title}</p>
@@ -78,6 +85,12 @@ export default function VideoPickerGrid() {
           <div className="creator-panel w-full max-w-md p-5">
             <h3 id="pick-title" className="text-base font-bold text-white">Show on your profile</h3>
             <p className="mt-1 line-clamp-2 text-sm text-slate-400">{picking.title}</p>
+            {!picking.aiDisclosed && (
+              <p className="mt-3 rounded-lg border border-amber-400/30 bg-amber-500/10 p-3 text-xs text-amber-100">
+                This video isn't marked as AI-made on YouTube. Non-AI videos can lower your profile's visibility. If it is AI-made,
+                turn on "Altered or synthetic content" for it in YouTube Studio, then sync your channel.
+              </p>
+            )}
             <ShowcaseFields value={fields} onChange={setFields} />
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setPicking(null)} className="creator-control h-9 px-4 text-xs font-bold text-slate-200">Cancel</button>
