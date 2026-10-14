@@ -58,6 +58,8 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
   const [requestConform, conformRequestState] = useRequestShotConformMutation();
   const [fetchConform] = useLazyGetShotConformQuery();
   const [conformStatus, setConformStatus] = useState(null);
+  // Topaz generates the missing frames with a model (paid); otherwise ffmpeg interpolates them.
+  const [aiFrames, setAiFrames] = useState(false);
   const slowing = conformRequestState.isLoading || conformStatus === "QUEUED" || conformStatus === "PROCESSING";
   // Defaults to the shot's length, which is the whole point -- the clip was generated shorter on purpose.
   const [retimeTo, setRetimeTo] = useState(shot?.durationSeconds || 3);
@@ -201,7 +203,7 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
     const target = Number(retimeTo);
     if (!(target > 0)) return;
     try {
-      const queued = await requestConform({ projectId, shotId, targetSeconds: target, interpolate: true }).unwrap();
+      const queued = await requestConform({ projectId, shotId, targetSeconds: target, interpolate: true, ai: aiFrames }).unwrap();
       setConformStatus(queued.status);
       for (let attempt = 0; attempt < 120; attempt += 1) {
         // eslint-disable-next-line no-await-in-loop
@@ -212,7 +214,7 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
         setConformStatus(latest.status);
         if (latest.status === "COMPLETED") {
           dispatch(creatorApi.util.invalidateTags([{ type: "CreatorHomeProjects", id: `clip-cuts-${shotId}` }]));
-          dispatch(showFlash({ message: `Slowed to ${target}s and interpolated, with the recorded take. Watch it below, then use it if it is right.`, type: "success" }));
+          dispatch(showFlash({ message: `Slowed to ${target}s${aiFrames ? " with Topaz-generated frames" : " and interpolated"}, with the recorded take. Watch it below, then use it if it is right.`, type: "success" }));
           return;
         }
         if (latest.status === "FAILED") {
@@ -333,8 +335,13 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
             className="flex items-center gap-1.5 text-[10px] font-bold text-amber-200 disabled:opacity-50"
           >
             {slowing ? <Loader2 size={11} className="animate-spin" /> : <Gauge size={11} />}
-            {slowing ? (conformStatus === "PROCESSING" ? "Interpolating…" : "Queued…") : "Slow down & interpolate"}
+            {slowing ? (conformStatus === "PROCESSING" ? (aiFrames ? "Generating frames…" : "Interpolating…") : "Queued…") : "Slow down & interpolate"}
           </button>
+          <label className="ml-1 flex items-center gap-1 border-l border-amber-400/20 pl-2 text-[10px] font-bold text-amber-200/80"
+                 title="Topaz's model generates the in-between frames -- smoother on faces and fast motion. A few cents per shot.">
+            <input type="checkbox" checked={aiFrames} onChange={(e) => setAiFrames(e.target.checked)} disabled={busy} className="accent-amber-400" />
+            AI frames (Topaz, paid)
+          </label>
         </span>
         <button
           type="button"

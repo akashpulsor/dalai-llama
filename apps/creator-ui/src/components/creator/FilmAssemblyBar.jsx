@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { AlertTriangle, Download, Film, Loader2, Send, Upload, UserCircle } from "lucide-react";
+import { AlertTriangle, Download, Film, Loader2, Send, Sparkles, Upload, UserCircle } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import ShotCanvasPlayer from "./ShotCanvasPlayer.jsx";
 import { Link } from "react-router-dom";
@@ -11,6 +11,7 @@ import {
   useAssembleFilmMutation,
   useGetFilmReadinessQuery,
   useGetLatestFilmQuery,
+  useUpscaleFilmMutation,
   useListProjectClipsQuery,
   usePublishFilmMutation,
   useUploadFilmEditMutation,
@@ -42,6 +43,8 @@ export default function FilmAssemblyBar({ projectId, aspectRatio }) {
   const { data: film, refetch: refetchFilm } = useGetLatestFilmQuery(projectId, { skip: !projectId });
   const { data: currentClips = [] } = useListProjectClipsQuery(projectId, { skip: !projectId });
   const [assemble] = useAssembleFilmMutation();
+  const [upscaleFilm] = useUpscaleFilmMutation();
+  const [upscaling, setUpscaling] = React.useState(false);
 
   /**
    * Whether the film on screen was built from the cuts the shots have NOW.
@@ -157,6 +160,39 @@ export default function FilmAssemblyBar({ projectId, aspectRatio }) {
     }
   };
 
+  // A film generated small (480x854 is typical) can be upscaled to Full HD once the edit is settled.
+  const upscaled = !!film?.upscaledFromRenderId;
+  const canUpscale = film?.status === "COMPLETED" && !upscaled && film?.width > 0 && film?.height > 0
+    && Math.min(film.width, film.height) < 1080;
+  const upscaleRunning = upscaling || (upscaled && (film?.status === "QUEUED" || film?.status === "PROCESSING"));
+
+  const handleUpscale = async () => {
+    setUpscaling(true);
+    try {
+      await upscaleFilm({ projectId, renderId: film.renderId }).unwrap();
+      dispatch(showFlash({ message: "Upscaling the film to Full HD with Topaz — a few minutes.", type: "info" }));
+      for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((resolve) => { setTimeout(resolve, POLL_INTERVAL_MS); });
+        // eslint-disable-next-line no-await-in-loop
+        const latest = await refetchFilm().unwrap();
+        if (latest?.status === "COMPLETED") {
+          dispatch(showFlash({ message: "The Full HD film is ready. Publish it when you want the client to see it.", type: "success" }));
+          return;
+        }
+        if (latest?.status === "FAILED") {
+          dispatch(showFlash({ message: latest.lastError || "Upscaling the film failed.", type: "error" }));
+          return;
+        }
+      }
+      dispatch(showFlash({ message: "Still upscaling — it will appear here when it finishes.", type: "info" }));
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || error?.data?.error || "Could not upscale the film", type: "error" }));
+    } finally {
+      setUpscaling(false);
+    }
+  };
+
   const handlePublish = async () => {
     try {
       await publish({ projectId, renderId: film.renderId, published: !film.published }).unwrap();
@@ -195,6 +231,24 @@ export default function FilmAssemblyBar({ projectId, aspectRatio }) {
           {joining ? <Loader2 size={14} className="animate-spin" /> : <Film size={14} />}
           {joining ? "Joining…" : "Combine into one video"}
         </button>
+
+        {(canUpscale || upscaleRunning) && (
+          <button
+            type="button"
+            onClick={handleUpscale}
+            disabled={upscaleRunning}
+            title="Topaz upscales the joined film to Full HD (1080 wide for a vertical film). About $0.02 per second of film."
+            className="flex min-h-9 items-center justify-center gap-2 rounded-md border border-sky-400/30 bg-sky-500/10 px-4 text-xs font-black text-sky-100 disabled:opacity-60"
+          >
+            {upscaleRunning ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+            {upscaleRunning ? "Upscaling to Full HD…" : "Upscale to Full HD"}
+          </button>
+        )}
+        {upscaled && film?.status === "COMPLETED" && (
+          <span className="flex min-h-9 items-center rounded-md border border-sky-400/20 px-3 text-[11px] font-bold text-sky-200">
+            Full HD · {film.width}×{film.height}
+          </span>
+        )}
 
         {film?.status === "COMPLETED" && film?.videoUrl && (
           <button

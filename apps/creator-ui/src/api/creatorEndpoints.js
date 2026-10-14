@@ -4052,6 +4052,14 @@ export const creatorApi = apiSlice.injectEndpoints({
       providesTags: (_r, _e, projectId) => [{ type: "CreatorHomeProjects", id: `film-${projectId}` }],
     }),
 
+    // A Full HD copy of the film by Topaz, queued; it becomes the project's latest film.
+    upscaleFilm: builder.mutation({
+      query: ({ projectId, renderId }) => ({
+        url: platformUrl(`/post-production/projects/${projectId}/film/${renderId}/upscale`), method: "POST",
+      }),
+      invalidatesTags: (_r, _e, { projectId }) => [{ type: "CreatorHomeProjects", id: `film-${projectId}` }],
+    }),
+
     // The creator's own edit of the whole film, brought back after cutting it elsewhere. Recorded
     // as a NEW render, so the joined version and the hand-edited one both survive.
     uploadFilmEdit: builder.mutation({
@@ -4275,10 +4283,11 @@ export const creatorApi = apiSlice.injectEndpoints({
     // Slow (with frame interpolation) or trim the shot's newest clip to a length, in post-production.
     // Queued; poll getShotConform with the returned requestId.
     requestShotConform: builder.mutation({
-      query: ({ projectId, shotId, targetSeconds, interpolate }) => ({
+      // ai: Topaz generates the missing frames (paid) instead of ffmpeg interpolating them.
+      query: ({ projectId, shotId, targetSeconds, interpolate, ai }) => ({
         url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/conform`),
         method: "POST",
-        body: { targetSeconds, interpolate },
+        body: { targetSeconds, interpolate, ai: !!ai },
       }),
     }),
     // A post-production conform: the clip slowed (with frame interpolation) or trimmed to its planned
@@ -5003,6 +5012,7 @@ export const {
   useGetDubJobQuery,
   useGetFilmReadinessQuery,
   useGetLatestFilmQuery,
+  useUpscaleFilmMutation,
   useLazyGetDubJobQuery,
   useListClipVersionsQuery,
   usePublishFilmMutation,
