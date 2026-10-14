@@ -189,7 +189,7 @@ function ShotVoiceControl({ shotId, projectId, dubVoiceId, dubCastProfileId, tak
  * time), so the previous recording is gone once this runs. That is worth knowing before pressing it,
  * and worth hearing the current one first.
  */
-function DubbedVoiceControl({ shotId, projectId, line, dubbed, dubVoiceId, dubCastProfileId, onDubbed, children }) {
+function DubbedVoiceControl({ shotId, projectId, line, dubbed, lineTakes = [], dubVoiceId, dubCastProfileId, onDubbed, children }) {
   const dispatch = useDispatch();
   // Queued, not waited on. Recording a line takes seconds to tens of seconds, and while the request
   // held the connection there was nothing on screen saying so -- which is exactly why pressing the
@@ -239,12 +239,15 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed, dubVoiceId, dubCa
   // The take on file was made from these words; the shot now says those. When they differ the
   // recording is of a line that no longer exists, which is exactly what the fit report stops
   // treating as a measurement -- so say it here too, next to the button that fixes it.
-  const stale = !!audioUrl && !!dubbed?.text && !!line && dubbed.text.trim() !== line.trim();
+  // A shot with several lines is recorded line by line, each in its speaker's voice; its "take" is
+  // those, and the whole-line comparison below does not apply to it.
+  const multiLine = lineTakes.length > 1;
+  const stale = !multiLine && !!audioUrl && !!dubbed?.text && !!line && dubbed.text.trim() !== line.trim();
   const otherVoice = !!audioUrl && !!dubVoiceId && !!dubbed?.providerVoiceId && dubbed.providerVoiceId !== dubVoiceId;
   // Recording is only asked for when the take is missing or no longer matches the line or voice.
   // Otherwise it is "Re-record": the same words again, replacing this take -- for a take that
   // sounds wrong, not a step in the flow.
-  const recordLabel = !audioUrl ? "Record the line" : stale ? "Record the new line" : otherVoice ? "Record in the new voice" : null;
+  const recordLabel = !audioUrl ? "Record the line" : stale ? "Record the new line" : otherVoice && !multiLine ? "Record in the new voice" : null;
 
   // A shot with no line written for it used to render nothing at all, which left no way to give one
   // narration from this page: the beats editor hides once a shot is prepared, so a finished shot
@@ -386,7 +389,23 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed, dubVoiceId, dubCa
         </p>
       )}
 
-      {audioUrl ? (
+      {multiLine ? (
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-medium text-slate-500">
+            Each line is recorded on its own, in its speaker's voice, and laid on at its planned moment.
+          </p>
+          <ol className="space-y-1.5">
+            {lineTakes.map((take) => (
+              <li key={take.beatId} className="space-y-0.5">
+                <p className="text-[10px] font-medium text-slate-300">
+                  “{take.text}”{take.durationMs > 0 ? ` · ${(take.durationMs / 1000).toFixed(1)}s` : ""}
+                </p>
+                <audio controls src={take.audioUrl} preload="metadata" className="h-8 w-full" />
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : audioUrl ? (
         <div className="space-y-1">
           {/* Same reason as the clip: a bare audio element is an inert grey bar until the file has
               arrived, which reads as nothing having happened. */}
@@ -439,7 +458,7 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed, dubVoiceId, dubCa
             title="Records the same words again and replaces this take. Only needed if this one sounds wrong."
             className={`${linkButton} text-slate-400 hover:text-purple-200`}>
             {isLoading ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
-            {isLoading ? "Recording…" : "Re-record"}
+            {isLoading ? "Recording…" : multiLine ? "Re-record every line" : "Re-record"}
           </button>
         )}
         {!editing && (
@@ -639,7 +658,7 @@ const ASPECT_RATIO_CSS = {
 /** One shot as a visual card -- the frame (or the finished clip, once generated) IS the card,
  * not a text row that hides the image behind an accordion toggle. Clicking anywhere opens the
  * full prepare/approve panel below it, spanning the grid so it doesn't stretch its neighbors. */
-export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info, busy, video, activeClip, dubbed, onDubbed, selected, onSelectToggle, onPrepare, onSavePrompt, onReject, onAutoFix, onRegenerate, regenerating, previousShot, onStudioGenerated }) {
+export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info, busy, video, activeClip, dubbed, lineTakes, onDubbed, selected, onSelectToggle, onPrepare, onSavePrompt, onReject, onAutoFix, onRegenerate, regenerating, previousShot, onStudioGenerated }) {
   // Text handed to the video studio's editor as a new draft: Edit on a sent version, or the prompt
   // being rewritten after Reject. A fresh object each time, so the same text can be seeded twice.
   const [seedDraft, setSeedDraft] = React.useState(null);
@@ -890,6 +909,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               projectId={projectId}
               line={dialogueVoiceText}
               dubbed={dubbed}
+              lineTakes={lineTakes}
               dubVoiceId={shot.dubVoiceId}
               dubCastProfileId={shot.dubCastProfileId}
               onDubbed={onDubbed}

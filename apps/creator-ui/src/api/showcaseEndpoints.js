@@ -6,7 +6,7 @@ import { api as apiSlice } from "@dalaillama/shared-store";
 import { opsAdminUrl, platformUrl } from "./creatorEndpoints.js";
 
 const showcaseBase = apiSlice.enhanceEndpoints({
-  addTagTypes: ["ShowcaseProfile", "ShowcaseChannel", "ShowcaseVideos", "ShowcaseItems", "ShowcaseVisibility", "ShowcaseUpload",
+  addTagTypes: ["ShowcaseProfile", "PosterFrames", "ShowcaseChannel", "ShowcaseVideos", "ShowcaseItems", "ShowcaseVisibility", "ShowcaseUpload",
     "ShowcaseAdmin", "ShowcaseRequests", "Outreach", "EmailTemplates", "Audiences", "AudienceLeads", "YouTubeConnection", "YouTubeJobs",
     "YouTubeAnalytics", "ExtensionTokens", "PlatformYouTube", "YouTubeQuota", "BrandCredits", "FilmConsent"],
 });
@@ -81,6 +81,15 @@ export const showcaseApi = showcaseBase.injectEndpoints({
       providesTags: ["FilmConsent"],
     }),
     // The creator confirms their client agreed to marketing use (pre-production records it as creator-attested).
+    // The film's thumbnail on the public profile, chosen from its shots' generated frames.
+    getPosterFrames: builder.query({
+      query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/poster-frames`) }),
+      providesTags: (_r, _e, projectId) => [{ type: "PosterFrames", id: projectId }],
+    }),
+    choosePosterFrame: builder.mutation({
+      query: ({ projectId, imageId }) => ({ url: platformUrl(`/projects/${projectId}/poster-frame`), method: "PUT", body: { imageId } }),
+      invalidatesTags: (_r, _e, { projectId }) => [{ type: "PosterFrames", id: projectId }, "ShowcaseItems"],
+    }),
     recordMarketingConsent: builder.mutation({
       query: (projectId) => ({ url: platformUrl(`/projects/${projectId}/marketing-consent`), method: "POST" }),
       invalidatesTags: ["FilmConsent"],
@@ -429,6 +438,8 @@ export const {
   useGetOutreachAnalyticsQuery,
   useGetYouTubeConnectionQuery,
   usePublishFilmToProfileMutation,
+  useGetPosterFramesQuery,
+  useChoosePosterFrameMutation,
   useGetYouTubeChannelsQuery,
   useDisconnectYouTubeChannelMutation,
   useStartYouTubeConnectMutation,

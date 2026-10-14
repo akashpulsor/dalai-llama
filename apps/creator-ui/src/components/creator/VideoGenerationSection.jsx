@@ -175,6 +175,11 @@ export default function VideoGenerationSection({ projectId }) {
     pollingInterval: 45 * 60 * 1000,
   });
   const dubbedVoices = Object.fromEntries(savedAudio.map((audio) => [audio.shotId, audio]));
+  // A shot with several lines has one take per line, each in its speaker's voice.
+  const lineTakes = savedAudio.reduce((byShot, audio) => {
+    if (audio.beatId) (byShot[audio.shotId] ||= []).push(audio);
+    return byShot;
+  }, {});
 
   // The film's running length against what the client agreed. Every per-shot decision to give a shot
   // more seconds is individually reasonable and collectively how a sixty second ad becomes ninety --
@@ -759,6 +764,7 @@ export default function VideoGenerationSection({ projectId }) {
             video={videos[shot.id]}
             activeClip={activeClips[shot.id]}
             dubbed={dubbedVoices[shot.id]}
+            lineTakes={lineTakes[shot.id]}
             onDubbed={reloadAudio}
             selected={selectedShotIds.includes(shot.id)}
             onSelectToggle={() => toggleShotSelected(shot.id)}
