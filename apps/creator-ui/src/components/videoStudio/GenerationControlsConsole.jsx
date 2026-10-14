@@ -5,40 +5,17 @@ import { showFlash } from "@dalaillama/shared-store";
 import { useGetGenerationControlsQuery, useUpdateGenerationControlsMutation } from "../../api/creatorEndpoints.js";
 
 /**
- * Every step of the render path that can stop or reshape a shot, as a switch for this project. The
- * defaults are the path that always lets a shot be generated; each switch says what turning it on
- * costs or risks, so the trade is visible where it is made.
+ * The steps of the render path that are genuinely the creator's call, as switches for this project.
+ * Length, voice and slowing are not here: the clip is the length chosen in the video studio, a shot
+ * with a line is rendered silent and gets its recorded take, and a shorter clip is slowed to the shot
+ * (always interpolated) after generation, from the clip itself.
  */
 export const SWITCHES = [
-  {
-    key: "fitDurationToDialogue",
-    label: "Fit duration to dialogue",
-    on: "Resizes the clip to its measured line, and refuses a line too long to fit.",
-    off: "Generates at exactly the duration you chose; a long line may be cut.",
-  },
-  {
-    key: "autoDubDialogue",
-    label: "Auto-dub the cloned voice",
-    on: "Generates silent, then lays the cast's cloned voice on top.",
-    off: "The video model performs the line itself.",
-  },
   {
     key: "preventDuplicateRenders",
     label: "Prevent duplicate renders",
     on: "A shot already rendering, or already rendered from that prompt, is not queued again.",
     off: "You can queue the same shot again -- each render is billed.",
-  },
-  {
-    key: "conformToPlannedDuration",
-    label: "Conform clips to the planned length",
-    on: "A clip generated shorter is slowed to the planned length in post-production (longer ones are trimmed), with its line and music laid on.",
-    off: "Clips stay at the length they were generated.",
-  },
-  {
-    key: "interpolateWhenSlowing",
-    label: "Interpolate frames when slowing down",
-    on: "New in-between frames are synthesised, so slowed motion stays smooth.",
-    off: "Frames are held longer -- cheaper to process, but motion judders.",
   },
   {
     key: "attachPreviousLastFrame",

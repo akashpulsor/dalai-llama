@@ -1,8 +1,9 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { AlertTriangle, ArrowRight, Check, Film, Lightbulb, Loader2, Wand2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, Lightbulb, Loader2, Wand2 } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
+import ShotLengthConfirm from "./ShotLengthConfirm.jsx";
 import {
   useGetProjectDialogueFitQuery,
   useAdviseShotDialogueFitMutation,
@@ -14,7 +15,9 @@ import {
 
 /**
  * Whether this shot's spoken line fits the clip it is about to be generated into, and the choice of
- * what to do when it does not: extend the shot, rephrase the dialogue, or go with the original.
+ * what to do when it does not: extend the shot or rephrase the dialogue. Generating anyway needs no
+ * button -- the panel does not block -- and a "go with the original" that only hid the panel in one
+ * browser was removed, since it recorded nothing and the box came back everywhere else.
  *
  * <p>It sits before "Approve & generate" because that is the last moment any of it is free. Once the
  * clip is rendered the outcome is baked in and paid for.
@@ -29,8 +32,8 @@ import {
  *
  * <p>Which remedy suits the shot is asked of a model, because it is a judgement about craft rather
  * than arithmetic -- whether the extra seconds would still look like the film, whether the line can
- * afford to lose words. That suggestion arrives with its reasoning and selects one of the three; it
- * never adds a fourth. Only shots with a real overrun ever reach it.
+ * afford to lose words. That suggestion arrives with its reasoning and highlights one of the remedies,
+ * or says to generate as planned. Only shots with a real overrun ever reach it.
  *
  * <p>Deliberately not a blocking modal and deliberately not self-repairing. A rephrase is shown
  * against the original and replaces it only on an explicit "Use this line".
@@ -121,7 +124,7 @@ function RewritePreview({ retimed, onUse, onDismiss, applying }) {
   );
 }
 
-export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOriginal, onDialogueReplaced }) {
+export default function DialogueFitPanel({ shot, projectId, onResized, onDialogueReplaced }) {
   const dispatch = useDispatch();
   // The project's fit report, not this shot's.
   //
@@ -149,16 +152,8 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
   const [redub] = useTestShotVoiceMutation();
   const [retimed, setRetimed] = React.useState(null);
   const [applying, setApplying] = React.useState(false);
-  // "Go with the original" is a decision, not a render: it is remembered for this shot and this
-  // exact line, and the box folds to one line that can be undone.
-  const keptKey = `dialogue-fit-kept:${shot?.id}`;
-  const [kept, setKept] = React.useState(() => {
-    try { return localStorage.getItem(keptKey); } catch { return null; }
-  });
-  const keepOriginal = (line) => {
-    try { if (line) localStorage.setItem(keptKey, line); else localStorage.removeItem(keptKey); } catch { /* the choice still holds for this visit */ }
-    setKept(line);
-  };
+  // Extending changes the shot's length in the film, so it asks first, like the length field does.
+  const [confirmExtend, setConfirmExtend] = React.useState(false);
 
   // Only the cases where something is actually lost get an interface. A shot whose line fits, or
   // whose line is SHORTER than the clip, renders nothing at all: every word is heard, the shot just
@@ -198,16 +193,6 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
     ? fit.beats.reduce((latest, beat) => (beat.startSeconds >= (latest?.startSeconds ?? -1) ? beat : latest), null)
     : null;
   const lineToRewrite = lastBeat?.text || fit.dialogue;
-
-  if (kept && kept === (fit.dialogue ?? lineToRewrite)) {
-    return (
-      <div className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-[10px] text-slate-400">
-        <Film size={11} className="shrink-0" />
-        <span className="flex-1">Going with the original line at the planned length — the end of the line may be cut.</span>
-        <button type="button" onClick={() => keepOriginal(null)} className="font-bold text-purple-300 hover:text-purple-200">Undo</button>
-      </div>
-    );
-  }
 
   const handleRewrite = async () => {
     setRetimed(null);
@@ -309,6 +294,7 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
   };
 
   const handleResize = async () => {
+    setConfirmExtend(false);
     try {
       await updateShot({ projectId, shotId: shot.id, durationSeconds: extendTo }).unwrap();
       refetch();
@@ -317,8 +303,8 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
       onResized?.(extendTo);
       dispatch(showFlash({
         message: onResized
-          ? `Shot is now ${extendTo}s — rebuilding the timeline and prompt to match.`
-          : `Shot is now ${extendTo}s. Press Update in the video studio to rebuild its plan.`,
+          ? `Shot is now ${extendTo}s in the film — rebuilding the timeline and prompt to match.`
+          : `Shot is now ${extendTo}s in the film. The clip length is unchanged — press Update in the video studio to rebuild the plan.`,
         type: "success",
       }));
     } catch (error) {
@@ -337,9 +323,8 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
   const extendTo = recommendedExtend ?? (fit.verdict === "AUDIO_LONGER" ? fit.suggestedDurationSeconds : null);
   const extraSeconds = (extendTo ?? 0) - (fit.plannedDurationSeconds ?? 0);
   const canExtend = extendTo != null && extraSeconds > 0;
-  // The suggested option is the highlighted one; the other two stay alongside as equals.
-  const suggested = advice?.recommendation === "EXTEND" || advice?.recommendation === "REWRITE"
-    ? advice.recommendation : advice?.recommendation ? "AS_PLANNED" : null;
+  // The suggested remedy is the highlighted one; the other stays alongside as an equal.
+  const suggested = advice?.recommendation ?? null;
   const optionClass = (option) => `flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[10px] font-bold disabled:opacity-50 ${
     option === suggested
       ? "border-purple-400/40 bg-purple-500/15 text-purple-100 hover:bg-purple-500/25"
@@ -375,8 +360,7 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
             <p className="mt-1 text-[10px] font-medium text-amber-200/80">
               Giving this shot the {seconds(fit.requiredSeconds)} its line needs would be{" "}
               {((fit.requiredSeconds / Math.max(1, fit.plannedDurationSeconds))).toFixed(1)}× its
-              length — billed per second, and added to the film's running time. Rephrasing costs
-              nothing.
+              length, added to the film's running time. Rephrasing keeps the film as it is.
             </p>
           )}
           {fit.verdict === "UNFITTABLE" && (
@@ -412,9 +396,6 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
             </div>
           )}
 
-          {/* Three options, stated as three. Only the first two change anything; "go with the
-              original" is a real choice rather than the absence of one, so it is a button like the
-              others -- and for a line too long for any clip it is the only way past the block. */}
           {/* Never hidden. These used to disappear whenever the line had no recording, on the
               reasoning that the audio must exist before the picture is built around it -- which is
               true of GENERATING and true of nothing else here. Rephrasing is a text operation; it
@@ -426,11 +407,11 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
               <button
                 type="button"
                 disabled={updateShotState.isLoading}
-                onClick={handleResize}
+                onClick={() => setConfirmExtend(true)}
                 className={optionClass("EXTEND")}
               >
                 {updateShotState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <ArrowRight size={11} />}
-                {`Extend shot to ${extendTo}s (+${extraSeconds}s, billed)`}
+                {`Extend shot to ${extendTo}s (+${extraSeconds}s in the film)`}
               </button>
             )}
             {lineToRewrite && fit.suggestedTargetAudioSeconds != null && (
@@ -446,26 +427,18 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
                   : `Rephrase dialogue for ${seconds(fit.suggestedTargetAudioSeconds)}`}
               </button>
             )}
-            {!fit.needsDubbing && (
-              <button
-                type="button"
-                onClick={() => (onKeepOriginal ? onKeepOriginal() : keepOriginal(fit.dialogue ?? lineToRewrite))}
-                title="Generate at the planned length and with the line as written."
-                className={optionClass("AS_PLANNED")}
-              >
-                <Film size={11} />
-                Go with the original
-              </button>
-            )}
           </div>
           <details className="mt-1.5 text-[10px] font-medium text-slate-500">
             <summary className="cursor-pointer select-none hover:text-slate-300">Which should I choose?</summary>
             <p className="mt-1">
-              Extending keeps the whole line but adds billed seconds to this shot and to the film.
-              Rephrasing keeps both the length and the cost. Going with the original means the end
+              Extending keeps the whole line but makes the shot, and the whole film, longer.
+              Rephrasing keeps both the length and the cost. Generating without either means the end
               of the line is cut.
             </p>
           </details>
+
+          <ShotLengthConfirm change={confirmExtend && canExtend ? { from: fit.plannedDurationSeconds, to: extendTo } : null}
+            onConfirm={handleResize} onCancel={() => setConfirmExtend(false)} />
 
           {retimed && (
             <RewritePreview

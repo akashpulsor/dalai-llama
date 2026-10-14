@@ -7,6 +7,9 @@ import {
   formatSeconds,
   generateBlockers,
   hasUnsavedEdits,
+  clipOutcome,
+  squeezedLineFix,
+  shotLengthChangeNote,
   closeTimelineGaps,
   lengthChanged,
   planStatus,
@@ -193,4 +196,73 @@ test("a timeline corrected after the prompt was written leaves the prompt out of
     prompt: { aiRecommendedPrompt: "p", promptDurationSeconds: 6, promptComposedAt: "2026-10-13T10:00:00Z" },
   };
   assert.equal(staleness(plan).promptOlderThanTimeline, true);
+});
+
+test("planStatus names each failed timeline check and what to do, instead of a count", () => {
+  const plan = {
+    settings: { generationDurationSeconds: 3 },
+    timelineDurationSeconds: 3,
+    timeline: [{ startSeconds: 0, endSeconds: 3, actionId: "OPEN,D1,END", action: "x" }],
+    timelineIssues: [{ code: "FIXED_TIMING_SHORTENED", actionId: "D1", message: "Given 1.2s of the 3s clip; the line needs 1.714s of it." }],
+    prompt: {},
+  };
+  const { problems } = planStatus(plan);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /^Timeline D1: Given 1\.2s of the 3s clip; the line needs 1\.714s of it\. /);
+  assert.match(problems[0], /generate a longer clip/);
+  assert.doesNotMatch(problems[0], /check failed/);
+});
+
+test("a shot moved from 2s to 7s lists only the length change -- the old timeline's failures go with Update", () => {
+  const plan = {
+    plannedDurationSeconds: "2.000",
+    settings: { generationDurationSeconds: 3 },
+    assessment: { assessedAt: "2026-10-14T09:00:00Z" },
+    timelineDurationSeconds: 3,
+    timeline: [{ startSeconds: 0, endSeconds: 3, actionId: "OPEN,D1,END", action: "x" }],
+    timelineIssues: [{ code: "FIXED_TIMING_SHORTENED", actionId: "D1", message: "Given 3s; the line takes 6.084s to say." }],
+    prompt: {},
+  };
+  const { problems, upToDate } = planStatus(plan, staleness(plan), [], 7);
+  assert.equal(upToDate, false);
+  assert.deepEqual(problems, ["Shot length: now 7s, the plan was built for a 2s shot"]);
+});
+
+test("clipOutcome says what post-production does to the clip for the shot", () => {
+  assert.equal(clipOutcome(7, 7, true), null);
+  assert.equal(clipOutcome(8, 7, true), "Trimmed to the 7s shot after generation.");
+  // Slowing is the creator's step after generation, and always interpolated.
+  assert.equal(clipOutcome(3, 7, true), "After generation, \"Slow down to length\" stretches it 2.3× to the 7s shot, interpolated. The line plays at normal speed, so lips will not match.");
+  assert.equal(clipOutcome(3, 7, false), "After generation, \"Slow down to length\" stretches it 2.3× to the 7s shot, interpolated. More than 2× slower can look unnatural.");
+  assert.equal(clipOutcome(5, 7, false), "After generation, \"Slow down to length\" stretches it 1.4× to the 7s shot, interpolated.");
+});
+
+test("changing a shot's length says the whole video changes and the clip does not", () => {
+  assert.equal(shotLengthChangeNote(7, 7), null);
+  const longer = shotLengthChangeNote(2, 7);
+  assert.equal(longer.title, "Change the shot to 7s?");
+  assert.equal(longer.film, "This changes the shot's length in the film from 2s to 7s, so the whole video gets 5s longer.");
+  assert.match(longer.clip, /clip length does not change/);
+  assert.match(shotLengthChangeNote(7, 5).film, /2s shorter\.$/);
+});
+
+test("a line longer than the whole clip is fixed with a longer clip, not a timeline edit", () => {
+  const actions = [{ actionId: "D1", fixedSeconds: "6.084" }];
+  const issue = { code: "FIXED_TIMING_SHORTENED", actionId: "D1", message: "Given 3s; the line takes 6.084s to say." };
+  const fix = squeezedLineFix(issue, actions, 3, [2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  assert.equal(fix.kind, "LONGER_CLIP");
+  assert.equal(fix.clip, 7); // 6.084s + 0.4s breath
+  assert.equal(fix.message, "The line alone is 6.1s and the whole clip is 3s, so no timeline edit can fit it. Generate a 7s clip, or shorten the line.");
+
+  assert.equal(squeezedLineFix(issue, actions, 3, [2, 3, 4, 5, 6]).clip, null);
+  assert.equal(squeezedLineFix(issue, actions, 8, [8]).kind, "WIDEN");
+  assert.equal(squeezedLineFix({ code: "GAP" }, actions, 3, [7]), null);
+});
+
+test("a line in a 3s clip slowed to a 7s shot needs only its share of the clip", () => {
+  const actions = [{ actionId: "D1", fixedSeconds: "6.084" }];
+  const issue = { code: "FIXED_TIMING_SHORTENED", actionId: "D1" };
+  const fix = squeezedLineFix(issue, actions, 3, [2, 3, 4, 5, 6, 7], 3 / 7);
+  assert.equal(fix.kind, "WIDEN");
+  assert.match(fix.message, /at least 2\.6s of the 3s clip \(the 6\.1s line, slowed with the clip\)/);
 });

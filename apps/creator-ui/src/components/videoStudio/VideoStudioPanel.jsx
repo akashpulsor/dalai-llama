@@ -19,6 +19,7 @@ import {
   creatorApi,
 } from "../../api/creatorEndpoints.js";
 import {
+  clipOutcome,
   closeTimelineGaps,
   differsFromRecommendation,
   formatSeconds,
@@ -50,6 +51,8 @@ import { PromptFreshness, buildCardData, draftStaleReasons, estimateFor, formatE
  */
 export default function VideoStudioPanel({ shot, projectId, previousShot, generating, onGenerated, onRegeneratePrompt, onReject, seedDraft, lengthRow = null }) {
   const [regenerating, setRegenerating] = React.useState(false);
+  // The clip length picked beside Update, not yet built. Null follows what Update would build anyway.
+  const [clipChoice, setClipChoice] = React.useState(null);
   // Approve & generate asks first: what will be sent, for how long, and what it costs.
   const [confirmApprove, setConfirmApprove] = React.useState(false);
   // A new object opens the prompt's text box: Edit on a sent version, or Reject & rewrite.
@@ -143,7 +146,6 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
   const caps = plan.capabilities ?? { supportedDurationsSeconds: [], supportedFps: [] };
   const assessment = plan.assessment;
   const unsaved = hasUnsavedEdits(editorText, plan);
-  const blockers = generateBlockers(plan, editorText);
   const maxChars = plan.prompt?.maxChars;
   const inFlight = generating || generateState.isLoading;
   const promptCard = buildCardData({
@@ -152,8 +154,23 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
   });
   const cost = formatEstimate(estimateFor(promptCard.history, duration));
   const status = planStatus(plan, flags, draftStaleReasons(plan, flags), shotSeconds);
-  const planned = plan.plannedDurationSeconds == null ? null : Number(plan.plannedDurationSeconds);
+  // The shot's length as saved now. plan.plannedDurationSeconds is only what the plan was built
+  // for -- showing it as "the shot" read a 7s shot as 2s.
+  const planned = shotSeconds != null ? Number(shotSeconds)
+    : plan.plannedDurationSeconds == null ? null : Number(plan.plannedDurationSeconds);
   const fitSeconds = shotLengthClip(caps.supportedDurationsSeconds, planned);
+  // The clip length is its own choice, never derived from the shot's: a shot made longer keeps the
+  // clip that was picked, and Update builds for whatever the dropdown says.
+  const clipSeconds = clipChoice ?? duration;
+  // Picked but not built: generating now would render the old length.
+  const clipPending = clipSeconds != null && clipSeconds !== duration;
+  // The analysis's shorter length, offered as an option -- a cost saving the creator opts into.
+  const saver = assessment?.shorterGenerationSuitable && assessment.recommendedDurationSeconds < (planned ?? 0)
+    ? assessment.recommendedDurationSeconds : null;
+  const blockers = [
+    ...generateBlockers(plan, editorText),
+    ...(clipPending ? [`The clip is set to ${clipSeconds}s but the plan is built for ${duration}s. Press Update first.`] : []),
+  ];
   // A spoken line is laid on at normal speed, so a slowed clip puts the lips out of sync.
   const spoken = !!(shot.voiceOver || (shot.shotType === "DIALOGUE" && shot.scriptLine));
   const planBusy = regenerating || analyzeState.isLoading || timelineState.isLoading || composeState.isLoading;
@@ -173,8 +190,23 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
     setValidation(null);
   };
 
-  const handleCompose = async () => {
+  const handleCompose = async (target = clipSeconds) => {
     if (unsaved && !window.confirm("Regenerating replaces your unsaved edits with a new AI version. Continue?")) return;
+    // The clip length first, so everything after is built for it. A shot whose length moved is
+    // re-analysed before the choice is applied -- analysis resets the clip to the shot's length, and
+    // applying the choice first would be undone by it.
+    const moved = lengthChanged(plan, shotSeconds);
+    let current = duration;
+    if (moved) {
+      const analysed = await run("plan", () => analyze(args));
+      if (!analysed) return;
+      current = analysed.settings?.generationDurationSeconds ?? current;
+    }
+    const clipChanged = target != null && target !== current;
+    if (clipChanged && !(await run("plan", () => selectSettings({
+      ...args, generationDurationSeconds: target, generationFps: fps ?? caps.supportedFps?.[0] ?? null,
+    })))) return;
+    setClipChoice(null);
     if (onRegeneratePrompt) {
       // The shot's Prepare: redoes the analysis if the shot changed and the timeline if the seconds
       // changed (or it fails its checks), writes the prompt and saves it as a new version.
@@ -190,8 +222,10 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
       return;
     }
     // Without the shot's Prepare: the same steps one by one, skipping what is already current.
-    if (status.steps[0].state !== "done" && !(await run("plan", () => analyze(args)))) return;
-    if ((status.steps[0].state !== "done" || status.steps[1].state !== "done") && !(await run("plan", () => buildTimeline(args)))) return;
+    const analysisCurrent = moved || status.steps[0].state === "done";
+    if (!analysisCurrent && !(await run("plan", () => analyze(args)))) return;
+    const timelineCurrent = analysisCurrent && !moved && !clipChanged && status.steps[1].state === "done";
+    if (!timelineCurrent && !(await run("plan", () => buildTimeline(args)))) return;
     const result = await run("plan", () => composePrompt(args), "Plan updated");
     if (result) showNewVersion(result.prompt);
   };
@@ -247,7 +281,8 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
       {/* A. Shot context */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide text-purple-200"><Clapperboard size={12} /> Video studio</span>
-        <Chip tone="purple">Shot {formatSeconds(plan.plannedDurationSeconds)}s{frameRate ? ` · ${frameRate} fps` : ""}</Chip>
+        <Chip tone="purple">Shot {formatSeconds(planned)}s{frameRate ? ` · ${frameRate} fps` : ""}</Chip>
+        {duration != null && <Chip>Clip {duration}s</Chip>}
         <Chip>{plan.modelId}{caps.declared === false ? " (limits not declared)" : ""}</Chip>
         {cost && <Chip tone="green" title="Estimated provider cost for the generation length">Est. cost {cost}{duration ? ` · ${duration}s` : ""}</Chip>}
       </div>
@@ -256,16 +291,6 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
           two controls in two places; they are one decision. */}
       <Section title="Length">
         {lengthRow}
-        <ClipLine
-          planned={planned}
-          duration={duration}
-          fitSeconds={fitSeconds}
-          saver={assessment?.shorterGenerationSuitable && assessment.recommendedDurationSeconds < (planned ?? 0)
-            ? assessment.recommendedDurationSeconds : null}
-          spoken={spoken}
-          busy={settingsState.isLoading || planBusy}
-          onChoose={(seconds) => chooseSettings(seconds, fps ?? caps.supportedFps?.[0] ?? "")}
-        />
         {caps.supportedFps.length > 1 && (
           <label className="text-[10px] font-bold text-slate-400">Frame rate
             <select value={fps ?? ""} onChange={(e) => chooseSettings(duration, e.target.value)}
@@ -311,12 +336,13 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
           be a numbered step with its own rebuild, and changing the length opened a dialog on top. */}
       <PlanBar
         status={status}
-        duration={duration}
-        busy={planBusy}
-        disabled={duration == null}
-        onUpdate={handleCompose}
+        clip={{ seconds: clipSeconds, options: caps.supportedDurationsSeconds, shotSeconds: planned, fitSeconds, saver, spoken, pending: clipPending }}
+        onClipChange={(seconds) => setClipChoice(seconds === duration ? null : seconds)}
+        busy={planBusy || settingsState.isLoading}
+        disabled={clipSeconds == null}
+        onUpdate={() => handleCompose()}
       />
-      <ErrorLine message={stepError.plan} onRetry={handleCompose} retrying={planBusy} />
+      <ErrorLine message={stepError.plan} onRetry={() => handleCompose()} retrying={planBusy} />
 
       {(assessment || plan.timeline?.length > 0) && (
         <div className="divide-y divide-white/5 rounded-md border border-white/10">
@@ -350,8 +376,11 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
                 </>
               )}
               <ErrorLine message={stepError.timeline} />
-              <TimelineProblems issues={plan.timelineIssues} fixing={editTimelineState.isLoading}
-                onFixTimes={() => saveTimeline(closeTimelineGaps(plan.timeline, plan.timelineDurationSeconds ?? duration))} />
+              <TimelineProblems issues={plan.timelineIssues} fixing={editTimelineState.isLoading || planBusy}
+                onFixTimes={() => saveTimeline(closeTimelineGaps(plan.timeline, plan.timelineDurationSeconds ?? duration))}
+                line={{ requiredActions: plan.requiredActions, clipSeconds: plan.timelineDurationSeconds ?? duration, clipOptions: caps.supportedDurationsSeconds, clipPerShotSecond: plan.clipSecondsPerShotSecond }}
+                onUseClip={(seconds) => { setClipChoice(seconds); handleCompose(seconds); }}
+                onEditTimeline={() => setEditingTimeline(true)} />
             </Fold>
           )}
         </div>
@@ -488,59 +517,29 @@ function Chip({ children, tone = "slate", title }) {
   return <span title={title} className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${tones[tone]}`}>{children}</span>;
 }
 
-/**
- * What the model renders for the shot, in one sentence. The shot's own length is the plan; a
- * shorter, slowed clip is a cost saving the creator opts into, never the default.
- */
-function ClipLine({ planned, duration, fitSeconds, saver, spoken, busy, onChoose }) {
-  if (planned == null || duration == null) return null;
-  const link = "font-bold text-purple-300 underline-offset-2 hover:underline disabled:opacity-50";
-  if (duration < planned) {
-    const slower = planned / duration;
-    return (
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-amber-400/25 bg-amber-500/[0.06] px-2.5 py-1.5 text-[10px] text-amber-100">
-        <span className="flex-1">
-          Cost saver: a {duration}s clip, slowed {slower.toFixed(1)}× to fill the {formatSeconds(planned)}s shot.
-          {spoken && " The line is spoken at normal speed over slowed picture, so lips will not match."}
-          {!spoken && slower > 2 && " More than 2× slower can look unnatural."}
-        </span>
-        {fitSeconds != null && (
-          <button type="button" className={link} disabled={busy} onClick={() => onChoose(fitSeconds)}>Generate the full {fitSeconds}s instead</button>
-        )}
-      </div>
-    );
-  }
-  return (
-    <p className="flex flex-wrap items-center gap-x-2 text-[10px] text-slate-500">
-      <span>
-        {duration === planned
-          ? `The model renders exactly ${duration}s.`
-          : `The model renders ${duration}s, trimmed to ${formatSeconds(planned)}s — it has no ${formatSeconds(planned)}s length.`}
-      </span>
-      {fitSeconds != null && duration !== fitSeconds && (
-        <button type="button" className={link} disabled={busy} onClick={() => onChoose(fitSeconds)}>Use {fitSeconds}s</button>
-      )}
-      {saver != null && (
-        <button type="button" className="font-semibold text-slate-400 hover:text-slate-200 disabled:opacity-50" disabled={busy}
-          title={spoken ? "The line stays at normal speed over slowed picture, so lips will not match." : undefined}
-          onClick={() => onChoose(saver)}>
-          Save cost: generate {saver}s and slow it{spoken ? " (lips will not match)" : ""}
-        </button>
-      )}
-    </p>
-  );
-}
-
 const STEP_LOOK = {
   done: { Icon: CheckCircle2, className: "text-emerald-300" },
   stale: { Icon: RefreshCw, className: "text-amber-300" },
   missing: { Icon: Circle, className: "text-slate-500" },
 };
 
-/** Analysis → timeline → prompt as one line, and the one button that brings them up to date. */
-function PlanBar({ status, duration, busy, disabled, onUpdate }) {
-  const behind = !status.upToDate;
-  const label = status.untouched ? "Plan this shot" : behind ? `Update for ${duration}s` : "Rebuild";
+function clipOptionLabel(seconds, { shotSeconds, fitSeconds, saver }) {
+  if (seconds === fitSeconds) return `${seconds}s — whole shot`;
+  if (seconds === saver) return `${seconds}s — cost saver, slowed after`;
+  if (shotSeconds != null && seconds < shotSeconds) return `${seconds}s — slowed after`;
+  if (shotSeconds != null && seconds > shotSeconds) return `${seconds}s — trimmed after`;
+  return `${seconds}s`;
+}
+
+/**
+ * Analysis → timeline → prompt as one line, with the clip length and the one button that builds
+ * them for it. The length lives here because it is what Update builds for: picking one changes
+ * nothing until Update, which re-analyses if the shot moved, applies it, and rebuilds the rest.
+ */
+function PlanBar({ status, clip, onClipChange, busy, disabled, onUpdate }) {
+  const behind = !status.upToDate || clip.pending;
+  const label = status.untouched ? "Plan this shot" : behind ? "Update" : "Rebuild";
+  const outcome = clipOutcome(clip.seconds, clip.shotSeconds, clip.spoken);
   return (
     <div className={`space-y-1.5 rounded-md border px-3 py-2 ${behind ? "border-amber-400/30 bg-amber-500/[0.06]" : "border-white/10 bg-white/[0.02]"}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -557,6 +556,15 @@ function PlanBar({ status, duration, busy, disabled, onUpdate }) {
             );
           })}
         </ol>
+        <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
+          Clip length
+          <select value={clip.seconds ?? ""} disabled={busy || !clip.options.length}
+            onChange={(e) => onClipChange(Number(e.target.value))}
+            className="creator-input px-2 py-1 text-[11px]">
+            {clip.seconds != null && !clip.options.includes(clip.seconds) && <option value={clip.seconds}>{clip.seconds}s</option>}
+            {clip.options.map((seconds) => <option key={seconds} value={seconds}>{clipOptionLabel(seconds, clip)}</option>)}
+          </select>
+        </label>
         <button type="button" onClick={onUpdate} disabled={busy || disabled}
           className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-bold disabled:opacity-50 ${behind
             ? "border-amber-400/50 bg-amber-500/20 text-amber-50 hover:bg-amber-500/30"
@@ -565,6 +573,7 @@ function PlanBar({ status, duration, busy, disabled, onUpdate }) {
           {busy ? "Working…" : label}
         </button>
       </div>
+      {outcome && <p className="text-[10px] text-amber-100/90">{outcome}</p>}
       {!busy && behind && status.problems.length > 0 && (
         <ul className="space-y-0.5 text-[10px] text-amber-100">
           {status.problems.map((problem) => <li key={problem} className="flex gap-1.5"><AlertTriangle size={10} className="mt-0.5 shrink-0 text-amber-300" />{problem}</li>)}
@@ -572,9 +581,9 @@ function PlanBar({ status, duration, busy, disabled, onUpdate }) {
       )}
       <p className="text-[10px] text-slate-500">
         {busy ? "Finding the actions, timing them and writing the prompt — usually under a minute."
-          : status.untouched ? `Finds every action in the shot, times them across the ${duration ?? "chosen"}s clip and writes the prompt.`
-            : behind ? `To fix: press Update. It redoes only what is out of date for the ${duration}s clip and saves the prompt as a new version — the old one stays in History.`
-              : `Everything is built for the ${duration}s clip.`}
+          : status.untouched ? `Finds every action in the shot, times them across the ${clip.seconds ?? "chosen"}s clip and writes the prompt.`
+            : behind ? `To fix: pick the clip length, then press Update. It builds the analysis, timeline and prompt for a ${clip.seconds}s clip and saves the prompt as a new version — the old one stays in History.`
+              : `Everything is built for the ${clip.seconds}s clip. Pick another length to rebuild for it.`}
       </p>
     </div>
   );

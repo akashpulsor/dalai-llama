@@ -1,6 +1,6 @@
 import React from "react";
 import { AlertTriangle, CheckCircle2, ChevronDown, Loader2, Plus, Trash2, Wrench } from "lucide-react";
-import { coverageRows, formatSeconds, issuesFor, timelineFix } from "./studioState.js";
+import { coverageRows, formatSeconds, issuesFor, squeezedLineFix, timelineFix } from "./studioState.js";
 
 const FIRST_ROWS = 6;
 
@@ -154,6 +154,7 @@ export function ActionTimeline({ intervals, frameRate, stale }) {
 
 
 const cell = "creator-input w-full px-1.5 py-1 text-[11px]";
+const FIX_BUTTON = "flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/15 px-2.5 py-1 text-[10px] font-bold text-purple-100 hover:bg-purple-500/25 disabled:opacity-50";
 
 /**
  * The timeline as a form: each moment's start, end, action ids and what happens. Saving sends it
@@ -226,7 +227,7 @@ export function TimelineEditor({ intervals, seconds, saving, onSave, onCancel })
  * time get one button that fixes them all; the rest say what to change by hand, or that Update
  * rebuilds the timeline -- which replaces any hand edits, so it is the last resort, not the first.
  */
-export function TimelineProblems({ issues, onFixTimes, fixing }) {
+export function TimelineProblems({ issues, onFixTimes, fixing, line, onUseClip, onEditTimeline }) {
   if (!issues?.length) return null;
   const timeOnly = issues.some((issue) => timelineFix(issue).timeOnly);
   return (
@@ -235,13 +236,30 @@ export function TimelineProblems({ issues, onFixTimes, fixing }) {
         <AlertTriangle size={11} /> The timeline fails {issues.length} check{issues.length === 1 ? "" : "s"}
       </p>
       <ul className="space-y-1">
-        {issues.map((issue, i) => (
-          // eslint-disable-next-line react/no-array-index-key
-          <li key={i} className="text-[10px]">
-            <p className="text-rose-100">{issue.actionId && <ActionIdChip id={issue.actionId} />} {issue.message}</p>
-            <p className="text-slate-400">{timelineFix(issue).advice}</p>
-          </li>
-        ))}
+        {issues.map((issue, i) => {
+          const fix = line && squeezedLineFix(issue, line.requiredActions, line.clipSeconds, line.clipOptions, line.clipPerShotSecond);
+          return (
+            // eslint-disable-next-line react/no-array-index-key
+            <li key={i} className="space-y-1 text-[10px]">
+              <p className="text-rose-100">{issue.actionId && <ActionIdChip id={issue.actionId} />} {issue.message}</p>
+              <p className="text-slate-300">{fix ? fix.message : timelineFix(issue).advice}</p>
+              {fix && (
+                <div className="flex flex-wrap gap-1.5">
+                  {fix.kind === "LONGER_CLIP" && fix.clip != null && onUseClip && (
+                    <button type="button" onClick={() => onUseClip(fix.clip)} disabled={fixing} className={FIX_BUTTON}>
+                      {fixing ? <Loader2 size={11} className="animate-spin" /> : <Wrench size={11} />} Use a {fix.clip}s clip and rebuild
+                    </button>
+                  )}
+                  {fix.kind === "WIDEN" && onEditTimeline && (
+                    <button type="button" onClick={onEditTimeline} disabled={fixing} className={FIX_BUTTON}>
+                      <Wrench size={11} /> Edit the timeline
+                    </button>
+                  )}
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ul>
       {timeOnly && onFixTimes && (
         <button type="button" onClick={onFixTimes} disabled={fixing}

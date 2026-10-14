@@ -123,7 +123,12 @@ export function planStatus(plan, flags = staleness(plan), promptReasons = [], sh
   ];
   const checks = (n) => `${n} check${n === 1 ? "" : "s"} failed`;
   const problems = [];
-  if (lengthMoved) problems.push(`Shot length: now ${shotSeconds}s, the plan was built for a ${formatSeconds(plan.plannedDurationSeconds)}s shot`);
+  if (lengthMoved) {
+    // Everything else was built for the old length and Update redoes all of it, so its failed checks
+    // are not this shot's problems -- listing them sent the creator fixing a timeline about to go.
+    problems.push(`Shot length: now ${shotSeconds}s, the plan was built for a ${formatSeconds(plan.plannedDurationSeconds)}s shot`);
+    return { steps, problems, upToDate: false, untouched: false };
+  }
   if (plan?.assessmentIssues?.length) problems.push(`Analysis: ${checks(plan.assessmentIssues.length)}`);
   if (flags.timelineStale) {
     const seconds = plan?.settings?.generationDurationSeconds;
@@ -131,7 +136,10 @@ export function planStatus(plan, flags = staleness(plan), promptReasons = [], sh
       ? `Timeline: built for ${plan.timelineDurationSeconds}s, the clip is now ${seconds}s`
       : `Timeline: built for ${plan.timelineFps ?? "another"} fps, the clip is now ${plan?.settings?.generationFps} fps`);
   }
-  if (plan?.timelineIssues?.length) problems.push(`Timeline: ${checks(plan.timelineIssues.length)}`);
+  // Each failed check by name, not a count: "1 check failed" left no way to know what to fix.
+  for (const issue of plan?.timelineIssues ?? []) {
+    problems.push(`Timeline${issue.actionId ? ` ${issue.actionId}` : ""}: ${issue.message} ${timelineFix(issue).advice}`);
+  }
   for (const reason of promptReasons) problems.push(`Prompt: ${reason.charAt(0).toLowerCase()}${reason.slice(1)}`);
   const untouched = steps.every((step) => step.state === "missing");
   return { steps, problems, upToDate: steps.every((step) => step.state === "done"), untouched };
@@ -148,6 +156,33 @@ export function shotLengthClip(supportedSeconds, plannedSeconds) {
   const needed = Math.ceil(Number(plannedSeconds) - 1e-9);
   const holding = supportedSeconds.filter((d) => d >= needed);
   return holding.length ? Math.min(...holding) : Math.max(...supportedSeconds);
+}
+
+/** What the clip becomes after generation, for one clip length. Generation renders the clip;
+ * slowing or trimming it to the shot is post-production's step, stated here so the choice is
+ * made knowing it. */
+export function clipOutcome(seconds, shotSeconds, spoken) {
+  if (seconds == null || shotSeconds == null || seconds === shotSeconds) return null;
+  if (seconds > shotSeconds) return `Trimmed to the ${formatSeconds(shotSeconds)}s shot after generation.`;
+  const slower = shotSeconds / seconds;
+  return `After generation, "Slow down to length" stretches it ${slower.toFixed(1)}× to the ${formatSeconds(shotSeconds)}s shot, interpolated.`
+    + (spoken ? " The line plays at normal speed, so lips will not match." : slower > 2 ? " More than 2× slower can look unnatural." : "");
+}
+
+/**
+ * What changing a shot's length in the film does, in words for the confirmation. The shot's length
+ * is the film's running time; the clip length is the model's and stays as chosen.
+ */
+export function shotLengthChangeNote(from, to) {
+  if (to == null || Number(to) === Number(from)) return null;
+  const delta = Number(to) - Number(from ?? 0);
+  return {
+    title: `Change the shot to ${formatSeconds(to)}s?`,
+    film: from == null
+      ? `The shot will run ${formatSeconds(to)}s in the film.`
+      : `This changes the shot's length in the film from ${formatSeconds(from)}s to ${formatSeconds(to)}s, so the whole video gets ${formatSeconds(Math.abs(delta))}s ${delta > 0 ? "longer" : "shorter"}.`,
+    clip: "The clip length does not change. Pick it in the video studio beside Update.",
+  };
 }
 
 /** The shot's length was changed after the plan was built for it. */
@@ -191,9 +226,41 @@ const TIMELINE_ADVICE = Object.freeze({
   OPENING_STATE_NOT_AT_START: "The opening state must be the first moment. Move OPEN to the start.",
   ENDING_STATE_NOT_LAST: "The ending state must be the last moment. Move END to the end.",
   ENDING_STATE_NOT_AT_END: "The ending state must be the last moment. Move END to the end.",
-  FIXED_TIMING_SHORTENED: "An action that needs a set time was squeezed. Give its moment more time.",
+  FIXED_TIMING_SHORTENED: "The line has less of the clip than it takes to say. Give its moment more time, or generate a longer clip.",
   ACTION_NOT_PRESERVED: "An action was dropped. Add it back, or press Update to rebuild.",
 });
+
+/** The breath left after a line, as the dialogue-fit report reserves it. */
+const LINE_BREATH_SECONDS = 0.4;
+
+/**
+ * The way out of a line squeezed in the timeline (FIXED_TIMING_SHORTENED), worked out rather than
+ * described. A line longer than the whole clip cannot be fixed by editing the timeline, so the fix
+ * is a longer clip -- the shortest the model renders that holds the line and a breath -- or a
+ * shorter line. A line that fits the clip just needs its moment widened by hand.
+ */
+export function squeezedLineFix(issue, requiredActions, clipSeconds, supportedSeconds, clipPerShotSecond = 1) {
+  if (issue?.code !== "FIXED_TIMING_SHORTENED") return null;
+  const lineSeconds = Number((requiredActions ?? []).find((a) => a.actionId === issue.actionId)?.fixedSeconds);
+  if (!lineSeconds || clipSeconds == null) return null;
+  // A clip slowed to the shot afterwards holds the line in proportion: the server's ratio, not ours.
+  const ratio = Number(clipPerShotSecond ?? 1) || 1;
+  const inClip = lineSeconds * ratio;
+  if (inClip <= Number(clipSeconds)) {
+    const slowed = ratio < 1 ? ` (the ${formatSeconds(lineSeconds)}s line, slowed with the clip)` : "";
+    return { kind: "WIDEN", lineSeconds, message: `Give ${issue.actionId}'s moment at least ${formatSeconds(inClip)}s of the ${clipSeconds}s clip${slowed} in the timeline editor, or press Update to rebuild the timeline.` };
+  }
+  const needed = Math.ceil(lineSeconds + LINE_BREATH_SECONDS - 1e-9);
+  const holding = (supportedSeconds ?? []).filter((d) => d >= needed);
+  const clip = holding.length ? Math.min(...holding) : null;
+  return {
+    kind: "LONGER_CLIP",
+    lineSeconds,
+    clip,
+    message: `The line alone is ${formatSeconds(lineSeconds)}s and the whole clip is ${clipSeconds}s, so no timeline edit can fit it.`
+      + (clip != null ? ` Generate a ${clip}s clip, or shorten the line.` : " No clip this model makes is long enough — shorten the line."),
+  };
+}
 
 /** How to fix one problem the timeline's checks found: advice, and whether "Fix the times" does it. */
 export function timelineFix(issue) {

@@ -5,14 +5,13 @@ import { showFlash } from "@dalaillama/shared-store";
 import { creatorApi, useLazyGetShotConformQuery, useRequestShotConformMutation } from "../../api/creatorEndpoints.js";
 
 /**
- * Slow the shot's newest clip to a length -- the planned one by default -- in post-production, with
- * frame interpolation so the slowed motion stays smooth. A longer clip is trimmed instead. The
- * result becomes the shot's clip; the clip as generated stays in its cuts.
+ * Slow the shot's newest clip to a length -- the shot's by default -- in post-production, always
+ * with frame interpolation so the slowed motion stays smooth, and the recorded take laid on. A longer
+ * clip is trimmed instead. The result becomes the shot's clip; the clip as generated stays in its cuts.
  */
 export default function ConformPanel({ shot, projectId, clipSeconds }) {
   const dispatch = useDispatch();
   const [target, setTarget] = React.useState(shot.durationSeconds ?? "");
-  const [interpolate, setInterpolate] = React.useState(true);
   const [status, setStatus] = React.useState(null);
   const [requestConform, { isLoading: requesting }] = useRequestShotConformMutation();
   const [fetchConform] = useLazyGetShotConformQuery();
@@ -22,7 +21,7 @@ export default function ConformPanel({ shot, projectId, clipSeconds }) {
     const seconds = Number(target);
     if (!(seconds > 0)) return;
     try {
-      const queued = await requestConform({ projectId, shotId: shot.id, targetSeconds: seconds, interpolate }).unwrap();
+      const queued = await requestConform({ projectId, shotId: shot.id, targetSeconds: seconds, interpolate: true }).unwrap();
       setStatus(queued.status);
       for (let attempt = 0; attempt < 120; attempt += 1) {
         // eslint-disable-next-line no-await-in-loop
@@ -36,7 +35,7 @@ export default function ConformPanel({ shot, projectId, clipSeconds }) {
             { type: "CreatorHomeProjects", id: `project-clips-${projectId}` },
             { type: "CreatorHomeProjects", id: `clip-cuts-${shot.id}` },
           ]));
-          dispatch(showFlash({ message: `The shot now plays at ${seconds}s${interpolate ? ", interpolated" : ""}.`, type: "success" }));
+          dispatch(showFlash({ message: `The shot now plays at ${seconds}s, interpolated.`, type: "success" }));
           return;
         }
         if (latest.status === "FAILED") {
@@ -60,17 +59,13 @@ export default function ConformPanel({ shot, projectId, clipSeconds }) {
       </p>
       <p className="mt-1 text-[10px] text-slate-500">
         {clipSeconds ? `The clip is ${Number(clipSeconds).toFixed(1)}s. ` : ""}
-        Slowed to the length you set{factor && factor > 1 ? ` (${factor.toFixed(1)}× slower)` : ""}; a longer clip is trimmed.
-        The line and the music are laid back on at normal speed.
+        Slowed to the length you set{factor && factor > 1 ? ` (${factor.toFixed(1)}× slower)` : ""}, with new in-between
+        frames so motion stays smooth; a longer clip is trimmed. The recorded line is laid on at normal speed.
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <label className="text-[10px] font-bold text-slate-400">Length
           <input type="number" min="1" step="1" value={target} onChange={(e) => setTarget(e.target.value)}
             disabled={working} className="creator-input ml-1.5 w-16 px-2 py-1 text-[11px]" /> s
-        </label>
-        <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
-          <input type="checkbox" checked={interpolate} onChange={(e) => setInterpolate(e.target.checked)} disabled={working} />
-          Interpolate frames (smooth motion)
         </label>
         <button type="button" onClick={run} disabled={working || !(Number(target) > 0)}
           className="flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/15 px-2.5 py-1.5 text-[11px] font-bold text-purple-100 disabled:opacity-50">

@@ -17,6 +17,7 @@ import {
 } from "../../api/creatorEndpoints.js";
 import DialogueBeatsEditor from "./DialogueBeatsEditor.jsx";
 import DialogueFitPanel from "./DialogueFitPanel.jsx";
+import ShotLengthConfirm from "./ShotLengthConfirm.jsx";
 import ClipRepairPanel from "./ClipRepairPanel.jsx";
 import ClipCutsPanel from "./ClipCutsPanel.jsx";
 import BuiltinVoicePicker from "./BuiltinVoicePicker.jsx";
@@ -550,6 +551,8 @@ function ShotLengthRow({ shot, projectId, dubSeconds, mismatch, overruns }) {
   // The typed value while it differs from the saved one. Nothing is saved until Save: a length is a
   // decision about the film, billed per second, and the plan is rebuilt for it only on Update.
   const [draft, setDraft] = React.useState(null);
+  // Save asks first: the shot's length is the film's running time, not the clip's.
+  const [confirming, setConfirming] = React.useState(false);
   const suggested = dubSeconds != null ? Math.ceil(dubSeconds) + 1 : null;
   const current = shot.durationSeconds ?? null;
   const original = shot.originalDurationSeconds ?? null;
@@ -557,11 +560,12 @@ function ShotLengthRow({ shot, projectId, dubSeconds, mismatch, overruns }) {
   const changed = typed != null && typed > 0 && typed !== current;
 
   const save = async () => {
+    setConfirming(false);
     if (!changed) return;
     try {
       await saveShot({ projectId, shotId: shot.id, durationSeconds: typed }).unwrap();
       setDraft(null);
-      dispatch(showFlash({ message: `Shot is now ${typed}s. Press Update in the video studio to rebuild its plan.`, type: "success" }));
+      dispatch(showFlash({ message: `Shot is now ${typed}s in the film. The clip length is unchanged — press Update in the video studio to rebuild the plan.`, type: "success" }));
     } catch (error) {
       dispatch(showFlash({ message: error?.data?.message || "Could not change the shot's length", type: "error" }));
     }
@@ -579,7 +583,7 @@ function ShotLengthRow({ shot, projectId, dubSeconds, mismatch, overruns }) {
             value={draft ?? current ?? ""}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") save();
+              if (event.key === "Enter" && changed) setConfirming(true);
               if (event.key === "Escape") setDraft(null);
             }}
             disabled={saveState.isLoading}
@@ -589,7 +593,7 @@ function ShotLengthRow({ shot, projectId, dubSeconds, mismatch, overruns }) {
         </label>
         {changed && (
           <span className="flex items-center gap-1.5">
-            <button type="button" onClick={save} disabled={saveState.isLoading}
+            <button type="button" onClick={() => setConfirming(true)} disabled={saveState.isLoading}
               className={`${chip} flex items-center gap-1 border-purple-400/30 bg-purple-500/15 text-purple-100`}>
               {saveState.isLoading ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />} Save {typed}s
             </button>
@@ -619,6 +623,8 @@ function ShotLengthRow({ shot, projectId, dubSeconds, mismatch, overruns }) {
           )}
         </p>
       )}
+      <ShotLengthConfirm change={confirming && changed ? { from: current, to: typed } : null}
+        onConfirm={save} onCancel={() => setConfirming(false)} />
     </div>
   );
 }

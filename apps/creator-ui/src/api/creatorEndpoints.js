@@ -3513,8 +3513,9 @@ export const creatorApi = apiSlice.injectEndpoints({
       invalidatesTags: (_result, _error, args) => [{ type: "CreatorHomeProjects", id: `project-config-${args?.projectId}` }],
     }),
 
-    // pre-production-service MotionGraphicPlanController -- MOTION_GRAPHIC shots are planned,
-    // never dispatched to video-generation-service (no motion-graphics rendering engine exists).
+    // pre-production-service MotionGraphicPlanController. The plan drives the shot: the video
+    // studio turns its animation notes into timed actions and its on-screen text into one that must
+    // appear. Generate plans it afresh, update saves the creator's own, enhance only suggests.
     generateMotionGraphicPlan: builder.mutation({
       query: (shotId) => ({ url: platformUrl(`/shots/${shotId}/motion-graphic-plan/generate`), method: "POST" }),
       invalidatesTags: (_result, _error, shotId) => [{ type: "CreatorHomeProjects", id: `motion-graphic-plan-${shotId}` }],
@@ -3523,6 +3524,21 @@ export const creatorApi = apiSlice.injectEndpoints({
     getMotionGraphicPlan: builder.query({
       query: (shotId) => ({ url: platformUrl(`/shots/${shotId}/motion-graphic-plan`) }),
       providesTags: (_result, _error, shotId) => [{ type: "CreatorHomeProjects", id: `motion-graphic-plan-${shotId}` }],
+    }),
+
+    updateMotionGraphicPlan: builder.mutation({
+      query: ({ shotId, ...body }) => ({ url: platformUrl(`/shots/${shotId}/motion-graphic-plan`), method: "PUT", body }),
+      // The studio's actions come from this plan, so its view of the shot changes with it.
+      invalidatesTags: (_result, _error, { shotId }) => [
+        { type: "CreatorHomeProjects", id: `motion-graphic-plan-${shotId}` },
+        { type: "CreatorHomeProjects", id: `prompt-inputs-${shotId}` },
+      ],
+    }),
+
+    enhanceMotionGraphicPlan: builder.mutation({
+      query: ({ shotId, instruction }) => ({
+        url: platformUrl(`/shots/${shotId}/motion-graphic-plan/enhance`), method: "POST", body: { instruction },
+      }),
     }),
 
     // pre-production-service ContinuityBibleController -- deterministically recomputed whenever
@@ -3597,18 +3613,12 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: (jobId) => ({ url: platformUrl(`/jobs/${jobId}`) }),
     }),
 
-    // acceptDialogueOverrun: generate even though the shot's line cannot be said in ANY clip this
-    // model produces, so it will be cut off mid-word. The backend refuses without it, deliberately:
-    // the alternative is a render that is paid for and then unusable. Only send it from the
-    // "generate it cut off anyway" action, where the creator has read the numbers and both remedies.
+    // Renders at exactly the length the job was prepared for; a line too long for its shot is fixed
+    // before this, by extending the shot or rephrasing the line.
     approveVideoGenJob: builder.mutation({
       query: (arg) => {
-        const { jobId, acceptDialogueOverrun } = typeof arg === "object" && arg !== null ? arg : { jobId: arg };
-        return {
-          url: platformUrl(`/jobs/${jobId}/approve`),
-          method: "POST",
-          params: acceptDialogueOverrun ? { acceptDialogueOverrun: true } : undefined,
-        };
+        const jobId = typeof arg === "object" && arg !== null ? arg.jobId : arg;
+        return { url: platformUrl(`/jobs/${jobId}/approve`), method: "POST" };
       },
       // Invalidated on failure as well as success, and that is the point. Approve renders
       // synchronously and holds the connection for minutes; when the answer is lost -- a gateway
@@ -5031,6 +5041,8 @@ export const {
   useUpdateProjectConfigMutation,
   useGenerateMotionGraphicPlanMutation,
   useGetMotionGraphicPlanQuery,
+  useUpdateMotionGraphicPlanMutation,
+  useEnhanceMotionGraphicPlanMutation,
   useGetContinuityBibleQuery,
   useGenerateLightingPlanMutation,
   useGetLightingPlanQuery,
