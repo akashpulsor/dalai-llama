@@ -27,7 +27,7 @@ export default function PublishToShowcaseDialog({ projectId, onClose }) {
       <div className="creator-panel max-h-[90vh] w-full max-w-2xl overflow-y-auto p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 id="publish-title" className="text-base font-bold text-white">Publish to YouTube</h3>
+            <h3 id="publish-title" className="text-base font-bold text-white">Share to YouTube</h3>
             <p className="mt-1 text-xs text-slate-400">Goes to your own channel, stamped "Made on Dalaillama".</p>
           </div>
           <button type="button" aria-label="Close" onClick={onClose} className="creator-control flex h-8 w-8 items-center justify-center text-slate-300">
@@ -44,7 +44,7 @@ export default function PublishToShowcaseDialog({ projectId, onClose }) {
             {!connected && <ConnectionCard connection={connection} />}
             {connected && (
               <p className="rounded-lg border border-purple-400/30 bg-purple-500/10 px-3 py-2 text-xs text-purple-100">
-                Once the upload finishes, this film appears on your profile as "Made on Dalaillama", whatever its YouTube setting:
+                Pick the channel below. Your profile keeps playing our own copy, whatever its YouTube setting:
                 your profile plays our own copy. <b>Private</b> keeps it off YouTube for everyone else; <b>Public</b> also promotes it
                 on YouTube.
               </p>

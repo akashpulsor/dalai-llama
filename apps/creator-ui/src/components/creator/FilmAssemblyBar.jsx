@@ -1,10 +1,11 @@
 // @ts-nocheck
-import React, { useState } from "react";
+import React from "react";
 import { useDispatch } from "react-redux";
 import { AlertTriangle, Download, Film, Loader2, Send, Upload, UserCircle } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import ShotCanvasPlayer from "./ShotCanvasPlayer.jsx";
-import PublishToShowcaseDialog from "../showcase/PublishToShowcaseDialog.jsx";
+import { Link } from "react-router-dom";
+import { useGetMyShowcaseQuery, usePublishFilmToProfileMutation } from "../../api/showcaseEndpoints.js";
 import {
   useAssembleFilmMutation,
   useGetFilmReadinessQuery,
@@ -30,7 +31,10 @@ const POLL_INTERVAL_MS = 4000;
 const POLL_MAX_ATTEMPTS = 225; // ~15 minutes, an ffmpeg join of a long project
 
 export default function FilmAssemblyBar({ projectId, aspectRatio }) {
-  const [showcaseOpen, setShowcaseOpen] = useState(false);
+  // Publishing puts the film on the creator's profile; sharing it to YouTube happens from there.
+  const [publishToProfile, profileState] = usePublishFilmToProfileMutation();
+  const { data: profileItems = [] } = useGetMyShowcaseQuery();
+  const onProfile = profileItems.some((item) => item.sourceProjectId === projectId && item.status === "LIVE");
   const dispatch = useDispatch();
   const { data: readiness } = useGetFilmReadinessQuery(projectId, { skip: !projectId });
   const { data: film, refetch: refetchFilm } = useGetLatestFilmQuery(projectId, { skip: !projectId });
@@ -229,17 +233,31 @@ export default function FilmAssemblyBar({ projectId, aspectRatio }) {
           </button>
         )}
 
-        {film?.status === "COMPLETED" && film?.published && (
-          <button
-            type="button"
-            onClick={() => setShowcaseOpen(true)}
+        {film?.status === "COMPLETED" && film?.published && (onProfile ? (
+          <Link
+            to="/profile#films"
             className="flex min-h-9 items-center justify-center gap-2 rounded-md border border-emerald-400/30 bg-emerald-500/10 px-4 text-xs font-black text-emerald-100"
           >
-            <UserCircle size={14} /> Publish to my profile
+            <UserCircle size={14} /> On your profile · share it from there
+          </Link>
+        ) : (
+          <button
+            type="button"
+            disabled={profileState.isLoading}
+            onClick={async () => {
+              try {
+                await publishToProfile(projectId).unwrap();
+                dispatch(showFlash({ message: "It's on your profile. Share it to YouTube from your profile page.", type: "success" }));
+              } catch (error) {
+                dispatch(showFlash({ message: error?.data?.message || error?.data?.error || "Could not put it on your profile", type: "error" }));
+              }
+            }}
+            className="flex min-h-9 items-center justify-center gap-2 rounded-md border border-emerald-400/30 bg-emerald-500/10 px-4 text-xs font-black text-emerald-100 disabled:opacity-60"
+          >
+            {profileState.isLoading ? <Loader2 size={14} className="animate-spin" /> : <UserCircle size={14} />} Publish to my profile
           </button>
-        )}
+        ))}
       </div>
-      {showcaseOpen && <PublishToShowcaseDialog projectId={projectId} onClose={() => setShowcaseOpen(false)} />}
 
       {!ready && disabledReason && (
         <p className="mt-1.5 text-[10px] font-bold text-amber-200/90">{disabledReason}</p>

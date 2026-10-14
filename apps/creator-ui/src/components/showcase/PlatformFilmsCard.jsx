@@ -1,7 +1,15 @@
 // @ts-nocheck
 import React, { useState } from "react";
-import { Film, Upload } from "lucide-react";
-import { useGetPublishableFilmsQuery, useGetPublishJobsQuery, useGetYouTubeChannelsQuery } from "../../api/showcaseEndpoints.js";
+import { useDispatch } from "react-redux";
+import { CheckCircle2, Film, Loader2, Upload, UserCircle } from "lucide-react";
+import { showFlash } from "@dalaillama/shared-store";
+import {
+  useGetMyShowcaseQuery,
+  useGetPublishableFilmsQuery,
+  useGetPublishJobsQuery,
+  useGetYouTubeChannelsQuery,
+  usePublishFilmToProfileMutation,
+} from "../../api/showcaseEndpoints.js";
 import PublishToShowcaseDialog from "./PublishToShowcaseDialog.jsx";
 
 const STATUS = {
@@ -13,9 +21,21 @@ const STATUS = {
   CANCELLED: "Cancelled",
 };
 
-/** The films made on Dalaillama, each publishable to one of the creator's YouTube channels from
- * here. Once uploaded, a film goes on the profile as "Made on Dalaillama". */
+/** The films made on Dalaillama: put each on the profile, then share it to one of the creator's
+ * YouTube channels from here. */
 export default function PlatformFilmsCard() {
+  const dispatch = useDispatch();
+  const { data: profileItems = [] } = useGetMyShowcaseQuery();
+  const [publishToProfile, profileState] = usePublishFilmToProfileMutation();
+  const onProfile = (projectId) => profileItems.some((item) => item.sourceProjectId === projectId && item.status === "LIVE");
+  const putOnProfile = async (projectId) => {
+    try {
+      await publishToProfile(projectId).unwrap();
+      dispatch(showFlash({ message: "It's on your profile.", type: "success" }));
+    } catch (error) {
+      dispatch(showFlash({ message: error?.data?.message || error?.data?.error || "Could not put it on your profile", type: "error" }));
+    }
+  };
   const { data: films = [], isLoading } = useGetPublishableFilmsQuery();
   const { data: jobs = [] } = useGetPublishJobsQuery();
   const { data: channels = [] } = useGetYouTubeChannelsQuery();
@@ -39,6 +59,7 @@ export default function PlatformFilmsCard() {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold text-white">{film.name}</p>
                 <p className="text-xs text-slate-400">
+                  {onProfile(film.projectId) && <span className="mr-1.5 inline-flex items-center gap-1 font-bold text-emerald-300"><CheckCircle2 size={11} /> On your profile ·</span>}
                   {film.renderedAt ? `Finished ${new Date(film.renderedAt).toLocaleDateString()}` : "Finished"}
                   {!film.clientConsented && " · client hasn't agreed to marketing use, so private only"}
                 </p>
@@ -48,9 +69,15 @@ export default function PlatformFilmsCard() {
                   </p>
                 )}
               </div>
+              {!onProfile(film.projectId) && (
+                <button type="button" onClick={() => putOnProfile(film.projectId)} disabled={profileState.isLoading}
+                        className="creator-primary flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                  {profileState.isLoading ? <Loader2 size={13} className="animate-spin" /> : <UserCircle size={13} />} Publish to profile
+                </button>
+              )}
               <button type="button" onClick={() => setPublishing(film.projectId)}
-                      className="creator-primary flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white">
-                <Upload size={13} /> Publish to YouTube
+                      className="creator-control flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-200">
+                <Upload size={13} /> Share to YouTube
               </button>
             </li>
           );

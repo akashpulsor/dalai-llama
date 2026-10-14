@@ -53,6 +53,11 @@ export const showcaseApi = showcaseBase.injectEndpoints({
       query: () => ({ url: "/tenants/me/showcase" }),
       providesTags: ["ShowcaseItems"],
     }),
+    // A finished film onto the profile, no YouTube; sharing to YouTube is a later step from there.
+    publishFilmToProfile: builder.mutation({
+      query: (projectId) => ({ url: `/tenants/me/showcase/projects/${projectId}/profile`, method: "POST" }),
+      invalidatesTags: ["ShowcaseItems"],
+    }),
     pickVideo: builder.mutation({
       query: (body) => ({ url: "/tenants/me/showcase", method: "POST", body }),
       invalidatesTags: ["ShowcaseItems", "ShowcaseProfile", "ShowcaseVisibility"],
@@ -423,6 +428,7 @@ export const {
   useSendToAudienceMutation,
   useGetOutreachAnalyticsQuery,
   useGetYouTubeConnectionQuery,
+  usePublishFilmToProfileMutation,
   useGetYouTubeChannelsQuery,
   useDisconnectYouTubeChannelMutation,
   useStartYouTubeConnectMutation,

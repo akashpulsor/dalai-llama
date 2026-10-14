@@ -5,6 +5,9 @@ import { AudioLines, Check, Download, Gauge, Loader2, RotateCcw, Send, Upload, V
 import { showFlash } from "@dalaillama/shared-store";
 import ShotCanvasPlayer from "./ShotCanvasPlayer.jsx";
 import {
+  creatorApi,
+  useLazyGetShotConformQuery,
+  useRequestShotConformMutation,
   useAcceptClipCutMutation,
   useRejectClipCutMutation,
   useCheckoutClipVersionMutation,
@@ -12,7 +15,6 @@ import {
   usePublishClipVersionMutation,
   useCreateDubbedCutMutation,
   useCreateSilentCutMutation,
-  useCreateRetimedCutMutation,
   usePreviewClipMixMutation,
   useKeepClipPreviewMutation,
   useListClipVersionsQuery,
@@ -36,6 +38,7 @@ const ORIGIN_LABEL = {
   DUBBED: "with the dubbed voice",
   SILENT: "no voice",
   RETIMED: "slowed to fit",
+  CONFORMED: "slowed and interpolated",
   UPLOADED: "your own edit",
 };
 
@@ -50,9 +53,13 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
   );
   const [createDubbed, dubbedState] = useCreateDubbedCutMutation();
   const [createSilent, silentState] = useCreateSilentCutMutation();
-  const [createRetimed, retimedState] = useCreateRetimedCutMutation();
-  // Defaults to the length the shot plan asked for, which is the whole point -- the clip was
-  // generated shorter than this on purpose.
+  // Slow down & interpolate: queued in post-production (interpolation is CPU work), so it is
+  // requested, then polled. The result is a new version to watch and choose, like the others.
+  const [requestConform, conformRequestState] = useRequestShotConformMutation();
+  const [fetchConform] = useLazyGetShotConformQuery();
+  const [conformStatus, setConformStatus] = useState(null);
+  const slowing = conformRequestState.isLoading || conformStatus === "QUEUED" || conformStatus === "PROCESSING";
+  // Defaults to the shot's length, which is the whole point -- the clip was generated shorter on purpose.
   const [retimeTo, setRetimeTo] = useState(shot?.durationSeconds || 3);
   const [previewMix, previewState] = usePreviewClipMixMutation();
   const [keepPreview, keepState] = useKeepClipPreviewMutation();
@@ -102,7 +109,7 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
   // file back links the two rather than leaving a version that came from nowhere.
   const editingFromRef = React.useRef(null);
 
-  const busy = dubbedState.isLoading || silentState.isLoading || retimedState.isLoading
+  const busy = dubbedState.isLoading || silentState.isLoading || slowing
     || uploadState.isLoading || acceptState.isLoading || rejectState.isLoading || publishState.isLoading
     || baselineState.isLoading;
 
@@ -190,6 +197,36 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
   const previews = versions.filter((version) => version.status === "PREVIEW" && !version.rejected);
   const rejectedCuts = versions.filter((version) => version.rejected && version.status !== "ACTIVE");
 
+  const handleSlowDown = async () => {
+    const target = Number(retimeTo);
+    if (!(target > 0)) return;
+    try {
+      const queued = await requestConform({ projectId, shotId, targetSeconds: target, interpolate: true }).unwrap();
+      setConformStatus(queued.status);
+      for (let attempt = 0; attempt < 120; attempt += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((resolve) => { setTimeout(resolve, 5000); });
+        // eslint-disable-next-line no-await-in-loop
+        const latest = await fetchConform({ projectId, shotId, requestId: queued.requestId }).unwrap().catch(() => null);
+        if (!latest) continue;
+        setConformStatus(latest.status);
+        if (latest.status === "COMPLETED") {
+          dispatch(creatorApi.util.invalidateTags([{ type: "CreatorHomeProjects", id: `clip-cuts-${shotId}` }]));
+          dispatch(showFlash({ message: `Slowed to ${target}s and interpolated, with the recorded take. Watch it below, then use it if it is right.`, type: "success" }));
+          return;
+        }
+        if (latest.status === "FAILED") {
+          dispatch(showFlash({ message: latest.error || "Could not slow the clip down", type: "error" }));
+          return;
+        }
+      }
+      dispatch(showFlash({ message: "Still working on it — the new version appears here when it is done.", type: "info" }));
+    } catch (error) {
+      setConformStatus(null);
+      dispatch(showFlash({ message: error?.data?.message || error?.data?.error || "Could not start that", type: "error" }));
+    }
+  };
+
   const run = async (action, args, madeMessage) => {
     try {
       const made = await action({ projectId, shotId, shotRef: shot?.shotRef, ...args }).unwrap();
@@ -265,7 +302,7 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
     <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">
-          This shot's video
+          Clip tools <span className="font-semibold normal-case tracking-normal text-slate-500">— each makes a new version; use it or keep the current one</span>
         </p>
         {current && (
           <span className="text-[10px] font-bold text-slate-500">
@@ -275,16 +312,38 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
         )}
       </div>
 
-      {/* The two cuts, as two buttons. Neither changes the film -- both make something to look at. */}
+      {/* Every tool makes a version to look at; none changes the film until "Use this cut". */}
       <div className="flex flex-wrap gap-2">
+        {/* Generate short, then stretch to the shot: new in-between frames keep the motion smooth,
+            and the recorded take is laid on at normal speed. */}
+        <span className="flex items-center gap-1 rounded-md border border-amber-400/25 bg-amber-400/[0.06] px-2 py-1">
+          <input
+            type="number"
+            min={1}
+            value={retimeTo}
+            onChange={(event) => setRetimeTo(event.target.value)}
+            title="Slow the clip down to this many seconds"
+            className="w-12 bg-transparent text-[10px] font-bold text-amber-100 outline-none"
+          />
+          <span className="text-[10px] font-bold text-amber-200/70">s</span>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={handleSlowDown}
+            className="flex items-center gap-1.5 text-[10px] font-bold text-amber-200 disabled:opacity-50"
+          >
+            {slowing ? <Loader2 size={11} className="animate-spin" /> : <Gauge size={11} />}
+            {slowing ? (conformStatus === "PROCESSING" ? "Interpolating…" : "Queued…") : "Slow down & interpolate"}
+          </button>
+        </span>
         <button
           type="button"
           disabled={busy}
-          onClick={() => run(createDubbed, {}, "Made a cut with the dubbed voice on it.")}
+          onClick={() => run(createDubbed, {}, "Made a version with the recorded take on it.")}
           className="flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/15 px-2.5 py-1.5 text-[10px] font-bold text-purple-200 disabled:opacity-50"
         >
           {dubbedState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <AudioLines size={11} />}
-          {dubbedState.isLoading ? "Making…" : "Use the dubbed voice"}
+          {dubbedState.isLoading ? "Making…" : "Add recorded take"}
         </button>
         <button
           type="button"
@@ -293,31 +352,8 @@ export default function ClipCutsPanel({ shot, projectId, aspectRatio, onChanged 
           className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 py-1.5 text-[10px] font-bold text-slate-200 disabled:opacity-50"
         >
           {silentState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <VolumeX size={11} />}
-          {silentState.isLoading ? "Making…" : "Remove the audio"}
+          {silentState.isLoading ? "Making…" : "Remove audio"}
         </button>
-        {/* Generate short, stretch to the planned length, watch it. Muted by construction --
-            "Use the dubbed voice" afterwards puts the cloned line back at normal speed, which is
-            what keeps the speech from sounding drawled. */}
-        <span className="flex items-center gap-1 rounded-md border border-amber-400/25 bg-amber-400/[0.06] px-2 py-1">
-          <input
-            type="number"
-            min={1}
-            value={retimeTo}
-            onChange={(event) => setRetimeTo(event.target.value)}
-            title="Stretch the picture to this many seconds"
-            className="w-12 bg-transparent text-[10px] font-bold text-amber-100 outline-none"
-          />
-          <span className="text-[10px] font-bold text-amber-200/70">s</span>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => run(createRetimed, { targetSeconds: Number(retimeTo) }, `Stretched the picture to ${retimeTo}s (muted).`)}
-            className="flex items-center gap-1.5 text-[10px] font-bold text-amber-200 disabled:opacity-50"
-          >
-            {retimedState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Gauge size={11} />}
-            {retimedState.isLoading ? "Stretching…" : "Slow to fit"}
-          </button>
-        </span>
         <button
           type="button"
           disabled={busy || previewState.isLoading}

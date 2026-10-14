@@ -165,7 +165,7 @@ export function clipOutcome(seconds, shotSeconds, spoken) {
   if (seconds == null || shotSeconds == null || seconds === shotSeconds) return null;
   if (seconds > shotSeconds) return `Trimmed to the ${formatSeconds(shotSeconds)}s shot after generation.`;
   const slower = shotSeconds / seconds;
-  return `After generation, "Slow down to length" stretches it ${slower.toFixed(1)}× to the ${formatSeconds(shotSeconds)}s shot, interpolated.`
+  return `After generation, "Slow down & interpolate" stretches it ${slower.toFixed(1)}× to the ${formatSeconds(shotSeconds)}s shot.`
     + (spoken ? " The line plays at normal speed, so lips will not match." : slower > 2 ? " More than 2× slower can look unnatural." : "");
 }
 

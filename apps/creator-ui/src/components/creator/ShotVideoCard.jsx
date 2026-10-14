@@ -28,7 +28,6 @@ import VideoStudioPanel from "../videoStudio/VideoStudioPanel.jsx";
 import VideoPromptCard from "../videoStudio/videoPrompt/VideoPromptCard.jsx";
 import ShotControlsPanel from "../videoStudio/ShotControlsPanel.jsx";
 import PromptInputsChecklist from "../videoStudio/PromptInputsChecklist.jsx";
-import ConformPanel from "../videoStudio/ConformPanel.jsx";
 import { castReaders } from "../videoStudio/castReaders.js";
 import ShotThoughtLog from "./ShotThoughtLog.jsx";
 import SoundLayersPanel from "./SoundLayersPanel.jsx";
@@ -930,6 +929,14 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               <VideoPromptCard shotId={shot.id} onEditSent={editSent} editsUnlocked={entitlements.editsEnabled} />
             )}
 
+            {/* Right under the generated clip: slow down & interpolate, remove audio, add the
+                recorded take -- each a version to watch, then use or not. No onChanged: accepting
+                invalidates the project's current cuts, and the player reads them, so the swap
+                happens on its own (wiring it to onPrepare once kicked off a paid prompt rebuild). */}
+            {hasClip && !regenerating && (
+              <ClipCutsPanel shot={shot} projectId={projectId} aspectRatio={shot.aspectRatio} />
+            )}
+
             {hasClip && !regenerating && onRegenerate && (
               <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
                 <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
@@ -955,30 +962,8 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
           </CardGroup>
 
           {hasClip && (
-            <CardGroup title="After generation" hint="Slow it to length, cuts of the clip, and repairs.">
-              <ConformPanel shot={shot} projectId={projectId} clipSeconds={activeClip?.durationSeconds ?? video?.durationSeconds} />
-              {/* A generated shot was a dead end: the card showed the clip and nothing else, so a shot
-                  that came back wrong -- the line cut off, the wrong duration, a rewritten line since
-                  saved -- could only be fixed by never having generated it. Regenerating builds a fresh
-                  prompt from the shot as it stands now, then goes through the same approve step, so the
-                  new clip is costed and confirmed exactly like the first one. */}
-              {hasClip && (
-                // No onChanged. It used to be wired to onPrepare, so accepting a cut kicked off a
-                // prompt REBUILD of the shot -- the card went busy, the spinner never resolved into
-                // the new clip, and a model call was paid for that nobody asked for. Accepting
-                // invalidates the project's current cuts, and the player reads them, so the swap
-                // happens on its own.
-                <ClipCutsPanel
-                  shot={shot}
-                  projectId={projectId}
-                  aspectRatio={shot.aspectRatio}
-                />
-              )}
-
-              {hasClip && (
-                <ClipRepairPanel shot={shot} projectId={projectId} />
-              )}
-
+            <CardGroup title="Repairs" hint="Extend the tail, hold the last frame, or bring in your own file.">
+              <ClipRepairPanel shot={shot} projectId={projectId} />
             </CardGroup>
           )}
 

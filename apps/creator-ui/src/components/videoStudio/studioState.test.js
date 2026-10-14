@@ -232,9 +232,9 @@ test("clipOutcome says what post-production does to the clip for the shot", () =
   assert.equal(clipOutcome(7, 7, true), null);
   assert.equal(clipOutcome(8, 7, true), "Trimmed to the 7s shot after generation.");
   // Slowing is the creator's step after generation, and always interpolated.
-  assert.equal(clipOutcome(3, 7, true), "After generation, \"Slow down to length\" stretches it 2.3× to the 7s shot, interpolated. The line plays at normal speed, so lips will not match.");
-  assert.equal(clipOutcome(3, 7, false), "After generation, \"Slow down to length\" stretches it 2.3× to the 7s shot, interpolated. More than 2× slower can look unnatural.");
-  assert.equal(clipOutcome(5, 7, false), "After generation, \"Slow down to length\" stretches it 1.4× to the 7s shot, interpolated.");
+  assert.equal(clipOutcome(3, 7, true), "After generation, \"Slow down & interpolate\" stretches it 2.3× to the 7s shot. The line plays at normal speed, so lips will not match.");
+  assert.equal(clipOutcome(3, 7, false), "After generation, \"Slow down & interpolate\" stretches it 2.3× to the 7s shot. More than 2× slower can look unnatural.");
+  assert.equal(clipOutcome(5, 7, false), "After generation, \"Slow down & interpolate\" stretches it 1.4× to the 7s shot.");
 });
 
 test("changing a shot's length says the whole video changes and the clip does not", () => {
