@@ -48,28 +48,44 @@ export const SWITCHES = [
   },
 ];
 
+/** A toggle switch: the label is the row's own text, read by aria-labelledby. */
+function Switch({ on, disabled, onClick, labelledBy, describedBy }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-labelledby={labelledBy}
+      aria-describedby={describedBy}
+      disabled={disabled}
+      onClick={onClick}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60 disabled:cursor-not-allowed disabled:opacity-50 ${
+        on ? "border-purple-400/60 bg-purple-500" : "border-white/15 bg-white/10"}`}
+    >
+      <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${on ? "translate-x-[18px]" : "translate-x-[3px]"}`} />
+    </button>
+  );
+}
+
+/** Switches turned on, out of all of them. */
+export function switchesOn(controls) {
+  return SWITCHES.filter((item) => !!controls?.[item.key]).length;
+}
+
 /** The switch list itself, shared by the project defaults and each shot's own set. */
 export function ControlSwitches({ controls, saving, onToggle }) {
   return (
-    <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
+    <ul className="divide-y divide-white/5 overflow-hidden rounded-md border border-white/10 bg-white/[0.02]">
       {SWITCHES.map((item) => {
         const on = !!controls[item.key];
         return (
-          <li key={item.key} className="flex items-start gap-2.5 rounded-md border border-white/5 bg-white/[0.02] p-2">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={on}
-              disabled={saving}
-              onClick={() => onToggle(item.key)}
-              className={`relative mt-0.5 h-4 w-7 shrink-0 rounded-full transition ${on ? "bg-purple-500" : "bg-white/15"} disabled:opacity-60`}
-            >
-              <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition ${on ? "left-3.5" : "left-0.5"}`} />
-            </button>
-            <div>
-              <p className="text-[11px] font-bold text-slate-200">{item.label}</p>
-              <p className="text-[10px] text-slate-500">{on ? item.on : item.off}</p>
+          <li key={item.key} className="flex items-center gap-3 px-3 py-2">
+            <div className="min-w-0 flex-1">
+              <p id={`switch-${item.key}`} className={`text-[11px] font-bold ${on ? "text-slate-100" : "text-slate-300"}`}>{item.label}</p>
+              <p id={`switch-${item.key}-hint`} className="text-[10px] leading-snug text-slate-500">{on ? item.on : item.off}</p>
             </div>
+            <Switch on={on} disabled={saving} onClick={() => onToggle(item.key)}
+              labelledBy={`switch-${item.key}`} describedBy={`switch-${item.key}-hint`} />
           </li>
         );
       })}

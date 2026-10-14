@@ -3656,8 +3656,9 @@ export const creatorApi = apiSlice.injectEndpoints({
         method: "POST",
         body: overrides,
       }),
-      invalidatesTags: (_result, _error, { projectId }) => [
+      invalidatesTags: (_result, _error, { projectId, shotId }) => [
         { type: "CreatorHomeProjects", id: `shot-prompts-${projectId}` },
+        { type: "CreatorHomeProjects", id: `prompt-versions-${shotId}` },
       ],
     }),
 
@@ -4200,6 +4201,15 @@ export const creatorApi = apiSlice.injectEndpoints({
       }),
       onQueryStarted: cacheGenerationPlan,
     }),
+    // The creator's corrected timeline. The prompt is then older than it until Update rewrites it.
+    editShotGenerationTimeline: builder.mutation({
+      query: ({ projectId, shotId, intervals }) => ({
+        url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-plan/timeline`),
+        method: "PUT",
+        body: { intervals },
+      }),
+      onQueryStarted: cacheGenerationPlan,
+    }),
     composeShotGenerationPrompt: builder.mutation({
       query: ({ projectId, shotId }) => ({
         url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-plan/prompt`),
@@ -4313,6 +4323,8 @@ export const creatorApi = apiSlice.injectEndpoints({
         method: "POST",
         body: { prompt },
       }),
+      // Generating writes the prompt as the shot's next version.
+      invalidatesTags: (_result, _error, { shotId }) => [{ type: "CreatorHomeProjects", id: `prompt-versions-${shotId}` }],
     }),
 
     // All prepared shot prompts for a project, one row per shot (latest version wins). Video
@@ -4367,8 +4379,10 @@ export const creatorApi = apiSlice.injectEndpoints({
         method: "PUT",
         body: { positive },
       }),
-      invalidatesTags: (_result, _error, { projectId }) =>
-        projectId ? [{ type: "CreatorHomeProjects", id: `shot-prompts-${projectId}` }] : [],
+      invalidatesTags: (result, _error, { projectId }) => [
+        ...(projectId ? [{ type: "CreatorHomeProjects", id: `shot-prompts-${projectId}` }] : []),
+        ...(result?.shotId ? [{ type: "CreatorHomeProjects", id: `prompt-versions-${result.shotId}` }] : []),
+      ],
     }),
 
     // video-generation-service FinalRenderController -- concatenates every completed shot
@@ -5035,6 +5049,7 @@ export const {
   useAnalyzeShotGenerationPlanMutation,
   useSelectShotGenerationSettingsMutation,
   useBuildShotGenerationTimelineMutation,
+  useEditShotGenerationTimelineMutation,
   useComposeShotGenerationPromptMutation,
   useSaveShotGenerationDraftMutation,
   useResetShotGenerationDraftMutation,

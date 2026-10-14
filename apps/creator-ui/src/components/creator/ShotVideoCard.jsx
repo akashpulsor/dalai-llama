@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React from "react";
 import { useDispatch } from "react-redux";
-import { AudioLines, Check, ChevronDown, History, Loader2, Mic, Music, Pencil, PlayCircle, RefreshCw, Save, Sparkles, Upload, X } from "lucide-react";
+import { AudioLines, Check, ChevronDown, Loader2, Mic, Music, Pencil, PlayCircle, RefreshCw, Sparkles, Upload, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useListBuiltinVoicesQuery,
@@ -9,7 +9,6 @@ import {
   useListCastAssignmentsQuery,
   useGetScriptQuery,
   useListPreProductionShotImagesQuery,
-  useListShotPromptVersionsQuery,
   useLazyGetDubJobQuery,
   useQueueShotDubMutation,
   useRejectShotDubMutation,
@@ -25,13 +24,13 @@ import ShotCanvasPlayer from "./ShotCanvasPlayer.jsx";
 import MotionGraphicPanel from "./MotionGraphicPanel.jsx";
 import CritiqueFindingsPanel from "./CritiqueFindingsPanel.jsx";
 import VideoStudioPanel from "../videoStudio/VideoStudioPanel.jsx";
+import VideoPromptCard from "../videoStudio/videoPrompt/VideoPromptCard.jsx";
 import ShotControlsPanel from "../videoStudio/ShotControlsPanel.jsx";
 import PromptInputsChecklist from "../videoStudio/PromptInputsChecklist.jsx";
 import ConformPanel from "../videoStudio/ConformPanel.jsx";
 import { castReaders } from "../videoStudio/castReaders.js";
 import ShotThoughtLog from "./ShotThoughtLog.jsx";
 import SoundLayersPanel from "./SoundLayersPanel.jsx";
-import ProCta from "../common/ProCta.jsx";
 import useCreatorVideoEntitlements from "../../hooks/useCreatorVideoEntitlements.js";
 import { useCachedImageUrl } from "../../utils/cachedImageUrl.js";
 import replaceDialogueLine from "../../utils/replaceDialogueLine.js";
@@ -85,7 +84,7 @@ function ShotVoiceControl({ shotId, projectId, dubVoiceId, dubCastProfileId, tak
     : dubVoiceId ? (chosenVoice?.displayName || dubVoiceId) : "the shot's own character, else the narrator";
 
   return (
-    <div className="mt-2.5 border-t border-white/10 pt-2.5">
+    <div className="border-t border-white/10 pt-2.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[10px] font-medium text-slate-400">
           Read by: <span className="font-bold text-slate-200">{current}</span>
@@ -190,7 +189,7 @@ function ShotVoiceControl({ shotId, projectId, dubVoiceId, dubCastProfileId, tak
  * time), so the previous recording is gone once this runs. That is worth knowing before pressing it,
  * and worth hearing the current one first.
  */
-function DubbedVoiceControl({ shotId, projectId, line, dubbed, dubVoiceId, dubCastProfileId, onDubbed }) {
+function DubbedVoiceControl({ shotId, projectId, line, dubbed, dubVoiceId, dubCastProfileId, onDubbed, children }) {
   const dispatch = useDispatch();
   // Queued, not waited on. Recording a line takes seconds to tens of seconds, and while the request
   // held the connection there was nothing on screen saying so -- which is exactly why pressing the
@@ -241,6 +240,11 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed, dubVoiceId, dubCa
   // recording is of a line that no longer exists, which is exactly what the fit report stops
   // treating as a measurement -- so say it here too, next to the button that fixes it.
   const stale = !!audioUrl && !!dubbed?.text && !!line && dubbed.text.trim() !== line.trim();
+  const otherVoice = !!audioUrl && !!dubVoiceId && !!dubbed?.providerVoiceId && dubbed.providerVoiceId !== dubVoiceId;
+  // Recording is only asked for when the take is missing or no longer matches the line or voice.
+  // Otherwise it is "Re-record": the same words again, replacing this take -- for a take that
+  // sounds wrong, not a step in the flow.
+  const recordLabel = !audioUrl ? "Record the line" : stale ? "Record the new line" : otherVoice ? "Record in the new voice" : null;
 
   // A shot with no line written for it used to render nothing at all, which left no way to give one
   // narration from this page: the beats editor hides once a shot is prepared, so a finished shot
@@ -328,116 +332,23 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed, dubVoiceId, dubCa
     }
   };
 
+  const linkButton = "flex items-center gap-1.5 text-[10px] font-bold disabled:opacity-60";
   return (
-    <div className={`rounded-md border p-3 ${stale ? "border-amber-400/30 bg-amber-500/[0.06]" : "border-white/10 bg-white/[0.02]"}`}>
-      <div className="mb-2 flex items-center gap-1.5">
-        <AudioLines size={13} className={stale ? "text-amber-300" : "text-purple-300"} />
-        <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Spoken take</p>
-      </div>
-      {audioUrl ? (
-        <div className="space-y-2">
-          {/* Same reason as the clip: a bare audio element is an inert grey bar until the file has
-              arrived, which reads as nothing having happened. */}
-          <div className="relative">
-            <audio
-              key={audioUrl}
-              controls
-              src={audioUrl}
-              preload="metadata"
-              onLoadedMetadata={() => setTakeLoading(false)}
-              onError={() => setTakeLoading(false)}
-              className="h-9 w-full"
-            />
-            {takeLoading && (
-              <div className="pointer-events-none absolute inset-0 flex items-center gap-1.5 rounded bg-black/70 px-2">
-                <Loader2 size={12} className="animate-spin text-slate-300" />
-                <span className="text-[10px] font-bold text-slate-400">Loading the take…</span>
-              </div>
-            )}
-          </div>
-          {dubbed?.durationMs > 0 && (
-            <p className="text-[10px] font-medium text-slate-500">
-              This take runs {(dubbed.durationMs / 1000).toFixed(1)}s.
-            </p>
-          )}
-          <p className="flex items-center gap-1 text-[10px] font-bold text-emerald-300/90">
-            <Check size={11} />
-            Saved automatically — this is the take used by dubbed mixes.
-          </p>
-          {stale && (
-            <p className="text-[10px] font-medium text-amber-200/90">
-              This recording is of the previous line. Dub again to hear the line as it stands now —
-              until then the fit figures are an estimate.
-            </p>
-          )}
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              disabled={isLoading || editing}
-              onClick={handleRedub}
-              className="flex items-center gap-1.5 text-[10px] font-bold text-purple-300 hover:text-purple-200 disabled:opacity-60"
-            >
-              {isLoading ? <Loader2 size={11} className="animate-spin" /> : <AudioLines size={11} />}
-              {isLoading ? "Dubbing…" : "Record the next take"}
-            </button>
-          </div>
+    <div className={`space-y-2.5 rounded-md border p-3 ${stale ? "border-amber-400/30 bg-amber-500/[0.06]" : "border-white/10 bg-white/[0.02]"}`}>
+      <div>
+        <div className="flex items-center gap-1.5">
+          <AudioLines size={13} className={stale ? "text-amber-300" : "text-purple-300"} />
+          <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Spoken take</p>
         </div>
-      ) : (
-        <button
-          type="button"
-          disabled={isLoading || editing}
-          onClick={handleRedub}
-          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-white/15 py-1.5 text-[11px] font-bold text-slate-300 hover:border-purple-400/40 hover:text-purple-200 disabled:opacity-60"
-        >
-          {isLoading ? <Loader2 size={12} className="animate-spin" /> : <AudioLines size={12} />}
-          {isLoading ? "Dubbing…" : "Dub this shot to hear it"}
-        </button>
-      )}
+        <p className="mt-1 text-[10px] font-medium text-slate-500">
+          This shot's line, recorded in the voice chosen below. It is what the audience hears, and the
+          shot is timed around it.
+        </p>
+      </div>
 
-      {/* Rejecting sits outside the has-audio branch on purpose.
-          
-          This panel only shows a take whose stored text still matches the line, which is right for
-          "here is your recording" and wrong for rejecting: a take whose words have since been
-          replaced is hidden here while the cut path still reaches for it, because that path selects
-          by recency rather than by text. So the one situation where a creator most needs to say
-          "not that one" was the one where the button was not on screen. */}
-      <button
-        type="button"
-        disabled={isLoading || editing || rejectState.isLoading}
-        onClick={async () => {
-          try {
-            await rejectDub({ projectId, shotId }).unwrap();
-            dispatch(showFlash({
-              message: "Take rejected. Nothing will use it — dub again when you are ready.",
-              type: "success",
-            }));
-          } catch (error) {
-            dispatch(showFlash({
-              message: error?.data?.message || error?.message || "Could not reject this take",
-              type: "error",
-            }));
-          }
-        }}
-        className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-rose-300 disabled:opacity-60"
-      >
-        {rejectState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
-        Reject the latest take
-      </button>
-
-      <ShotVoiceControl
-        shotId={shotId}
-        projectId={projectId}
-        dubVoiceId={dubVoiceId}
-        dubCastProfileId={dubCastProfileId}
-        takeVoiceId={dubbed?.providerVoiceId}
-        hasTake={!!audioUrl}
-        disabled={isLoading || editing}
-      />
-
-      {/* The words themselves, which this panel never showed -- it offered to re-record a line
-          without ever saying what the line was. */}
+      {/* The words first -- the panel used to offer re-recording a line without saying what it was. */}
       {editing ? (
-        <div className="mt-2.5 border-t border-white/10 pt-2.5">
+        <div>
           <textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
@@ -470,18 +381,106 @@ function DubbedVoiceControl({ shotId, projectId, line, dubbed, dubVoiceId, dubCa
           </div>
         </div>
       ) : (
-        <div className="mt-2.5 border-t border-white/10 pt-2.5">
-          <p className="text-[11px] font-medium leading-relaxed text-slate-300">{line}</p>
-          <button
-            type="button"
-            disabled={isLoading}
-            onClick={() => { setDraft(line); setEditing(true); }}
-            className="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-slate-200 disabled:opacity-60"
-          >
-            <Pencil size={11} /> Change the words and dub again
-          </button>
-        </div>
+        <p className="rounded-md border-l-2 border-purple-400/40 bg-black/20 px-2.5 py-1.5 text-[11px] font-medium leading-relaxed text-slate-200">
+          {line}
+        </p>
       )}
+
+      {audioUrl ? (
+        <div className="space-y-1">
+          {/* Same reason as the clip: a bare audio element is an inert grey bar until the file has
+              arrived, which reads as nothing having happened. */}
+          <div className="relative">
+            <audio
+              key={audioUrl}
+              controls
+              src={audioUrl}
+              preload="metadata"
+              onLoadedMetadata={() => setTakeLoading(false)}
+              onError={() => setTakeLoading(false)}
+              className="h-9 w-full"
+            />
+            {takeLoading && (
+              <div className="pointer-events-none absolute inset-0 flex items-center gap-1.5 rounded bg-black/70 px-2">
+                <Loader2 size={12} className="animate-spin text-slate-300" />
+                <span className="text-[10px] font-bold text-slate-400">Loading the take…</span>
+              </div>
+            )}
+          </div>
+          <p className="flex flex-wrap items-center gap-x-2 text-[10px] font-medium text-slate-500">
+            {dubbed?.durationMs > 0 && <span>Runs {(dubbed.durationMs / 1000).toFixed(1)}s ·</span>}
+            <span className="flex items-center gap-1 text-emerald-300/90"><Check size={11} /> Saved — used by dubbed mixes</span>
+          </p>
+          {stale && (
+            <p className="text-[10px] font-medium text-amber-200/90">
+              This recording is of the previous line. Dub again to hear the line as it stands now —
+              until then the fit figures are an estimate.
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="text-[10px] font-medium text-slate-500">Not recorded yet.</p>
+      )}
+
+      {children}
+
+      {/* Reject sits outside the has-audio branch on purpose: a take whose words have since changed
+          is hidden above while the cut path still reaches for it, because that path selects by
+          recency rather than by text -- exactly when a creator most needs to say "not that one". */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        {recordLabel ? (
+          <button type="button" disabled={isLoading || editing} onClick={handleRedub}
+            className="flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/15 px-2.5 py-1.5 text-[10px] font-bold text-purple-100 hover:bg-purple-500/25 disabled:opacity-50">
+            {isLoading ? <Loader2 size={11} className="animate-spin" /> : <AudioLines size={11} />}
+            {isLoading ? "Recording…" : recordLabel}
+          </button>
+        ) : (
+          <button type="button" disabled={isLoading || editing} onClick={handleRedub}
+            title="Records the same words again and replaces this take. Only needed if this one sounds wrong."
+            className={`${linkButton} text-slate-400 hover:text-purple-200`}>
+            {isLoading ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+            {isLoading ? "Recording…" : "Re-record"}
+          </button>
+        )}
+        {!editing && (
+          <button type="button" disabled={isLoading} onClick={() => { setDraft(line); setEditing(true); }}
+            className={`${linkButton} text-slate-400 hover:text-slate-200`}>
+            <Pencil size={11} /> Change the words
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={isLoading || editing || rejectState.isLoading}
+          onClick={async () => {
+            try {
+              await rejectDub({ projectId, shotId }).unwrap();
+              dispatch(showFlash({
+                message: "Take rejected. Nothing will use it — dub again when you are ready.",
+                type: "success",
+              }));
+            } catch (error) {
+              dispatch(showFlash({
+                message: error?.data?.message || error?.message || "Could not reject this take",
+                type: "error",
+              }));
+            }
+          }}
+          className={`${linkButton} text-slate-400 hover:text-rose-300`}
+        >
+          {rejectState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
+          Reject the latest take
+        </button>
+      </div>
+
+      <ShotVoiceControl
+        shotId={shotId}
+        projectId={projectId}
+        dubVoiceId={dubVoiceId}
+        dubCastProfileId={dubCastProfileId}
+        takeVoiceId={dubbed?.providerVoiceId}
+        hasTake={!!audioUrl}
+        disabled={isLoading || editing}
+      />
     </div>
   );
 }
@@ -545,200 +544,80 @@ function ShotPlayer({ src, aspect }) {
  * wrong in: a clip slightly longer than its line ends in silence, a clip slightly shorter ends
  * mid-word.
  */
-function ShotLengthRow({ shot, projectId, dubSeconds, mismatch, overruns, onChanged }) {
+function ShotLengthRow({ shot, projectId, dubSeconds, mismatch, overruns }) {
   const dispatch = useDispatch();
   const [saveShot, saveState] = useUpdatePreProductionShotMutation();
-  const [draft, setDraft] = React.useState("");
+  // The typed value while it differs from the saved one. Nothing is saved until Save: a length is a
+  // decision about the film, billed per second, and the plan is rebuilt for it only on Update.
+  const [draft, setDraft] = React.useState(null);
   const suggested = dubSeconds != null ? Math.ceil(dubSeconds) + 1 : null;
-  const current = shot.durationSeconds ?? "";
+  const current = shot.durationSeconds ?? null;
+  const original = shot.originalDurationSeconds ?? null;
+  const typed = draft == null ? null : Math.round(Number(draft));
+  const changed = typed != null && typed > 0 && typed !== current;
 
-  const commit = async (value) => {
-    const seconds = Number(value);
-    if (!Number.isFinite(seconds) || seconds <= 0 || seconds === shot.durationSeconds) return;
+  const save = async () => {
+    if (!changed) return;
     try {
-      await saveShot({ projectId, shotId: shot.id, durationSeconds: Math.round(seconds) }).unwrap();
-      setDraft("");
-      dispatch(showFlash({
-        message: `Shot is now ${Math.round(seconds)}s.${onChanged ? " Rebuilding the prompt." : ""}`,
-        type: "success",
-      }));
-      onChanged?.();
+      await saveShot({ projectId, shotId: shot.id, durationSeconds: typed }).unwrap();
+      setDraft(null);
+      dispatch(showFlash({ message: `Shot is now ${typed}s. Press Update in the video studio to rebuild its plan.`, type: "success" }));
     } catch (error) {
       dispatch(showFlash({ message: error?.data?.message || "Could not change the shot's length", type: "error" }));
     }
   };
 
+  const chip = "rounded-md border px-2 py-0.5 text-[10px] font-bold disabled:opacity-50";
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-medium">
-      <span className="flex items-center gap-1.5 text-slate-400">
-        Shot
-        <input
-          type="number"
-          min="1"
-          value={draft === "" ? current : draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onBlur={(event) => commit(event.target.value)}
-          onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
-          disabled={saveState.isLoading}
-          className="w-12 rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-center text-[11px] font-bold text-slate-100 disabled:opacity-50"
-        />
-        s
-      </span>
-      {dubSeconds != null && (
-        <span className={mismatch ? "text-amber-300" : "text-slate-400"}>
-          Voice <strong>{dubSeconds.toFixed(1)}s</strong>
-          {mismatch ? ` — ${overruns ? "longer than" : "shorter than"} the shot` : " — fits"}
-        </span>
-      )}
-      {suggested != null && suggested !== shot.durationSeconds && (
-        <button
-          type="button"
-          disabled={saveState.isLoading}
-          onClick={() => commit(suggested)}
-          className="flex items-center gap-1 rounded-md border border-purple-400/30 bg-purple-500/15 px-2 py-0.5 text-[10px] font-bold text-purple-200 disabled:opacity-50"
-        >
-          {saveState.isLoading ? <Loader2 size={10} className="animate-spin" /> : null}
-          {`Fit to voice: ${suggested}s`}
-        </button>
-      )}
-    </div>
-  );
-}
-
-/** A bare number is not a price. The backend quotes in the wallet's own currency (billing
- * converts the provider's USD before it reaches here), so show the symbol that matches -- a
- * creator reading "0.66" next to a rupee balance cannot tell what they are agreeing to. */
-const CURRENCY_SYMBOLS = { INR: "₹", USD: "$", EUR: "€", GBP: "£" };
-
-function formatCost(amount, currency) {
-  if (amount == null) return null;
-  const code = (currency || "INR").toUpperCase();
-  const value = Number(amount);
-  const shown = Number.isFinite(value) ? value.toFixed(2) : amount;
-  const symbol = CURRENCY_SYMBOLS[code];
-  return symbol ? `${symbol}${shown}` : `${shown} ${code}`;
-}
-
-const REFERENCE_KIND_LABELS = {
-  STORYBOARD: "Shot frame",
-  CHARACTER_FACE: "Character",
-  PRODUCT_HERO: "Product",
-  DP_LIGHTING: "Lighting",
-  CAMERA_PLAN_IMAGE: "Camera plan",
-  SET: "Set",
-  STYLE_ANCHOR: "Style",
-  PRIOR_SHOT_LAST_FRAME: "Prev. frame",
-  CHARACTER_VOICE: "Voice sample",
-  BACKGROUND_MUSIC: "Music bed",
-};
-
-/** Where an audio attachment came from. The voice sample is the actor's own recording, uploaded
- * in Cast; the music bed was generated for this shot from its sound design. Worth saying on the
- * card: they look identical as two audio players, and a creator deciding whether to regenerate
- * one needs to know which is their material and which is the machine's. */
-const REFERENCE_KIND_ORIGIN = {
-  CHARACTER_VOICE: "uploaded",
-  BACKGROUND_MUSIC: "generated",
-};
-
-/** What this prompt was actually built from -- the frames, the face crops, the voice sample, the
- * music bed -- so the creator can see at a glance that the right assets were picked up instead of
- * inferring it from the prompt text. `references` (kind-tagged, images + audio) comes from
- * video-generation-service 0.2.23 on; older responses only carry the flat image-url list, which
- * still renders, just without labels. */
-function PromptAttachments({ info, shotImages = [] }) {
-  const references = info.references || [];
-  const fallbackUrls = references.length ? [] : info.prompt?.referenceImageUrls || [];
-
-  const images = references.filter((ref) => !ref.audio);
-  const audio = references.filter((ref) => ref.audio);
-
-  // Every image the shot HAS, against the ones that were actually sent.
-  //
-  // The card already fetched all of them to pick a thumbnail and then showed exactly one. A shot
-  // with a production still, a storyboard, a lighting frame and a camera-plan frame displayed the
-  // first and silently hid the rest, so "which images does this shot have" had no answer anywhere
-  // in the UI -- and only one of them is ever attached as the model's frame, by design.
-  const sentKeys = new Set(images.map((ref) => ref.url).filter(Boolean));
-  const notSent = shotImages.filter((img) => img?.signedUrl && !sentKeys.has(img.signedUrl));
-
-  if (!references.length && !fallbackUrls.length && !notSent.length) return null;
-
-  return (
-    <div className="mt-2.5 space-y-2">
-      {(images.length > 0 || fallbackUrls.length > 0) && (
-        <div>
-          <p className="mb-1.5 text-[10px] font-medium text-slate-500">Images sent to the model, in slot order</p>
-          <div className="flex gap-1.5 overflow-x-auto">
-            {fallbackUrls.map((url, i) => (
-              <img key={i} src={url} alt="Reference" className="h-14 w-14 shrink-0 rounded border border-white/10 object-cover" />
-            ))}
-            {images.map((ref) => (
-              <figure key={`${ref.kind}-${ref.slotIndex}`} className="shrink-0">
-                <img
-                  src={ref.url}
-                  alt={REFERENCE_KIND_LABELS[ref.kind] || ref.kind}
-                  title={`Slot ${ref.slotIndex} — ${REFERENCE_KIND_LABELS[ref.kind] || ref.kind}`}
-                  className="h-14 w-14 rounded border border-white/10 object-cover"
-                />
-                <figcaption className="mt-0.5 w-14 truncate text-center text-[9px] font-semibold text-slate-500">
-                  {REFERENCE_KIND_LABELS[ref.kind] || ref.kind}
-                </figcaption>
-              </figure>
-            ))}
-          </div>
-        </div>
-      )}
-      {notSent.length > 0 && (
-        <div>
-          <p className="mb-1.5 text-[10px] font-medium text-slate-500">
-            This shot's other images — held, not sent to the model
-          </p>
-          <div className="flex gap-1.5 overflow-x-auto">
-            {notSent.map((img) => (
-              <figure key={img.id} className="shrink-0">
-                <img
-                  src={img.signedUrl}
-                  alt={img.kind}
-                  title={img.kind}
-                  className="h-14 w-14 rounded border border-dashed border-white/15 object-cover opacity-70"
-                />
-                <figcaption className="mt-0.5 w-14 truncate text-center text-[9px] font-semibold text-slate-500">
-                  {img.kind}
-                </figcaption>
-              </figure>
-            ))}
-          </div>
-        </div>
-      )}
-      {audio.length > 0 && (
-        <div className="space-y-1.5">
-          <p className="text-[10px] font-medium text-slate-500">Audio attached to this shot</p>
-          {audio.map((ref) => (
-            <div key={`${ref.kind}-${ref.slotIndex}`} className="flex items-center gap-2">
-              <span className="flex w-24 shrink-0 flex-col">
-                <span className="text-[9px] font-semibold text-slate-400">
-                  {REFERENCE_KIND_LABELS[ref.kind] || ref.kind}
-                </span>
-                {REFERENCE_KIND_ORIGIN[ref.kind] && (
-                  <span
-                    className={`text-[8px] font-bold uppercase tracking-wide ${
-                      REFERENCE_KIND_ORIGIN[ref.kind] === "generated" ? "text-purple-300" : "text-slate-500"
-                    }`}
-                  >
-                    {REFERENCE_KIND_ORIGIN[ref.kind]}
-                  </span>
-                )}
-              </span>
-              <audio controls src={ref.url} className="h-7 flex-1" />
-            </div>
-          ))}
-          {audio.some((ref) => ref.kind === "BACKGROUND_MUSIC") && (
-            <p className="text-[9px] font-medium text-slate-500">
-              Mixed under the dialogue when this shot is generated.
-            </p>
+    <div className="space-y-1">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] font-medium">
+        <label className="flex items-center gap-1.5 text-slate-400">
+          Shot length in the film
+          <input
+            type="number"
+            min="1"
+            value={draft ?? current ?? ""}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") save();
+              if (event.key === "Escape") setDraft(null);
+            }}
+            disabled={saveState.isLoading}
+            className={`w-12 rounded border bg-white/5 px-1.5 py-0.5 text-center text-[11px] font-bold text-slate-100 disabled:opacity-50 ${changed ? "border-purple-400/60" : "border-white/15"}`}
+          />
+          s
+        </label>
+        {changed && (
+          <span className="flex items-center gap-1.5">
+            <button type="button" onClick={save} disabled={saveState.isLoading}
+              className={`${chip} flex items-center gap-1 border-purple-400/30 bg-purple-500/15 text-purple-100`}>
+              {saveState.isLoading ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />} Save {typed}s
+            </button>
+            <button type="button" onClick={() => setDraft(null)} disabled={saveState.isLoading} className={`${chip} border-white/10 text-slate-400`}>Cancel</button>
+          </span>
+        )}
+        {dubSeconds != null && (
+          <span className={mismatch ? "text-amber-300" : "text-slate-400"}>
+            Voice <strong>{dubSeconds.toFixed(1)}s</strong>
+            {mismatch ? ` — ${overruns ? "longer than" : "shorter than"} the shot` : " — fits"}
+          </span>
+        )}
+        {suggested != null && suggested !== current && suggested !== typed && (
+          <button type="button" onClick={() => setDraft(String(suggested))} disabled={saveState.isLoading}
+            className={`${chip} border-white/15 bg-white/5 text-slate-200 hover:border-purple-400/40`}>
+            Fit to voice: {suggested}s
+          </button>
+        )}
+      </div>
+      {original != null && original !== current && (
+        <p className="text-[10px] text-slate-500">
+          Originally planned {original}s.{" "}
+          {original !== typed && (
+            <button type="button" onClick={() => setDraft(String(original))} className="font-bold text-slate-400 hover:text-slate-200">
+              Back to {original}s
+            </button>
           )}
-        </div>
+        </p>
       )}
     </div>
   );
@@ -755,119 +634,12 @@ const ASPECT_RATIO_CSS = {
 /** One shot as a visual card -- the frame (or the finished clip, once generated) IS the card,
  * not a text row that hides the image behind an accordion toggle. Clicking anywhere opens the
  * full prepare/approve panel below it, spanning the grid so it doesn't stretch its neighbors. */
-/** Every prompt this shot has had, newest first.
- *
- * Editing never overwrites -- video-generation-service writes a new row parented to the one it
- * came from -- so a rejected prompt is still here to read, and "Use this" seeds the editor with an
- * older version to save forward as a new one. Nothing is mutated in place and nothing is deleted,
- * which is the whole point: a rewrite that turns out worse than what it replaced is recoverable.
- *
- * Collapsed by default. A shot with one prompt has no history worth the space.
- */
-/** Where a prompt version came from (the backend's variantLabel). */
-const VERSION_SOURCE = {
-  planned: "From plan + timeline",
-  "studio-reviewed": "Generated from studio",
-};
-
-/** Three lines, or the whole version on click. */
-function VersionText({ text }) {
-  const [full, setFull] = React.useState(false);
-  return (
-    <button type="button" onClick={() => setFull((f) => !f)} title={full ? "Show less" : "Show the whole prompt"}
-            className={`block w-full text-left text-[11px] font-medium leading-relaxed text-slate-400 ${full ? "whitespace-pre-wrap" : "line-clamp-3"}`}>
-      {text || "—"}
-    </button>
-  );
-}
-
-function PromptVersionHistory({ shotId, onUse, canEdit }) {
-  const [open, setOpen] = React.useState(false);
-  const { data: versions = [], isFetching } = useListShotPromptVersionsQuery(shotId, { skip: !shotId || !open });
-
-  return (
-    <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between gap-2 text-left"
-      >
-        <div className="flex items-center gap-1.5">
-          <History size={12} className="text-slate-400" />
-          <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Prompt history</p>
-        </div>
-        <ChevronDown size={12} className={`text-slate-500 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      {open && (
-        <div className="mt-2 space-y-1.5">
-          {isFetching ? (
-            <p className="flex items-center gap-1.5 py-2 text-[11px] font-semibold text-slate-500">
-              <Loader2 size={11} className="animate-spin" /> Loading versions…
-            </p>
-          ) : versions.length === 0 ? (
-            <p className="py-2 text-[11px] font-semibold text-slate-600">No earlier versions for this shot.</p>
-          ) : (
-            versions.map((version, index) => {
-              const text = version.promptCompressed || version.promptOriginal || "";
-              const rejected = version.approvalStatus === "REJECTED";
-              return (
-                <div key={version.promptId} className="rounded border border-white/10 bg-black/20 p-2">
-                  <div className="mb-1 flex items-center gap-1.5">
-                    <span className="text-[9px] font-black uppercase tracking-wide text-slate-500">
-                      {index === 0 ? `Current · v${versions.length}` : `v${versions.length - index}`}
-                    </span>
-                    <span className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] font-bold text-slate-400">
-                      {VERSION_SOURCE[version.variantLabel] || (version.parentPromptId ? "Edited" : "Prepared")}
-                    </span>
-                    {version.durationSeconds && <span className="text-[9px] font-bold text-slate-500">{version.durationSeconds}s</span>}
-                    {version.createdAt && (
-                      <span className="text-[9px] font-semibold text-slate-600">
-                        {new Date(version.createdAt).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    )}
-                    {version.approvalStatus && (
-                      <span className={`rounded px-1.5 py-0.5 text-[9px] font-black uppercase ${
-                        rejected ? "bg-rose-400/10 text-rose-300" : "bg-white/10 text-slate-400"
-                      }`}>
-                        {version.approvalStatus}
-                      </span>
-                    )}
-                    {version.shipped && (
-                      <span className="rounded bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-black uppercase text-emerald-300">
-                        Shipped
-                      </span>
-                    )}
-                  </div>
-                  <VersionText text={text} />
-                  {index > 0 && canEdit && onUse && (
-                    <button
-                      type="button"
-                      onClick={() => onUse(text)}
-                      className="mt-1.5 text-[10px] font-bold text-purple-300 hover:text-purple-200"
-                    >
-                      Use this
-                    </button>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info, busy, video, activeClip, dubbed, onDubbed, selected, onSelectToggle, onPrepare, onSavePrompt, onApprove, onReject, onAutoFix, onRegenerate, regenerating, previousShot, onStudioGenerated }) {
-  // Prompt editing is local to the open card: the draft only leaves here on an explicit Save, so
-  // collapsing the card or wandering off never silently rewrites what will be generated.
-  const [editing, setEditing] = React.useState(false);
-  const [draft, setDraft] = React.useState("");
-  const [saving, setSaving] = React.useState(false);
-  // Kept on the card rather than in project config: choosing to cut an overlong line is a
-  // deliberate exception for this one shot, not a new default for every render in the film.
-  const [dialogueFitChoice, setDialogueFitChoice] = React.useState("");
+export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info, busy, video, activeClip, dubbed, onDubbed, selected, onSelectToggle, onPrepare, onSavePrompt, onReject, onAutoFix, onRegenerate, regenerating, previousShot, onStudioGenerated }) {
+  // Text handed to the video studio's editor as a new draft: Edit on a sent version, or the prompt
+  // being rewritten after Reject. A fresh object each time, so the same text can be seeded twice.
+  const [seedDraft, setSeedDraft] = React.useState(null);
+  // The prepared job this card already rejected, so Reject & rewrite does not reject it twice.
+  const [rejectedJobId, setRejectedJobId] = React.useState(null);
   const { entitlements } = useCreatorVideoEntitlements();
 
   // What this shot actually plays.
@@ -894,28 +666,10 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
   // with a 409 -- the way forward is a fresh prompt and a fresh job, which is Prepare again.
   const jobFailed = !hasClip && video?.status === "FAILED";
 
-  /** Rejecting is the start of a rewrite, not the end of the shot. Mark it rejected, then drop
-   * straight into the prompt so the creator can say what was wrong with it -- saving writes a
-   * new version and leaves the rejected prompt intact as its parent. The card used to vanish
-   * on reject, which threw away the one thing they needed to edit. */
-  const handleReject = async () => {
-    if (!onReject) return;
-    const rejected = await onReject();
-    if (rejected === false) return;
-    if (!onSavePrompt || !info?.prompt) return;
-    setDraft(info.prompt.promptCompressed || info.prompt.promptOriginal || "");
-    setEditing(true);
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      // Leave edit mode only if the save actually landed -- otherwise the creator's text is gone
-      // and the old prompt silently reappears as if nothing happened.
-      if (await onSavePrompt(draft)) setEditing(false);
-    } finally {
-      setSaving(false);
-    }
+  /** Editing a sent prompt never changes it: the studio opens with its text as the next draft. */
+  const editSent = (text) => {
+    setSeedDraft({ text });
+    onRegenerate?.();
   };
 
   const { data: images = [] } = useListPreProductionShotImagesQuery(shot.id, { skip: !shot.id });
@@ -953,6 +707,18 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
   // itself hasn't changed, which would otherwise force the browser to re-download the frame on
   // every open. Cache the bytes locally keyed by shot+kind instead of the ever-changing URL.
   const frameSrc = useCachedImageUrl(frame && `${shot.id}:${frame.kind}`, frame?.signedUrl);
+
+  // The shot's length in the film and its voice fit. One control: inside the studio while it is
+  // open (next to the clip length it decides), in the Shot group otherwise.
+  const lengthRow = (shot.durationSeconds || dubSeconds != null) ? (
+    <ShotLengthRow
+      shot={shot}
+      projectId={projectId}
+      dubSeconds={dubSeconds}
+      mismatch={dubMismatch}
+      overruns={dubOverruns}
+    />
+  ) : null;
 
   return (
     <div className={`relative overflow-hidden rounded-lg border bg-white/[0.02] ${selected ? "border-purple-400/50" : "border-white/10"} ${isOpen ? "col-span-full" : ""}`}>
@@ -1070,16 +836,24 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
                 opened: how long the shot is meant to run against how long the voice actually takes.
                 It was only visible inside the fit panel, which appears when something is already
                 wrong -- so a shot could look fine and not be. */}
-            {(shot.durationSeconds || dubSeconds != null) && (
-              <ShotLengthRow
-                shot={shot}
-                projectId={projectId}
-                dubSeconds={dubSeconds}
-                mismatch={dubMismatch}
-                overruns={dubOverruns}
-                onChanged={!hasClip ? onPrepare : undefined}
-              />
-            )}
+            {hasClip && !regenerating && lengthRow}
+            {/* Whether the line fits the shot, and what to do if not -- decided before the prompt is
+                written, since extending the shot or rephrasing the line both change it. */}
+            <DialogueFitPanel
+              shot={shot}
+              projectId={projectId}
+              // Swaps the spoken line inside the prompt that already exists and saves it as a new
+              // version, rather than rebuilding everything when only the words changed.
+              onDialogueReplaced={info?.prompt && onSavePrompt ? async (oldLine, newLine) => {
+                // The text that will actually be sent: the compressed one when compression ran.
+                const current = info.prompt.compressionApplied
+                  ? (info.prompt.promptCompressed || info.prompt.promptOriginal || "")
+                  : (info.prompt.promptOriginal || info.prompt.promptCompressed || "");
+                const swapped = replaceDialogueLine(current, oldLine, newLine);
+                if (!swapped) return false;
+                return onSavePrompt(swapped.text);
+              } : undefined}
+            />
 
             {playableUrl && (
               <ShotCanvasPlayer
@@ -1096,8 +870,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
 
           </CardGroup>
 
-          <CardGroup title="Voice & music" hint="Who reads the line, the recorded take, and the music bed under the shot.">
-            {(!hasClip || regenerating) && <DialogueBeatsEditor shot={shot} projectId={projectId} />}
+          <CardGroup title="Voice & music" hint="The spoken line — its recording and who reads it — and the music under the shot.">
             {/* Not gated on !info. video-generation-service was changed specifically so a bed
                 generated after a shot was prepared still gets mixed in -- when the prompt carries
                 no music reference it reads the shot's current track from pre-production. Hiding
@@ -1115,12 +888,17 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               dubVoiceId={shot.dubVoiceId}
               dubCastProfileId={shot.dubCastProfileId}
               onDubbed={onDubbed}
-            />
+            >
+              {(!hasClip || regenerating) && <DialogueBeatsEditor shot={shot} projectId={projectId} hasLine={!!dialogueVoiceText} />}
+            </DubbedVoiceControl>
             <SoundLayersPanel projectId={projectId} shot={shot} />
           </CardGroup>
 
           <CardGroup title="Generate" hint={hasClip && !regenerating ? "This shot has a clip. Regenerate to open the video studio again." : undefined}>
             <ShotControlsPanel projectId={projectId} shotId={shot.id} />
+            {info?.critiqueVerdict === "NEEDS_HUMAN_REVIEW" && (!hasClip || regenerating) && (
+              <CritiqueFindingsPanel findings={info.findings} fixing={busy} onAutoFix={onAutoFix} onReject={onReject} />
+            )}
             {/* The video studio replaces prepare-then-approve for a shot with no clip yet, or one being
                 redone: analyse, choose settings, build the timeline, read and correct the prompt, then
                 generate exactly that text. Every step is its own button, so no failure leaves the shot
@@ -1133,7 +911,17 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
                 generating={busy}
                 onGenerated={(job) => onStudioGenerated?.(job)}
                 onRegeneratePrompt={onPrepare}
+                // Rejects the prepared render waiting for approval, when there is one.
+                onReject={info?.externalJobId && !jobFailed && rejectedJobId !== info.externalJobId
+                  ? async () => { if (await onReject?.()) setRejectedJobId(info.externalJobId); }
+                  : undefined}
+                seedDraft={seedDraft}
+                lengthRow={lengthRow}
               />
+            )}
+
+            {hasClip && !regenerating && (
+              <VideoPromptCard shotId={shot.id} onEditSent={editSent} editsUnlocked={entitlements.editsEnabled} />
             )}
 
             {hasClip && !regenerating && onRegenerate && (
@@ -1157,6 +945,7 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
               </div>
             )}
 
+            <ShotThoughtLog shotId={shot.id} />
           </CardGroup>
 
           {hasClip && (
@@ -1187,238 +976,6 @@ export default function ShotVideoCard({ shot, projectId, isOpen, onToggle, info,
             </CardGroup>
           )}
 
-          <CardGroup title="Older tools & diagnostics" defaultOpen={false}
-            hint="The previous dialogue-fit and prepare/approve flow, critic findings, and the shot's thought log.">
-            {/* Shown before the prompt is built -- the mismatch is knowable from the plan and the
-                dubbed audio alone, and that is the cheapest moment to find it -- and shown again on a
-                shot that has ALREADY been generated, which is the case this most needs to cover: a
-                clip that shipped with its line cut looks finished, and without this there is nothing
-                on the card saying why it is wrong or offering to put it right. */}
-            <DialogueFitPanel
-              shot={shot}
-              projectId={projectId}
-              onResized={onPrepare}
-              // Swaps the spoken line inside the prompt that already exists and saves it as a new
-              // version. Accepting a rewrite used to trigger a full re-prepare, which rebuilds
-              // everything -- model recommendation, cost estimate, compression -- when the only thing
-              // that changed was the words. Changing the dialogue should change the dialogue.
-              onDialogueReplaced={info?.prompt && onSavePrompt ? async (oldLine, newLine) => {
-                // The text that will actually be sent: the compressed one when compression ran,
-                // since that is what dispatch picks. Swapping the line in the other one would edit a
-                // prompt nobody uses and look like it had worked.
-                const current = info.prompt.compressionApplied
-                  ? (info.prompt.promptCompressed || info.prompt.promptOriginal || "")
-                  : (info.prompt.promptOriginal || info.prompt.promptCompressed || "");
-                const swapped = replaceDialogueLine(current, oldLine, newLine);
-                if (!swapped) return false;
-                return onSavePrompt(swapped.text);
-              } : undefined}
-              // Only offered once there is a job to approve -- "go with the original" is a way of
-              // generating, so before prepare there is nothing for it to act on.
-              onKeepOriginal={info?.externalJobId && !hasClip ? () => onApprove?.({ dialogueFit: "KEEP_PLANNED" }) : undefined}
-            />
-
-            {info && info.critiqueVerdict === "NEEDS_HUMAN_REVIEW" && (
-              <CritiqueFindingsPanel
-                findings={info.findings}
-                fixing={busy}
-                onAutoFix={onAutoFix}
-                onReject={onReject}
-              />
-            )}
-
-            {/* Gated on the PROMPT, not on the job.
-
-                This used to require info.externalJobId, so a shot that had been prepared but had no
-                job row rendered none of this: no prompt, no version history, no Save -- and the card
-                fell through to a bare "Prepare shot for video" as though nothing had ever been built
-                for it. That is why Approve was missing on so many shots, and why restoring an older
-                prompt version "did nothing": the Use button sets the draft, and the Save that would
-                commit it lives in here. Approve itself still needs a job id and says so below. */}
-            {info && (
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-wrap gap-2">
-                  {info.recommendedModel && (
-                    <span className="rounded-full border border-purple-400/20 bg-purple-500/10 px-2.5 py-1 text-[11px] font-bold text-purple-200">
-                      Suggested model: {info.recommendedModel}
-                    </span>
-                  )}
-                  {info.estimatedCost != null && (
-                    <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-bold text-slate-300">
-                      {/* On a shot already rendered this is what generating it AGAIN would cost, not
-                          what was spent -- saying "Est. cost" there would read as a bill already paid. */}
-                      {hasClip && !regenerating ? "Regenerating costs: " : "Est. cost: "}
-                      {formatCost(info.estimatedCost, info.costCurrency)}
-                    </span>
-                  )}
-                </div>
-                {info.recommendationReasoning && (
-                  <p className="text-[11px] font-medium italic text-slate-400">"{info.recommendationReasoning}"</p>
-                )}
-                {info.prompt && (
-                  <div className="rounded-md border border-white/10 bg-white/[0.03] p-3">
-                    <div className="mb-1 flex items-center justify-between gap-2">
-                      <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-                        Prompt
-                        {/* The length this prompt will actually be generated at. Editing a shot's
-                            length changes the plan immediately, but the prepared prompt keeps the
-                            length it was built with until the shot is prepared again -- and it is the
-                            prompt that gets sent. Without this there was no way to tell from the page
-                            whether a change to 8s had reached the thing about to be generated. */}
-                        {info.prompt.durationSeconds != null && (
-                          <span className="ml-1.5 font-bold normal-case tracking-normal text-slate-400">
-                            · will generate {info.prompt.durationSeconds}s
-                            {shot.durationSeconds != null && shot.durationSeconds !== info.prompt.durationSeconds
-                              ? `, but the shot is now ${shot.durationSeconds}s — prepare again`
-                              : ""}
-                          </span>
-                        )}
-                      </p>
-                      {!editing && onSavePrompt && (
-                        <ProCta
-                          unlocked={entitlements.editsEnabled}
-                          feature="Editing the prompt"
-                          onClick={() => {
-                            setDraft(info.prompt.promptCompressed || info.prompt.promptOriginal || "");
-                            setEditing(true);
-                          }}
-                          className="flex items-center gap-1 text-[10px] font-bold text-purple-300 hover:text-purple-200"
-                        >
-                          <Pencil size={10} />
-                          Edit
-                        </ProCta>
-                      )}
-                    </div>
-                    {editing ? (
-                      <>
-                        <textarea
-                          value={draft}
-                          onChange={(event) => setDraft(event.target.value)}
-                          rows={8}
-                          className="creator-input w-full text-[11px] font-medium leading-relaxed"
-                        />
-                        <div className="mt-2 flex gap-2">
-                          <button
-                            type="button"
-                            disabled={saving || !draft.trim()}
-                            onClick={handleSave}
-                            className="flex items-center gap-1.5 rounded-md border border-purple-400/30 bg-purple-500/15 px-3 py-1.5 text-[11px] font-bold text-purple-200 disabled:opacity-50"
-                          >
-                            {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                            {saving ? "Saving…" : "Save prompt"}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={saving}
-                            onClick={() => setEditing(false)}
-                            className="rounded-md border border-white/10 px-3 py-1.5 text-[11px] font-bold text-slate-400 disabled:opacity-50"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                        <p className="mt-1.5 text-[10px] font-medium text-slate-500">
-                          Saving keeps a new version — the original stays in this shot's history, and the reference
-                          images below carry over unchanged.
-                        </p>
-                      </>
-                    ) : (
-                      <p className="whitespace-pre-wrap text-[11px] font-medium leading-relaxed text-slate-300">
-                        {info.prompt.promptCompressed || info.prompt.promptOriginal}
-                      </p>
-                    )}
-                    {info.prompt.negativePrompt && (
-                      <p className="mt-2 text-[10px] font-medium text-slate-500">Negative: {info.prompt.negativePrompt}</p>
-                    )}
-                    <PromptAttachments info={info} shotImages={images} />
-                    <PromptVersionHistory
-                      shotId={shot.id}
-                      canEdit={entitlements.editsEnabled && !!onSavePrompt}
-                      onUse={(text) => {
-                        setDraft(text);
-                        setEditing(true);
-                      }}
-                    />
-                  </div>
-                )}
-                {/* Approve and reject belong to a shot that has not been rendered yet. Once a clip
-                    exists the prompt above it is a record of what produced it, and the action that
-                    makes sense is to generate again -- which is the Regenerate control below. */}
-                {/* A prompt with no job behind it cannot be approved -- approve acts on the job, not
-                    the text. Say that, and offer the thing that creates one, instead of rendering
-                    nothing and leaving the shot looking unprepared. */}
-                {(!hasClip || regenerating) && !info.externalJobId && (
-                  <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-400/25 bg-amber-400/[0.06] p-2.5">
-                    <p className="flex-1 text-[10px] font-semibold text-amber-100">
-                      This prompt has no render job behind it yet, so there is nothing to approve.
-                      Preparing again builds one from the shot as it stands now — your saved prompt
-                      edits stay in the history.
-                    </p>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={onPrepare}
-                      className="flex items-center gap-1.5 rounded-md border border-amber-400/30 bg-amber-500/10 px-2.5 py-1.5 text-[10px] font-bold text-amber-100 disabled:opacity-50"
-                    >
-                      {busy ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
-                      {busy ? "Preparing…" : "Prepare again"}
-                    </button>
-                  </div>
-                )}
-
-                {jobFailed && !regenerating && (
-                  <div className="flex flex-wrap items-center gap-2 rounded-md border border-rose-400/25 bg-rose-500/[0.07] p-2.5">
-                    <p className="flex-1 text-[10px] font-semibold text-rose-100">
-                      This shot's render failed, so there is no clip. That job cannot be approved
-                      again — prepare it again to build a fresh prompt and try once more.
-                    </p>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={onPrepare}
-                      className="flex items-center gap-1.5 rounded-md border border-rose-400/30 bg-rose-500/10 px-2.5 py-1.5 text-[10px] font-bold text-rose-100 disabled:opacity-50"
-                    >
-                      {busy ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
-                      {busy ? "Preparing…" : "Prepare again"}
-                    </button>
-                  </div>
-                )}
-
-                {(!hasClip || regenerating) && info.externalJobId && !jobFailed && (
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={handleReject}
-                      className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-bold text-slate-300"
-                    >
-                      <X size={13} />
-                      Reject & rewrite
-                    </button>
-                    <select
-                      value={dialogueFitChoice}
-                      onChange={(event) => setDialogueFitChoice(event.target.value)}
-                      disabled={busy || editing}
-                      title="Choose whether generation may resize/refuse the shot for dialogue fit, or must keep the planned duration even if the voice is cut."
-                      className="creator-input min-w-44 px-2.5 py-2 text-[11px] font-bold text-slate-200 disabled:opacity-60"
-                    >
-                      <option value="">Fit dialogue automatically</option>
-                      <option value="KEEP_PLANNED">As planned — keep short clip</option>
-                    </select>
-                    <button
-                      type="button"
-                      disabled={busy || editing}
-                      title={editing ? "Save or cancel your prompt edit first." : undefined}
-                      onClick={() => onApprove?.({ dialogueFit: dialogueFitChoice || undefined })}
-                      className="creator-primary flex flex-1 items-center justify-center gap-2 py-2 text-xs font-bold text-white disabled:opacity-60"
-                    >
-                      {busy && <Loader2 size={13} className="animate-spin" />}
-                      {busy ? "Generating… (can take a few minutes)" : "Approve & generate"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-            <ShotThoughtLog shotId={shot.id} />
-          </CardGroup>
         </div>
       )}
     </div>

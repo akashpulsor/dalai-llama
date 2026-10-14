@@ -149,6 +149,16 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
   const [redub] = useTestShotVoiceMutation();
   const [retimed, setRetimed] = React.useState(null);
   const [applying, setApplying] = React.useState(false);
+  // "Go with the original" is a decision, not a render: it is remembered for this shot and this
+  // exact line, and the box folds to one line that can be undone.
+  const keptKey = `dialogue-fit-kept:${shot?.id}`;
+  const [kept, setKept] = React.useState(() => {
+    try { return localStorage.getItem(keptKey); } catch { return null; }
+  });
+  const keepOriginal = (line) => {
+    try { if (line) localStorage.setItem(keptKey, line); else localStorage.removeItem(keptKey); } catch { /* the choice still holds for this visit */ }
+    setKept(line);
+  };
 
   // Only the cases where something is actually lost get an interface. A shot whose line fits, or
   // whose line is SHORTER than the clip, renders nothing at all: every word is heard, the shot just
@@ -188,6 +198,16 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
     ? fit.beats.reduce((latest, beat) => (beat.startSeconds >= (latest?.startSeconds ?? -1) ? beat : latest), null)
     : null;
   const lineToRewrite = lastBeat?.text || fit.dialogue;
+
+  if (kept && kept === (fit.dialogue ?? lineToRewrite)) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-[10px] text-slate-400">
+        <Film size={11} className="shrink-0" />
+        <span className="flex-1">Going with the original line at the planned length — the end of the line may be cut.</span>
+        <button type="button" onClick={() => keepOriginal(null)} className="font-bold text-purple-300 hover:text-purple-200">Undo</button>
+      </div>
+    );
+  }
 
   const handleRewrite = async () => {
     setRetimed(null);
@@ -296,7 +316,9 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
       // anything -- the parent owns that, since it also owns the prepare button's busy state.
       onResized?.(extendTo);
       dispatch(showFlash({
-        message: `Shot is now ${extendTo}s. Prepare it again so the prompt matches.`,
+        message: onResized
+          ? `Shot is now ${extendTo}s — rebuilding the timeline and prompt to match.`
+          : `Shot is now ${extendTo}s. Press Update in the video studio to rebuild its plan.`,
         type: "success",
       }));
     } catch (error) {
@@ -315,6 +337,13 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
   const extendTo = recommendedExtend ?? (fit.verdict === "AUDIO_LONGER" ? fit.suggestedDurationSeconds : null);
   const extraSeconds = (extendTo ?? 0) - (fit.plannedDurationSeconds ?? 0);
   const canExtend = extendTo != null && extraSeconds > 0;
+  // The suggested option is the highlighted one; the other two stay alongside as equals.
+  const suggested = advice?.recommendation === "EXTEND" || advice?.recommendation === "REWRITE"
+    ? advice.recommendation : advice?.recommendation ? "AS_PLANNED" : null;
+  const optionClass = (option) => `flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[10px] font-bold disabled:opacity-50 ${
+    option === suggested
+      ? "border-purple-400/40 bg-purple-500/15 text-purple-100 hover:bg-purple-500/25"
+      : "border-white/15 bg-white/5 text-slate-200 hover:border-white/30"}`;
 
   return (
     <div className={`rounded-md border p-3 ${style.tone}`}>
@@ -398,7 +427,7 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
                 type="button"
                 disabled={updateShotState.isLoading}
                 onClick={handleResize}
-                className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 py-1.5 text-[10px] font-bold text-slate-200 hover:border-white/30 disabled:opacity-50"
+                className={optionClass("EXTEND")}
               >
                 {updateShotState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <ArrowRight size={11} />}
                 {`Extend shot to ${extendTo}s (+${extraSeconds}s, billed)`}
@@ -409,7 +438,7 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
                 type="button"
                 disabled={retimeState.isLoading}
                 onClick={handleRewrite}
-                className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-2.5 py-1.5 text-[10px] font-bold text-slate-200 hover:border-white/30 disabled:opacity-50"
+                className={optionClass("REWRITE")}
               >
                 {retimeState.isLoading ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
                 {retimeState.isLoading
@@ -417,23 +446,26 @@ export default function DialogueFitPanel({ shot, projectId, onResized, onKeepOri
                   : `Rephrase dialogue for ${seconds(fit.suggestedTargetAudioSeconds)}`}
               </button>
             )}
-            {onKeepOriginal && (
+            {!fit.needsDubbing && (
               <button
                 type="button"
-                onClick={onKeepOriginal}
+                onClick={() => (onKeepOriginal ? onKeepOriginal() : keepOriginal(fit.dialogue ?? lineToRewrite))}
                 title="Generate at the planned length and with the line as written."
-                className="flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1.5 text-[10px] font-bold text-slate-400 hover:text-slate-200"
+                className={optionClass("AS_PLANNED")}
               >
                 <Film size={11} />
                 Go with the original
               </button>
             )}
           </div>
-          <p className="mt-1.5 text-[10px] font-medium text-slate-500">
-            Extending keeps the whole line but adds billed seconds to this shot and to the film.
-            Rephrasing keeps both the length and the cost. Going with the original means the end of
-            the line is cut.
-          </p>
+          <details className="mt-1.5 text-[10px] font-medium text-slate-500">
+            <summary className="cursor-pointer select-none hover:text-slate-300">Which should I choose?</summary>
+            <p className="mt-1">
+              Extending keeps the whole line but adds billed seconds to this shot and to the film.
+              Rephrasing keeps both the length and the cost. Going with the original means the end
+              of the line is cut.
+            </p>
+          </details>
 
           {retimed && (
             <RewritePreview
