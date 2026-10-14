@@ -23,8 +23,9 @@ export default function ShowcaseCard({ card, onOpen, showCreator = true }) {
             <Play size={20} className="ml-0.5" fill="currentColor" />
           </span>
         </span>
+        {/* Where the film came from, not where it plays: made here, or picked from the creator's channel. */}
         {card.origin !== "PLATFORM" && (
-          <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">YouTube</span>
+          <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">External</span>
         )}
         {card.origin === "PLATFORM" && (
           <span className="absolute left-2 top-2 rounded bg-purple-600 px-1.5 py-0.5 text-[10px] font-bold text-white">Made on Dalaillama</span>
