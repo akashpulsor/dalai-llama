@@ -23,7 +23,7 @@ export default function ShowcaseCard({ card, onOpen, showCreator = true }) {
             <Play size={20} className="ml-0.5" fill="currentColor" />
           </span>
         </span>
-        {card.host === "YOUTUBE" && (
+        {card.origin !== "PLATFORM" && (
           <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">YouTube</span>
         )}
         {card.origin === "PLATFORM" && (

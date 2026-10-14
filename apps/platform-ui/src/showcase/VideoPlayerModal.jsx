@@ -21,6 +21,10 @@ export default function VideoPlayerModal({ card, onClose, actions }) {
   const mountRef = useRef(null);
   const [failed, setFailed] = useState(false);
   const [selfUrl, setSelfUrl] = useState(null);
+  // Made on Dalaillama: our own copy in our own player, never YouTube. A pick from the creator's
+  // channel plays through YouTube. Decided by where the film came from, not by whether YouTube has it.
+  const ownPlayer = card.origin === "PLATFORM" || card.host === "SELF";
+  const [attempt, setAttempt] = useState(0);
   const [reporting, setReporting] = useState(false);
   const counted = useRef(false);
 
@@ -30,17 +34,19 @@ export default function VideoPlayerModal({ card, onClose, actions }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // The film is fetched only now, on opening: the page itself loads nothing but thumbnails.
   useEffect(() => {
-    if (card.host !== "SELF") return undefined;
+    if (!ownPlayer) return undefined;
     let cancelled = false;
+    setFailed(false);
     getSelfSource(card.publicId)
       .then((source) => !cancelled && (source ? setSelfUrl(source.url) : setFailed(true)))
       .catch(() => !cancelled && setFailed(true));
     return () => { cancelled = true; };
-  }, [card]);
+  }, [card, ownPlayer, attempt]);
 
   useEffect(() => {
-    if (card.host !== "YOUTUBE") return undefined;
+    if (ownPlayer) return undefined;
     let player;
     let timer;
     loadYouTubeIframeApi().then((YT) => {
@@ -87,13 +93,20 @@ export default function VideoPlayerModal({ card, onClose, actions }) {
            onClick={(e) => e.stopPropagation()}>
         <div className="mx-auto w-full overflow-hidden rounded-xl bg-black sm:flex-1"
              style={{ aspectRatio: `${card.aspectW} / ${card.aspectH}`, maxHeight: "80vh", maxWidth: card.vertical ? 420 : undefined }}>
-          {failed ? (
+          {failed && ownPlayer ? (
+            <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-3 p-6 text-center text-sm text-white">
+              <p>This film couldn't load.</p>
+              <button type="button" onClick={() => setAttempt((n) => n + 1)}
+                      className="rounded-lg bg-white/[0.04] ring-1 ring-white/10 px-4 py-2 font-bold text-white">Try again</button>
+            </div>
+          ) : failed ? (
             <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-3 p-6 text-center text-sm text-white">
               <p>This video can't play here.</p>
               <a href={card.watchUrl} target="_blank" rel="noreferrer" className="rounded-lg bg-white/[0.04] ring-1 ring-white/10 px-4 py-2 font-bold text-white">Watch on YouTube</a>
             </div>
-          ) : card.host === "SELF" ? (
-            selfUrl && <video src={selfUrl} controls autoPlay playsInline onTimeUpdate={onSelfTime}
+          ) : ownPlayer ? (
+            selfUrl && <video src={selfUrl} controls autoPlay playsInline preload="auto" poster={card.thumbnailUrl}
+                              onError={() => setFailed(true)} onTimeUpdate={onSelfTime}
                               onEnded={() => recordPlay(card.publicId, true)} className="h-full w-full" />
           ) : (
             <div ref={mountRef} className="h-full w-full" />
@@ -116,7 +129,7 @@ export default function VideoPlayerModal({ card, onClose, actions }) {
           </a>
           <LikeButton card={card} />
           {actions}
-          {card.host === "YOUTUBE" && (
+          {!ownPlayer && (
             <a href={card.watchUrl} target="_blank" rel="noreferrer"
                className="flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-white">
               Watch on YouTube <ExternalLink size={14} />

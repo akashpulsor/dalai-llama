@@ -37,7 +37,7 @@ export default function PublishToShowcaseDialog({ projectId, onClose }) {
 
         {isLoading && <p className="mt-3 flex items-center gap-2 text-sm text-slate-400"><Loader2 size={14} className="animate-spin" /> Loading…</p>}
         {error && <p className="mt-3 text-sm text-rose-200">{errorMessage(error, "Could not load this film")}</p>}
-        {kit && !kit.filmReady && <p className="mt-3 text-sm text-amber-200">Publish the finished film to the review page first.</p>}
+        {kit && !kit.filmReady && <p className="mt-3 text-sm text-amber-200">Combine the shots into one film first.</p>}
 
         {kit && kit.filmReady && (
           <div className="mt-4 space-y-4">

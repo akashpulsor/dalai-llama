@@ -289,7 +289,9 @@ export default function FilmAssemblyBar({ projectId, aspectRatio }) {
           </button>
         )}
 
-        {film?.status === "COMPLETED" && film?.published && (onProfile ? (
+        {/* The profile shows the newest finished film -- this one -- whether or not it was published
+            to the client's review page. */}
+        {film?.status === "COMPLETED" && (onProfile ? (
           <Link
             to="/profile#films"
             className="flex min-h-9 items-center justify-center gap-2 rounded-md border border-emerald-400/30 bg-emerald-500/10 px-4 text-xs font-black text-emerald-100"
