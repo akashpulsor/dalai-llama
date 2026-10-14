@@ -4,6 +4,7 @@ import { ChevronDown, ExternalLink, UserCircle } from "lucide-react";
 import ProfileForm from "../components/showcase/ProfileForm.jsx";
 import VideoPickerGrid from "../components/showcase/VideoPickerGrid.jsx";
 import ShowcaseManager from "../components/showcase/ShowcaseManager.jsx";
+import PlatformFilmsCard from "../components/showcase/PlatformFilmsCard.jsx";
 import LadderCard from "../components/showcase/LadderCard.jsx";
 import { ConnectionCard, useYouTubeResultFlash } from "../components/outreach/YouTubePanel.jsx";
 import { RequestsList } from "./RequestsPage.jsx";
@@ -67,6 +68,10 @@ export default function CreatorProfilePage() {
           <section id="videos">
             <h2 className={heading}>On your profile</h2>
             <ShowcaseManager />
+          </section>
+          <section id="films">
+            <h2 className={heading}>Films made on Dalaillama</h2>
+            <PlatformFilmsCard />
           </section>
           <section>
             <h2 className={heading}>Your channel's videos</h2>

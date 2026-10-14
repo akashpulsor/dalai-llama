@@ -249,6 +249,15 @@ export const showcaseApi = showcaseBase.injectEndpoints({
       query: () => ({ url: "/tenants/me/youtube/connection", method: "DELETE" }),
       invalidatesTags: ["YouTubeConnection", "YouTubeAnalytics"],
     }),
+    // Every channel the creator connected, the profile's first. "Connect another" uses the same start.
+    getYouTubeChannels: builder.query({
+      query: () => ({ url: "/tenants/me/youtube/connection/channels" }),
+      providesTags: ["YouTubeConnection"],
+    }),
+    disconnectYouTubeChannel: builder.mutation({
+      query: (connectionId) => ({ url: `/tenants/me/youtube/connection/channels/${connectionId}`, method: "DELETE" }),
+      invalidatesTags: ["YouTubeConnection", "YouTubeAnalytics"],
+    }),
     getPublishableFilms: builder.query({
       query: () => ({ url: "/tenants/me/youtube/films" }),
       providesTags: ["FilmConsent"],
@@ -414,6 +423,8 @@ export const {
   useSendToAudienceMutation,
   useGetOutreachAnalyticsQuery,
   useGetYouTubeConnectionQuery,
+  useGetYouTubeChannelsQuery,
+  useDisconnectYouTubeChannelMutation,
   useStartYouTubeConnectMutation,
   useDisconnectYouTubeMutation,
   useGetPublishableFilmsQuery,

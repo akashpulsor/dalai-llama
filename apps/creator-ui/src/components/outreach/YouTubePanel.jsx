@@ -6,12 +6,13 @@ import { showFlash } from "@dalaillama/shared-store";
 import {
   useRecordMarketingConsentMutation,
   useCancelPublishJobMutation,
-  useDisconnectYouTubeMutation,
+  useDisconnectYouTubeChannelMutation,
   useEditYouTubeVideoMutation,
   useGetExtensionTokensQuery,
   useGetPublishableFilmsQuery,
   useGetPublishJobsQuery,
   useGetYouTubeAnalyticsQuery,
+  useGetYouTubeChannelsQuery,
   useGetYouTubeConnectionQuery,
   usePairExtensionMutation,
   usePublishToYouTubeMutation,
@@ -59,7 +60,6 @@ const YOUTUBE_RESULT = {
   no_offline_access: ["Google didn't give lasting access; please connect again", "error"],
   no_channel: ["That Google account has no YouTube channel", "error"],
   taken: ["That channel is connected to another Dalai Llama account", "error"],
-  other_channel: ["Your account already uses a different channel; disconnect it first", "error"],
   failed: ["Connecting YouTube failed; please try again", "error"],
 };
 
@@ -81,21 +81,27 @@ function useFail() {
   return (e, fallback) => dispatch(showFlash({ message: errorMessage(e, fallback), type: "error" }));
 }
 
+/** The creator's connected channels. The first is the profile's channel (imports and analytics);
+ * any others are places to publish films, picked per upload. */
 export function ConnectionCard({ connection }) {
   const fail = useFail();
   const [start, startState] = useStartYouTubeConnectMutation();
-  const [disconnect, disconnectState] = useDisconnectYouTubeMutation();
+  const [disconnect, disconnectState] = useDisconnectYouTubeChannelMutation();
+  const { data: channels = [] } = useGetYouTubeChannelsQuery(undefined, { skip: !connection?.channelId });
   const connect = async () => {
     try { window.location.assign((await start().unwrap()).authorizationUrl); } catch (e) { fail(e, "Couldn't start connecting"); }
   };
-  const remove = async () => {
-    if (!window.confirm("Disconnect your YouTube channel? Publishing and analytics stop until you connect again.")) return;
-    try { await disconnect().unwrap(); } catch (e) { fail(e, "Couldn't disconnect"); }
+  const remove = async (channel) => {
+    const message = channel.profileChannel
+      ? `Disconnect ${channel.channelTitle}? Publishing to it and your analytics stop until you connect it again. Your profile keeps the channel.`
+      : `Disconnect ${channel.channelTitle}? You won't be able to publish to it until you connect it again.`;
+    if (!window.confirm(message)) return;
+    try { await disconnect(channel.connectionId).unwrap(); } catch (e) { fail(e, "Couldn't disconnect"); }
   };
 
   return (
     <section className="creator-panel p-5">
-      <h2 className="text-sm font-bold uppercase tracking-normal text-slate-300">Your YouTube channel</h2>
+      <h2 className="text-sm font-bold uppercase tracking-normal text-slate-300">Your YouTube channels</h2>
       {!connection?.oauthConfigured ? (
         <p className="mt-2 text-sm text-slate-400">Connecting YouTube isn't switched on yet.</p>
       ) : !connection?.channelId ? (
@@ -109,27 +115,40 @@ export function ConnectionCard({ connection }) {
           </button>
         </div>
       ) : (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            {connection.channelThumbnail && <img src={connection.channelThumbnail} alt="" className="h-11 w-11 rounded-full object-cover" />}
-            <div>
-              <p className="font-bold text-white">{connection.channelTitle}</p>
-              <p className="text-xs text-slate-400">
-                {connection.connected ? "Connected" : "Access expired: reconnect to keep publishing"}
-                {connection.connected && !connection.canReadAnalytics && " · analytics not allowed"}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            {(!connection.connected || !connection.canReadAnalytics) && (
-              <button type="button" onClick={connect} disabled={startState.isLoading} className="creator-primary flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white">
-                <RotateCw size={13} /> Reconnect
-              </button>
-            )}
-            <button type="button" onClick={remove} disabled={disconnectState.isLoading} className="creator-control px-3 py-2 text-xs font-bold text-slate-300">
-              Disconnect
-            </button>
-          </div>
+        <div className="mt-3 space-y-3">
+          <ul className="space-y-3">
+            {(channels.length ? channels : [connection]).map((channel) => (
+              <li key={channel.connectionId || channel.channelId} className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  {channel.channelThumbnail && <img src={channel.channelThumbnail} alt="" className="h-10 w-10 rounded-full object-cover" />}
+                  <div className="min-w-0">
+                    <p className="truncate font-bold text-white">{channel.channelTitle}</p>
+                    <p className="text-xs text-slate-400">
+                      {channel.profileChannel ? "Profile channel" : "For publishing"}
+                      {" · "}{channel.connected ? "Connected" : "Access expired: reconnect to keep publishing"}
+                      {channel.connected && channel.profileChannel && !channel.canReadAnalytics && " · analytics not allowed"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {(!channel.connected || (channel.profileChannel && !channel.canReadAnalytics)) && (
+                    <button type="button" onClick={connect} disabled={startState.isLoading} className="creator-primary flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white">
+                      <RotateCw size={13} /> Reconnect
+                    </button>
+                  )}
+                  {channel.connectionId && (
+                    <button type="button" onClick={() => remove(channel)} disabled={disconnectState.isLoading} className="creator-control px-3 py-2 text-xs font-bold text-slate-300">
+                      Disconnect
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+          <button type="button" onClick={connect} disabled={startState.isLoading} className="creator-control px-3 py-2 text-xs font-bold text-slate-200">
+            + Connect another channel
+          </button>
+          <p className="text-[11px] text-slate-500">On Google's page, choose the other channel (or brand account) you want to add.</p>
         </div>
       )}
     </section>
@@ -208,7 +227,12 @@ export function PublishCard({ projectId = "", defaultPrivacy = "PRIVATE" }) {
   const [polling, setPolling] = useState(0);
   const { data: jobs = [] } = useGetPublishJobsQuery(undefined, { pollingInterval: polling });
   const [publish, publishState] = usePublishToYouTubeMutation();
-  const [form, setForm] = useState({ projectId, title: "", description: "", tags: "", privacy: defaultPrivacy, publishAt: "", confirmPublic: false });
+  const { data: channels = [] } = useGetYouTubeChannelsQuery();
+  const [form, setForm] = useState({ projectId, title: "", description: "", tags: "", privacy: defaultPrivacy, publishAt: "", confirmPublic: false, connectionId: "" });
+  const publishable = channels.filter((c) => c.connected && c.canPublish);
+  // The profile's channel unless the creator picks another.
+  const channel = publishable.find((c) => c.connectionId === form.connectionId) || publishable[0];
+  const channelTitles = Object.fromEntries(channels.map((c) => [c.connectionId, c.channelTitle]));
   const [key, setKey] = useState(newKey);
 
   useEffect(() => {
@@ -227,7 +251,7 @@ export function PublishCard({ projectId = "", defaultPrivacy = "PRIVATE" }) {
         projectId: film.projectId, title: form.title, description: form.description,
         tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),
         privacy: form.privacy, publishAt: form.publishAt ? new Date(form.publishAt).toISOString() : null,
-        confirmPublic: form.confirmPublic, idempotencyKey: key,
+        confirmPublic: form.confirmPublic, idempotencyKey: key, connectionId: channel?.connectionId ?? null,
       }).unwrap();
       setKey(newKey());
       setForm((f) => ({ ...f, confirmPublic: false }));
@@ -250,6 +274,14 @@ export function PublishCard({ projectId = "", defaultPrivacy = "PRIVATE" }) {
               {films.map((f) => <option key={f.projectId} value={f.projectId}>{f.name}{f.clientConsented ? "" : " (private only)"}</option>)}
             </select>
           </label>
+          {publishable.length > 1 && (
+            <label className="block sm:col-span-2"><span className={label}>Channel</span>
+              <select value={channel?.connectionId || ""} onChange={(e) => setForm({ ...form, connectionId: e.target.value })}
+                      className="w-full rounded-lg border border-white/10 bg-[#0b0f19] px-3 py-2.5 text-sm text-white">
+                {publishable.map((c) => <option key={c.connectionId} value={c.connectionId}>{c.channelTitle}{c.profileChannel ? " (profile channel)" : ""}</option>)}
+              </select>
+            </label>
+          )}
           <label className="block sm:col-span-2"><span className={label}>Title</span>
             <input required maxLength={100} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value.replace(/[<>]/g, "") })} className={input} />
           </label>
@@ -278,7 +310,7 @@ export function PublishCard({ projectId = "", defaultPrivacy = "PRIVATE" }) {
           {goesPublic && (
             <label className="flex items-start gap-2 rounded-lg border border-amber-300/30 bg-amber-500/10 p-3 text-sm text-amber-100 sm:col-span-2">
               <input type="checkbox" checked={form.confirmPublic} onChange={(e) => setForm({ ...form, confirmPublic: e.target.checked })} className="mt-1" />
-              I understand this video will be public on my YouTube channel{form.publishAt ? " at the scheduled time" : ""}.
+              I understand this video will be public on {channel?.channelTitle || "my YouTube channel"}{form.publishAt ? " at the scheduled time" : ""}.
             </label>
           )}
           <div className="sm:col-span-2">
@@ -291,14 +323,16 @@ export function PublishCard({ projectId = "", defaultPrivacy = "PRIVATE" }) {
       )}
       {jobs.length > 0 && (
         <ul className="mt-6 space-y-3">
-          {jobs.map((j) => <JobRow key={j.id} job={j} />)}
+          {jobs.filter((j) => !projectId || j.projectId === projectId).map((j) => (
+            <JobRow key={j.id} job={j} channelTitle={channels.length > 1 ? channelTitles[j.connectionId] : null} />
+          ))}
         </ul>
       )}
     </section>
   );
 }
 
-function JobRow({ job }) {
+function JobRow({ job, channelTitle = null }) {
   const fail = useFail();
   const fileRef = useRef(null);
   const [cancel] = useCancelPublishJobMutation();
@@ -318,7 +352,7 @@ function JobRow({ job }) {
         <div className="min-w-0">
           <p className="font-bold text-white">{job.title}</p>
           <p className="text-xs text-slate-400">
-            {job.privacy.toLowerCase()}{job.publishAt ? ` · goes public ${new Date(job.publishAt).toLocaleString()}` : ""}
+            {channelTitle ? `${channelTitle} · ` : ""}{job.privacy.toLowerCase()}{job.publishAt ? ` · goes public ${new Date(job.publishAt).toLocaleString()}` : ""}
             {job.via === "EXTENSION" ? " · from the extension" : ""}
           </p>
         </div>
