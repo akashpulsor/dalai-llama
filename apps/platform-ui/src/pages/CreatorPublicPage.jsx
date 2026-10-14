@@ -64,6 +64,9 @@ export default function CreatorPublicPage() {
         {profile.avatarUrl && <img src={profile.avatarUrl} alt="" className="h-24 w-24 rounded-full border-4 border-white object-cover shadow" />}
         <div className="min-w-0 flex-1">
           <h1 className="text-3xl font-bold tracking-tight text-white">{profile.displayName}</h1>
+          {profile.companyName && profile.companyName !== profile.displayName && (
+            <p className="mt-0.5 text-sm font-semibold text-slate-400">{profile.companyName}</p>
+          )}
           {profile.headline && <p className="mt-1 text-lg text-slate-300">{profile.headline}</p>}
           <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500">
             {profile.countryCode && <span className="flex items-center gap-1"><MapPin size={14} /> {profile.countryCode}</span>}

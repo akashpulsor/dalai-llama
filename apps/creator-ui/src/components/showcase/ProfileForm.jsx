@@ -109,9 +109,16 @@ export default function ProfileForm() {
             )}
           </label>
           <label className="block">
-            <span className={labelClass}>Name brands see</span>
+            <span className={labelClass}>Your name</span>
             <input id="displayName" value={form.displayName} onChange={set("displayName")} maxLength={80} className={inputClass} />
           </label>
+          {/* The account's company: fixed with the account, shown beside the creator's own name. */}
+          {profile.companyName && (
+            <div className="block">
+              <span className={labelClass}>Company</span>
+              <p className="py-2.5 text-sm text-slate-300">{profile.companyName}</p>
+            </div>
+          )}
           <label className="block">
             <span className={labelClass}>Country (2 letters)</span>
             <input id="countryCode" value={form.countryCode} onChange={set("countryCode")} maxLength={2} placeholder="IN" className={inputClass} />
