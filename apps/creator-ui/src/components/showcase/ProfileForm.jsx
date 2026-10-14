@@ -89,7 +89,8 @@ export default function ProfileForm() {
               <input
                 id="handle"
                 value={form.handle}
-                onChange={set("handle")}
+                // Handles are lower case, so a capital can never make a second creator's link.
+                onChange={(e) => setForm((f) => ({ ...f, handle: e.target.value.toLowerCase() }))}
                 onBlur={() => handleChanged && checkHandle(form.handle)}
                 className={inputClass}
                 disabled={Boolean(profile.handleChangeAllowedFrom)}
