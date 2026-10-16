@@ -4297,6 +4297,10 @@ export const creatorApi = apiSlice.injectEndpoints({
         url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/conform/${requestId}`),
       }),
     }),
+    // The film's shots as planned (full length, top resolution) against as made.
+    getGenerationSavings: builder.query({
+      query: (projectId) => ({ url: platformUrl(`/scenes/projects/${projectId}/generation-savings`) }),
+    }),
     // One shot's generation controls: its own set, or (custom: false) the project's defaults.
     getShotGenerationControls: builder.query({
       query: ({ projectId, shotId }) => ({ url: platformUrl(`/scenes/projects/${projectId}/shots/${shotId}/generation-controls`) }),
@@ -5084,6 +5088,7 @@ export const {
   useRequestShotConformMutation,
   useGetGenerationControlsQuery,
   useGetShotGenerationControlsQuery,
+  useGetGenerationSavingsQuery,
   useUpdateShotGenerationControlsMutation,
   useResetShotGenerationControlsMutation,
   useUpdateGenerationControlsMutation,

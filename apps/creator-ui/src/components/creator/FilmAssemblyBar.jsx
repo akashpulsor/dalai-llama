@@ -10,6 +10,7 @@ import PublishToProfileDialog from "../showcase/PublishToProfileDialog.jsx";
 import {
   useAssembleFilmMutation,
   useGetFilmReadinessQuery,
+  useGetGenerationSavingsQuery,
   useGetLatestFilmQuery,
   useUpscaleFilmMutation,
   useListProjectClipsQuery,
@@ -333,6 +334,8 @@ export default function FilmAssemblyBar({ projectId, aspectRatio }) {
         </p>
       )}
 
+      {film?.status === "COMPLETED" && <SavingsCard projectId={projectId} filmId={film.renderId} />}
+
       {film?.status === "COMPLETED" && film?.videoUrl && (
         <div className="mt-3">
           <ShotCanvasPlayer
@@ -343,6 +346,33 @@ export default function FilmAssemblyBar({ projectId, aspectRatio }) {
           />
         </div>
       )}
+    </div>
+  );
+}
+
+/** What making the film smart saved: every shot at its planned length and top resolution against
+ * the shorter, lighter clips actually generated and slowed to fit. Refetched for each new film. */
+function SavingsCard({ projectId, filmId }) {
+  const { data, refetch } = useGetGenerationSavingsQuery(projectId, { skip: !projectId });
+  React.useEffect(() => {
+    if (filmId) refetch();
+  }, [filmId, refetch]);
+  if (!data || data.shots === 0 || data.savedPercent <= 0) return null;
+  const money = (amount) =>
+    new Intl.NumberFormat("en-IN", { style: "currency", currency: data.currency || "INR", maximumFractionDigits: 0 }).format(amount);
+  return (
+    <div className="mt-3 flex items-center gap-3 rounded-md border border-emerald-400/30 bg-emerald-500/[0.08] px-3 py-2.5">
+      <Sparkles size={16} className="shrink-0 text-emerald-300" />
+      <div className="min-w-0 text-[11px] leading-relaxed text-emerald-100">
+        <p className="text-sm font-bold text-emerald-200">
+          You saved {money(data.savedCost)} ({data.savedPercent}%)
+        </p>
+        <p>
+          Planned at full length and top quality: <span className="line-through opacity-70">{money(data.plannedCost)}</span>{" "}
+          · made for <span className="font-bold">{money(data.actualCost)}</span> — {data.generatedSeconds}s generated
+          for {data.plannedSeconds}s of film.
+        </p>
+      </div>
     </div>
   );
 }
