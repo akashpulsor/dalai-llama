@@ -11,6 +11,7 @@ import {
   useDetachShotContinuationFrameMutation,
   useGenerateShotFromPlanMutation,
   useGetShotGenerationPlanQuery,
+  useGetSlowDownBreakEvenQuery,
   useListShotPromptVersionsQuery,
   useResetShotGenerationDraftMutation,
   useSaveShotGenerationDraftMutation,
@@ -20,6 +21,7 @@ import {
 } from "../../api/creatorEndpoints.js";
 import {
   clipOutcome,
+  slowDownSaving,
   closeTimelineGaps,
   differsFromRecommendation,
   formatSeconds,
@@ -167,6 +169,9 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
   // The analysis's shorter length, offered as an option -- a cost saving the creator opts into.
   const saver = assessment?.shorterGenerationSuitable && assessment.recommendedDurationSeconds < (planned ?? 0)
     ? assessment.recommendedDurationSeconds : null;
+  // Whether a shorter clip slowed back is actually cheaper for this model -- a share, never a rate.
+  const { data: breakEven } = useGetSlowDownBreakEvenQuery(plan.modelId, { skip: !plan.modelId });
+  const slowing = slowDownSaving(planned, breakEven?.ratio, caps.supportedDurationsSeconds);
   const blockers = [
     ...generateBlockers(plan, editorText),
     ...(clipPending ? [`The clip is set to ${clipSeconds}s but the plan is built for ${duration}s. Press Update first.`] : []),
@@ -336,7 +341,7 @@ export default function VideoStudioPanel({ shot, projectId, previousShot, genera
           be a numbered step with its own rebuild, and changing the length opened a dialog on top. */}
       <PlanBar
         status={status}
-        clip={{ seconds: clipSeconds, options: caps.supportedDurationsSeconds, shotSeconds: planned, fitSeconds, saver, spoken, pending: clipPending }}
+        clip={{ seconds: clipSeconds, options: caps.supportedDurationsSeconds, shotSeconds: planned, fitSeconds, saver, spoken, pending: clipPending, slowing }}
         onClipChange={(seconds) => setClipChoice(seconds === duration ? null : seconds)}
         busy={planBusy || settingsState.isLoading}
         disabled={clipSeconds == null}
@@ -523,10 +528,15 @@ const STEP_LOOK = {
   missing: { Icon: Circle, className: "text-slate-500" },
 };
 
-function clipOptionLabel(seconds, { shotSeconds, fitSeconds, saver }) {
+function clipOptionLabel(seconds, { shotSeconds, fitSeconds, saver, slowing }) {
   if (seconds === fitSeconds) return `${seconds}s — whole shot`;
-  if (seconds === saver) return `${seconds}s — cost saver, slowed after`;
-  if (shotSeconds != null && seconds < shotSeconds) return `${seconds}s — slowed after`;
+  // A shorter clip is only a saving under the model's break-even; above it, say it costs more.
+  const costsMore = slowing && shotSeconds != null && seconds < shotSeconds && !slowing.saves(seconds);
+  if (seconds === saver) return costsMore ? `${seconds}s — slowed after, costs more` : `${seconds}s — cost saver, slowed after`;
+  if (shotSeconds != null && seconds < shotSeconds) {
+    if (!slowing) return `${seconds}s — slowed after`;
+    return costsMore ? `${seconds}s — slowed after, costs more` : `${seconds}s — slowed after, saves`;
+  }
   if (shotSeconds != null && seconds > shotSeconds) return `${seconds}s — trimmed after`;
   return `${seconds}s`;
 }
@@ -574,6 +584,11 @@ function PlanBar({ status, clip, onClipChange, busy, disabled, onUpdate }) {
         </button>
       </div>
       {outcome && <p className="text-[10px] text-amber-100/90">{outcome}</p>}
+      {clip.slowing && clip.shotSeconds != null && clip.seconds != null && clip.seconds < clip.shotSeconds && (
+        <p className={`text-[10px] ${clip.slowing.saves(clip.seconds) ? "text-emerald-200/90" : "text-amber-100/90"}`}>
+          {clip.slowing.note}
+        </p>
+      )}
       {!busy && behind && status.problems.length > 0 && (
         <ul className="space-y-0.5 text-[10px] text-amber-100">
           {status.problems.map((problem) => <li key={problem} className="flex gap-1.5"><AlertTriangle size={10} className="mt-0.5 shrink-0 text-amber-300" />{problem}</li>)}

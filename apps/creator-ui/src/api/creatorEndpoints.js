@@ -4297,6 +4297,10 @@ export const creatorApi = apiSlice.injectEndpoints({
         url: platformUrl(`/post-production/projects/${projectId}/shots/${shotId}/conform/${requestId}`),
       }),
     }),
+    // The share of a shot's length under which a shorter clip slowed back saves money (no rate).
+    getSlowDownBreakEven: builder.query({
+      query: (modelId) => ({ url: platformUrl(`/scenes/slow-down-break-even?modelId=${encodeURIComponent(modelId)}`) }),
+    }),
     // The film's shots as planned (full length, top resolution) against as made.
     getGenerationSavings: builder.query({
       query: (projectId) => ({ url: platformUrl(`/scenes/projects/${projectId}/generation-savings`) }),
@@ -5089,6 +5093,7 @@ export const {
   useGetGenerationControlsQuery,
   useGetShotGenerationControlsQuery,
   useGetGenerationSavingsQuery,
+  useGetSlowDownBreakEvenQuery,
   useUpdateShotGenerationControlsMutation,
   useResetShotGenerationControlsMutation,
   useUpdateGenerationControlsMutation,

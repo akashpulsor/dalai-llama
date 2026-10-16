@@ -170,6 +170,27 @@ export function clipOutcome(seconds, shotSeconds, spoken) {
 }
 
 /**
+ * When a shorter clip slowed back to the shot costs less than generating the whole shot. ratio is
+ * the model's break-even share from the backend (0.56 = 56%); the slow-down is paid on the whole
+ * shot, so a clip only a little shorter costs more. Null when the shot or ratio is unknown.
+ */
+export function slowDownSaving(shotSeconds, ratio, options = []) {
+  if (shotSeconds == null || ratio == null) return null;
+  const limit = Number(shotSeconds) * Number(ratio);
+  const saving = options.filter((s) => s < limit);
+  const percent = Math.round(Number(ratio) * 100);
+  const maxSeconds = saving.length ? Math.max(...saving) : null;
+  return {
+    percent,
+    maxSeconds,
+    saves: (seconds) => seconds != null && seconds < Number(shotSeconds) && seconds < limit,
+    note: maxSeconds == null
+      ? `Slowing saves money only when the clip is under about ${percent}% of the shot's length — no clip length is that short for this ${formatSeconds(shotSeconds)}s shot, so generate the whole shot.`
+      : `Slowing saves money only when the clip is under about ${percent}% of the shot's length — ${formatSeconds(maxSeconds)}s or less for this ${formatSeconds(shotSeconds)}s shot. Longer clips slowed back cost more than generating the whole shot.`,
+  };
+}
+
+/**
  * What changing a shot's length in the film does, in words for the confirmation. The shot's length
  * is the film's running time; the clip length is the model's and stays as chosen.
  */

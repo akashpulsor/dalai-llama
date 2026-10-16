@@ -8,6 +8,7 @@ import {
   generateBlockers,
   hasUnsavedEdits,
   clipOutcome,
+  slowDownSaving,
   squeezedLineFix,
   shotLengthChangeNote,
   closeTimelineGaps,
@@ -235,6 +236,20 @@ test("clipOutcome says what post-production does to the clip for the shot", () =
   assert.equal(clipOutcome(3, 7, true), "After generation, \"Slow down & interpolate\" stretches it 2.3× to the 7s shot. The line plays at normal speed, so lips will not match.");
   assert.equal(clipOutcome(3, 7, false), "After generation, \"Slow down & interpolate\" stretches it 2.3× to the 7s shot. More than 2× slower can look unnatural.");
   assert.equal(clipOutcome(5, 7, false), "After generation, \"Slow down & interpolate\" stretches it 1.4× to the 7s shot.");
+});
+
+test("slowDownSaving says which clip lengths save money once slowed back", () => {
+  // Wan 3.0: slowing pays under 56% of the shot, so for a 7s shot 3s saves and 4s+ costs more.
+  const wan = slowDownSaving(7, 0.5588, [3, 4, 5, 6, 7, 8]);
+  assert.equal(wan.maxSeconds, 3);
+  assert.equal(wan.saves(3), true);
+  assert.equal(wan.saves(4), false);
+  assert.equal(wan.saves(7), false);
+  assert.equal(wan.note, "Slowing saves money only when the clip is under about 56% of the shot's length — 3s or less for this 7s shot. Longer clips slowed back cost more than generating the whole shot.");
+  // Nothing short enough: say so rather than suggest a saving.
+  assert.match(slowDownSaving(4, 0.5588, [3, 4, 5]).note, /no clip length is that short/);
+  assert.equal(slowDownSaving(null, 0.5, [3]), null);
+  assert.equal(slowDownSaving(7, null, [3]), null);
 });
 
 test("changing a shot's length says the whole video changes and the clip does not", () => {
