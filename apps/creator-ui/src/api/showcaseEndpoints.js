@@ -66,6 +66,11 @@ export const showcaseApi = showcaseBase.injectEndpoints({
       query: ({ itemId, ...body }) => ({ url: `/tenants/me/showcase/${itemId}`, method: "PUT", body }),
       invalidatesTags: ["ShowcaseItems", "ShowcaseProfile", "ShowcaseVisibility"],
     }),
+    // A video file (often private on YouTube) with its chosen thumbnail, as multipart form data.
+    uploadShowcaseVideo: builder.mutation({
+      query: (body) => ({ url: "/tenants/me/showcase/uploads", method: "POST", body }),
+      invalidatesTags: ["ShowcaseItems", "ShowcaseProfile", "ShowcaseVisibility"],
+    }),
     removeShowcaseItem: builder.mutation({
       query: (itemId) => ({ url: `/tenants/me/showcase/${itemId}`, method: "DELETE" }),
       invalidatesTags: ["ShowcaseItems", "ShowcaseProfile", "ShowcaseVisibility"],
@@ -400,6 +405,7 @@ export const {
   usePickVideoMutation,
   useUpdateShowcaseItemMutation,
   useRemoveShowcaseItemMutation,
+  useUploadShowcaseVideoMutation,
   useReorderShowcaseMutation,
   useGetYouTubeKitQuery,
   useRecordMarketingConsentMutation,

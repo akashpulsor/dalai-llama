@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
-import { ArrowDown, ArrowUp, Eye, EyeOff, Loader2, Pencil, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Eye, EyeOff, Loader2, Pencil, Trash2, Upload } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useGetMyShowcaseQuery,
@@ -10,6 +10,7 @@ import {
   useUpdateShowcaseItemMutation,
 } from "../../api/showcaseEndpoints.js";
 import ShowcaseFields from "./ShowcaseFields.jsx";
+import UploadVideoDialog from "./UploadVideoDialog.jsx";
 import { FORMAT_LABEL, INDUSTRY_LABEL, errorMessage } from "./showcaseLabels.js";
 
 /** The videos on the creator's profile, in their order. */
@@ -20,6 +21,7 @@ export default function ShowcaseManager() {
   const [remove] = useRemoveShowcaseItemMutation();
   const [reorder] = useReorderShowcaseMutation();
   const [editing, setEditing] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   const fail = (e, fallback) => dispatch(showFlash({ message: errorMessage(e, fallback), type: "error" }));
 
@@ -65,12 +67,25 @@ export default function ShowcaseManager() {
   };
 
   if (isLoading) return <Loader2 size={16} className="animate-spin text-slate-400" />;
-  if (items.length === 0) {
-    return <p className="text-sm text-slate-400">Nothing on your profile yet. Pick videos from your channel below.</p>;
-  }
+
+  // A video that is private on YouTube can't be picked from the channel: upload the file instead.
+  const uploadBar = (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <p className="text-xs text-slate-400">
+        {items.length === 0 ? "Nothing on your profile yet. Pick videos from your channel below, or upload one." : "Private on YouTube? Upload the file."}
+      </p>
+      <button type="button" onClick={() => setUploading(true)}
+              className="creator-control flex h-8 items-center gap-1.5 px-3 text-xs font-bold text-slate-100">
+        <Upload size={13} /> Upload a video
+      </button>
+      {uploading && <UploadVideoDialog onClose={() => setUploading(false)} />}
+    </div>
+  );
+  if (items.length === 0) return uploadBar;
 
   return (
     <div className="space-y-2">
+      {uploadBar}
       {items.map((item, index) => (
         <div key={item.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-3">
           <div className="h-14 w-20 shrink-0 overflow-hidden rounded bg-black">
@@ -79,7 +94,9 @@ export default function ShowcaseManager() {
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-white">{item.title}</p>
             <p className="text-xs text-slate-400">
-              {item.origin === "PLATFORM" && <span className="mr-1.5 rounded bg-purple-500/20 px-1.5 py-0.5 text-[10px] font-bold text-purple-100">Made on Dalaillama</span>}
+              {item.origin === "PLATFORM"
+                ? <span className="mr-1.5 rounded bg-purple-500/20 px-1.5 py-0.5 text-[10px] font-bold text-purple-100">Made on Dalaillama</span>
+                : <span className="mr-1.5 rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold text-slate-200">External</span>}
               {INDUSTRY_LABEL[item.industry]} · {FORMAT_LABEL[item.format]} · {item.playCount} plays
               {item.status === "HIDDEN" && " · Hidden"}
               {item.hiddenByOps && " · Hidden by Dalaillama"}
