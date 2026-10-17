@@ -1,7 +1,8 @@
 // @ts-nocheck
 import React, { useEffect, useState } from "react";
 import { Heart, UserPlus, Check, X } from "lucide-react";
-import { follow, isSignedIn, likedHere, requestVideo, setLiked, SignInRequired, unfollow, attributionToken } from "./brandApi.js";
+import { follow, isSignedIn, likedHere, requestVideo, requestVideoFromDalaillama, setLiked, SignInRequired, unfollow, attributionToken } from "./brandApi.js";
+import { INDUSTRIES } from "./labels.js";
 
 /** Sends the visitor to sign in, remembering what to do once they're back. */
 export function goSignIn(pendingAction) {
@@ -94,6 +95,26 @@ export function RequestVideoButton({ profile, film }) {
   );
 }
 
+/** "Request a video" with no creator chosen: Dalaillama finds one for the brand's industry. */
+export function RequestFromDalaillamaButton({ className, label = "Request a video", prefill = null, remember = true }) {
+  const resume = remember && new URLSearchParams(window.location.search).get("then") === "request";
+  const [open, setOpen] = useState(() => resume && isSignedIn());
+  // Arrived from this button while signed out: sign in (or register), then come back here.
+  useEffect(() => {
+    if (resume && !isSignedIn()) goSignIn("request");
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const start = () => (isSignedIn() ? setOpen(true) : goSignIn("request"));
+  return (
+    <>
+      <button type="button" onClick={start}
+              className={className || "rounded-lg bg-purple-600 px-4 py-2 text-sm font-bold text-white hover:bg-purple-700"}>
+        {label}
+      </button>
+      {open && <RequestDialog profile={null} film={null} prefill={prefill} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
 const DURATIONS = [[15, "15 seconds"], [30, "30 seconds"], [45, "45 seconds"], [60, "60 seconds"], [90, "90 seconds"]];
 const LANGUAGES = ["English", "Hindi", "Tamil", "Telugu", "Bengali", "Marathi", "Kannada", "Malayalam", "Gujarati", "Punjabi"];
 const field = "mt-1 w-full rounded-lg border border-white/15 bg-white/[0.04] p-2.5 text-sm font-normal text-white placeholder:text-slate-500";
@@ -102,10 +123,11 @@ const labelCls = "block text-sm font-semibold text-slate-300";
 /** The request is the same brief a creator fills for a new project (rule 48): what the video is
  * for, the product, who it's for, the direction, length and languages, plus budget and timing.
  * When the creator makes it a brief, all of it carries over. */
-function RequestDialog({ profile, film, onClose }) {
+function RequestDialog({ profile, film, prefill = null, onClose }) {
   const [form, setForm] = useState({
     message: "", productName: "", productDescription: "", targetAudience: "", campaignDirection: "",
-    durationSeconds: 30, languages: ["English"], budgetBand: "NOT_SURE", timeline: "THIS_MONTH",
+    durationSeconds: 30, languages: ["English"], budgetBand: "NOT_SURE", timeline: "THIS_MONTH", industry: "",
+    ...(prefill || {}),
   });
   const [state, setState] = useState("idle");
   const [error, setError] = useState("");
@@ -121,14 +143,17 @@ function RequestDialog({ profile, film, onClose }) {
     event.preventDefault();
     setState("sending");
     try {
-      await requestVideo(profile.handle, {
-        ...form, durationSeconds: Number(form.durationSeconds),
+      const brief = {
+        ...form, durationSeconds: Number(form.durationSeconds), industry: form.industry || null,
         publicId: film?.publicId || new URLSearchParams(window.location.search).get("film") || null,
         attributionToken: attributionToken(),
-      }, productImages, referenceImages);
+      };
+      // To the creator whose page this is, or to Dalaillama, which routes it to a creator.
+      if (profile) await requestVideo(profile.handle, brief, productImages, referenceImages);
+      else await requestVideoFromDalaillama(brief, productImages, referenceImages);
       setState("sent");
     } catch (e) {
-      if (e instanceof SignInRequired) return goSignIn(`request:${profile.handle}`);
+      if (e instanceof SignInRequired) return goSignIn(profile ? `request:${profile.handle}` : "request");
       setError(e.message);
       setState("idle");
     }
@@ -140,19 +165,33 @@ function RequestDialog({ profile, film, onClose }) {
       <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[#0B101C] p-6 ring-1 ring-white/10" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 id="request-title" className="text-xl font-bold text-white">New brief for {profile.displayName}</h2>
-            <p className="mt-1 text-sm text-slate-400">Tell them what you need. They turn it into a brief with a price for you to approve.</p>
+            <h2 id="request-title" className="text-xl font-bold text-white">{profile ? `New brief for ${profile.displayName}` : "Request a video"}</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              {profile
+                ? "Tell them what you need. They turn it into a brief with a price for you to approve."
+                : "Tell us what you need. We match you with a creator who makes videos for your industry; they turn it into a brief with a price for you to approve."}
+            </p>
           </div>
           <button type="button" aria-label="Close" onClick={onClose} className="rounded p-1 text-slate-500 hover:bg-white/5"><X size={18} /></button>
         </div>
         {state === "sent" ? (
           <div className="mt-5 space-y-3 text-sm text-slate-300">
-            <p>Sent. {profile.displayName} will turn it into a brief and email you the link to review.</p>
+            <p>{profile
+              ? `Sent. ${profile.displayName} will turn it into a brief and email you the link to review.`
+              : "Sent. We're matching you with a creator; your requests page shows who, and they email you the brief."}</p>
             <a href="/brands/home" className="font-bold text-purple-300">See your requests</a>
           </div>
         ) : (
           <form onSubmit={submit} className="mt-5 space-y-5">
             {film && <p className="text-sm text-slate-400">Inspired by: <span className="font-semibold text-slate-200">{film.title}</span></p>}
+            {!profile && (
+              <label className={labelCls}>Your industry
+                <select value={form.industry} onChange={set("industry")} className={field}>
+                  <option value="">Choose one</option>
+                  {INDUSTRIES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+                </select>
+              </label>
+            )}
             <label className={labelCls}>
               What should the video do?
               <textarea required maxLength={1000} rows={4} value={form.message} onChange={set("message")}

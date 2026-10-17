@@ -11,6 +11,7 @@ import { appConfig } from "@dalaillama/shared-config";
 import { useExchangeTokenMutation } from "@dalaillama/shared-hooks/keycloakApi";
 
 import DiscoverPage from "./pages/DiscoverPage.jsx";
+import InspirationPage from "./pages/InspirationPage.jsx";
 import CreatorPublicPage from "./pages/CreatorPublicPage.jsx";
 import BrandSignInPage, { BrandCallbackPage } from "./pages/BrandSignInPage.jsx";
 import BrandHomePage from "./pages/BrandHomePage.jsx";
@@ -89,6 +90,7 @@ function AppRoutes() {
         <Route path={R.ROOT} element={<ExternalRedirect to="https://dalaillama.in" />} />
         {/* Creator Showcase: public, no login. */}
         <Route path="/creators" element={<DiscoverPage />} />
+        <Route path="/inspiration" element={<InspirationPage />} />
         <Route path="/c/:handle" element={<CreatorPublicPage />} />
         <Route path="/brands/sign-in" element={<BrandSignInPage />} />
         {/* Old email-link URLs land on the Keycloak sign-in page. */}

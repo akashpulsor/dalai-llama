@@ -4,7 +4,7 @@ import { useDispatch } from "react-redux";
 import { Navigate } from "react-router-dom";
 import { ExternalLink, Loader2, Mail } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
-import { useConvertInquiryMutation, useGetInquiryImageQuery, useGetMyInquiriesQuery, useSetInquiryStatusMutation } from "../api/showcaseEndpoints.js";
+import { useAcceptInquiryMutation, useConvertInquiryMutation, useGetInquiryImageQuery, useGetMyInquiriesQuery, useSetInquiryStatusMutation } from "../api/showcaseEndpoints.js";
 import { INDUSTRY_LABEL, errorMessage } from "../components/showcase/showcaseLabels.js";
 
 const BUDGET = { UNDER_50K: "Under ₹50k", FROM_50K_TO_2L: "₹50k – 2L", FROM_2L_TO_8L: "₹2L – 8L", OVER_8L: "Over ₹8L", NOT_SURE: "Budget not sure" };
@@ -45,8 +45,10 @@ function RequestCard({ r }) {
   const dispatch = useDispatch();
   const [setStatus, { isLoading: updating }] = useSetInquiryStatusMutation();
   const [convert, { isLoading: converting }] = useConvertInquiryMutation();
-  const [label, tone] = STATUS[r.status];
-  const open = r.status === "NEW" || r.status === "VIEWED";
+  const [accept, { isLoading: accepting }] = useAcceptInquiryMutation();
+  // Offered to a few creators: shown as an offer until someone accepts it.
+  const [label, tone] = r.offered ? ["Offered to you", "bg-amber-500/15 text-amber-200"] : STATUS[r.status];
+  const open = !r.offered && (r.status === "NEW" || r.status === "VIEWED");
 
   const act = async (fn, success, fallback) => {
     try {
@@ -58,7 +60,7 @@ function RequestCard({ r }) {
   };
 
   return (
-    <li className="creator-panel rounded-2xl p-5" onMouseEnter={() => r.status === "NEW" && !updating && setStatus({ id: r.id, status: "VIEWED" })}>
+    <li className="creator-panel rounded-2xl p-5" onMouseEnter={() => !r.offered && r.status === "NEW" && !updating && setStatus({ id: r.id, status: "VIEWED" })}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-bold text-white">
@@ -94,6 +96,19 @@ function RequestCard({ r }) {
           new Date(r.createdAt).toLocaleDateString()].filter(Boolean).join(" · ")}
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
+        {r.offered && (
+          <>
+            <button type="button" disabled={accepting} className="creator-primary rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50"
+                    onClick={() => act(() => accept(r.id), "It's yours. Make a brief when you're ready", "Couldn't take this request")}>
+              {accepting ? "Taking…" : "Accept"}
+            </button>
+            <button type="button" disabled={updating} className="rounded-lg px-4 py-2 text-sm font-bold text-slate-400 hover:bg-white/5 hover:text-white"
+                    onClick={() => act(() => setStatus({ id: r.id, status: "DECLINED" }), "Passed", "Couldn't update")}>
+              Pass
+            </button>
+            <span className="self-center text-xs text-slate-500">Offered to a few creators; the first to accept takes it.</span>
+          </>
+        )}
         {open && (
           <>
             <button type="button" disabled={converting} className="creator-primary rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50"

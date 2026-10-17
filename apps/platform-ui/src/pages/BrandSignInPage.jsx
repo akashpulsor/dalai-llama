@@ -9,6 +9,8 @@ import { finishBrandLogin, startBrandLogin } from "../showcase/brandAuth.js";
 function afterSignIn(pendingAction) {
   const [action, handle] = (pendingAction || "").split(":");
   if (handle && (action === "follow" || action === "request")) return `/c/${handle}?then=${action}`;
+  // "Request a video" with no creator: back to the films, with the request form open.
+  if (action === "request") return "/creators?then=request";
   return "/brands/home";
 }
 

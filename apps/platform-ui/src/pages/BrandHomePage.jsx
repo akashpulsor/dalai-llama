@@ -167,11 +167,19 @@ function Requests({ inquiries }) {
                   ? <img src={q.creatorAvatarUrl} alt="" style={{ width: 40, height: 40, borderRadius: 999, objectFit: "cover" }} />
                   : <span style={{ width: 40, height: 40, borderRadius: 999, background: tone(q.creatorName), display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{initial(q.creatorName)}</span>}
                 <span style={{ flex: "1 1 260px", minWidth: 0 }}>
-                  <a href={`/c/${q.creatorHandle}`} style={{ display: "block", fontWeight: 600, color: C.text, textDecoration: "none" }}>{q.creatorName}</a>
+                  {q.creatorHandle
+                    ? <a href={`/c/${q.creatorHandle}`} style={{ display: "block", fontWeight: 600, color: C.text, textDecoration: "none" }}>{q.creatorName}</a>
+                    : <span style={{ display: "block", fontWeight: 600, color: C.text }}>Finding a creator for you…</span>}
                   <span style={{ display: "block", fontSize: 13.5, color: C.muted }}>{details}</span>
+                  {q.funded && !q.reviewUrl && (
+                    <span style={{ display: "block", fontSize: 13, color: "#6EE7A8" }}>Paid. {q.creatorName || "Your creator"} will share the review here when the first cut is ready.</span>
+                  )}
                 </span>
                 <span style={{ fontSize: 12.5, fontWeight: 700, padding: "4px 10px", borderRadius: 999, background: bg, color: fg, border: `1px solid ${border}` }}>{label}</span>
-                {q.briefUrl && (
+                {q.reviewUrl ? (
+                  // Paid, and the creator shared the review: the same page the review link opens.
+                  <a href={q.reviewUrl} style={{ height: 40, display: "inline-flex", alignItems: "center", padding: "0 16px", borderRadius: 10, background: "#16A34A", color: "#FFFFFF", textDecoration: "none", fontWeight: 700 }}>Open review</a>
+                ) : q.briefUrl && (
                   <a href={q.briefUrl} style={{ height: 40, display: "inline-flex", alignItems: "center", padding: "0 16px", borderRadius: 10, background: "#7C3AED", color: "#FFFFFF", textDecoration: "none", fontWeight: 700 }}>Open brief</a>
                 )}
               </li>

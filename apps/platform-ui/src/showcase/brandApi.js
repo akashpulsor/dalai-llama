@@ -60,6 +60,15 @@ export const requestVideo = (handle, request, productImages = [], referenceImage
   return call("POST", `/creators/${encodeURIComponent(handle)}/inquiries`, body);
 };
 
+/** A brief sent to Dalaillama rather than a creator: routed to a creator for the brand's industry. */
+export const requestVideoFromDalaillama = (request, productImages = [], referenceImages = []) => {
+  const body = new FormData();
+  body.append("data", new Blob([JSON.stringify(request)], { type: "application/json" }));
+  productImages.forEach((f) => body.append("productImages", f));
+  referenceImages.forEach((f) => body.append("referenceImages", f));
+  return call("POST", "/brands/me/requests", body);
+};
+
 // Likes are anonymous: the visitor id is enough. Which films this browser liked is remembered here
 // only to draw the button; the count comes from the server.
 const LIKED_KEY = "dl_liked";

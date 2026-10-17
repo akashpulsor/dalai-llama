@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import ShowcaseGrid from "../showcase/ShowcaseGrid.jsx";
+import { RequestFromDalaillamaButton } from "../showcase/BrandActions.jsx";
 import PublicHeader, { PublicFooter } from "../showcase/PublicHeader.jsx";
 import { getFeed } from "../showcase/showcaseApi.js";
 import { FORMATS, INDUSTRIES } from "../showcase/labels.js";
@@ -73,6 +74,11 @@ export default function DiscoverPage() {
       <main className="mx-auto w-full max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
         <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">Work from our creators</h1>
         <p className="mt-2 max-w-2xl text-slate-400">Films made by independent creators. Watch anything; ask a creator for one of your own.</p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <RequestFromDalaillamaButton />
+          <span className="text-sm text-slate-500">Not sure who to ask? We'll match you with a creator for your industry.</span>
+          <a href="/inspiration" className="text-sm font-semibold text-purple-300 hover:underline">Browse inspiration</a>
+        </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-2" role="tablist" aria-label="Sort">
           {TABS.map(([id, label]) => (

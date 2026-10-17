@@ -24,6 +24,8 @@ async function post(path, body) {
 }
 
 export const getLanding = () => getJson("/showcase/landing");
+/** The Inspiration board: Pinterest videos picked per industry (all industries when none). */
+export const getInspiration = (industry) => getJson(`/showcase/inspiration${industry ? `?industry=${encodeURIComponent(industry)}` : ""}`);
 
 export const getFeed = ({ tab = "TOP", industry, format, page = 0 }) => {
   const params = new URLSearchParams({ tab, page: String(page) });

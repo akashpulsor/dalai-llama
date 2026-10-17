@@ -167,6 +167,11 @@ export const showcaseApi = showcaseBase.injectEndpoints({
       query: (id) => ({ url: `/tenants/me/inquiries/${id}/convert`, method: "POST" }),
       invalidatesTags: ["ShowcaseRequests", "ShowcaseVisibility"],
     }),
+    // A request sent to Dalaillama and offered to this creator among others: first to accept takes it.
+    acceptInquiry: builder.mutation({
+      query: (id) => ({ url: `/tenants/me/inquiries/${id}/accept`, method: "POST" }),
+      invalidatesTags: ["ShowcaseRequests"],
+    }),
 
     // ---- Outreach (template mail to brands; one mail per brand per day) ----
     getOutreachOverview: builder.query({
@@ -421,6 +426,7 @@ export const {
   useAdminShowcaseProbeMutation,
   useAdminOnboardingBackfillMutation,
   useGetMyInquiriesQuery,
+  useAcceptInquiryMutation,
   useGetInquiryImageQuery,
   useSetInquiryStatusMutation,
   useConvertInquiryMutation,
