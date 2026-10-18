@@ -48,26 +48,29 @@ export const savePreferences = (prefs) => call("PATCH", "/brands/me/preferences"
 export const follow = (handle) => call("PUT", `/creators/${encodeURIComponent(handle)}/follow`);
 export const unfollow = (handle) => call("DELETE", `/creators/${encodeURIComponent(handle)}/follow`);
 
-/** The brief, with any product and reference images (sent as multipart when there are some). */
-export const requestVideo = (handle, request, productImages = [], referenceImages = []) => {
-  if (productImages.length === 0 && referenceImages.length === 0) {
-    return call("POST", `/creators/${encodeURIComponent(handle)}/inquiries`, request);
-  }
+/** A request as multipart: each JSON part, then the product and reference images. */
+function briefForm(parts, productImages, referenceImages) {
   const body = new FormData();
-  body.append("data", new Blob([JSON.stringify(request)], { type: "application/json" }));
+  Object.entries(parts).forEach(([name, value]) => body.append(name, new Blob([JSON.stringify(value)], { type: "application/json" })));
   productImages.forEach((f) => body.append("productImages", f));
   referenceImages.forEach((f) => body.append("referenceImages", f));
-  return call("POST", `/creators/${encodeURIComponent(handle)}/inquiries`, body);
+  return body;
+}
+
+/** The brief, with any product and reference images (sent as multipart when there are some). */
+export const requestVideo = (handle, request, productImages = [], referenceImages = []) => {
+  const path = `/creators/${encodeURIComponent(handle)}/inquiries`;
+  if (productImages.length === 0 && referenceImages.length === 0) return call("POST", path, request);
+  return call("POST", path, briefForm({ data: request }, productImages, referenceImages));
 };
 
 /** A brief sent to Dalaillama rather than a creator: routed to a creator for the brand's industry. */
-export const requestVideoFromDalaillama = (request, productImages = [], referenceImages = []) => {
-  const body = new FormData();
-  body.append("data", new Blob([JSON.stringify(request)], { type: "application/json" }));
-  productImages.forEach((f) => body.append("productImages", f));
-  referenceImages.forEach((f) => body.append("referenceImages", f));
-  return call("POST", "/brands/me/requests", body);
-};
+export const requestVideoFromDalaillama = (request, productImages = [], referenceImages = []) =>
+  call("POST", "/brands/me/requests", briefForm({ data: request }, productImages, referenceImages));
+
+/** The same, from someone who hasn't signed in: their name and email travel with it. */
+export const requestVideoAsGuest = (contact, request, productImages = [], referenceImages = []) =>
+  call("POST", "/brands/requests", briefForm({ contact, data: request }, productImages, referenceImages));
 
 // Likes are anonymous: the visitor id is enough. Which films this browser liked is remembered here
 // only to draw the button; the count comes from the server.

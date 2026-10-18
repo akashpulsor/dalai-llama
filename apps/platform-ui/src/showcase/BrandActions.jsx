@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useEffect, useState } from "react";
 import { Heart, UserPlus, Check, X } from "lucide-react";
-import { follow, isSignedIn, likedHere, requestVideo, requestVideoFromDalaillama, setLiked, SignInRequired, unfollow, attributionToken } from "./brandApi.js";
+import { follow, isSignedIn, likedHere, requestVideo, requestVideoAsGuest, requestVideoFromDalaillama, setLiked, SignInRequired, unfollow, attributionToken } from "./brandApi.js";
 import { INDUSTRIES } from "./labels.js";
 
 /** Sends the visitor to sign in, remembering what to do once they're back. */
@@ -95,18 +95,13 @@ export function RequestVideoButton({ profile, film }) {
   );
 }
 
-/** "Request a video" with no creator chosen: Dalaillama finds one for the brand's industry. */
+/** "Request a video" with no creator chosen: Dalaillama finds one for the brand's industry. No
+ * sign-in: a visitor who isn't signed in just adds their name and email to the form. */
 export function RequestFromDalaillamaButton({ className, label = "Request a video", prefill = null, remember = true }) {
-  const resume = remember && new URLSearchParams(window.location.search).get("then") === "request";
-  const [open, setOpen] = useState(() => resume && isSignedIn());
-  // Arrived from this button while signed out: sign in (or register), then come back here.
-  useEffect(() => {
-    if (resume && !isSignedIn()) goSignIn("request");
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const start = () => (isSignedIn() ? setOpen(true) : goSignIn("request"));
+  const [open, setOpen] = useState(() => remember && new URLSearchParams(window.location.search).get("then") === "request");
   return (
     <>
-      <button type="button" onClick={start}
+      <button type="button" onClick={() => setOpen(true)}
               className={className || "rounded-lg bg-purple-600 px-4 py-2 text-sm font-bold text-white hover:bg-purple-700"}>
         {label}
       </button>
@@ -129,7 +124,13 @@ function RequestDialog({ profile, film, prefill = null, onClose }) {
     durationSeconds: 30, languages: ["English"], budgetBand: "NOT_SURE", timeline: "THIS_MONTH", industry: "",
     ...(prefill || {}),
   });
+  // Only a request to Dalaillama can be sent without signing in; who is asking comes with it.
+  const guest = !profile && !isSignedIn();
+  const [contact, setContact] = useState({ contactName: "", email: "", companyName: "", websiteUrl: "" });
+  const setContactField = (key) => (e) => setContact({ ...contact, [key]: e.target.value });
   const [state, setState] = useState("idle");
+  // The brief to review and pay, when a creator took the request at once.
+  const [briefUrl, setBriefUrl] = useState(null);
   const [error, setError] = useState("");
   const [productImages, setProductImages] = useState([]);
   const [referenceImages, setReferenceImages] = useState([]);
@@ -149,8 +150,10 @@ function RequestDialog({ profile, film, prefill = null, onClose }) {
         attributionToken: attributionToken(),
       };
       // To the creator whose page this is, or to Dalaillama, which routes it to a creator.
-      if (profile) await requestVideo(profile.handle, brief, productImages, referenceImages);
-      else await requestVideoFromDalaillama(brief, productImages, referenceImages);
+      const submitted = profile ? await requestVideo(profile.handle, brief, productImages, referenceImages)
+        : guest ? await requestVideoAsGuest(withWebsite(contact), brief, productImages, referenceImages)
+          : await requestVideoFromDalaillama(brief, productImages, referenceImages);
+      setBriefUrl(submitted?.briefUrl || null);
       setState("sent");
     } catch (e) {
       if (e instanceof SignInRequired) return goSignIn(profile ? `request:${profile.handle}` : "request");
@@ -168,22 +171,51 @@ function RequestDialog({ profile, film, prefill = null, onClose }) {
             <h2 id="request-title" className="text-xl font-bold text-white">{profile ? `New brief for ${profile.displayName}` : "Request a video"}</h2>
             <p className="mt-1 text-sm text-slate-400">
               {profile
-                ? "Tell them what you need. They turn it into a brief with a price for you to approve."
-                : "Tell us what you need. We match you with a creator who makes videos for your industry; they turn it into a brief with a price for you to approve."}
+                ? "Tell them what you need. You get a brief with their price straight away: review it and pay to start."
+                : "Tell us what you need. We match you with a creator for your industry, and you get a brief with the price straight away: review it and pay to start."}
             </p>
           </div>
           <button type="button" aria-label="Close" onClick={onClose} className="rounded p-1 text-slate-500 hover:bg-white/5"><X size={18} /></button>
         </div>
-        {state === "sent" ? (
+        {state === "sent" && briefUrl ? (
+          <div className="mt-5 space-y-4 text-sm text-slate-300">
+            <p>Your brief is ready{profile ? ` with ${profile.displayName}` : ""}. Check the details, change anything you like, and pay
+              the upfront amount to start production. We've emailed you the link too.</p>
+            <a href={briefUrl}
+               className="block w-full rounded-lg bg-purple-600 py-3 text-center text-sm font-bold text-white hover:bg-purple-700">
+              Review brief &amp; pay
+            </a>
+          </div>
+        ) : state === "sent" ? (
           <div className="mt-5 space-y-3 text-sm text-slate-300">
             <p>{profile
-              ? `Sent. ${profile.displayName} will turn it into a brief and email you the link to review.`
-              : "Sent. We're matching you with a creator; your requests page shows who, and they email you the brief."}</p>
-            <a href="/brands/home" className="font-bold text-purple-300">See your requests</a>
+              ? `Sent. ${profile.displayName} will turn it into a brief and email you the link to review and pay.`
+              : guest
+                ? `Sent. We're matching you with a creator, usually within a day, and we'll email ${contact.email.trim()} the brief to review and pay.`
+                : "Sent. We're matching you with a creator; your requests page shows who, and we email you the brief."}</p>
+            {!guest && <a href="/brands/home" className="font-bold text-purple-300">See your requests</a>}
           </div>
         ) : (
           <form onSubmit={submit} className="mt-5 space-y-5">
             {film && <p className="text-sm text-slate-400">Inspired by: <span className="font-semibold text-slate-200">{film.title}</span></p>}
+            {guest && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className={labelCls}>Your name
+                  <input required maxLength={80} autoComplete="name" value={contact.contactName} onChange={setContactField("contactName")} className={field} />
+                </label>
+                <label className={labelCls}>Work email
+                  <input required type="email" maxLength={254} autoComplete="email" value={contact.email} onChange={setContactField("email")}
+                         placeholder="you@yourbrand.com" className={field} />
+                </label>
+                <label className={labelCls}>Brand
+                  <input maxLength={120} autoComplete="organization" value={contact.companyName} onChange={setContactField("companyName")} className={field} />
+                </label>
+                <label className={labelCls}>Website <span className="font-normal text-slate-500">(optional)</span>
+                  <input maxLength={255} autoComplete="url" value={contact.websiteUrl} onChange={setContactField("websiteUrl")}
+                         placeholder="yourbrand.com" className={field} />
+                </label>
+              </div>
+            )}
             {!profile && (
               <label className={labelCls}>Your industry
                 <select value={form.industry} onChange={set("industry")} className={field}>
@@ -197,22 +229,6 @@ function RequestDialog({ profile, film, prefill = null, onClose }) {
               <textarea required maxLength={1000} rows={4} value={form.message} onChange={set("message")}
                         placeholder="e.g. Launch our new ghee for Diwali, run as Instagram reels and YouTube shorts, drive store visits."
                         className={field} />
-            </label>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className={labelCls}>Product
-                <input maxLength={160} value={form.productName} onChange={set("productName")} placeholder="e.g. A2 Desi Ghee" className={field} />
-              </label>
-              <label className={labelCls}>Who it's for
-                <input maxLength={500} value={form.targetAudience} onChange={set("targetAudience")} placeholder="e.g. Young parents in metro cities" className={field} />
-              </label>
-            </div>
-            <label className={labelCls}>About the product
-              <textarea maxLength={1000} rows={2} value={form.productDescription} onChange={set("productDescription")}
-                        placeholder="What it is, what makes it different" className={field} />
-            </label>
-            <label className={labelCls}>Look and feel
-              <textarea maxLength={1000} rows={2} value={form.campaignDirection} onChange={set("campaignDirection")}
-                        placeholder="e.g. Warm and homely, morning kitchen, no voice-over" className={field} />
             </label>
             <div className="grid gap-4 sm:grid-cols-3">
               <label className={labelCls}>Length
@@ -231,33 +247,58 @@ function RequestDialog({ profile, film, prefill = null, onClose }) {
                 </select>
               </label>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <ImagePicker label="Product photos" files={productImages} onChange={setProductImages}
-                           hint={form.productName ? "Photos of the product" : "Name the product above to attach its photos"} disabled={!form.productName} />
-              <ImagePicker label="Reference images" files={referenceImages} onChange={setReferenceImages}
-                           hint="Looks, moods or ads you like" />
-            </div>
-            <fieldset>
-              <legend className="text-sm font-semibold text-slate-300">Languages</legend>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {LANGUAGES.map((l) => (
-                  <button key={l} type="button" onClick={() => toggleLanguage(l)} aria-pressed={form.languages.includes(l)}
-                          className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${form.languages.includes(l) ? "bg-purple-600 text-white ring-purple-500" : "text-slate-300 ring-white/15 hover:bg-white/5"}`}>
-                    {l}
-                  </button>
-                ))}
+            <details className="group space-y-5" open={!!profile}>
+              <summary className="cursor-pointer text-sm font-semibold text-purple-300">More details <span className="font-normal text-slate-500">(optional: product, audience, look, images, languages)</span></summary>
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <label className={labelCls}>Product
+                  <input maxLength={160} value={form.productName} onChange={set("productName")} placeholder="e.g. A2 Desi Ghee" className={field} />
+                </label>
+                <label className={labelCls}>Who it's for
+                  <input maxLength={500} value={form.targetAudience} onChange={set("targetAudience")} placeholder="e.g. Young parents in metro cities" className={field} />
+                </label>
               </div>
-            </fieldset>
+              <label className={labelCls}>About the product
+                <textarea maxLength={1000} rows={2} value={form.productDescription} onChange={set("productDescription")}
+                          placeholder="What it is, what makes it different" className={field} />
+              </label>
+              <label className={labelCls}>Look and feel
+                <textarea maxLength={1000} rows={2} value={form.campaignDirection} onChange={set("campaignDirection")}
+                          placeholder="e.g. Warm and homely, morning kitchen, no voice-over" className={field} />
+              </label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <ImagePicker label="Product photos" files={productImages} onChange={setProductImages}
+                             hint={form.productName ? "Photos of the product" : "Name the product above to attach its photos"} disabled={!form.productName} />
+                <ImagePicker label="Reference images" files={referenceImages} onChange={setReferenceImages}
+                             hint="Looks, moods or ads you like" />
+              </div>
+              <fieldset>
+                <legend className="text-sm font-semibold text-slate-300">Languages</legend>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {LANGUAGES.map((l) => (
+                    <button key={l} type="button" onClick={() => toggleLanguage(l)} aria-pressed={form.languages.includes(l)}
+                            className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${form.languages.includes(l) ? "bg-purple-600 text-white ring-purple-500" : "text-slate-300 ring-white/15 hover:bg-white/5"}`}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+            </details>
             {error && <p className="text-sm text-rose-300">{error}</p>}
             <button type="submit" disabled={state === "sending" || !form.message.trim() || form.languages.length === 0}
                     className="w-full rounded-lg bg-purple-600 py-3 text-sm font-bold text-white hover:bg-purple-700 disabled:opacity-50">
-              {state === "sending" ? "Sending…" : "Send brief"}
+              {state === "sending" ? "Sending…" : guest ? "Send request" : "Send brief"}
             </button>
           </form>
         )}
       </div>
     </div>
   );
+}
+
+/** "yourbrand.com" is what people type; the server wants a link. */
+function withWebsite(contact) {
+  const site = contact.websiteUrl.trim();
+  return { ...contact, email: contact.email.trim(), websiteUrl: site && !/^https?:\/\//i.test(site) ? `https://${site}` : site };
 }
 
 /** Up to 4 images, 3 MB each; previews with remove. */

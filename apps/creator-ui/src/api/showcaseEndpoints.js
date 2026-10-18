@@ -7,7 +7,7 @@ import { opsAdminUrl, platformUrl } from "./creatorEndpoints.js";
 
 const showcaseBase = apiSlice.enhanceEndpoints({
   addTagTypes: ["ShowcaseProfile", "PosterFrames", "ShowcaseChannel", "ShowcaseVideos", "ShowcaseItems", "ShowcaseVisibility", "ShowcaseUpload",
-    "ShowcaseAdmin", "ShowcaseRequests", "Outreach", "EmailTemplates", "Audiences", "AudienceLeads", "YouTubeConnection", "YouTubeJobs",
+    "ShowcaseAdmin", "ShowcaseRequests", "RequestSettings", "Outreach", "EmailTemplates", "Audiences", "AudienceLeads", "YouTubeConnection", "YouTubeJobs",
     "YouTubeAnalytics", "ExtensionTokens", "PlatformYouTube", "YouTubeQuota", "BrandCredits", "FilmConsent"],
 });
 
@@ -166,6 +166,15 @@ export const showcaseApi = showcaseBase.injectEndpoints({
     convertInquiry: builder.mutation({
       query: (id) => ({ url: `/tenants/me/inquiries/${id}/convert`, method: "POST" }),
       invalidatesTags: ["ShowcaseRequests", "ShowcaseVisibility"],
+    }),
+    // What a brand pays upfront on the brief made from a request sent to this creator.
+    getRequestSettings: builder.query({
+      query: () => ({ url: "/tenants/me/inquiries/settings" }),
+      providesTags: ["RequestSettings"],
+    }),
+    saveRequestSettings: builder.mutation({
+      query: (body) => ({ url: "/tenants/me/inquiries/settings", method: "PUT", body }),
+      invalidatesTags: ["RequestSettings"],
     }),
     // A request sent to Dalaillama and offered to this creator among others: first to accept takes it.
     acceptInquiry: builder.mutation({
@@ -426,6 +435,8 @@ export const {
   useAdminShowcaseProbeMutation,
   useAdminOnboardingBackfillMutation,
   useGetMyInquiriesQuery,
+  useGetRequestSettingsQuery,
+  useSaveRequestSettingsMutation,
   useAcceptInquiryMutation,
   useGetInquiryImageQuery,
   useSetInquiryStatusMutation,

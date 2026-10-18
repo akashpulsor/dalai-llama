@@ -1,10 +1,10 @@
 // @ts-nocheck
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import { Navigate } from "react-router-dom";
 import { ExternalLink, Loader2, Mail } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
-import { useAcceptInquiryMutation, useConvertInquiryMutation, useGetInquiryImageQuery, useGetMyInquiriesQuery, useSetInquiryStatusMutation } from "../api/showcaseEndpoints.js";
+import { useAcceptInquiryMutation, useConvertInquiryMutation, useGetInquiryImageQuery, useGetMyInquiriesQuery, useGetRequestSettingsQuery, useSaveRequestSettingsMutation, useSetInquiryStatusMutation } from "../api/showcaseEndpoints.js";
 import { INDUSTRY_LABEL, errorMessage } from "../components/showcase/showcaseLabels.js";
 
 const BUDGET = { UNDER_50K: "Under ₹50k", FROM_50K_TO_2L: "₹50k – 2L", FROM_2L_TO_8L: "₹2L – 8L", OVER_8L: "Over ₹8L", NOT_SURE: "Budget not sure" };
@@ -16,9 +16,9 @@ const STATUS = {
   DECLINED: ["Declined", "bg-rose-500/15 text-rose-300"],
 };
 
-/** Brands who asked for a video from the public profile. "Make a brief" creates the brief and
- * emails the brand its link; from there it is the normal brief, payment and review flow. */
-/** Requests now live on the Profile page; old links land there. */
+/** Requests now live on the Profile page; old links land there. Each request becomes a priced
+ * brief as soon as it is this creator's ("Make a brief" only when that couldn't happen at once),
+ * and the brand is emailed the link to review and pay. */
 export default function RequestsPage() {
   return <Navigate to="/profile#requests" replace />;
 }
@@ -27,6 +27,7 @@ export function RequestsList() {
   const { data: requests = [], isLoading, isError } = useGetMyInquiriesQuery();
   return (
     <div>
+      <UpfrontShare />
       {isLoading && <p className="flex items-center gap-2 text-slate-400"><Loader2 size={16} className="animate-spin" /> Loading…</p>}
       {isError && <p className="text-rose-300">Requests couldn't load. Try again in a moment.</p>}
       {!isLoading && !isError && requests.length === 0 && (
@@ -38,6 +39,46 @@ export function RequestsList() {
         {requests.map((r) => <RequestCard key={r.id} r={r} />)}
       </ul>
     </div>
+  );
+}
+
+/** A request sent to this creator becomes a brief at once, at their rate; this is the share of it the
+ * brand pays upfront to start. Requests routed from Dalaillama use the platform's price and share. */
+function UpfrontShare() {
+  const dispatch = useDispatch();
+  const { data } = useGetRequestSettingsQuery();
+  const [save, { isLoading: saving }] = useSaveRequestSettingsMutation();
+  const [percent, setPercent] = useState("");
+  useEffect(() => {
+    if (data) setPercent(String(data.prepaymentPercent));
+  }, [data]);
+  const value = Number(percent);
+  const valid = Number.isInteger(value) && value >= 1 && value <= 100;
+
+  const submit = async (event) => {
+    event.preventDefault();
+    try {
+      await save({ prepaymentPercent: value }).unwrap();
+      dispatch(showFlash({ message: `Brands now pay ${value}% upfront`, type: "success" }));
+    } catch (e) {
+      dispatch(showFlash({ message: errorMessage(e, "Couldn't save"), type: "error" }));
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="creator-panel mb-4 flex flex-wrap items-center gap-3 rounded-2xl p-4 text-sm text-slate-300">
+      <label htmlFor="upfront-share">Brands pay upfront on requests sent to you</label>
+      <span className="flex items-center gap-1">
+        <input id="upfront-share" type="number" min={1} max={100} value={percent} onChange={(e) => setPercent(e.target.value)}
+               className="w-20 rounded-lg border border-white/15 bg-white/[0.04] p-2 text-white" />
+        <span>%</span>
+      </span>
+      <button type="submit" disabled={!valid || saving || value === data?.prepaymentPercent}
+              className="rounded-lg bg-purple-600 px-3 py-2 font-bold text-white hover:bg-purple-700 disabled:opacity-50">
+        {saving ? "Saving…" : "Save"}
+      </button>
+      <span className="text-xs text-slate-500">The rest is due when they approve the finished video.</span>
+    </form>
   );
 }
 
