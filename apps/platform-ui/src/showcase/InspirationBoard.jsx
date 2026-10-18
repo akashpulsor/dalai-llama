@@ -5,8 +5,10 @@ import { getInspiration } from "./showcaseApi.js";
 import { INDUSTRY_LABEL } from "./labels.js";
 import { RequestFromDalaillamaButton } from "./BrandActions.jsx";
 
-/** Pinterest's player draws its "Save" button in this top strip; the card crops it off. */
+/** Pinterest's player draws its "Save" button in a top strip and repeats the caption and maker in a
+ * white footer; the card crops both off. The maker stays credited in the card's own "Pinned by" line. */
 const PLAYER_TOP_CROP = 56;
+const PLAYER_BOTTOM_CROP = 86;
 /** Pinterest's player is 450px wide at the height its oEmbed reports; tall vertical when unknown. */
 const PLAYER_WIDTH = 450;
 const TALL_PLAYER_HEIGHT = 899;
@@ -34,13 +36,13 @@ export default function InspirationBoard({ industry = null, limit = null }) {
         {shown.map((item) => (
           <li key={item.id} className="flex flex-col rounded-xl bg-white/[0.03] p-2.5 ring-1 ring-white/10">
             <div className="relative w-full overflow-hidden rounded-lg"
-                 style={{ aspectRatio: `${PLAYER_WIDTH} / ${(item.embedHeight || TALL_PLAYER_HEIGHT) - PLAYER_TOP_CROP}` }}>
+                 style={{ aspectRatio: `${PLAYER_WIDTH} / ${(item.embedHeight || TALL_PLAYER_HEIGHT) - PLAYER_TOP_CROP - PLAYER_BOTTOM_CROP}` }}>
               <iframe
                 title={item.title}
                 src={`https://assets.pinterest.com/ext/embed.html?id=${item.pinId}`}
                 loading="lazy"
                 className="absolute left-0 w-full border-0"
-                style={{ top: -PLAYER_TOP_CROP, height: `calc(100% + ${PLAYER_TOP_CROP}px)` }}
+                style={{ top: -PLAYER_TOP_CROP, height: `calc(100% + ${PLAYER_TOP_CROP + PLAYER_BOTTOM_CROP}px)` }}
                 scrolling="no"
               />
             </div>
