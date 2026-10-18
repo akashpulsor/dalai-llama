@@ -5,13 +5,23 @@ import { getInspiration } from "./showcaseApi.js";
 import { INDUSTRY_LABEL } from "./labels.js";
 import { RequestFromDalaillamaButton } from "./BrandActions.jsx";
 
-/** Pinterest's player draws its "Save" button in a top strip and repeats the caption and maker in a
- * white footer; the card crops both off. The maker stays credited in the card's own "Pinned by" line. */
-const PLAYER_TOP_CROP = 56;
-const PLAYER_BOTTOM_CROP = 86;
-/** Pinterest's player is 450px wide at the height its oEmbed reports; tall vertical when unknown. */
+/**
+ * Pinterest's player scales the video to its width and adds a fixed-height white footer (caption and
+ * maker) below it, with a "Save" button over the video's top. The card shows the video alone: sized
+ * to the video, its top strip and the footer cut off. The maker stays credited in the card's own
+ * "Pinned by" line.
+ */
+const SAVE_STRIP = 56;
+const PLAYER_FOOTER = 99;
+/** At Pinterest's 450px width the oEmbed height is the video plus the footer; tall when unknown. */
 const PLAYER_WIDTH = 450;
 const TALL_PLAYER_HEIGHT = 899;
+
+/** The card's box: the video's height for the card's width, less the cropped strip. */
+const videoBox = (embedHeight) => {
+  const videoRatio = ((embedHeight || TALL_PLAYER_HEIGHT) - PLAYER_FOOTER) / PLAYER_WIDTH;
+  return { height: 0, paddingBottom: `calc(${(videoRatio * 100).toFixed(3)}% - ${SAVE_STRIP}px)` };
+};
 
 /**
  * Videos from Pinterest that we picked as references for an industry, each credited under the
@@ -35,14 +45,13 @@ export default function InspirationBoard({ industry = null, limit = null }) {
       <ul className="columns-2 gap-4 sm:columns-3 lg:columns-4 [&>*]:mb-4 [&>*]:break-inside-avoid">
         {shown.map((item) => (
           <li key={item.id} className="flex flex-col rounded-xl bg-white/[0.03] p-2.5 ring-1 ring-white/10">
-            <div className="relative w-full overflow-hidden rounded-lg"
-                 style={{ aspectRatio: `${PLAYER_WIDTH} / ${(item.embedHeight || TALL_PLAYER_HEIGHT) - PLAYER_TOP_CROP - PLAYER_BOTTOM_CROP}` }}>
+            <div className="relative w-full overflow-hidden rounded-lg" style={videoBox(item.embedHeight)}>
               <iframe
                 title={item.title}
                 src={`https://assets.pinterest.com/ext/embed.html?id=${item.pinId}`}
                 loading="lazy"
                 className="absolute left-0 w-full border-0"
-                style={{ top: -PLAYER_TOP_CROP, height: `calc(100% + ${PLAYER_TOP_CROP + PLAYER_BOTTOM_CROP}px)` }}
+                style={{ top: -SAVE_STRIP, height: `calc(100% + ${SAVE_STRIP + PLAYER_FOOTER}px)` }}
                 scrolling="no"
               />
             </div>
