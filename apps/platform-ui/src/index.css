@@ -21,3 +21,11 @@
 .animate-fadeIn {
   animation: fadeIn 0.35s ease-out;
 }
+
+/* Dropdown lists: the closed select is styled dark, but its open list is drawn by the OS and
+   inherits the white text; without a background of its own it reads white-on-white (Windows). */
+select option,
+select optgroup {
+  background-color: #0b101c;
+  color: #e2e8f0;
+}

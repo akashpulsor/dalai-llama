@@ -12,7 +12,7 @@ import { RequestFromDalaillamaButton } from "./BrandActions.jsx";
  * "Pinned by" line.
  */
 const SAVE_STRIP = 56;
-const PLAYER_FOOTER = 99;
+const PLAYER_FOOTER = 104;
 /** At Pinterest's 450px width the oEmbed height is the video plus the footer; tall when unknown. */
 const PLAYER_WIDTH = 450;
 const TALL_PLAYER_HEIGHT = 899;
