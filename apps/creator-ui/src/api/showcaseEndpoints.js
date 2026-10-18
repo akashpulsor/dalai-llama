@@ -126,6 +126,10 @@ export const showcaseApi = showcaseBase.injectEndpoints({
       query: ({ handle, accepting }) => ({ url: opsAdminUrl(`/tenants/requests/creators/${handle}`), method: "PUT", body: { accepting } }),
       invalidatesTags: ["RequestRouting"],
     }),
+    adminExpireRequest: builder.mutation({
+      query: (id) => ({ url: opsAdminUrl(`/tenants/requests/${id}/expire`), method: "POST" }),
+      invalidatesTags: ["RequestRouting"],
+    }),
     adminAssignRequest: builder.mutation({
       query: ({ id, handle }) => ({ url: opsAdminUrl(`/tenants/requests/${id}/assign`), method: "POST", body: { handle } }),
       invalidatesTags: ["RequestRouting"],
@@ -192,6 +196,11 @@ export const showcaseApi = showcaseBase.injectEndpoints({
     saveRequestSettings: builder.mutation({
       query: (body) => ({ url: "/tenants/me/inquiries/settings", method: "PUT", body }),
       invalidatesTags: ["RequestSettings"],
+    }),
+    // Closes a request the brand never paid for: its brief link stops working.
+    expireInquiry: builder.mutation({
+      query: (id) => ({ url: `/tenants/me/inquiries/${id}/expire`, method: "POST" }),
+      invalidatesTags: ["ShowcaseRequests"],
     }),
     // A request sent to Dalaillama and offered to this creator among others: first to accept takes it.
     acceptInquiry: builder.mutation({
@@ -456,6 +465,8 @@ export const {
   useAdminSetRoutingStrategyMutation,
   useAdminSetCreatorAcceptingMutation,
   useAdminAssignRequestMutation,
+  useAdminExpireRequestMutation,
+  useExpireInquiryMutation,
   useGetRequestSettingsQuery,
   useSaveRequestSettingsMutation,
   useAcceptInquiryMutation,

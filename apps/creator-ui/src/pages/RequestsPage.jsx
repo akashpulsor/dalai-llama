@@ -4,7 +4,7 @@ import { useDispatch } from "react-redux";
 import { Navigate } from "react-router-dom";
 import { ExternalLink, Loader2, Mail } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
-import { useAcceptInquiryMutation, useConvertInquiryMutation, useGetInquiryImageQuery, useGetMyInquiriesQuery, useGetRequestSettingsQuery, useSaveRequestSettingsMutation, useSetInquiryStatusMutation } from "../api/showcaseEndpoints.js";
+import { useAcceptInquiryMutation, useConvertInquiryMutation, useExpireInquiryMutation, useGetInquiryImageQuery, useGetMyInquiriesQuery, useGetRequestSettingsQuery, useSaveRequestSettingsMutation, useSetInquiryStatusMutation } from "../api/showcaseEndpoints.js";
 import { INDUSTRY_LABEL, errorMessage } from "../components/showcase/showcaseLabels.js";
 
 const BUDGET = { UNDER_50K: "Under ₹50k", FROM_50K_TO_2L: "₹50k – 2L", FROM_2L_TO_8L: "₹2L – 8L", OVER_8L: "Over ₹8L", NOT_SURE: "Budget not sure" };
@@ -14,6 +14,7 @@ const STATUS = {
   VIEWED: ["Seen", "bg-white/10 text-slate-300"],
   CONVERTED: ["Brief sent", "bg-emerald-500/15 text-emerald-300"],
   DECLINED: ["Declined", "bg-rose-500/15 text-rose-300"],
+  EXPIRED: ["Expired", "bg-white/5 text-slate-500"],
 };
 
 /** Requests now live on the Profile page; old links land there. Each request becomes a priced
@@ -87,6 +88,9 @@ function RequestCard({ r }) {
   const [setStatus, { isLoading: updating }] = useSetInquiryStatusMutation();
   const [convert, { isLoading: converting }] = useConvertInquiryMutation();
   const [accept, { isLoading: accepting }] = useAcceptInquiryMutation();
+  const [expire, { isLoading: expiring }] = useExpireInquiryMutation();
+  // Theirs and still unpaid: the brief can be closed if the brand never pays.
+  const expirable = !r.offered && !r.paid && ["NEW", "VIEWED", "CONVERTED"].includes(r.status);
   // Offered to a few creators: shown as an offer until someone accepts it.
   const [label, tone] = r.offered ? ["Offered to you", "bg-amber-500/15 text-amber-200"] : STATUS[r.status];
   const open = !r.offered && (r.status === "NEW" || r.status === "VIEWED");
@@ -162,7 +166,15 @@ function RequestCard({ r }) {
             </button>
           </>
         )}
-        {r.briefUrl && (
+        {r.paid && <span className="self-center rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-300">Paid</span>}
+        {expirable && (
+          <button type="button" disabled={expiring} title="The brand never paid: close it, and its brief link stops working"
+                  className="rounded-lg px-4 py-2 text-sm font-bold text-slate-400 hover:bg-white/5 hover:text-white disabled:opacity-50"
+                  onClick={() => act(() => expire(r.id), "Expired: the brief link no longer works", "Couldn't expire it")}>
+            {expiring ? "Expiring…" : "Expire"}
+          </button>
+        )}
+        {r.briefUrl && r.status !== "EXPIRED" && (
           <a href={r.briefUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-sm font-bold text-emerald-300 hover:underline">
             Brief link <ExternalLink size={13} />
           </a>

@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { Loader2 } from "lucide-react";
 import {
   useAdminAssignRequestMutation,
+  useAdminExpireRequestMutation,
   useAdminRequestRoutingQuery,
   useAdminSetCreatorAcceptingMutation,
   useAdminSetRoutingStrategyMutation,
@@ -22,17 +23,24 @@ export default function RequestRoutingTab() {
   const [setStrategy, strategyState] = useAdminSetRoutingStrategyMutation();
   const [setAccepting] = useAdminSetCreatorAcceptingMutation();
   const [assign] = useAdminAssignRequestMutation();
+  const [expire] = useAdminExpireRequestMutation();
   const [message, setMessage] = useState(null);
+  // The row being worked on: its buttons wait, so a slow assign (it makes the brief) can't be sent twice.
+  const [busy, setBusy] = useState(null);
 
-  const run = async (action, ok) => {
+  const run = async (action, ok, key = null) => {
     setMessage(null);
+    setBusy(key);
     try {
       await action().unwrap();
       setMessage({ ok: true, text: ok });
     } catch (e) {
       setMessage({ ok: false, text: e?.data?.message || `Failed (${e?.status || "?"})` });
+    } finally {
+      setBusy(null);
     }
   };
+  const expireRow = (id, brand) => run(() => expire(id), `Expired ${brand}'s request; its brief link no longer works`, id);
 
   if (isLoading) return <Loader2 className="h-5 w-5 animate-spin text-slate-500" />;
   if (isError || !data) return <p className="text-sm text-rose-300">Routing couldn't load.</p>;
@@ -83,29 +91,60 @@ export default function RequestRoutingTab() {
         <h3 className="font-bold text-white">Waiting for a creator <span className="font-normal text-slate-400">· {data.waiting.length}</span></h3>
         {data.waiting.length === 0 && <p className="mt-2 text-xs text-slate-400">Nothing waiting.</p>}
         <ul className="mt-3 space-y-3">
-          {data.waiting.map((w) => <WaitingRow key={w.id} w={w} creators={data.creators}
-                                                onAssign={(handle) => run(() => assign({ id: w.id, handle }), `Assigned to @${handle}; the brand gets the brief to pay`)} />)}
+          {data.waiting.map((w) => <WaitingRow key={w.id} w={w} creators={data.creators} busy={busy === w.id}
+                                                onExpire={() => expireRow(w.id, w.brand)}
+                                                onAssign={(handle) => run(() => assign({ id: w.id, handle }), `Assigned to @${handle}; the brand gets the brief to pay`, w.id)} />)}
+        </ul>
+      </div>
+
+      <div className="creator-panel rounded-xl p-4">
+        <h3 className="font-bold text-white">With a creator, not paid yet <span className="font-normal text-slate-400">· {data.unpaid.length}</span></h3>
+        <p className="mt-1 text-xs text-slate-400">Expire one the brand has left too long: its brief link stops working.</p>
+        {data.unpaid.length === 0 && <p className="mt-2 text-xs text-slate-400">Nothing unpaid.</p>}
+        <ul className="mt-3 divide-y divide-white/10">
+          {data.unpaid.map((u) => (
+            <li key={u.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+              <span>
+                <span className="font-semibold text-white">{u.brand}</span> <span className="text-slate-400">· {u.email} · @{u.creatorHandle}</span>
+                <span className="block text-xs text-slate-500">{u.status === "CONVERTED" ? "Brief sent" : "No brief yet"} · {daysAgo(u.createdAt)}</span>
+              </span>
+              <button type="button" disabled={busy === u.id} onClick={() => expireRow(u.id, u.brand)}
+                      className="rounded-lg px-3 py-1.5 text-xs font-bold text-rose-300 ring-1 ring-rose-400/30 hover:bg-rose-500/10 disabled:opacity-50">
+                {busy === u.id ? "Expiring…" : "Expire"}
+              </button>
+            </li>
+          ))}
         </ul>
       </div>
     </section>
   );
 }
 
-function WaitingRow({ w, creators, onAssign }) {
+/** "today", "1 day ago", "6 days ago". */
+function daysAgo(at) {
+  const days = Math.floor((Date.now() - new Date(at).getTime()) / 86_400_000);
+  return days === 0 ? "today" : days === 1 ? "1 day ago" : `${days} days ago`;
+}
+
+function WaitingRow({ w, creators, busy, onAssign, onExpire }) {
   const [handle, setHandle] = useState(creators.find((c) => c.accepting)?.handle || creators[0]?.handle || "");
   return (
     <li className="rounded-lg bg-white/[0.03] p-3 ring-1 ring-white/10">
       <p className="font-semibold text-white">{w.brand} <span className="font-normal text-slate-400">· {w.email}{w.industry ? ` · ${INDUSTRY_LABEL[w.industry]}` : ""}</span></p>
       <p className="mt-1 text-slate-300">“{w.message}”</p>
-      <p className="mt-1 text-xs text-slate-500">{new Date(w.createdAt).toLocaleString()}</p>
+      <p className="mt-1 text-xs text-slate-500">{new Date(w.createdAt).toLocaleString()} · {daysAgo(w.createdAt)}</p>
       <div className="mt-2 flex items-center gap-2">
         <select value={handle} onChange={(e) => setHandle(e.target.value)}
                 className="rounded-lg border border-white/15 bg-white/[0.04] p-1.5 text-xs text-white">
           {creators.map((c) => <option key={c.handle} value={c.handle}>{c.displayName} (@{c.handle})</option>)}
         </select>
-        <button type="button" disabled={!handle} onClick={() => onAssign(handle)}
+        <button type="button" disabled={!handle || busy} onClick={() => onAssign(handle)}
                 className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-purple-700 disabled:opacity-50">
-          Assign
+          {busy ? "Working…" : "Assign"}
+        </button>
+        <button type="button" disabled={busy} onClick={onExpire}
+                className="rounded-lg px-3 py-1.5 text-xs font-bold text-rose-300 hover:bg-rose-500/10 disabled:opacity-50">
+          Expire
         </button>
       </div>
     </li>

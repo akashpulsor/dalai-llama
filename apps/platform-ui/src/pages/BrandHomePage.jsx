@@ -15,6 +15,7 @@ const STATUS = {
   VIEWED: ["Creator viewed", "rgba(139,92,246,.14)", "#D8B4FE", "rgba(168,85,247,.38)"],
   CONVERTED: ["Brief ready", "rgba(56,214,122,.12)", "#6EE7A8", "rgba(56,214,122,.35)"],
   DECLINED: ["Declined", "rgba(244,63,94,.10)", "#FDA4AF", "rgba(244,63,94,.30)"],
+  EXPIRED: ["Expired", "rgba(148,163,184,.08)", "#94A3B8", "rgba(148,163,184,.20)"],
 };
 const AVATAR_TONES = ["#3B2A63", "#1E3A5F", "#14402D", "#3F2A1E"];
 const CADENCES = [[7, "Weekly"], [14, "Every two weeks"], [30, "Monthly"]];
