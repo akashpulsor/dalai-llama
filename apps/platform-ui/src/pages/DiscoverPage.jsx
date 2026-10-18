@@ -133,7 +133,7 @@ export default function DiscoverPage() {
             </a>
           </div>
           <div className="mt-5">
-            <InspirationBoard industry={industry || null} limit={9} />
+            <InspirationBoard industry={industry || null} limit={12} />
           </div>
         </section>
       </main>
