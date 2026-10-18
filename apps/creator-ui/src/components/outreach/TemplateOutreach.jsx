@@ -26,6 +26,7 @@ const OUTCOME = {
   SUPPRESSED: ["Unsubscribed", "text-slate-400"],
   OVER_ALLOWANCE: ["No mails left", "text-rose-300"],
   UNDELIVERABLE: ["Address can't receive mail", "text-rose-300"],
+  DAILY_LIMIT: ["Daily sending limit reached, it'll go out tomorrow", "text-sky-300"],
   DUPLICATE: ["Listed twice", "text-slate-400"],
 };
 const STATUS = {
