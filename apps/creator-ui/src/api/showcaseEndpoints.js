@@ -7,7 +7,7 @@ import { opsAdminUrl, platformUrl } from "./creatorEndpoints.js";
 
 const showcaseBase = apiSlice.enhanceEndpoints({
   addTagTypes: ["ShowcaseProfile", "PosterFrames", "ShowcaseChannel", "ShowcaseVideos", "ShowcaseItems", "ShowcaseVisibility", "ShowcaseUpload",
-    "ShowcaseAdmin", "ShowcaseRequests", "RequestSettings", "Outreach", "EmailTemplates", "Audiences", "AudienceLeads", "YouTubeConnection", "YouTubeJobs",
+    "ShowcaseAdmin", "ShowcaseRequests", "RequestSettings", "RequestRouting", "Outreach", "EmailTemplates", "Audiences", "AudienceLeads", "YouTubeConnection", "YouTubeJobs",
     "YouTubeAnalytics", "ExtensionTokens", "PlatformYouTube", "YouTubeQuota", "BrandCredits", "FilmConsent"],
 });
 
@@ -113,6 +113,23 @@ export const showcaseApi = showcaseBase.injectEndpoints({
     }),
 
     // ---- Ops (ops.dalaillama.in only; oauth2-proxy + dalai_admin at the gateway) ----
+    // Requests sent to Dalaillama: routing strategy, creators on/off, the waiting queue.
+    adminRequestRouting: builder.query({
+      query: () => ({ url: opsAdminUrl("/tenants/requests/routing") }),
+      providesTags: ["RequestRouting"],
+    }),
+    adminSetRoutingStrategy: builder.mutation({
+      query: (strategy) => ({ url: opsAdminUrl("/tenants/requests/routing"), method: "PUT", body: { strategy } }),
+      invalidatesTags: ["RequestRouting"],
+    }),
+    adminSetCreatorAccepting: builder.mutation({
+      query: ({ handle, accepting }) => ({ url: opsAdminUrl(`/tenants/requests/creators/${handle}`), method: "PUT", body: { accepting } }),
+      invalidatesTags: ["RequestRouting"],
+    }),
+    adminAssignRequest: builder.mutation({
+      query: ({ id, handle }) => ({ url: opsAdminUrl(`/tenants/requests/${id}/assign`), method: "POST", body: { handle } }),
+      invalidatesTags: ["RequestRouting"],
+    }),
     adminShowcaseRescore: builder.mutation({
       query: () => ({ url: opsAdminUrl("/tenants/showcase/rescore"), method: "POST" }),
       invalidatesTags: ["ShowcaseAdmin"],
@@ -435,6 +452,10 @@ export const {
   useAdminShowcaseProbeMutation,
   useAdminOnboardingBackfillMutation,
   useGetMyInquiriesQuery,
+  useAdminRequestRoutingQuery,
+  useAdminSetRoutingStrategyMutation,
+  useAdminSetCreatorAcceptingMutation,
+  useAdminAssignRequestMutation,
   useGetRequestSettingsQuery,
   useSaveRequestSettingsMutation,
   useAcceptInquiryMutation,

@@ -12,6 +12,7 @@
  * action the Pragya incident actually needed.
  */
 import ShowcaseAdminTab from "../components/showcase/ShowcaseAdminTab.jsx";
+import RequestRoutingTab from "../components/showcase/RequestRoutingTab.jsx";
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { AlertTriangle, RefreshCw, ExternalLink, Loader2, ShieldAlert, Plus } from "lucide-react";
@@ -95,6 +96,7 @@ export default function AdminOpsPage() {
     { key: "pricing", label: "Pricing", component: <PricingTab /> },
     { key: "plans", label: "Plans", component: <PlansTab /> },
     { key: "showcase", label: "Showcase", component: <ShowcaseAdminTab /> },
+    { key: "requests", label: "Requests", component: <RequestRoutingTab /> },
   ];
 
   return (
