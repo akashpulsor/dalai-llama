@@ -8,12 +8,14 @@ import { getCreator } from "../showcase/showcaseApi.js";
 import { INDUSTRY_LABEL } from "../showcase/labels.js";
 import { FollowButton, RequestVideoButton } from "../showcase/BrandActions.jsx";
 
-/** dalaillama.in/c/<handle>: one creator's films, platform films first. ?industry= brings the
- * films for that industry to the top (how mail links open it). */
+/** dalaillama.in/c/<handle>: one creator's films, platform films first. Mail links open it with
+ * ?film=<publicId> (that film first) and ?industry= (the films for that industry next). */
 export default function CreatorPublicPage() {
   const { handle } = useParams();
   const navigate = useNavigate();
-  const industry = new URLSearchParams(window.location.search).get("industry");
+  const query = new URLSearchParams(window.location.search);
+  const industry = query.get("industry");
+  const film = query.get("film");
   const [profile, setProfile] = useState(undefined);
 
   useEffect(() => {
@@ -52,9 +54,8 @@ export default function CreatorPublicPage() {
     );
   }
 
-  const items = industry
-    ? [...profile.items].sort((a, b) => (b.industry === industry) - (a.industry === industry))
-    : profile.items;
+  const items = [...profile.items].sort((a, b) =>
+    (b.publicId === film) - (a.publicId === film) || (industry ? (b.industry === industry) - (a.industry === industry) : 0));
   const platform = items.filter((i) => i.origin === "PLATFORM");
   const other = items.filter((i) => i.origin !== "PLATFORM");
 

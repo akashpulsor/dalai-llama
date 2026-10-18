@@ -69,7 +69,11 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
   const [results, setResults] = useState(null);
   const [audienceResult, setAudienceResult] = useState(null);
 
-  const template = templates.find((t) => t.id === templateId) || templates[0];
+  const films = overview?.mailableFilms || [];
+  // No film of your own yet: start on the inspiration mail, which needs none.
+  const fallback = overview && films.length === 0 ? templates.find((t) => t.layout === "INSPIRATION") : null;
+  const template = templates.find((t) => t.id === templateId) || fallback || templates[0];
+  const ideas = template?.layout === "INSPIRATION";
   useEffect(() => {
     if (template) setDraft({ subject: template.subject, intro: template.intro });
   }, [template?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -88,9 +92,8 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
   };
   const audience = audiences.find((a) => a.id === audienceId) || audiences[0];
   const recipients = useMemo(() => parseRecipients(recipientsText), [recipientsText]);
-  const films = overview?.mailableFilms || [];
   const film = publicId || films[0]?.publicId || "";
-  const needsFilm = template?.layout !== "CREATOR_PORTFOLIO";
+  const needsFilm = template?.layout !== "CREATOR_PORTFOLIO" && !ideas;
   const allowance = overview?.allowance;
   const left = allowance ? Math.max(0, allowance.freePerWeek - allowance.freeUsedThisWeek) + allowance.packMailsLeft : 0;
   const pack = overview?.packs?.[0];
@@ -202,13 +205,20 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
         </div>
       )}
 
-      {films.length === 0 ? (
+      {films.length === 0 && !ideas ? (
         <p className="rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">
           Nothing to send yet. Only films made on Dalai Llama that your client fully paid for, and agreed to marketing use of, can be
-          emailed. Publish one from the film bar ("Publish to my profile") once it's paid.
+          emailed. Publish one from the film bar ("Publish to my profile") once it's paid. Until then, send
+          "Video ideas for your brand": videos brands in your industry are running, credited to their makers, with a button to request one from you.
         </p>
       ) : (
         <div className="space-y-4">
+          {ideas && (
+            <p className="rounded-lg border border-white/10 bg-white/[0.04] p-3 text-xs text-slate-300">
+              Sends up to three inspiration videos for your industries, shown as ideas (credited to whoever made them, never as your
+              work), with a button for the brand to request a video from you.
+            </p>
+          )}
           {needsFilm && (
             <label className="block">
               <span className={label}>3 · Film</span>

@@ -4,6 +4,7 @@ export const LAYOUTS = [
   ["SHOWCASE_WORK", "One film"],
   ["SIMILAR_BRAND_WORK", "One film, for the brand's industry"],
   ["CREATOR_PORTFOLIO", "Up to three films + profile"],
+  ["INSPIRATION", "Video ideas for the brand (no film needed)"],
 ];
 
 export const LAYOUT_LABEL = Object.fromEntries(LAYOUTS);

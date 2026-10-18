@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Heart, UserPlus, Check, X } from "lucide-react";
 import { follow, isSignedIn, likedHere, requestVideo, requestVideoAsGuest, requestVideoFromDalaillama, setLiked, SignInRequired, unfollow, attributionToken } from "./brandApi.js";
 import { INDUSTRIES } from "./labels.js";
+import { getCreator } from "./showcaseApi.js";
 
 /** Sends the visitor to sign in, remembering what to do once they're back. */
 export function goSignIn(pendingAction) {
@@ -96,18 +97,34 @@ export function RequestVideoButton({ profile, film }) {
 }
 
 /** "Request a video" with no creator chosen: Dalaillama finds one for the brand's industry. No
- * sign-in: a visitor who isn't signed in just adds their name and email to the form. */
+ * sign-in: a visitor who isn't signed in just adds their name and email to the form. Opened from a
+ * creator's mail (?then=request&creator=<handle>), it is a request to that creator: the router gives
+ * it to them. */
 export function RequestFromDalaillamaButton({ className, label = "Request a video", prefill = null, remember = true }) {
   const [open, setOpen] = useState(() => remember && new URLSearchParams(window.location.search).get("then") === "request");
+  const { creator, ...fromMail } = remember ? mailPrefill() : {};
   return (
     <>
       <button type="button" onClick={() => setOpen(true)}
               className={className || "rounded-lg bg-purple-600 px-4 py-2 text-sm font-bold text-white hover:bg-purple-700"}>
         {label}
       </button>
-      {open && <RequestDialog profile={null} film={null} prefill={prefill} onClose={() => setOpen(false)} />}
+      {open && <RequestDialog profile={null} film={null} prefill={{ ...fromMail, ...(prefill || {}) }}
+                              creatorHandle={creator || null} onClose={() => setOpen(false)} />}
     </>
   );
+}
+
+/** What a mail's "Request a video" link says: the creator, the industry, the inspiration pin. */
+function mailPrefill() {
+  const q = new URLSearchParams(window.location.search);
+  const industry = INDUSTRIES.some(([code]) => code === q.get("industry")) ? q.get("industry") : undefined;
+  const pin = /^[0-9]{6,32}$/.test(q.get("inspiration") || "") ? q.get("inspiration") : null;
+  return {
+    creator: q.get("creator") || null,
+    ...(industry ? { industry } : {}),
+    ...(pin ? { campaignDirection: `Like this reference: https://www.pinterest.com/pin/${pin}/` } : {}),
+  };
 }
 
 const DURATIONS = [[15, "15 seconds"], [30, "30 seconds"], [45, "45 seconds"], [60, "60 seconds"], [90, "90 seconds"]];
@@ -118,12 +135,20 @@ const labelCls = "block text-sm font-semibold text-slate-300";
 /** The request is the same brief a creator fills for a new project (rule 48): what the video is
  * for, the product, who it's for, the direction, length and languages, plus budget and timing.
  * When the creator makes it a brief, all of it carries over. */
-function RequestDialog({ profile, film, prefill = null, onClose }) {
+function RequestDialog({ profile, film, prefill = null, creatorHandle = null, onClose }) {
   const [form, setForm] = useState({
     message: "", productName: "", productDescription: "", targetAudience: "", campaignDirection: "",
     durationSeconds: 30, languages: ["English"], budgetBand: "NOT_SURE", timeline: "THIS_MONTH", industry: "",
     ...(prefill || {}),
   });
+  // From a creator's mail: who it goes to, by name.
+  const [mailer, setMailer] = useState(null);
+  useEffect(() => {
+    if (!creatorHandle) return undefined;
+    let cancelled = false;
+    getCreator(creatorHandle).then((p) => !cancelled && setMailer(p)).catch(() => {});
+    return () => { cancelled = true; };
+  }, [creatorHandle]);
   // Only a request to Dalaillama can be sent without signing in; who is asking comes with it.
   const guest = !profile && !isSignedIn();
   const [contact, setContact] = useState({ contactName: "", email: "", companyName: "", websiteUrl: "" });
@@ -148,6 +173,7 @@ function RequestDialog({ profile, film, prefill = null, onClose }) {
         ...form, durationSeconds: Number(form.durationSeconds), industry: form.industry || null,
         publicId: film?.publicId || new URLSearchParams(window.location.search).get("film") || null,
         attributionToken: attributionToken(),
+        creator: profile ? null : creatorHandle,
       };
       // To the creator whose page this is, or to Dalaillama, which routes it to a creator.
       const submitted = profile ? await requestVideo(profile.handle, brief, productImages, referenceImages)
@@ -168,11 +194,15 @@ function RequestDialog({ profile, film, prefill = null, onClose }) {
       <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[#0B101C] p-6 ring-1 ring-white/10" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 id="request-title" className="text-xl font-bold text-white">{profile ? `New brief for ${profile.displayName}` : "Request a video"}</h2>
+            <h2 id="request-title" className="text-xl font-bold text-white">
+              {profile ? `New brief for ${profile.displayName}` : mailer ? `Request a video from ${mailer.displayName}` : "Request a video"}
+            </h2>
             <p className="mt-1 text-sm text-slate-400">
               {profile
                 ? "Tell them what you need. You get a brief with their price straight away: review it and pay to start."
-                : "Tell us what you need. We match you with a creator for your industry, and you get a brief with the price straight away: review it and pay to start."}
+                : mailer
+                  ? `Tell ${mailer.displayName} what you need. You get a brief with the price straight away: review it and pay to start.`
+                  : "Tell us what you need. We match you with a creator for your industry, and you get a brief with the price straight away: review it and pay to start."}
             </p>
           </div>
           <button type="button" aria-label="Close" onClick={onClose} className="rounded p-1 text-slate-500 hover:bg-white/5"><X size={18} /></button>
@@ -190,6 +220,8 @@ function RequestDialog({ profile, film, prefill = null, onClose }) {
           <div className="mt-5 space-y-3 text-sm text-slate-300">
             <p>{profile
               ? `Sent. ${profile.displayName} will turn it into a brief and email you the link to review and pay.`
+              : mailer
+                ? `Sent to ${mailer.displayName}. We'll email ${guest ? contact.email.trim() : "you"} the brief to review and pay.`
               : guest
                 ? `Sent. We're matching you with a creator, usually within a day, and we'll email ${contact.email.trim()} the brief to review and pay.`
                 : "Sent. We're matching you with a creator; your requests page shows who, and we email you the brief."}</p>
