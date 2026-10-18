@@ -5,9 +5,12 @@ import { getInspiration } from "./showcaseApi.js";
 import { INDUSTRY_LABEL } from "./labels.js";
 import { RequestFromDalaillamaButton } from "./BrandActions.jsx";
 
+/** Pinterest's player draws its logo and "Save" button in this top strip; the card crops it off. */
+const PLAYER_TOP_CROP = 56;
+
 /**
- * Videos from Pinterest that we picked as references for an industry. They play in Pinterest's own
- * embed, which credits whoever made them: inspiration, never our creators' work. "Make one like
+ * Videos from Pinterest that we picked as references for an industry, each credited under the
+ * video ("Pinned by ..."): inspiration, never presented as our creators' work. "Make one like
  * this" opens the request form with the pin as the reference.
  */
 export default function InspirationBoard({ industry = null, limit = null }) {
@@ -23,31 +26,30 @@ export default function InspirationBoard({ industry = null, limit = null }) {
   const shown = limit ? items.slice(0, limit) : items;
   return (
     <div>
-      <p className="mb-4 text-xs text-slate-500">From Pinterest, credited to their makers — references, not work by our creators.</p>
       <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {shown.map((item) => (
           <li key={item.id} className="flex flex-col rounded-xl bg-white/[0.03] p-3 ring-1 ring-white/10">
-            <iframe
-              title={item.title}
-              src={`https://assets.pinterest.com/ext/embed.html?id=${item.pinId}`}
-              loading="lazy"
-              className="mx-auto h-[560px] w-full max-w-[345px] rounded-lg border-0"
-              scrolling="no"
-            />
+            <div className="relative mx-auto w-full max-w-[345px] overflow-hidden rounded-lg" style={{ height: 560 - PLAYER_TOP_CROP }}>
+              <iframe
+                title={item.title}
+                src={`https://assets.pinterest.com/ext/embed.html?id=${item.pinId}`}
+                loading="lazy"
+                className="absolute left-0 h-[560px] w-full border-0"
+                style={{ top: -PLAYER_TOP_CROP }}
+                scrolling="no"
+              />
+            </div>
             <p className="mt-3 font-semibold text-white">{item.title}</p>
             <p className="text-xs text-slate-400">
               {INDUSTRY_LABEL[item.industry]}{item.note ? ` · ${item.note}` : ""}
             </p>
-            <div className="mt-3 flex items-center gap-3">
+            <div className="mt-3">
               <RequestFromDalaillamaButton
                 label="Make one like this"
                 prefill={{ industry: item.industry, campaignDirection: `Like this reference: ${item.pinUrl}` }}
                 remember={false}
                 className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-purple-700"
               />
-              <a href={item.pinUrl} target="_blank" rel="noreferrer" className="text-xs font-semibold text-slate-400 hover:text-white">
-                On Pinterest
-              </a>
             </div>
           </li>
         ))}

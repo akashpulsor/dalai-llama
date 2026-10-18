@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import ShowcaseGrid from "../showcase/ShowcaseGrid.jsx";
+import InspirationBoard from "../showcase/InspirationBoard.jsx";
 import { RequestFromDalaillamaButton } from "../showcase/BrandActions.jsx";
 import PublicHeader, { PublicFooter } from "../showcase/PublicHeader.jsx";
 import { getFeed } from "../showcase/showcaseApi.js";
@@ -77,7 +78,6 @@ export default function DiscoverPage() {
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <RequestFromDalaillamaButton />
           <span className="text-sm text-slate-500">Not sure who to ask? We'll match you with a creator for your industry.</span>
-          <a href="/inspiration" className="text-sm font-semibold text-purple-300 hover:underline">Browse inspiration</a>
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-2" role="tablist" aria-label="Sort">
@@ -121,6 +121,21 @@ export default function DiscoverPage() {
             </button>
           )}
         </div>
+
+        <section className="mt-14" aria-labelledby="inspiration-title">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 id="inspiration-title" className="text-2xl font-bold tracking-tight text-white">Inspiration</h2>
+              <p className="mt-1 max-w-2xl text-slate-400">Videos brands like yours are running. See one you like? We'll make you one like it.</p>
+            </div>
+            <a href={industry ? `/inspiration?industry=${industry}` : "/inspiration"} className="text-sm font-semibold text-purple-300 hover:underline">
+              See all
+            </a>
+          </div>
+          <div className="mt-5">
+            <InspirationBoard industry={industry || null} limit={9} />
+          </div>
+        </section>
       </main>
       <PublicFooter />
     </div>

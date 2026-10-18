@@ -5,14 +5,14 @@ import { isSignedIn } from "./brandApi.js";
 
 const SITE = "https://dalaillama.in";
 
-/** The brand site's header (landing-site look). Everything here stays on the brand site: creators,
- * and the brand's own console or sign-in. Only the small "dalaillama.in" link leaves it. */
+/** The brand site's header (landing-site look). The logo goes to the landing site; the rest stays
+ * on the brand site: creators, and the brand's own console or sign-in. */
 export default function PublicHeader({ right }) {
   const signedIn = isSignedIn();
   return (
     <div className="site-shell" style={{ paddingBottom: 24 }}>
       <header className="topbar creator-panel-muted">
-        <a className="wordmark" href={signedIn ? "/brands/home" : "/creators"} aria-label="Dalaillama for brands">
+        <a className="wordmark" href={SITE} aria-label="Dalaillama home">
           <BrandLogo />
         </a>
         <nav className="nav-links" aria-label="Primary navigation">
