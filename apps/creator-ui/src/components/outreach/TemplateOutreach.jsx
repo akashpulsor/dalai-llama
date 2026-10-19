@@ -95,7 +95,7 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
   const film = publicId || films[0]?.publicId || "";
   const needsFilm = template?.layout !== "CREATOR_PORTFOLIO" && !ideas;
   const allowance = overview?.allowance;
-  const left = allowance ? Math.max(0, allowance.freePerWeek - allowance.freeUsedThisWeek) + allowance.packMailsLeft : 0;
+  const left = allowance ? Math.max(0, allowance.freePerMonth - allowance.freeUsedThisMonth) + allowance.packMailsLeft : 0;
   const pack = overview?.packs?.[0];
   const body = { templateId: template?.id, publicId: needsFilm ? film : null, note: note || null };
   const fail = (e, fallback) => dispatch(showFlash({ message: errorMessage(e, fallback), type: "error" }));
@@ -159,7 +159,7 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
         {allowance && (
           <div className="text-right text-xs text-slate-400">
             <p><span className="text-lg font-bold text-white">{left}</span> mails left</p>
-            <p>{allowance.freeUsedThisWeek}/{allowance.freePerWeek} free this week{allowance.packMailsLeft > 0 ? ` · ${allowance.packMailsLeft} from packs` : ""}</p>
+            <p>{allowance.freeUsedThisMonth}/{allowance.freePerMonth} free this month{allowance.packMailsLeft > 0 ? ` · ${allowance.packMailsLeft} from packs` : ""}</p>
             {pack && (
               <button type="button" onClick={doBuy} disabled={buyState.isLoading}
                       className="creator-control mt-1 inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-slate-200 disabled:opacity-50">

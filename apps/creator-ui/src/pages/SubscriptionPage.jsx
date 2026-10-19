@@ -22,11 +22,14 @@ import { runCheckoutForExistingOrder, runWalletRecharge, walletRechargeErrorMess
 const rupee = (n, code = "INR") =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: code || "INR", maximumFractionDigits: 0 }).format(Number(n) || 0);
 
-const CYCLE_LABEL = { MONTHLY: "Monthly", QUARTERLY: "Quarterly", YEARLY: "Yearly" };
+const CYCLE_LABEL = { MONTHLY: "Monthly", QUARTERLY: "Quarterly", HALF_YEARLY: "Every 6 months", YEARLY: "Yearly" };
+const CYCLE_ORDER = ["MONTHLY", "QUARTERLY", "HALF_YEARLY", "YEARLY"];
+/** The paid plans, cheapest first: tier code -> name shown. */
+const TIER_NAME = { STARTER: "Studio", PROFESSIONAL: "Pro" };
 
 /** Months each cycle bills for. Used to show a per-month figure beside the headline price, which
  * is the only way a creator can compare a quarterly plan against a monthly one at a glance. */
-const CYCLE_MONTHS = { MONTHLY: 1, QUARTERLY: 3, YEARLY: 12 };
+const CYCLE_MONTHS = { MONTHLY: 1, QUARTERLY: 3, HALF_YEARLY: 6, YEARLY: 12 };
 
 const FEATURE_ROWS = [
   ["editsEnabled", "AI edits & repairs"],
@@ -54,6 +57,7 @@ export default function SubscriptionPage() {
   const [createWalletRecharge] = useAddWalletBalanceMutation();
   const [verifyWalletPayment] = useVerifyWalletPaymentMutation();
   const [toppingUp, setToppingUp] = useState(false);
+  const [cycle, setCycle] = useState("MONTHLY");
 
   const proPlans = plans.filter((p) => p.tier !== "FREE");
   const busy = subscribing || cancelling || pausing || resuming || toppingUp;
@@ -257,87 +261,81 @@ export default function SubscriptionPage() {
 
       {status !== "ACTIVE" && (
         <>
-          <div className="mt-8 flex items-end justify-between gap-4">
+          <div className="mt-8 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h2 className="text-lg font-bold text-white">Choose a billing cycle</h2>
+              <h2 className="text-lg font-bold text-white">Choose a plan</h2>
               <p className="mt-0.5 text-xs font-medium text-slate-400">
-                Same Pro features on every cycle — longer cycles cost less per month.
+                Prices are per month; longer billing costs less: 10% off quarterly, 15% every 6 months, 20% yearly.
               </p>
+            </div>
+            <div className="flex flex-wrap gap-1 rounded-lg border border-white/10 bg-white/[0.03] p-1" role="radiogroup" aria-label="Billing">
+              {CYCLE_ORDER.filter((c) => proPlans.some((p) => p.billingCycle === c)).map((c) => (
+                <button key={c} type="button" role="radio" aria-checked={cycle === c} onClick={() => setCycle(c)}
+                        className={`rounded-md px-3 py-1.5 text-[11px] font-bold ${cycle === c ? "bg-purple-600 text-white" : "text-slate-300 hover:bg-white/5"}`}>
+                  {CYCLE_LABEL[c]}
+                </button>
+              ))}
             </div>
           </div>
 
           {plansLoading ? (
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {[0, 1, 2].map((i) => (
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {[0, 1].map((i) => (
                 <div key={i} className="creator-panel h-64 animate-pulse p-5" />
               ))}
             </div>
           ) : (
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {proPlans.map((plan) => {
-                const months = CYCLE_MONTHS[plan.billingCycle] || 1;
-                const perMonth = Number(plan.price || 0) / months;
-                // Cheapest per month, not cheapest sticker price -- the yearly plan has the
-                // biggest number on it and is usually the best value, so ranking by sticker
-                // price would recommend exactly the wrong one.
-                const bestValue =
-                  proPlans.length > 1 &&
-                  proPlans.every((other) => {
-                    const otherMonths = CYCLE_MONTHS[other.billingCycle] || 1;
-                    return perMonth <= Number(other.price || 0) / otherMonths;
-                  });
-                return (
-                  <div
-                    key={plan.planCode}
-                    className={`creator-panel relative flex flex-col p-5 ${
-                      bestValue ? "border-purple-400/40 ring-1 ring-purple-400/30" : ""
-                    }`}
-                  >
-                    {bestValue && (
-                      <span className="absolute -top-2.5 left-5 rounded-full bg-purple-500 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white">
-                        Best value
-                      </span>
-                    )}
-                    <p className="text-[10px] font-extrabold uppercase tracking-wide text-purple-300">
-                      {CYCLE_LABEL[plan.billingCycle] || plan.billingCycle}
-                    </p>
-                    <div className="mt-2 flex items-baseline gap-1.5">
-                      <span className="text-3xl font-black tracking-tight text-white">{rupee(plan.price, plan.currency)}</span>
-                      <span className="text-[11px] font-semibold text-slate-500">
-                        /{(CYCLE_LABEL[plan.billingCycle] || "cycle").toLowerCase()}
-                      </span>
-                    </div>
-                    {months > 1 && (
-                      <p className="mt-0.5 text-[11px] font-semibold text-emerald-300">
-                        {rupee(perMonth, plan.currency)} per month
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {proPlans
+                .filter((plan) => plan.billingCycle === cycle)
+                .sort((a, b) => Number(a.price || 0) - Number(b.price || 0))
+                .map((plan) => {
+                  const months = CYCLE_MONTHS[plan.billingCycle] || 1;
+                  const perMonth = Number(plan.price || 0) / months;
+                  const top = plan.tier === "PROFESSIONAL";
+                  const e = plan.entitlements || {};
+                  return (
+                    <div key={plan.planCode}
+                         className={`creator-panel relative flex flex-col p-5 ${top ? "border-purple-400/40 ring-1 ring-purple-400/30" : ""}`}>
+                      <p className="text-[10px] font-extrabold uppercase tracking-wide text-purple-300">
+                        {TIER_NAME[plan.tier] || plan.planName}
                       </p>
-                    )}
-
-                    <div className="mt-4 space-y-1.5 border-t border-white/10 pt-4">
-                      {FEATURE_ROWS.map(([key, label]) => (
-                        <p key={key} className="flex items-start gap-1.5 text-[11px] font-semibold text-slate-300">
-                          <Check size={12} className="mt-0.5 shrink-0 text-emerald-400" />
-                          {label}
+                      <div className="mt-2 flex items-baseline gap-1.5">
+                        <span className="text-3xl font-black tracking-tight text-white">{rupee(perMonth, plan.currency)}</span>
+                        <span className="text-[11px] font-semibold text-slate-500">/month</span>
+                      </div>
+                      {months > 1 && (
+                        <p className="mt-0.5 text-[11px] font-semibold text-emerald-300">
+                          Billed {rupee(plan.price, plan.currency)} {months === 12 ? "a year" : `every ${months} months`}
                         </p>
-                      ))}
-                    </div>
+                      )}
 
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => handleSubscribe(plan)}
-                      className={`mt-5 flex items-center justify-center gap-1.5 rounded-md py-2.5 text-xs font-black disabled:opacity-60 ${
-                        bestValue
-                          ? "creator-primary text-white"
-                          : "border border-white/10 bg-white/5 text-slate-100 hover:border-purple-400/30"
-                      }`}
-                    >
-                      {busy ? <Loader2 size={13} className="animate-spin" /> : null}
-                      {toppingUp ? "Opening payment…" : `Subscribe ${(CYCLE_LABEL[plan.billingCycle] || "").toLowerCase()}`}
-                    </button>
-                  </div>
-                );
-              })}
+                      <div className="mt-4 space-y-1.5 border-t border-white/10 pt-4">
+                        <p className="flex items-start gap-1.5 text-[11px] font-semibold text-slate-300">
+                          <Check size={12} className="mt-0.5 shrink-0 text-emerald-400" />
+                          {Number(e.monthlyOutreachEmails || 0).toLocaleString("en-IN")} emails a month to brands
+                        </p>
+                        <p className="flex items-start gap-1.5 text-[11px] font-semibold text-slate-300">
+                          <Check size={12} className="mt-0.5 shrink-0 text-emerald-400" />
+                          {e.brandReach == null ? "Your work reaches every brand" : `Your work reaches up to ${e.brandReach} brands a month`}
+                        </p>
+                        {FEATURE_ROWS.map(([key, label]) => (
+                          <p key={key} className={`flex items-start gap-1.5 text-[11px] font-semibold ${e[key] ? "text-slate-300" : "text-slate-500"}`}>
+                            {e[key] ? <Check size={12} className="mt-0.5 shrink-0 text-emerald-400" /> : <X size={12} className="mt-0.5 shrink-0" />}
+                            {label}
+                          </p>
+                        ))}
+                      </div>
+
+                      <button type="button" disabled={busy} onClick={() => handleSubscribe(plan)}
+                              className={`mt-5 flex items-center justify-center gap-1.5 rounded-md py-2.5 text-xs font-black disabled:opacity-60 ${
+                                top ? "creator-primary text-white" : "border border-white/10 bg-white/5 text-slate-100 hover:border-purple-400/30"}`}>
+                        {busy ? <Loader2 size={13} className="animate-spin" /> : null}
+                        {toppingUp ? "Opening payment…" : `Subscribe to ${TIER_NAME[plan.tier] || plan.planName}`}
+                      </button>
+                    </div>
+                  );
+                })}
             </div>
           )}
 
