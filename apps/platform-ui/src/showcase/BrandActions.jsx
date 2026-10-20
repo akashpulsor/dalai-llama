@@ -123,7 +123,7 @@ function mailPrefill() {
   return {
     creator: q.get("creator") || null,
     ...(industry ? { industry } : {}),
-    ...(pin ? { campaignDirection: `Like this reference: https://www.pinterest.com/pin/${pin}/` } : {}),
+    ...(pin ? { campaignDirection: `Like this inspiration video: ${window.location.origin}/inspiration?pin=${pin}` } : {}),
   };
 }
 

@@ -32,7 +32,7 @@ export default function InspirationPage() {
           </select>
         </label>
         <div className="mt-6">
-          <InspirationBoard industry={industry || null} />
+          <InspirationBoard industry={industry || null} first={new URLSearchParams(window.location.search).get("pin")} />
         </div>
       </main>
       <PublicFooter />
