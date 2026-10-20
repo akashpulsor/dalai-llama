@@ -6,7 +6,7 @@ import { isSignedIn } from "./brandApi.js";
 const SITE = "https://dalaillama.in";
 
 /** The brand site's header: the landing site's header, same logo and links in the same order, so
- * moving between the two sites feels like one site. A signed-in brand's "Sign in" opens their console. */
+ * moving between the two sites feels like one site. A signed-in brand's "Brand sign in" opens their console. */
 export default function PublicHeader({ right }) {
   const signedIn = isSignedIn();
   return (
@@ -23,7 +23,8 @@ export default function PublicHeader({ right }) {
           <a href={`${SITE}/#pricing`}>Pricing</a>
           <a href={`${SITE}/blog`}>Guides</a>
           {right}
-          <a href={signedIn ? "/brands/home" : "/brands/sign-in"}>{signedIn ? "Your brand console" : "Sign in"}</a>
+          <a href={signedIn ? "/brands/home" : "/brands/sign-in"}>{signedIn ? "Your brand console" : "Brand sign in"}</a>
+          <a className="nav-cta" href="https://creator.dalaillama.in/">Creator sign in</a>
         </nav>
       </header>
     </div>

@@ -1815,3 +1815,9 @@ a:hover {
     grid-template-columns: 1fr;
   }
 }
+
+.nav-links a.nav-cta {
+  border: 1px solid var(--creator-border-strong, rgba(167, 139, 250, 0.38));
+  color: #ffffff;
+  background: rgba(124, 58, 237, 0.18);
+}
