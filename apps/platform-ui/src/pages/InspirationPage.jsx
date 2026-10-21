@@ -18,7 +18,7 @@ export default function InspirationPage() {
   return (
     <div className="min-h-screen creator-app text-slate-100">
       <PublicHeader />
-      <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-8">
+      <main className="page-main pt-8">
         <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">Inspiration</h1>
         <p className="mt-2 max-w-2xl text-slate-400">
           Videos brands like yours are running. See one you like? Ask for one like it — we match you with a creator for your industry.

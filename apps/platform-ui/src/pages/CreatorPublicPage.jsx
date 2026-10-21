@@ -115,7 +115,7 @@ function Shell({ children }) {
   return (
     <div className="min-h-screen creator-app text-slate-100">
       <PublicHeader />
-      <main className="mx-auto w-full max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">{children}</main>
+      <main className="page-main">{children}</main>
       <PublicFooter />
     </div>
   );

@@ -1821,3 +1821,10 @@ a:hover {
   color: #ffffff;
   background: rgba(124, 58, 237, 0.18);
 }
+
+/* Page content lines up with the header (.site-shell), as on the landing site. */
+.page-main {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding-bottom: 96px;
+}

@@ -77,7 +77,7 @@ export default function DiscoverPage() {
   return (
     <div className="min-h-screen creator-app text-slate-100">
       <PublicHeader />
-      <main className="mx-auto w-full max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+      <main className="page-main">
         <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">Videos for brands like yours</h1>
         <p className="mt-2 max-w-2xl text-slate-400">Films made on Dalaillama, and inspiration from ads brands are running. See one you like? Ask for one of your own.</p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
