@@ -38,6 +38,10 @@ import {
   useUpdateAdminPlanMutation,
   useActivateAdminPlanMutation,
   useDeactivateAdminPlanMutation,
+  useListGrantablePlansQuery,
+  useGetCreatorGrantQuery,
+  useGrantCreatorPlanMutation,
+  useEndCreatorGrantMutation,
 } from "../api/creatorEndpoints.js";
 import { ProductionChargeLines, ProjectEconomicsCard, money } from "../components/billing/ProjectEconomics.jsx";
 import { ProviderCostCard, groupProviderCosts, usd } from "../components/billing/ProviderCosts.jsx";
@@ -95,6 +99,7 @@ export default function AdminOpsPage() {
     { key: "costs", label: "Provider costs", component: <ProviderCostsTab /> },
     { key: "pricing", label: "Pricing", component: <PricingTab /> },
     { key: "plans", label: "Plans", component: <PlansTab /> },
+    { key: "grants", label: "Free plans", component: <GrantsTab /> },
     { key: "showcase", label: "Showcase", component: <ShowcaseAdminTab /> },
     { key: "requests", label: "Requests", component: <RequestRoutingTab /> },
   ];
@@ -1122,6 +1127,104 @@ function StatusPill({ status }) {
   }[status] || "bg-slate-500/15 text-slate-300 border-slate-400/30";
   return (
     <span className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${tone}`}>{status}</span>
+  );
+}
+
+/** Free plans: give a creator Studio or Pro free for a number of days. Nothing is charged or
+ * renewed; when the days are up they are back on the free plan. A creator who pays is left alone. */
+function GrantsTab() {
+  const { data: tenants = [] } = useListAdminTenantsQuery();
+  const { data: plans = [] } = useListGrantablePlansQuery();
+  const [tenantId, setTenantId] = useState("");
+  const [planCode, setPlanCode] = useState("");
+  const [days, setDays] = useState(30);
+  const [note, setNote] = useState("");
+  const [flash, setFlash] = useState(null);
+  const { data: current, isFetching } = useGetCreatorGrantQuery(tenantId, { skip: !tenantId });
+  const [grant, { isLoading: granting }] = useGrantCreatorPlanMutation();
+  const [endGrant, { isLoading: ending }] = useEndCreatorGrantMutation();
+  const plan = planCode || plans.find((p) => p.tier === "PROFESSIONAL")?.planCode || plans[0]?.planCode || "";
+  const tenant = tenants.find((t) => t.id === tenantId);
+  const ends = new Date(Date.now() + Number(days || 0) * 86400000);
+  const planLabel = (p) => (p.tier === "PROFESSIONAL" ? "Pro" : p.tier === "STARTER" ? "Studio" : p.name);
+
+  const handleGrant = async () => {
+    setFlash(null);
+    try {
+      const result = await grant({ tenantId, planCode: plan, days: Number(days), note: note || null }).unwrap();
+      setFlash({ tone: "success", message: `${tenant?.name || "Creator"} is on ${result.planName} free until ${new Date(result.expiresAt).toLocaleString()}.` });
+      setNote("");
+    } catch (err) {
+      setFlash({ tone: "error", message: err?.data?.message || err?.data?.detail || "Couldn't grant the plan" });
+    }
+  };
+  const handleEnd = async () => {
+    if (!window.confirm(`End ${tenant?.name || "this creator"}'s free plan now? They go back to the free plan.`)) return;
+    setFlash(null);
+    try {
+      await endGrant({ subscriptionId: current.subscriptionId, tenantId }).unwrap();
+      setFlash({ tone: "warn", message: "Free plan ended." });
+    } catch (err) {
+      setFlash({ tone: "error", message: err?.data?.message || "Couldn't end the free plan" });
+    }
+  };
+
+  const activeGrant = current?.complimentary && current.status === "ACTIVE";
+  const field = "mt-1 w-full rounded-lg border border-white/10 bg-[#0b0f19] px-3 py-2 text-sm text-white";
+  return (
+    <div className="space-y-4">
+      <Notice>
+        Give a creator a paid plan free for a set number of days. Nothing is charged or renewed; when the days are up they are back
+        on the free plan. Granting again replaces the current free plan (to extend it or change the plan).
+      </Notice>
+      {flash && <Notice tone={flash.tone}>{flash.message}</Notice>}
+      <div className="creator-panel grid gap-3 p-4 sm:grid-cols-2">
+        <label className="text-xs text-slate-400">Creator
+          <select value={tenantId} onChange={(e) => setTenantId(e.target.value)} className={field}>
+            <option value="">— pick a creator —</option>
+            {tenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </label>
+        <label className="text-xs text-slate-400">Plan
+          <select value={plan} onChange={(e) => setPlanCode(e.target.value)} className={field}>
+            {plans.map((p) => <option key={p.planCode} value={p.planCode}>{planLabel(p)}</option>)}
+          </select>
+        </label>
+        <label className="text-xs text-slate-400">For how many days
+          <input type="number" min={1} max={3660} value={days} onChange={(e) => setDays(e.target.value)} className={field} />
+          <span className="mt-1 block text-[11px] text-slate-500">
+            {[7, 30, 90, 365].map((d) => (
+              <button key={d} type="button" onClick={() => setDays(d)} className="mr-2 text-purple-300 hover:underline">
+                {d === 365 ? "1 year" : `${d} days`}
+              </button>
+            ))}
+            {Number(days) >= 1 && <>· ends {ends.toLocaleDateString()}</>}
+          </span>
+        </label>
+        <label className="text-xs text-slate-400">Note (optional, for ops)
+          <input maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Launch partner, 3 months free" className={field} />
+        </label>
+        <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+          <button type="button" disabled={!tenantId || !plan || granting || !(Number(days) >= 1)} onClick={handleGrant}
+                  className="creator-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+            {granting ? "Granting…" : "Give this plan free"}
+          </button>
+          {tenantId && (isFetching ? <Loader2 size={13} className="animate-spin text-slate-400" /> : current && (
+            <span className="text-xs text-slate-300">
+              Now: {current.subscriptionId
+                ? `${current.planName || current.planCode} · ${current.status}${current.complimentary ? " · free" : " · paid"}${current.expiresAt ? ` · until ${new Date(current.expiresAt).toLocaleDateString()}` : ""}`
+                : "Free plan (never subscribed)"}
+              {current.note ? ` · ${current.note}` : ""}
+            </span>
+          ))}
+          {activeGrant && (
+            <button type="button" disabled={ending} onClick={handleEnd} className="text-xs font-bold text-rose-300 hover:underline disabled:opacity-50">
+              End free plan now
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

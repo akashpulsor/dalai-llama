@@ -4577,6 +4577,22 @@ export const creatorApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (_r, _e, { tenantId }) => [{ type: "CreatorHomeProjects", id: `admin-wallet-${tenantId}` }],
     }),
+    // Free plans: ops give a creator Studio or Pro free for a number of days (product-service).
+    listGrantablePlans: builder.query({
+      query: () => ({ url: opsAdminUrl(`/subscriptions/creator-video/plans`) }),
+    }),
+    getCreatorGrant: builder.query({
+      query: (tenantId) => ({ url: opsAdminUrl(`/subscriptions/creator-video?tenantId=${encodeURIComponent(tenantId)}`) }),
+      providesTags: (_r, _e, tenantId) => [{ type: "CreatorHomeProjects", id: `admin-grant-${tenantId}` }],
+    }),
+    grantCreatorPlan: builder.mutation({
+      query: (body) => ({ url: opsAdminUrl(`/subscriptions/creator-video/grants`), method: "POST", body }),
+      invalidatesTags: (_r, _e, { tenantId }) => [{ type: "CreatorHomeProjects", id: `admin-grant-${tenantId}` }],
+    }),
+    endCreatorGrant: builder.mutation({
+      query: ({ subscriptionId }) => ({ url: opsAdminUrl(`/subscriptions/creator-video/${subscriptionId}/end-grant`), method: "POST" }),
+      invalidatesTags: (_r, _e, { tenantId }) => [{ type: "CreatorHomeProjects", id: `admin-grant-${tenantId}` }],
+    }),
     listAdminPlans: builder.query({
       query: () => ({ url: opsAdminUrl(`/plans`) }),
       providesTags: [{ type: "CreatorHomeProjects", id: "admin-plans" }],
@@ -4886,6 +4902,10 @@ export const {
   useUpdateAdminPlanMutation,
   useActivateAdminPlanMutation,
   useDeactivateAdminPlanMutation,
+  useListGrantablePlansQuery,
+  useGetCreatorGrantQuery,
+  useGrantCreatorPlanMutation,
+  useEndCreatorGrantMutation,
   useQueryLokiRangeQuery,
   useListPreProductionShotsQuery,
   useCreatePreProductionShotMutation,
