@@ -44,6 +44,7 @@ import {
   useEndCreatorGrantMutation,
   useListAdminPayoutsQuery,
   useRetryAdminPayoutMutation,
+  useMarkAdminPayoutPaidMutation,
 } from "../api/creatorEndpoints.js";
 import { ProductionChargeLines, ProjectEconomicsCard, money } from "../components/billing/ProjectEconomics.jsx";
 import { ProviderCostCard, groupProviderCosts, usd } from "../components/billing/ProviderCosts.jsx";
@@ -1133,31 +1134,42 @@ function StatusPill({ status }) {
   );
 }
 
-/** Creator payouts: each project's share, sent through RazorpayX once the client's final payment
- * is in. A FAILED payout's money is already back in the creator's wallet; Retry works it out again. */
+/** Creator payouts: each project's share once the client's final payment is in. Until RazorpayX is
+ * available they are paid by hand: a READY payout has already left the creator's wallet -- send that
+ * amount to the bank / UPI shown, then enter the transfer's UTR to mark it paid. A FAILED payout's
+ * money is back in the creator's wallet; Retry works it out again. */
 function PayoutsTab() {
-  const { data: payouts = [], isLoading, refetch } = useListAdminPayoutsQuery();
+  const { data: rows = [], isLoading, refetch } = useListAdminPayoutsQuery();
   const { data: tenants = [] } = useListAdminTenantsQuery();
   const [retry, { isLoading: retrying }] = useRetryAdminPayoutMutation();
+  const [markPaid, { isLoading: marking }] = useMarkAdminPayoutPaidMutation();
+  const [utrs, setUtrs] = useState({});
   const [flash, setFlash] = useState(null);
   const nameOf = React.useMemo(() => new Map(tenants.map((t) => [t.id, t.name])), [tenants]);
+  const toPay = rows.filter((r) => r.payout.status === "READY");
 
-  const handleRetry = async (payout) => {
+  const run = async (action, success) => {
     setFlash(null);
     try {
-      await retry(payout.id).unwrap();
-      setFlash({ tone: "success", message: "Queued again -- it goes out on the next run (about a minute)." });
+      await action().unwrap();
+      setFlash({ tone: "success", message: success });
     } catch (err) {
-      setFlash({ tone: "error", message: err?.data?.message || "Couldn't retry the payout" });
+      setFlash({ tone: "error", message: err?.data?.message || "That didn't work" });
     }
   };
+  const handleMarkPaid = (p) => run(() => markPaid({ payoutId: p.id, utr: utrs[p.id] || "" }),
+    `Marked paid -- ${nameOf.get(p.tenantId) || "the creator"} now sees it as paid.`);
+  const handleRetry = (p) => run(() => retry(p.id), "Queued again -- worked out afresh on the next run (about a minute).");
+  const copy = (text) => navigator.clipboard?.writeText(text);
 
   return (
     <div className="space-y-4">
       <Notice>
         Amount = what the client paid into the creator's wallet − the project's AI usage (as charged) − Razorpay's fees on those
-        payments, capped at the wallet balance. Nothing is sent until RAZORPAYX_PAYOUTS_ENABLED is on.
+        payments, capped at the wallet balance. A payout is <b>READY</b> once it's worked out and taken from the wallet: send
+        that amount to the account shown, then enter the UTR and mark it paid.
       </Notice>
+      {toPay.length > 0 && <Notice tone="warn">{toPay.length} payout{toPay.length > 1 ? "s" : ""} to pay by hand.</Notice>}
       {flash && <Notice tone={flash.tone}>{flash.message}</Notice>}
       <div className="creator-panel overflow-x-auto p-4">
         <div className="mb-2 flex justify-end">
@@ -1165,7 +1177,7 @@ function PayoutsTab() {
         </div>
         {isLoading ? (
           <Loader2 size={14} className="animate-spin text-slate-400" />
-        ) : payouts.length === 0 ? (
+        ) : rows.length === 0 ? (
           <p className="text-xs text-slate-400">No payouts yet.</p>
         ) : (
           <table className="w-full text-left text-xs text-slate-300">
@@ -1173,23 +1185,41 @@ function PayoutsTab() {
               <tr>
                 <th className="py-2 pr-3">Creator</th><th className="pr-3">Project</th><th className="pr-3">Client paid</th>
                 <th className="pr-3">Production</th><th className="pr-3">Fees</th><th className="pr-3">Payout</th>
-                <th className="pr-3">Status</th><th className="pr-3">RazorpayX</th><th />
+                <th className="pr-3">Pay to</th><th className="pr-3">Status</th><th />
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {payouts.map((p) => (
-                <tr key={p.id}>
+              {rows.map(({ payout: p, payee }) => (
+                <tr key={p.id} className="align-top">
                   <td className="py-2 pr-3">{nameOf.get(p.tenantId) || p.tenantId.slice(0, 8)}</td>
-                  <td className="pr-3 font-mono">{p.projectId.slice(0, 8)}</td>
-                  <td className="pr-3">{p.clientPaid != null ? money(p.clientPaid, p.currency) : "—"}</td>
-                  <td className="pr-3">{p.productionCharged != null ? money(p.productionCharged, p.currency) : "—"}</td>
-                  <td className="pr-3">{p.gatewayFees != null ? money(p.gatewayFees, p.currency) : "—"}</td>
-                  <td className="pr-3 font-bold text-white">{p.amount != null ? money(p.amount, p.currency) : "—"}</td>
-                  <td className="pr-3" title={p.failureReason || ""}>
-                    {p.status}{p.failureReason ? ` · ${p.failureReason.slice(0, 60)}` : ""}
+                  <td className="py-2 pr-3 font-mono">{p.projectId.slice(0, 8)}</td>
+                  <td className="py-2 pr-3">{p.clientPaid != null ? money(p.clientPaid, p.currency) : "—"}</td>
+                  <td className="py-2 pr-3">{p.productionCharged != null ? money(p.productionCharged, p.currency) : "—"}</td>
+                  <td className="py-2 pr-3">{p.gatewayFees != null ? money(p.gatewayFees, p.currency) : "—"}</td>
+                  <td className="py-2 pr-3 font-bold text-white">{p.amount != null ? money(p.amount, p.currency) : "—"}</td>
+                  <td className="py-2 pr-3">
+                    {!payee ? <span className="text-amber-300">No account yet</span> : payee.method === "UPI" ? (
+                      <button type="button" onClick={() => copy(payee.vpa)} title="Copy" className="text-left hover:underline">
+                        UPI {payee.vpa}<span className="block text-slate-500">{payee.holderName}</span>
+                      </button>
+                    ) : (
+                      <button type="button" onClick={() => copy(payee.accountNumber)} title="Copy account number" className="text-left font-mono hover:underline">
+                        {payee.accountNumber} · {payee.ifsc}<span className="block font-sans text-slate-500">{payee.holderName}</span>
+                      </button>
+                    )}
                   </td>
-                  <td className="pr-3 font-mono text-[11px]">{p.gatewayPayoutId || "—"}{p.utr ? ` · ${p.utr}` : ""}</td>
-                  <td>
+                  <td className="py-2 pr-3" title={p.failureReason || ""}>
+                    {p.status}{p.utr ? ` · UTR ${p.utr}` : ""}{p.failureReason ? ` · ${p.failureReason.slice(0, 60)}` : ""}
+                  </td>
+                  <td className="py-2">
+                    {p.status === "READY" && (
+                      <div className="flex items-center gap-2">
+                        <input value={utrs[p.id] || ""} onChange={(e) => setUtrs({ ...utrs, [p.id]: e.target.value })} placeholder="UTR"
+                               maxLength={64} className="w-32 rounded border border-white/10 bg-[#0b0f19] px-2 py-1 text-xs text-white" />
+                        <button type="button" disabled={marking || !(utrs[p.id] || "").trim()} onClick={() => handleMarkPaid(p)}
+                                className="whitespace-nowrap text-xs font-bold text-emerald-300 hover:underline disabled:opacity-50">Mark paid</button>
+                      </div>
+                    )}
                     {p.status === "FAILED" && (
                       <button type="button" disabled={retrying} onClick={() => handleRetry(p)}
                               className="text-xs font-bold text-purple-300 hover:underline disabled:opacity-50">Retry</button>

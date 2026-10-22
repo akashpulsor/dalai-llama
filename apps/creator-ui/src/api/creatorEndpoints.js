@@ -4617,6 +4617,11 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: (payoutId) => ({ url: opsAdminUrl(`/billing/payouts/${payoutId}/retry`), method: "POST" }),
       invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-payouts" }],
     }),
+    // Ops paid a READY payout by hand (bank / UPI transfer) and records the transfer's UTR.
+    markAdminPayoutPaid: builder.mutation({
+      query: ({ payoutId, utr }) => ({ url: opsAdminUrl(`/billing/payouts/${payoutId}/mark-paid`), method: "POST", body: { utr } }),
+      invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-payouts" }],
+    }),
     listAdminPlans: builder.query({
       query: () => ({ url: opsAdminUrl(`/plans`) }),
       providesTags: [{ type: "CreatorHomeProjects", id: "admin-plans" }],
@@ -5039,6 +5044,7 @@ export const {
   useListPayoutsQuery,
   useListAdminPayoutsQuery,
   useRetryAdminPayoutMutation,
+  useMarkAdminPayoutPaidMutation,
   useListProjectShotPromptsQuery,
   useGetProjectDialogueFitQuery,
   useGetShotDialogueFitQuery,

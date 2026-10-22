@@ -15,7 +15,7 @@ const STATUS = {
   QUEUED: { label: "Working it out", tone: "text-slate-300" },
   AWAITING_ACCOUNT: { label: "Add a bank account or UPI", tone: "text-amber-300" },
   NOTHING_TO_PAY: { label: "Nothing left to pay", tone: "text-slate-400" },
-  READY: { label: "Sending", tone: "text-sky-300" },
+  READY: { label: "Being paid to you", tone: "text-sky-300" },
   SENT: { label: "On its way", tone: "text-sky-300" },
   PAID: { label: "Paid", tone: "text-emerald-300" },
   FAILED: { label: "Didn't go through — back in your wallet", tone: "text-rose-300" },
