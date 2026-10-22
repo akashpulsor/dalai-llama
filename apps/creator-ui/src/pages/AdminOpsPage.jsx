@@ -42,6 +42,8 @@ import {
   useGetCreatorGrantQuery,
   useGrantCreatorPlanMutation,
   useEndCreatorGrantMutation,
+  useListAdminPayoutsQuery,
+  useRetryAdminPayoutMutation,
 } from "../api/creatorEndpoints.js";
 import { ProductionChargeLines, ProjectEconomicsCard, money } from "../components/billing/ProjectEconomics.jsx";
 import { ProviderCostCard, groupProviderCosts, usd } from "../components/billing/ProviderCosts.jsx";
@@ -100,6 +102,7 @@ export default function AdminOpsPage() {
     { key: "pricing", label: "Pricing", component: <PricingTab /> },
     { key: "plans", label: "Plans", component: <PlansTab /> },
     { key: "grants", label: "Free plans", component: <GrantsTab /> },
+    { key: "payouts", label: "Payouts", component: <PayoutsTab /> },
     { key: "showcase", label: "Showcase", component: <ShowcaseAdminTab /> },
     { key: "requests", label: "Requests", component: <RequestRoutingTab /> },
   ];
@@ -1127,6 +1130,78 @@ function StatusPill({ status }) {
   }[status] || "bg-slate-500/15 text-slate-300 border-slate-400/30";
   return (
     <span className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${tone}`}>{status}</span>
+  );
+}
+
+/** Creator payouts: each project's share, sent through RazorpayX once the client's final payment
+ * is in. A FAILED payout's money is already back in the creator's wallet; Retry works it out again. */
+function PayoutsTab() {
+  const { data: payouts = [], isLoading, refetch } = useListAdminPayoutsQuery();
+  const { data: tenants = [] } = useListAdminTenantsQuery();
+  const [retry, { isLoading: retrying }] = useRetryAdminPayoutMutation();
+  const [flash, setFlash] = useState(null);
+  const nameOf = React.useMemo(() => new Map(tenants.map((t) => [t.id, t.name])), [tenants]);
+
+  const handleRetry = async (payout) => {
+    setFlash(null);
+    try {
+      await retry(payout.id).unwrap();
+      setFlash({ tone: "success", message: "Queued again -- it goes out on the next run (about a minute)." });
+    } catch (err) {
+      setFlash({ tone: "error", message: err?.data?.message || "Couldn't retry the payout" });
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Notice>
+        Amount = what the client paid into the creator's wallet − the project's AI usage (as charged) − Razorpay's fees on those
+        payments, capped at the wallet balance. Nothing is sent until RAZORPAYX_PAYOUTS_ENABLED is on.
+      </Notice>
+      {flash && <Notice tone={flash.tone}>{flash.message}</Notice>}
+      <div className="creator-panel overflow-x-auto p-4">
+        <div className="mb-2 flex justify-end">
+          <button type="button" onClick={refetch} className="text-xs font-bold text-purple-300 hover:underline">Refresh</button>
+        </div>
+        {isLoading ? (
+          <Loader2 size={14} className="animate-spin text-slate-400" />
+        ) : payouts.length === 0 ? (
+          <p className="text-xs text-slate-400">No payouts yet.</p>
+        ) : (
+          <table className="w-full text-left text-xs text-slate-300">
+            <thead className="text-[11px] uppercase tracking-wider text-slate-500">
+              <tr>
+                <th className="py-2 pr-3">Creator</th><th className="pr-3">Project</th><th className="pr-3">Client paid</th>
+                <th className="pr-3">Production</th><th className="pr-3">Fees</th><th className="pr-3">Payout</th>
+                <th className="pr-3">Status</th><th className="pr-3">RazorpayX</th><th />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {payouts.map((p) => (
+                <tr key={p.id}>
+                  <td className="py-2 pr-3">{nameOf.get(p.tenantId) || p.tenantId.slice(0, 8)}</td>
+                  <td className="pr-3 font-mono">{p.projectId.slice(0, 8)}</td>
+                  <td className="pr-3">{p.clientPaid != null ? money(p.clientPaid, p.currency) : "—"}</td>
+                  <td className="pr-3">{p.productionCharged != null ? money(p.productionCharged, p.currency) : "—"}</td>
+                  <td className="pr-3">{p.gatewayFees != null ? money(p.gatewayFees, p.currency) : "—"}</td>
+                  <td className="pr-3 font-bold text-white">{p.amount != null ? money(p.amount, p.currency) : "—"}</td>
+                  <td className="pr-3" title={p.failureReason || ""}>
+                    {p.status}{p.failureReason ? ` · ${p.failureReason.slice(0, 60)}` : ""}
+                  </td>
+                  <td className="pr-3 font-mono text-[11px]">{p.gatewayPayoutId || "—"}{p.utr ? ` · ${p.utr}` : ""}</td>
+                  <td>
+                    {p.status === "FAILED" && (
+                      <button type="button" disabled={retrying} onClick={() => handleRetry(p)}
+                              className="text-xs font-bold text-purple-300 hover:underline disabled:opacity-50">Retry</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
   );
 }
 

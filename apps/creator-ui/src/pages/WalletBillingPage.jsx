@@ -5,6 +5,7 @@ import { ArrowDownLeft, ArrowUpRight, ChevronDown, Crown, Percent, Save, Trendin
 import { Link } from "react-router-dom";
 import { selectTenantId, showFlash, useGetWalletBalanceQuery } from "@dalaillama/shared-store";
 import WalletStatementPanel from "../components/billing/WalletStatementPanel.jsx";
+import PayoutsPanel from "../components/billing/PayoutsPanel.jsx";
 import {
   useGetOrganizationQuery,
   useListPreProductionProjectsQuery,
@@ -36,6 +37,8 @@ const TYPE_LABEL = {
   REFUND: "Refund",
   DID_RENTAL: "Number rental",
   SUBSCRIPTION: "Subscription",
+  CREATOR_PAYOUT: "Paid out to you",
+  CREATOR_PAYOUT_REVERSAL: "Payout returned",
 };
 
 /** Wallet & Billing -- previously the sidebar link had nowhere to actually go (see Sidebar.jsx's
@@ -111,6 +114,8 @@ export default function WalletBillingPage() {
 
       {/* The statement first: what you last added, what has gone out since, and on what. The
           raw feed below is for looking something up, not for understanding the wallet. */}
+      <PayoutsPanel />
+
       <WalletStatementPanel />
 
       <ProjectStatements tenantId={tenantId} />

@@ -3709,6 +3709,21 @@ export const creatorApi = apiSlice.injectEndpoints({
       providesTags: ["CreatorWallet"],
     }),
 
+    // Payouts: where the creator is paid (bank account or UPI, registered with RazorpayX) and
+    // each project's payout -- what was left of the client's money after production and fees.
+    getPayoutAccount: builder.query({
+      query: (tenantId) => ({ url: `/billing/${tenantId}/payout-account` }),
+      providesTags: ["CreatorWallet"],
+    }),
+    savePayoutAccount: builder.mutation({
+      query: ({ tenantId, ...body }) => ({ url: `/billing/${tenantId}/payout-account`, method: "PUT", body }),
+      invalidatesTags: ["CreatorWallet"],
+    }),
+    listPayouts: builder.query({
+      query: (tenantId) => ({ url: `/billing/${tenantId}/payouts` }),
+      providesTags: ["CreatorWallet"],
+    }),
+
     // Progress of the project's latest prepare batch. video-generation-service runs the batch on
     // its Kafka worker side and this row is the durable record of it, so this is what the UI
     // polls: PENDING/RUNNING while live, SUCCEEDED/FAILED with counts once done. 404 means the
@@ -4593,6 +4608,15 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: ({ subscriptionId }) => ({ url: opsAdminUrl(`/subscriptions/creator-video/${subscriptionId}/end-grant`), method: "POST" }),
       invalidatesTags: (_r, _e, { tenantId }) => [{ type: "CreatorHomeProjects", id: `admin-grant-${tenantId}` }],
     }),
+    // Creator payouts across every tenant (billing-service), and retrying a failed one.
+    listAdminPayouts: builder.query({
+      query: () => ({ url: opsAdminUrl(`/billing/payouts`) }),
+      providesTags: [{ type: "CreatorHomeProjects", id: "admin-payouts" }],
+    }),
+    retryAdminPayout: builder.mutation({
+      query: (payoutId) => ({ url: opsAdminUrl(`/billing/payouts/${payoutId}/retry`), method: "POST" }),
+      invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-payouts" }],
+    }),
     listAdminPlans: builder.query({
       query: () => ({ url: opsAdminUrl(`/plans`) }),
       providesTags: [{ type: "CreatorHomeProjects", id: "admin-plans" }],
@@ -5010,6 +5034,11 @@ export const {
   useGetPrepareBatchStatusQuery,
   useGetWalletStatementQuery,
   useGetWalletStatementLinesQuery,
+  useGetPayoutAccountQuery,
+  useSavePayoutAccountMutation,
+  useListPayoutsQuery,
+  useListAdminPayoutsQuery,
+  useRetryAdminPayoutMutation,
   useListProjectShotPromptsQuery,
   useGetProjectDialogueFitQuery,
   useGetShotDialogueFitQuery,
