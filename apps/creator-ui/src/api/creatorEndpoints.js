@@ -4608,6 +4608,30 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: ({ subscriptionId }) => ({ url: opsAdminUrl(`/subscriptions/creator-video/${subscriptionId}/end-grant`), method: "POST" }),
       invalidatesTags: (_r, _e, { tenantId }) => [{ type: "CreatorHomeProjects", id: `admin-grant-${tenantId}` }],
     }),
+    // Ops mail to creators (tenant-service): templates, the creator picker, sending and the send log.
+    listCreatorMailTemplates: builder.query({
+      query: () => ({ url: opsAdminUrl(`/tenants/creator-mail/templates`) }),
+      providesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
+    }),
+    saveCreatorMailTemplate: builder.mutation({
+      query: ({ id, ...body }) => ({
+        url: opsAdminUrl(id ? `/tenants/creator-mail/templates/${id}` : `/tenants/creator-mail/templates`),
+        method: id ? "PUT" : "POST",
+        body,
+      }),
+      invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
+    }),
+    listCreatorMailRecipients: builder.query({
+      query: () => ({ url: opsAdminUrl(`/tenants/creator-mail/creators`) }),
+    }),
+    listCreatorMailSends: builder.query({
+      query: () => ({ url: opsAdminUrl(`/tenants/creator-mail/sends`) }),
+      providesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
+    }),
+    sendCreatorMail: builder.mutation({
+      query: (body) => ({ url: opsAdminUrl(`/tenants/creator-mail/send`), method: "POST", body }),
+      invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
+    }),
     // Creator payouts across every tenant (billing-service), and retrying a failed one.
     listAdminPayouts: builder.query({
       query: () => ({ url: opsAdminUrl(`/billing/payouts`) }),
@@ -4935,6 +4959,11 @@ export const {
   useGetCreatorGrantQuery,
   useGrantCreatorPlanMutation,
   useEndCreatorGrantMutation,
+  useListCreatorMailTemplatesQuery,
+  useSaveCreatorMailTemplateMutation,
+  useListCreatorMailRecipientsQuery,
+  useListCreatorMailSendsQuery,
+  useSendCreatorMailMutation,
   useQueryLokiRangeQuery,
   useListPreProductionShotsQuery,
   useCreatePreProductionShotMutation,

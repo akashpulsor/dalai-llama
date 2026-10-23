@@ -42,6 +42,11 @@ import {
   useGetCreatorGrantQuery,
   useGrantCreatorPlanMutation,
   useEndCreatorGrantMutation,
+  useListCreatorMailTemplatesQuery,
+  useSaveCreatorMailTemplateMutation,
+  useListCreatorMailRecipientsQuery,
+  useListCreatorMailSendsQuery,
+  useSendCreatorMailMutation,
   useListAdminPayoutsQuery,
   useRetryAdminPayoutMutation,
   useMarkAdminPayoutPaidMutation,
@@ -104,6 +109,7 @@ export default function AdminOpsPage() {
     { key: "plans", label: "Plans", component: <PlansTab /> },
     { key: "grants", label: "Free plans", component: <GrantsTab /> },
     { key: "payouts", label: "Payouts", component: <PayoutsTab /> },
+    { key: "creator-mail", label: "Mail creators", component: <CreatorMailTab /> },
     { key: "showcase", label: "Showcase", component: <ShowcaseAdminTab /> },
     { key: "requests", label: "Requests", component: <RequestRoutingTab /> },
   ];
@@ -1329,6 +1335,182 @@ function GrantsTab() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ------- Mail creators tab --------------------------------------------------
+
+const EMPTY_TEMPLATE = { id: null, name: "", subject: "", body: "", active: true };
+
+/** Ops mail to creators: keep templates, then send one to every active creator, to chosen
+ * creators, or to yourself as a test. {name} becomes each creator's first name. */
+function CreatorMailTab() {
+  const { data: templates = [] } = useListCreatorMailTemplatesQuery();
+  const { data: creators = [] } = useListCreatorMailRecipientsQuery();
+  const { data: sends = [] } = useListCreatorMailSendsQuery();
+  const [save, { isLoading: saving }] = useSaveCreatorMailTemplateMutation();
+  const [send, { isLoading: sending }] = useSendCreatorMailMutation();
+  const [draft, setDraft] = useState(EMPTY_TEMPLATE);
+  const [everyone, setEveryone] = useState(true);
+  const [chosen, setChosen] = useState([]);
+  const [testEmail, setTestEmail] = useState("");
+  const [flash, setFlash] = useState(null);
+  const field = "mt-1 w-full rounded-lg border border-white/10 bg-[#0b0f19] px-3 py-2 text-sm text-white";
+  const saved = templates.find((t) => t.id === draft.id);
+  const dirty = !saved || saved.name !== draft.name || saved.subject !== draft.subject || saved.body !== draft.body
+    || saved.active !== draft.active;
+  const recipients = everyone ? creators.length : chosen.length;
+  const firstName = (creators[0]?.name || "Asha").trim().split(/\s+/)[0];
+  const preview = (s) => s.split("{name}").join(firstName);
+  const plural = (n) => `${n} creator${n === 1 ? "" : "s"}`;
+  const errorOf = (err, fallback) => err?.data?.message || err?.data?.detail || fallback;
+
+  const handleSave = async () => {
+    setFlash(null);
+    try {
+      const t = await save(draft).unwrap();
+      setDraft({ id: t.id, name: t.name, subject: t.subject, body: t.body, active: t.active });
+      setFlash({ tone: "success", message: "Template saved." });
+    } catch (err) {
+      setFlash({ tone: "error", message: errorOf(err, "Couldn't save the template") });
+    }
+  };
+  const handleSend = async (test) => {
+    if (!test && !window.confirm(`Send "${draft.subject}" to ${plural(recipients)}?`)) return;
+    setFlash(null);
+    try {
+      const result = await send({ templateId: draft.id, tenantIds: everyone ? [] : chosen, testEmail: test ? testEmail : null }).unwrap();
+      setFlash({ tone: "success", message: test ? `Test sent to ${testEmail}.` : `Sending to ${plural(result.recipients)}.` });
+    } catch (err) {
+      setFlash({ tone: "error", message: errorOf(err, "Couldn't send") });
+    }
+  };
+  const toggle = (id) => setChosen((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
+  const canSave = !saving && dirty && draft.name.trim() && draft.subject.trim() && draft.body.trim();
+
+  return (
+    <div className="space-y-4">
+      <Notice>
+        Write a mail once, keep it as a template, and send it to every active creator or the ones you pick. It goes from Dalai Llama
+        (brands@partner.dalaillama.in). Write <code>{"{name}"}</code> for the creator's first name; a blank line starts a new paragraph
+        and links become clickable. Send yourself a test first.
+      </Notice>
+      {flash && <Notice tone={flash.tone}>{flash.message}</Notice>}
+      <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
+        <div className="creator-panel space-y-1 p-3">
+          <button type="button" onClick={() => setDraft(EMPTY_TEMPLATE)}
+                  className="mb-2 flex items-center gap-1 text-xs font-bold text-purple-300 hover:underline">
+            <Plus size={12} /> New template
+          </button>
+          {templates.length === 0 && <p className="text-xs text-slate-500">No templates yet.</p>}
+          {templates.map((t) => (
+            <button key={t.id} type="button"
+                    onClick={() => setDraft({ id: t.id, name: t.name, subject: t.subject, body: t.body, active: t.active })}
+                    className={`block w-full rounded-lg px-2 py-1.5 text-left text-xs ${draft.id === t.id ? "bg-white/10 text-white" : "text-slate-300 hover:bg-white/5"}`}>
+              <span className={t.active ? "" : "line-through opacity-60"}>{t.name}</span>
+              <span className="block text-[10px] text-slate-500">
+                {t.lastSentAt ? `last sent ${new Date(t.lastSentAt).toLocaleDateString()}` : "never sent"}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="space-y-4">
+          <div className="creator-panel grid gap-3 p-4">
+            <label className="text-xs text-slate-400">Template name (only ops see it)
+              <input maxLength={80} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className={field}
+                     placeholder="e.g. New feature: brand requests" />
+            </label>
+            <label className="text-xs text-slate-400">Subject
+              <input maxLength={200} value={draft.subject} onChange={(e) => setDraft({ ...draft, subject: e.target.value })} className={field}
+                     placeholder="{name}, brands can now request videos from you" />
+            </label>
+            <label className="text-xs text-slate-400">Message
+              <textarea rows={10} maxLength={10000} value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })}
+                        className={field} placeholder={"Hi {name},\n\n..."} />
+            </label>
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="button" disabled={!canSave} onClick={handleSave}
+                      className="creator-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+                {saving ? "Saving…" : draft.id ? "Save changes" : "Save template"}
+              </button>
+              {draft.id && (
+                <label className="flex items-center gap-1.5 text-xs text-slate-300">
+                  <input type="checkbox" checked={draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} />
+                  In use (untick and save to retire it)
+                </label>
+              )}
+            </div>
+          </div>
+          {(draft.subject || draft.body) && (
+            <div className="creator-panel p-4">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Preview for {firstName}</p>
+              <p className="mt-2 text-sm font-bold text-white">{preview(draft.subject)}</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm text-slate-300">{preview(draft.body)}</p>
+            </div>
+          )}
+          <div className="creator-panel space-y-3 p-4">
+            {!draft.id || dirty ? (
+              <p className="text-xs text-slate-400">Save the template to send it.</p>
+            ) : !draft.active ? (
+              <p className="text-xs text-slate-400">This template is retired; tick "In use" and save to send it.</p>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="flex-1 text-xs text-slate-400">Send a test to
+                    <input type="email" value={testEmail} onChange={(e) => setTestEmail(e.target.value)} className={field}
+                           placeholder="you@dalaillama.in" />
+                  </label>
+                  <button type="button" disabled={sending || !testEmail.includes("@")} onClick={() => handleSend(true)}
+                          className="rounded-lg border border-white/15 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+                    Send test
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-4 text-xs text-slate-300">
+                  <label className="flex items-center gap-1.5">
+                    <input type="radio" checked={everyone} onChange={() => setEveryone(true)} /> Every active creator ({creators.length})
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <input type="radio" checked={!everyone} onChange={() => setEveryone(false)} /> Only the ones I pick ({chosen.length})
+                  </label>
+                </div>
+                {!everyone && (
+                  <div className="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-white/10 p-2">
+                    {creators.map((c) => (
+                      <label key={c.tenantId} className="flex items-center gap-2 text-xs text-slate-300">
+                        <input type="checkbox" checked={chosen.includes(c.tenantId)} onChange={() => toggle(c.tenantId)} />
+                        {c.name} <span className="text-slate-500">{c.email}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <button type="button" disabled={sending || recipients === 0} onClick={() => handleSend(false)}
+                        className="creator-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+                  {sending ? "Sending…" : `Send to ${plural(recipients)}`}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+      {sends.length > 0 && (
+        <div className="creator-panel overflow-x-auto p-4">
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Recent sends</p>
+          <table className="w-full text-[11px]">
+            <thead><tr><Th>When</Th><Th>Subject</Th><Th>To</Th><Th>Recipients</Th></tr></thead>
+            <tbody>
+              {sends.map((s) => (
+                <tr key={s.id} className="border-t border-white/5">
+                  <Td>{new Date(s.createdAt).toLocaleString()}</Td>
+                  <Td>{s.subject}</Td>
+                  <Td>{s.audience === "ALL" ? "Every creator" : s.audience === "CHOSEN" ? "Picked creators" : "Test"}</Td>
+                  <Td>{s.recipients}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
