@@ -5,6 +5,7 @@ import { Loader2, Search } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import { useAddCompaniesToAudienceMutation, useCreateAudienceMutation, useGetAudiencesQuery, useLazySearchBrandsQuery } from "../../api/showcaseEndpoints.js";
 import { errorMessage, INDUSTRIES } from "../showcase/showcaseLabels.js";
+import { COMPANY_SIZES, NoEmailFlag, SizeBadge } from "./CompanySize.jsx";
 
 const control = "rounded-lg border border-white/10 bg-[#0b0f19] px-3 py-2 text-sm text-white";
 
@@ -24,7 +25,7 @@ export default function BrandFinder() {
   const [add, addState] = useAddCompaniesToAudienceMutation();
   const [createAudience, createState] = useCreateAudienceMutation();
   const [newName, setNewName] = useState("");
-  const [form, setForm] = useState({ industry: "", country: "IN", q: "" });
+  const [form, setForm] = useState({ industry: "", country: "IN", size: "", q: "" });
   const [selected, setSelected] = useState([]);
   const [audienceId, setAudienceId] = useState("");
   const [report, setReport] = useState(null);
@@ -35,7 +36,7 @@ export default function BrandFinder() {
     event.preventDefault();
     setSelected([]);
     setReport(null);
-    search({ industry: form.industry || undefined, country: form.country, q: form.q.trim() });
+    search({ industry: form.industry || undefined, country: form.country, size: form.size, q: form.q.trim() });
   };
   const toggle = (id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length >= 25 ? s : [...s, id]));
   const addSelected = async () => {
@@ -79,6 +80,12 @@ export default function BrandFinder() {
             {COUNTRIES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
           </select>
         </label>
+        <label className="text-[10px] font-bold uppercase tracking-normal text-slate-500">Size
+          <select value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })} className={`${control} mt-1 block`}>
+            <option value="">Any size</option>
+            {COMPANY_SIZES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+          </select>
+        </label>
         <label className="min-w-0 flex-1 text-[10px] font-bold uppercase tracking-normal text-slate-500">Keywords (optional)
           <input value={form.q} maxLength={120} onChange={(e) => setForm({ ...form, q: e.target.value })}
                  placeholder="e.g. tea, organic snacks" className={`${control} mt-1 block w-full`} />
@@ -98,11 +105,13 @@ export default function BrandFinder() {
                   <label className="flex cursor-pointer items-center gap-3 px-3 py-2 text-sm">
                     <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggle(c.id)} />
                     <span className="min-w-0 flex-1">
-                      <span className="block font-semibold text-white">{c.name || c.domain}</span>
+                      <span className="flex items-center gap-2 font-semibold text-white">{c.name || c.domain} <SizeBadge size={c.size} /></span>
                       <span className="block text-xs text-slate-500">{c.domain}{c.countryCode ? ` · ${c.countryCode}` : ""}</span>
                     </span>
                     <span className="text-xs text-slate-400">
-                      {c.contactsKnown > 0 ? `${c.contactsKnown} contacts known` : c.emailsAvailable ? `${c.emailsAvailable} emails available` : ""}
+                      {c.contactsKnown > 0 ? `${c.contactsKnown} contacts known`
+                        : c.emailsAvailable ? `${c.emailsAvailable} emails available`
+                        : <NoEmailFlag />}
                     </span>
                   </label>
                 </li>

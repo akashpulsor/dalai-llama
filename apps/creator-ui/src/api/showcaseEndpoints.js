@@ -270,6 +270,10 @@ export const showcaseApi = showcaseBase.injectEndpoints({
       },
       invalidatesTags: ["Audiences", "AudienceLeads"],
     }),
+    addLeadToAudience: builder.mutation({
+      query: ({ audienceId, ...lead }) => ({ url: `/tenants/me/outreach/audiences/${audienceId}/leads`, method: "POST", body: lead }),
+      invalidatesTags: ["Audiences", "AudienceLeads"],
+    }),
     getAudienceLeads: builder.query({
       query: ({ audienceId, q, page = 0 }) => ({
         url: `/tenants/me/outreach/audiences/${audienceId}/leads`,
@@ -379,9 +383,9 @@ export const showcaseApi = showcaseBase.injectEndpoints({
 
     // ---- Rules 41-42: shared YouTube quota (ops) and the brand directory ----
     searchBrands: builder.query({
-      query: ({ industry, country, q }) => ({
+      query: ({ industry, country, q, size }) => ({
         url: "/tenants/me/outreach/brand-search",
-        params: { industry, ...(country ? { country } : {}), ...(q ? { q } : {}) },
+        params: { industry, ...(country ? { country } : {}), ...(q ? { q } : {}), ...(size ? { size } : {}) },
       }),
     }),
     addCompaniesToAudience: builder.mutation({
@@ -486,6 +490,7 @@ export const {
   useCreateAudienceMutation,
   useDeleteAudienceMutation,
   useUploadAudienceCsvMutation,
+  useAddLeadToAudienceMutation,
   useGetAudienceLeadsQuery,
   useRemoveLeadFromAudienceMutation,
   useDiscardContactPointMutation,

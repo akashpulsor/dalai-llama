@@ -20,6 +20,12 @@ export default function MarketingPage() {
   useYouTubeResultFlash();
   const [tab, setTab] = useState(() => (new URLSearchParams(window.location.search).get("youtube") ? "youtube" : "send"));
   const [templateId, setTemplateId] = useState(null);
+  const [audienceId, setAudienceId] = useState("");
+  // "Send mail to this audience" on an audience: pick it in the send panel and scroll up to it.
+  const sendTo = (id) => {
+    setAudienceId(id);
+    document.getElementById("send-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
@@ -44,10 +50,12 @@ export default function MarketingPage() {
 
       {tab === "send" && (
         <div className="space-y-8">
-          <TemplateOutreach templateId={templateId} onTemplateChange={setTemplateId} />
+          <div id="send-panel" className="scroll-mt-4">
+            <TemplateOutreach templateId={templateId} onTemplateChange={setTemplateId} audienceId={audienceId} onAudienceChange={setAudienceId} />
+          </div>
           <section aria-labelledby="audiences-h">
             <h2 id="audiences-h" className="mb-3 text-sm font-bold uppercase tracking-normal text-slate-300">Your audiences</h2>
-            <AudiencesPanel />
+            <AudiencesPanel onSendTo={sendTo} />
           </section>
         </div>
       )}

@@ -46,7 +46,7 @@ function parseRecipients(text) {
 /** Send tab, one flow: pick a template (Dalai Llama's or your own), edit its subject and opening line
  * right here (saved as your own template when you send), pick the film and the audience, send. Only films made on Dalai Llama that the client fully paid for and agreed to
  * marketing use of can be sent; each brand gets at most one email a day. */
-export default function TemplateOutreach({ templateId, onTemplateChange }) {
+export default function TemplateOutreach({ templateId, onTemplateChange, audienceId, onAudienceChange }) {
   const dispatch = useDispatch();
   const { data: overview, isLoading } = useGetOutreachOverviewQuery();
   const { data: templates = [] } = useGetEmailTemplatesQuery();
@@ -63,7 +63,9 @@ export default function TemplateOutreach({ templateId, onTemplateChange }) {
   const [publicId, setPublicId] = useState("");
   const [note, setNote] = useState("");
   const [mode, setMode] = useState("audience");
-  const [audienceId, setAudienceId] = useState("");
+  const setAudienceId = onAudienceChange;
+  // An audience picked from the Audiences panel switches the recipients back to it.
+  useEffect(() => { if (audienceId) setMode("audience"); }, [audienceId]);
   const [recipientsText, setRecipientsText] = useState("");
   const [previewMail, setPreviewMail] = useState(null);
   const [results, setResults] = useState(null);

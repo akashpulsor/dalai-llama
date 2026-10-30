@@ -1,12 +1,13 @@
 // @ts-nocheck
 import React, { useRef, useState } from "react";
 import { useDispatch } from "react-redux";
-import { Loader2, Plus, Trash2, Upload, X } from "lucide-react";
+import { Loader2, Plus, Send, Trash2, Upload, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useCreateAudienceMutation,
   useDeleteAudienceMutation,
   useAddLeadContactPointMutation,
+  useAddLeadToAudienceMutation,
   useDiscardContactPointMutation,
   useGetDirectoriesQuery,
   useGetAudienceLeadsQuery,
@@ -14,15 +15,16 @@ import {
   useRemoveLeadFromAudienceMutation,
   useUploadAudienceCsvMutation,
 } from "../../api/showcaseEndpoints.js";
-import { errorMessage, INDUSTRY_LABEL } from "../showcase/showcaseLabels.js";
+import { errorMessage, INDUSTRIES, INDUSTRY_LABEL } from "../showcase/showcaseLabels.js";
 import { CONTACT_STATUS } from "./outreachLabels.js";
+import { COMPANY_SIZES, NoEmailFlag, SizeBadge } from "./CompanySize.jsx";
 import BrandFinder from "./BrandFinder.jsx";
 import PeopleFinder from "./PeopleFinder.jsx";
 
 /** Audiences tab (rules 21–25): upload a CSV into a named audience; rows for the same person (any
  * shared email or phone) become one lead. Contact points are checked continuously: once one is
  * validated only validated ones show, otherwise every unchecked one does. */
-export default function AudiencesPanel() {
+export default function AudiencesPanel({ onSendTo }) {
   const dispatch = useDispatch();
   const { data: audiences = [], isLoading } = useGetAudiencesQuery();
   const { data: directories } = useGetDirectoriesQuery();
@@ -69,7 +71,10 @@ export default function AudiencesPanel() {
               <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
                 <button type="button" onClick={() => setOpenId(openId === a.id ? null : a.id)} className="text-left">
                   <span className="block font-bold text-white">{a.name}</span>
-                  <span className="block text-xs text-slate-400">{a.leads} leads · {a.reachable} reachable</span>
+                  <span className="block text-xs text-slate-400">
+                    {a.leads} leads · {a.reachable} reachable
+                    {a.leads > a.reachable && <span className="text-amber-200"> · {a.leads - a.reachable} can't be emailed</span>}
+                  </span>
                 </button>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setOpenId(openId === a.id ? null : a.id)}
@@ -88,14 +93,15 @@ export default function AudiencesPanel() {
       {directories && !directories.people && !directories.companies && (
         <p className="creator-panel p-5 text-xs text-slate-400">Brand search isn't switched on yet. Upload a CSV meanwhile.</p>
       )}
-      {openId && <AudienceDetail audience={audiences.find((a) => a.id === openId)} onFail={fail} />}
+      {openId && <AudienceDetail audience={audiences.find((a) => a.id === openId)} onFail={fail} onSendTo={onSendTo} />}
     </div>
   );
 }
 
-function AudienceDetail({ audience, onFail }) {
+function AudienceDetail({ audience, onFail, onSendTo }) {
   const dispatch = useDispatch();
   const fileRef = useRef(null);
+  const [adding, setAdding] = useState(false);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(0);
   const [report, setReport] = useState(null);
@@ -120,7 +126,18 @@ function AudienceDetail({ audience, onFail }) {
     <section className="creator-panel p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-sm font-bold uppercase tracking-normal text-slate-300">{audience.name}</h2>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {onSendTo && (
+            <button type="button" onClick={() => onSendTo(audience.id)} disabled={audience.reachable === 0}
+                    title={audience.reachable === 0 ? "Add a lead with an email first" : undefined}
+                    className="creator-primary flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+              <Send size={13} /> Send mail to this audience
+            </button>
+          )}
+          <button type="button" onClick={() => setAdding(!adding)}
+                  className="creator-control flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-200">
+            <Plus size={13} /> Add a lead
+          </button>
           <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onFile} className="hidden" />
           <button type="button" onClick={() => fileRef.current?.click()} disabled={uploadState.isLoading}
                   className="creator-primary flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
@@ -128,11 +145,18 @@ function AudienceDetail({ audience, onFail }) {
           </button>
         </div>
       </div>
+      {adding && <AddLeadForm audienceId={audience.id} onDone={() => setAdding(false)} onFail={onFail} />}
       {report && (
         <p className="mt-3 rounded-lg border border-white/10 bg-white/[0.04] p-3 text-xs text-slate-300">
           {report.rowsImported} of {report.rowsTotal} rows imported · {report.leadsCreated} new leads · {report.leadsMerged} rows joined
-          an existing lead · {report.contactPointsAdded} new emails/phones · {report.rowsRejected} rows without an email or phone ·
-          audience now has {report.audienceSize} leads
+          an existing lead · {report.contactPointsAdded} new emails/phones · {report.rowsRejected} rows skipped (no email, phone, name or
+          company) · audience now has {report.audienceSize} leads
+          {report.leadsWithoutEmail > 0 && (
+            <span className="mt-2 block text-amber-200">
+              {report.leadsWithoutEmail} lead{report.leadsWithoutEmail === 1 ? " has" : "s have"} no email: they're kept and marked
+              "Email not available". Add an email on each to send to them.
+            </span>
+          )}
         </p>
       )}
       <label htmlFor="lead-search" className="sr-only">Search leads</label>
@@ -151,12 +175,14 @@ function AudienceDetail({ audience, onFail }) {
                     {l.name && l.designation && <span className="font-normal text-slate-400"> · {l.designation}</span>}
                     {l.name && l.company && <span className="font-normal text-slate-400"> · {l.company}</span>}
                     {l.industry && <span className="font-normal text-slate-500"> · {INDUSTRY_LABEL[l.industry]}</span>}
+                    {l.size && <span className="ml-2 align-middle"><SizeBadge size={l.size} /></span>}
                   </p>
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     {[...l.emails, ...l.phones].map((c) => (
                       <ContactChip key={c.id} c={c} onDiscard={() => discard({ leadId: l.id, contactPointId: c.id }).unwrap().catch((e) => onFail(e, "Couldn't remove"))} />
                     ))}
-                    {l.emails.length + l.phones.length === 0 && <AddContact leadId={l.id} onFail={onFail} />}
+                    {l.emails.length === 0 && <NoEmailFlag />}
+                    {l.emails.length === 0 && <AddContact leadId={l.id} onFail={onFail} />}
                     {l.discarded > 0 && <span className="text-[11px] text-slate-500">{l.discarded} discarded</span>}
                   </div>
                 </div>
@@ -193,9 +219,9 @@ function ContactChip({ c, onDiscard }) {
 }
 
 const SAMPLE_CSV = [
-  "name,designation,company,email,email2,phone,industry,website",
-  "Asha Rao,Marketing Head,Hearth Foods,asha@hearthfoods.in,marketing@hearthfoods.in,+91 98765 43210,FOOD_BEVERAGE,https://hearthfoods.in",
-  "Vikram Shah,Brand Manager,Bolt Motors,vikram@boltmotors.in,,+91 91234 56789,AUTOMOTIVE,https://boltmotors.in",
+  "name,designation,company,email,email2,phone,industry,website,size",
+  "Asha Rao,Marketing Head,Hearth Foods,asha@hearthfoods.in,marketing@hearthfoods.in,+91 98765 43210,FOOD_BEVERAGE,https://hearthfoods.in,Small",
+  "Vikram Shah,Brand Manager,Bolt Motors,vikram@boltmotors.in,,+91 91234 56789,AUTOMOTIVE,https://boltmotors.in,Medium",
 ].join("\r\n");
 
 /** The CSV columns, with a sample to download. Rows for the same person (any shared email or
@@ -217,11 +243,12 @@ function CsvFormat() {
     ["phone", "With country code, e.g. +91 98765 43210"],
     ["industry", "Optional: FASHION, BEAUTY, FOOD_BEVERAGE, TECH, FINANCE, …"],
     ["website", "Optional, starting with https://"],
+    ["size", "Optional: Small, Medium, Large or Enterprise (or a headcount like 11-50)"],
   ];
   return (
     <details className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs text-slate-300">
       <summary className="cursor-pointer font-bold text-slate-200">CSV format</summary>
-      <p className="mt-2 text-slate-400">First row must be the column names. Each row needs at least an email or a phone.</p>
+      <p className="mt-2 text-slate-400">First row must be the column names. A row without an email is still kept (marked "Email not available") if it has a name or company; add the email later.</p>
       <table className="mt-2 w-full text-left">
         <tbody>
           {cols.map(([c, d]) => (
@@ -235,6 +262,57 @@ function CsvFormat() {
 }
 
 /** No email yet (Apollo's free lookups ran out, or none was found): the creator adds one they found. */
+const EMPTY_LEAD = { name: "", designation: "", company: "", email: "", phone: "", industry: "", website: "", size: "" };
+
+/** One lead typed in: the CSV's columns as fields. Only a company, name or email is needed; with no
+ * email the lead is kept and marked "Email not available". */
+function AddLeadForm({ audienceId, onDone, onFail }) {
+  const dispatch = useDispatch();
+  const [lead, setLead] = useState(EMPTY_LEAD);
+  const [add, state] = useAddLeadToAudienceMutation();
+  const set = (field) => (e) => setLead({ ...lead, [field]: e.target.value });
+  const input = "mt-1 w-full rounded-md border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-sm text-white";
+  const ready = lead.company.trim() || lead.name.trim() || lead.email.trim();
+
+  const save = async (event) => {
+    event.preventDefault();
+    try {
+      const result = await add({ audienceId, ...lead, industry: lead.industry || null, size: lead.size || null }).unwrap();
+      dispatch(showFlash({ message: result.merged ? "Added to a lead you already had" : "Lead added", type: "success" }));
+      setLead(EMPTY_LEAD);
+    } catch (e) { onFail(e, "Couldn't add that lead"); }
+  };
+  return (
+    <form onSubmit={save} className="mt-4 grid gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-4 sm:grid-cols-2">
+      <label className="text-[11px] font-bold text-slate-400">Company<input value={lead.company} onChange={set("company")} maxLength={160} className={input} placeholder="Hearth Foods" /></label>
+      <label className="text-[11px] font-bold text-slate-400">Email<input value={lead.email} onChange={set("email")} maxLength={254} className={input} placeholder="asha@hearthfoods.in (leave empty if you don't have it)" /></label>
+      <label className="text-[11px] font-bold text-slate-400">Name<input value={lead.name} onChange={set("name")} maxLength={120} className={input} placeholder="Asha Rao" /></label>
+      <label className="text-[11px] font-bold text-slate-400">Designation<input value={lead.designation} onChange={set("designation")} maxLength={120} className={input} placeholder="Founder" /></label>
+      <label className="text-[11px] font-bold text-slate-400">Phone<input value={lead.phone} onChange={set("phone")} maxLength={40} className={input} placeholder="+91 98765 43210" /></label>
+      <label className="text-[11px] font-bold text-slate-400">Website<input value={lead.website} onChange={set("website")} maxLength={255} className={input} placeholder="hearthfoods.in" /></label>
+      <label className="text-[11px] font-bold text-slate-400">Industry
+        <select value={lead.industry} onChange={set("industry")} className={input}>
+          <option value="">—</option>
+          {INDUSTRIES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+        </select>
+      </label>
+      <label className="text-[11px] font-bold text-slate-400">Size
+        <select value={lead.size} onChange={set("size")} className={input}>
+          <option value="">—</option>
+          {COMPANY_SIZES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+        </select>
+      </label>
+      <div className="flex items-center gap-3 sm:col-span-2">
+        <button type="submit" disabled={!ready || state.isLoading} className="creator-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+          {state.isLoading ? "Adding…" : "Add lead"}
+        </button>
+        <button type="button" onClick={onDone} className="text-xs font-bold text-slate-400 hover:text-white">Done</button>
+        <span className="text-[11px] text-slate-500">Company, name or email is enough. No email? It's kept and marked so you can add it later.</span>
+      </div>
+    </form>
+  );
+}
+
 function AddContact({ leadId, onFail }) {
   const [value, setValue] = useState("");
   const [add, state] = useAddLeadContactPointMutation();
@@ -244,7 +322,6 @@ function AddContact({ leadId, onFail }) {
   };
   return (
     <form onSubmit={save} className="flex items-center gap-1.5">
-      <span className="text-xs text-amber-200">No email yet</span>
       <input value={value} onChange={(e) => setValue(e.target.value)} maxLength={254} placeholder="Add email or phone"
              aria-label="Add email or phone" className="w-48 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-xs text-white" />
       <button type="submit" disabled={!value.trim() || state.isLoading} className="creator-control px-2 py-1 text-xs font-bold text-slate-200 disabled:opacity-40">Add</button>
