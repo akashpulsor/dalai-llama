@@ -1358,10 +1358,10 @@ function GrantsTab() {
 
 // ------- Mail creators tab --------------------------------------------------
 
-const EMPTY_TEMPLATE = { id: null, name: "", subject: "", body: "", ctaLabel: "", ctaUrl: "", ideaVideos: 0, active: true };
+const EMPTY_TEMPLATE = { id: null, name: "", subject: "", body: "", ctaLabel: "", ctaUrl: "", ideaVideos: 0, style: "PLAIN", active: true };
 const asDraft = (t) => ({
   id: t.id, name: t.name, subject: t.subject, body: t.body, ctaLabel: t.ctaLabel || "", ctaUrl: t.ctaUrl || "",
-  ideaVideos: t.ideaVideos || 0, active: t.active,
+  ideaVideos: t.ideaVideos || 0, style: t.style || "PLAIN", active: t.active,
 });
 
 const SEND_AUDIENCE_LABEL = { ALL: "Every creator", CHOSEN: "Picked creators", NO_VIDEO: "No video on profile", LEADS: "Creator leads", TEST: "Test" };
@@ -1420,14 +1420,14 @@ function CreatorMailTab() {
   const saved = templates.find((t) => t.id === draft.id);
   const dirty = !saved || JSON.stringify(asDraft(saved)) !== JSON.stringify(draft);
   const [renderPreview, { data: rendered }] = usePreviewCreatorMailMutation();
-  // The real mail (a plain letter from Akash), redrawn shortly after each edit.
+  // The real mail in its chosen look, redrawn shortly after each edit.
   useEffect(() => {
     if (!draft.subject && !draft.body) return undefined;
     const timer = setTimeout(() => {
-      renderPreview({ subject: draft.subject, body: draft.body, ctaLabel: draft.ctaLabel, ctaUrl: draft.ctaUrl, ideaVideos: draft.ideaVideos });
+      renderPreview({ subject: draft.subject, body: draft.body, ctaLabel: draft.ctaLabel, ctaUrl: draft.ctaUrl, ideaVideos: draft.ideaVideos, style: draft.style });
     }, 500);
     return () => clearTimeout(timer);
-  }, [draft.subject, draft.body, draft.ctaLabel, draft.ctaUrl, draft.ideaVideos, renderPreview]);
+  }, [draft.subject, draft.body, draft.ctaLabel, draft.ctaUrl, draft.ideaVideos, draft.style, renderPreview]);
   const noVideo = creators.filter((c) => !c.liveVideos).length;
   const AUDIENCES = [
     ["ALL", `Every active creator (${creators.length})`],
@@ -1532,6 +1532,12 @@ function CreatorMailTab() {
                        placeholder="https://creator.dalaillama.in" />
               </label>
             </div>
+            <label className="text-xs text-slate-400">Look
+              <select value={draft.style} onChange={(e) => setDraft({ ...draft, style: e.target.value })} className={field}>
+                <option value="PLAIN">Plain letter from Akash (best for the main inbox)</option>
+                <option value="STYLED">Styled mail: picture cards and a button (often lands in Promotions)</option>
+              </select>
+            </label>
             <label className="text-xs text-slate-400">Inspiration videos in the mail
               <select value={draft.ideaVideos} onChange={(e) => setDraft({ ...draft, ideaVideos: Number(e.target.value) })} className={field}>
                 <option value={0}>None</option>
@@ -1539,7 +1545,7 @@ function CreatorMailTab() {
                 <option value={2}>2 videos from the inspiration board</option>
                 <option value={3}>3 videos from the inspiration board</option>
               </select>
-              <span className="mt-1 block text-[11px] text-slate-500">Picked when each mail goes out, listed by title after your message (no pictures, to keep the mail out of Promotions), with one link to watch them.</span>
+              <span className="mt-1 block text-[11px] text-slate-500">Picked when each mail goes out, after your message: listed by title in a plain letter, as picture cards in a styled mail.</span>
             </label>
             <div className="flex flex-wrap items-center gap-3">
               <button type="button" disabled={!canSave} onClick={handleSave}
