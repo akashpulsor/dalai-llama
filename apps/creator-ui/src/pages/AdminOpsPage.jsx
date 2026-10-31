@@ -1440,7 +1440,17 @@ function CreatorMailTab() {
   const firstName = (creators[0]?.name || "Asha").trim().split(/\s+/)[0];
   const preview = (s) => s.split("{name}").join(firstName);
   // A subject as ops read it outside the preview: {name} differs per creator.
-  const named = (s) => (s || "").split("{name}").join("‹first name›");
+  // The first name the mail would use for someone, roughly as the server does (an address-like name gives none).
+  const firstOf = (name) => {
+    const word = (name || "").trim().split(/\s+/)[0] || "";
+    return /^[\p{L}'-]{2,20}$/u.test(word) ? word[0].toUpperCase() + word.slice(1).toLowerCase() : "creator";
+  };
+  const audienceCreators = { ALL: creators, NO_VIDEO: creators.filter((c) => !c.liveVideos),
+    CHOSEN: creators.filter((c) => chosen.includes(c.tenantId)), LEADS: [] }[audience] || [];
+  const example = audienceCreators[0];
+  // A stored subject with {name} shown as a placeholder chip (it differs per creator).
+  const named = (s) => (s || "").split("{name}").flatMap((part, i) => (i === 0 ? [part] : [
+    <span key={i} className="rounded bg-purple-500/20 px-1 text-purple-200">first name</span>, part]));
   const plural = (n) => `${n} ${audience === "LEADS" ? "lead" : "creator"}${n === 1 ? "" : "s"}`;
   const errorOf = (err, fallback) => err?.data?.message || err?.data?.detail || fallback;
 
@@ -1455,7 +1465,9 @@ function CreatorMailTab() {
     }
   };
   const handleSend = async (test) => {
-    if (!test && !window.confirm(`Send "${named(draft.subject)}" to up to ${plural(recipients)}? Each creator sees their own first name.`)) return;
+    const sample = example ? `${draft.subject.split("{name}").join(firstOf(example.name))}" (as ${example.name} sees it; each gets their own name)`
+      : `${draft.subject.split("{name}").join("Asha")}" (each lead gets their own name)`;
+    if (!test && !window.confirm(`Send "${sample} to up to ${plural(recipients)}?`)) return;
     setFlash(null);
     try {
       const result = await send(test
