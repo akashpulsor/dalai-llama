@@ -1439,6 +1439,8 @@ function CreatorMailTab() {
   const recipients = { ALL: creators.length, NO_VIDEO: noVideo, CHOSEN: chosen.length, LEADS: overview?.creatorLeads ?? 0 }[audience];
   const firstName = (creators[0]?.name || "Asha").trim().split(/\s+/)[0];
   const preview = (s) => s.split("{name}").join(firstName);
+  // A subject as ops read it outside the preview: {name} differs per creator.
+  const named = (s) => (s || "").split("{name}").join("‹first name›");
   const plural = (n) => `${n} ${audience === "LEADS" ? "lead" : "creator"}${n === 1 ? "" : "s"}`;
   const errorOf = (err, fallback) => err?.data?.message || err?.data?.detail || fallback;
 
@@ -1453,7 +1455,7 @@ function CreatorMailTab() {
     }
   };
   const handleSend = async (test) => {
-    if (!test && !window.confirm(`Send "${draft.subject}" to up to ${plural(recipients)}?`)) return;
+    if (!test && !window.confirm(`Send "${named(draft.subject)}" to up to ${plural(recipients)}? Each creator sees their own first name.`)) return;
     setFlash(null);
     try {
       const result = await send(test
@@ -1641,7 +1643,7 @@ function CreatorMailTab() {
               {sends.map((s) => (
                 <tr key={s.id} className="border-t border-white/5">
                   <Td>{new Date(s.createdAt).toLocaleString()}</Td>
-                  <Td>{s.subject}</Td>
+                  <Td>{named(s.subject)}</Td>
                   <Td>{SEND_AUDIENCE_LABEL[s.audience] || s.audience}</Td>
                   <Td>{s.recipients}</Td>
                   <Td>{s.audience === "TEST" ? "-" : s.sent}</Td>
