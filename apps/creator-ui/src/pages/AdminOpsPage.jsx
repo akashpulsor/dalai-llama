@@ -13,6 +13,7 @@
  */
 import ShowcaseAdminTab from "../components/showcase/ShowcaseAdminTab.jsx";
 import RequestRoutingTab from "../components/showcase/RequestRoutingTab.jsx";
+import { INDUSTRIES } from "../components/showcase/showcaseLabels.js";
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { AlertTriangle, RefreshCw, ExternalLink, Loader2, ShieldAlert, Plus } from "lucide-react";
@@ -1358,10 +1359,10 @@ function GrantsTab() {
 
 // ------- Mail creators tab --------------------------------------------------
 
-const EMPTY_TEMPLATE = { id: null, name: "", subject: "", body: "", ctaLabel: "", ctaUrl: "", ideaVideos: 0, style: "PLAIN", active: true };
+const EMPTY_TEMPLATE = { id: null, name: "", subject: "", body: "", ctaLabel: "", ctaUrl: "", ideaVideos: 0, ideaIndustry: "", style: "PLAIN", active: true };
 const asDraft = (t) => ({
   id: t.id, name: t.name, subject: t.subject, body: t.body, ctaLabel: t.ctaLabel || "", ctaUrl: t.ctaUrl || "",
-  ideaVideos: t.ideaVideos || 0, style: t.style || "PLAIN", active: t.active,
+  ideaVideos: t.ideaVideos || 0, ideaIndustry: t.ideaIndustry || "", style: t.style || "PLAIN", active: t.active,
 });
 
 const SEND_AUDIENCE_LABEL = { ALL: "Every creator", CHOSEN: "Picked creators", NO_VIDEO: "No video on profile", LEADS: "Creator leads", TEST: "Test" };
@@ -1424,10 +1425,10 @@ function CreatorMailTab() {
   useEffect(() => {
     if (!draft.subject && !draft.body) return undefined;
     const timer = setTimeout(() => {
-      renderPreview({ subject: draft.subject, body: draft.body, ctaLabel: draft.ctaLabel, ctaUrl: draft.ctaUrl, ideaVideos: draft.ideaVideos, style: draft.style });
+      renderPreview({ subject: draft.subject, body: draft.body, ctaLabel: draft.ctaLabel, ctaUrl: draft.ctaUrl, ideaVideos: draft.ideaVideos, ideaIndustry: draft.ideaIndustry || null, style: draft.style });
     }, 500);
     return () => clearTimeout(timer);
-  }, [draft.subject, draft.body, draft.ctaLabel, draft.ctaUrl, draft.ideaVideos, draft.style, renderPreview]);
+  }, [draft.subject, draft.body, draft.ctaLabel, draft.ctaUrl, draft.ideaVideos, draft.ideaIndustry, draft.style, renderPreview]);
   const noVideo = creators.filter((c) => !c.liveVideos).length;
   const AUDIENCES = [
     ["ALL", `Every active creator (${creators.length})`],
@@ -1444,7 +1445,7 @@ function CreatorMailTab() {
   const handleSave = async () => {
     setFlash(null);
     try {
-      const t = await save(draft).unwrap();
+      const t = await save({ ...draft, ideaIndustry: draft.ideaIndustry || null }).unwrap();
       setDraft(asDraft(t));
       setFlash({ tone: "success", message: "Template saved." });
     } catch (err) {
@@ -1478,7 +1479,7 @@ function CreatorMailTab() {
     <div className="space-y-4">
       <Notice>
         Write a mail once, keep it as a template, and send it to creators on the platform or to creator leads you uploaded. It goes
-        from Dalai Llama (brands@partner.dalaillama.in) with an unsubscribe link. Write <code>{"{name}"}</code> for the first name; a
+        from Akash (hello@partner.dalaillama.in) with an unsubscribe link. Write <code>{"{name}"}</code> for the first name; a
         blank line starts a new paragraph and links become clickable. Mails queue and go out {overview?.dailyCap ?? "a set number"} a
         day; a template reaches each address once. Send yourself a test first.
       </Notice>
@@ -1547,6 +1548,14 @@ function CreatorMailTab() {
               </select>
               <span className="mt-1 block text-[11px] text-slate-500">Picked when each mail goes out, after your message: listed by title in a plain letter, as picture cards in a styled mail.</span>
             </label>
+            {draft.ideaVideos > 0 && (
+              <label className="text-xs text-slate-400">Which kind of videos
+                <select value={draft.ideaIndustry} onChange={(e) => setDraft({ ...draft, ideaIndustry: e.target.value })} className={field}>
+                  <option value="">Random: a different industry for every mail</option>
+                  {INDUSTRIES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+                </select>
+              </label>
+            )}
             <div className="flex flex-wrap items-center gap-3">
               <button type="button" disabled={!canSave} onClick={handleSave}
                       className="creator-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
