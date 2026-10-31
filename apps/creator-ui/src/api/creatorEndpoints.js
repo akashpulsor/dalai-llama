@@ -4632,6 +4632,10 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: (body) => ({ url: opsAdminUrl(`/tenants/creator-mail/send`), method: "POST", body }),
       invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
     }),
+    // A draft rendered exactly as it will be mailed: { subject, html }.
+    previewCreatorMail: builder.mutation({
+      query: (body) => ({ url: opsAdminUrl(`/tenants/creator-mail/preview`), method: "POST", body }),
+    }),
     getCreatorMailOverview: builder.query({
       query: () => ({ url: opsAdminUrl(`/tenants/creator-mail/overview`) }),
       providesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
@@ -4986,6 +4990,7 @@ export const {
   useListCreatorMailSendsQuery,
   useSendCreatorMailMutation,
   useGetCreatorMailOverviewQuery,
+  usePreviewCreatorMailMutation,
   useImportCreatorLeadsMutation,
   useImportBrandDirectoryMutation,
   useQueryLokiRangeQuery,

@@ -50,6 +50,7 @@ import {
   useGetCreatorMailOverviewQuery,
   useImportCreatorLeadsMutation,
   useImportBrandDirectoryMutation,
+  usePreviewCreatorMailMutation,
   useListAdminPayoutsQuery,
   useRetryAdminPayoutMutation,
   useMarkAdminPayoutPaidMutation,
@@ -1357,7 +1358,8 @@ function GrantsTab() {
 
 // ------- Mail creators tab --------------------------------------------------
 
-const EMPTY_TEMPLATE = { id: null, name: "", subject: "", body: "", active: true };
+const EMPTY_TEMPLATE = { id: null, name: "", subject: "", body: "", ctaLabel: "", ctaUrl: "", active: true };
+const asDraft = (t) => ({ id: t.id, name: t.name, subject: t.subject, body: t.body, ctaLabel: t.ctaLabel || "", ctaUrl: t.ctaUrl || "", active: t.active });
 
 const SEND_AUDIENCE_LABEL = { ALL: "Every creator", CHOSEN: "Picked creators", NO_VIDEO: "No video on profile", LEADS: "Creator leads", TEST: "Test" };
 
@@ -1413,8 +1415,16 @@ function CreatorMailTab() {
   const [flash, setFlash] = useState(null);
   const field = "mt-1 w-full rounded-lg border border-white/10 bg-[#0b0f19] px-3 py-2 text-sm text-white";
   const saved = templates.find((t) => t.id === draft.id);
-  const dirty = !saved || saved.name !== draft.name || saved.subject !== draft.subject || saved.body !== draft.body
-    || saved.active !== draft.active;
+  const dirty = !saved || JSON.stringify(asDraft(saved)) !== JSON.stringify(draft);
+  const [renderPreview, { data: rendered }] = usePreviewCreatorMailMutation();
+  // The real mail, styled, redrawn shortly after each edit.
+  useEffect(() => {
+    if (!draft.subject && !draft.body) return undefined;
+    const timer = setTimeout(() => {
+      renderPreview({ subject: draft.subject, body: draft.body, ctaLabel: draft.ctaLabel, ctaUrl: draft.ctaUrl });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [draft.subject, draft.body, draft.ctaLabel, draft.ctaUrl, renderPreview]);
   const noVideo = creators.filter((c) => !c.liveVideos).length;
   const AUDIENCES = [
     ["ALL", `Every active creator (${creators.length})`],
@@ -1432,7 +1442,7 @@ function CreatorMailTab() {
     setFlash(null);
     try {
       const t = await save(draft).unwrap();
-      setDraft({ id: t.id, name: t.name, subject: t.subject, body: t.body, active: t.active });
+      setDraft(asDraft(t));
       setFlash({ tone: "success", message: "Template saved." });
     } catch (err) {
       setFlash({ tone: "error", message: errorOf(err, "Couldn't save the template") });
@@ -1451,7 +1461,7 @@ function CreatorMailTab() {
       ].filter(Boolean).join(", ");
       setFlash({
         tone: "success",
-        message: test ? `Test sent to ${testEmail}.`
+        message: test ? `Test handed to the mail server for ${testEmail}; it usually arrives within a minute. Not there? Check Spam and Promotions.`
           : `${plural(result.recipients)} queued; up to ${overview?.dailyCap ?? "a set number of"} mails go out a day.${skipped ? ` Skipped: ${skipped}.` : ""}`,
       });
     } catch (err) {
@@ -1485,7 +1495,7 @@ function CreatorMailTab() {
           {templates.length === 0 && <p className="text-xs text-slate-500">No templates yet.</p>}
           {templates.map((t) => (
             <button key={t.id} type="button"
-                    onClick={() => setDraft({ id: t.id, name: t.name, subject: t.subject, body: t.body, active: t.active })}
+                    onClick={() => setDraft(asDraft(t))}
                     className={`block w-full rounded-lg px-2 py-1.5 text-left text-xs ${draft.id === t.id ? "bg-white/10 text-white" : "text-slate-300 hover:bg-white/5"}`}>
               <span className={t.active ? "" : "line-through opacity-60"}>{t.name}</span>
               <span className="block text-[10px] text-slate-500">
@@ -1508,6 +1518,16 @@ function CreatorMailTab() {
               <textarea rows={10} maxLength={10000} value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })}
                         className={field} placeholder={"Hi {name},\n\n..."} />
             </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-xs text-slate-400">Button text (optional)
+                <input maxLength={40} value={draft.ctaLabel} onChange={(e) => setDraft({ ...draft, ctaLabel: e.target.value })} className={field}
+                       placeholder="Join Dalai Llama free" />
+              </label>
+              <label className="text-xs text-slate-400">Button link
+                <input maxLength={300} value={draft.ctaUrl} onChange={(e) => setDraft({ ...draft, ctaUrl: e.target.value })} className={field}
+                       placeholder="https://creator.dalaillama.in" />
+              </label>
+            </div>
             <div className="flex flex-wrap items-center gap-3">
               <button type="button" disabled={!canSave} onClick={handleSave}
                       className="creator-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
@@ -1523,9 +1543,13 @@ function CreatorMailTab() {
           </div>
           {(draft.subject || draft.body) && (
             <div className="creator-panel p-4">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Preview for {firstName}</p>
-              <p className="mt-2 text-sm font-bold text-white">{preview(draft.subject)}</p>
-              <p className="mt-2 whitespace-pre-wrap text-sm text-slate-300">{preview(draft.body)}</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Preview, as it arrives (for a creator called Asha)</p>
+              <p className="mt-2 text-sm font-bold text-white">{rendered?.subject || preview(draft.subject)}</p>
+              {rendered?.html ? (
+                <iframe title="Mail preview" srcDoc={rendered.html} sandbox="" className="mt-3 h-[560px] w-full rounded-lg border border-white/10 bg-white" />
+              ) : (
+                <p className="mt-2 whitespace-pre-wrap text-sm text-slate-300">{preview(draft.body)}</p>
+              )}
             </div>
           )}
           <div className="creator-panel space-y-3 p-4">
