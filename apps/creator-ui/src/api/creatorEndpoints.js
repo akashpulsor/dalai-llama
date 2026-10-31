@@ -4632,6 +4632,27 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: (body) => ({ url: opsAdminUrl(`/tenants/creator-mail/send`), method: "POST", body }),
       invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
     }),
+    getCreatorMailOverview: builder.query({
+      query: () => ({ url: opsAdminUrl(`/tenants/creator-mail/overview`) }),
+      providesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
+    }),
+    // Creators not on the platform yet, to invite (CSV: email, name, website).
+    importCreatorLeads: builder.mutation({
+      query: (file) => {
+        const body = new FormData();
+        body.append("file", file);
+        return { url: opsAdminUrl(`/tenants/creator-mail/leads/import`), method: "POST", body };
+      },
+      invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
+    }),
+    // The brand master list creators search in Find brands (CSV: name, designation, company, email, phone, industry, website, country, size).
+    importBrandDirectory: builder.mutation({
+      query: (file) => {
+        const body = new FormData();
+        body.append("file", file);
+        return { url: opsAdminUrl(`/tenants/outreach/brand-directory/import`), method: "POST", body };
+      },
+    }),
     // Creator payouts across every tenant (billing-service), and retrying a failed one.
     listAdminPayouts: builder.query({
       query: () => ({ url: opsAdminUrl(`/billing/payouts`) }),
@@ -4964,6 +4985,9 @@ export const {
   useListCreatorMailRecipientsQuery,
   useListCreatorMailSendsQuery,
   useSendCreatorMailMutation,
+  useGetCreatorMailOverviewQuery,
+  useImportCreatorLeadsMutation,
+  useImportBrandDirectoryMutation,
   useQueryLokiRangeQuery,
   useListPreProductionShotsQuery,
   useCreatePreProductionShotMutation,

@@ -47,6 +47,9 @@ import {
   useListCreatorMailRecipientsQuery,
   useListCreatorMailSendsQuery,
   useSendCreatorMailMutation,
+  useGetCreatorMailOverviewQuery,
+  useImportCreatorLeadsMutation,
+  useImportBrandDirectoryMutation,
   useListAdminPayoutsQuery,
   useRetryAdminPayoutMutation,
   useMarkAdminPayoutPaidMutation,
@@ -379,7 +382,7 @@ function TenantsTab() {
           <table className="w-full text-[11px]">
             <thead className="bg-white/[0.03] text-[10px] uppercase tracking-wide text-slate-500">
               <tr>
-                <Th>Tenant</Th><Th>Contact</Th><Th>Status</Th><Th>Keycloak</Th><Th>Type</Th><Th>Created</Th><Th>Action</Th>
+                <Th>Tenant</Th><Th>Contact</Th><Th>Status</Th><Th>Keycloak</Th><Th>Type</Th><Th>Public profile</Th><Th>Created</Th><Th>Action</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -406,6 +409,19 @@ function TenantsTab() {
                       {t.keycloakConfigured ? "configured" : "MISSING"}
                     </Td>
                     <Td className="text-slate-300">{t.accountType || "-"}</Td>
+                    <Td>
+                      {t.publicProfileUrl ? (
+                        <>
+                          <a href={t.publicProfileUrl} target="_blank" rel="noreferrer"
+                             className="inline-flex items-center gap-1 text-purple-300 hover:underline">
+                            Open <ExternalLink size={11} />
+                          </a>
+                          <div className={t.liveVideos ? "text-slate-500" : "text-amber-300"}>
+                            {t.liveVideos ? `${t.liveVideos} video${t.liveVideos === 1 ? "" : "s"}` : "no video yet"}
+                          </div>
+                        </>
+                      ) : <span className="text-slate-500">-</span>}
+                    </Td>
                     <Td className="text-slate-400">{formatTime(t.createdAt)}</Td>
                     <Td>
                       {isActive ? (
@@ -1343,16 +1359,55 @@ function GrantsTab() {
 
 const EMPTY_TEMPLATE = { id: null, name: "", subject: "", body: "", active: true };
 
-/** Ops mail to creators: keep templates, then send one to every active creator, to chosen
- * creators, or to yourself as a test. {name} becomes each creator's first name. */
+const SEND_AUDIENCE_LABEL = { ALL: "Every creator", CHOSEN: "Picked creators", NO_VIDEO: "No video on profile", LEADS: "Creator leads", TEST: "Test" };
+
+/** CSV uploads ops make: creators to invite (not on the platform yet), and the brand master list
+ * creators search in Find brands. */
+function ListUploads({ onFlash }) {
+  const [importLeads, leadsState] = useImportCreatorLeadsMutation();
+  const [importBrands, brandsState] = useImportBrandDirectoryMutation();
+  const upload = (run, describe) => async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      onFlash({ tone: "success", message: describe(await run(file).unwrap()) });
+    } catch (err) {
+      onFlash({ tone: "error", message: err?.data?.message || err?.data?.detail || "Couldn't read that file" });
+    }
+  };
+  const button = "inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/15 px-3 py-2 text-xs font-bold text-white";
+  return (
+    <div className="creator-panel flex flex-wrap items-center gap-3 p-3 text-xs text-slate-400">
+      <label className={button}>
+        {leadsState.isLoading ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Upload creator leads (CSV)
+        <input type="file" accept=".csv,text/csv" className="hidden"
+               onChange={upload(importLeads, (r) => `${r.added} new creator leads, ${r.alreadyKnown} already known, ${r.rejected} rows without an email. ${r.totalLeads} leads in all.`)} />
+      </label>
+      <span>columns: email, name, website (their channel or page)</span>
+      <label className={button}>
+        {brandsState.isLoading ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Upload brand master list (CSV)
+        <input type="file" accept=".csv,text/csv" className="hidden"
+               onChange={upload(importBrands, (r) => `${r.companies} brands added or updated (${r.companiesWithoutEmail} without an email, shown as "Email not available"), ${r.contacts} contacts, ${r.rejected} rows skipped (no website or work email).`)} />
+      </label>
+      <span>columns: company, email, name, designation, phone, industry, website, country, size</span>
+    </div>
+  );
+}
+
+/** Ops mail to creators: keep templates, then send one to every active creator, creators whose
+ * profile has no video yet, chosen creators, or the creator leads ops uploaded (not on the platform
+ * yet); or to yourself as a test. {name} becomes the first name. Mail is queued and leaves a limited
+ * number a day, each with an unsubscribe link; a template reaches an address once. */
 function CreatorMailTab() {
   const { data: templates = [] } = useListCreatorMailTemplatesQuery();
   const { data: creators = [] } = useListCreatorMailRecipientsQuery();
   const { data: sends = [] } = useListCreatorMailSendsQuery();
+  const { data: overview } = useGetCreatorMailOverviewQuery(undefined, { pollingInterval: 60000 });
   const [save, { isLoading: saving }] = useSaveCreatorMailTemplateMutation();
   const [send, { isLoading: sending }] = useSendCreatorMailMutation();
   const [draft, setDraft] = useState(EMPTY_TEMPLATE);
-  const [everyone, setEveryone] = useState(true);
+  const [audience, setAudience] = useState("ALL");
   const [chosen, setChosen] = useState([]);
   const [testEmail, setTestEmail] = useState("");
   const [flash, setFlash] = useState(null);
@@ -1360,10 +1415,17 @@ function CreatorMailTab() {
   const saved = templates.find((t) => t.id === draft.id);
   const dirty = !saved || saved.name !== draft.name || saved.subject !== draft.subject || saved.body !== draft.body
     || saved.active !== draft.active;
-  const recipients = everyone ? creators.length : chosen.length;
+  const noVideo = creators.filter((c) => !c.liveVideos).length;
+  const AUDIENCES = [
+    ["ALL", `Every active creator (${creators.length})`],
+    ["NO_VIDEO", `Creators with no video on their profile (${noVideo})`],
+    ["CHOSEN", `Only the ones I pick (${chosen.length})`],
+    ["LEADS", `Creator leads, not on the platform yet (${overview?.creatorLeads ?? 0} uploaded)`],
+  ];
+  const recipients = { ALL: creators.length, NO_VIDEO: noVideo, CHOSEN: chosen.length, LEADS: overview?.creatorLeads ?? 0 }[audience];
   const firstName = (creators[0]?.name || "Asha").trim().split(/\s+/)[0];
   const preview = (s) => s.split("{name}").join(firstName);
-  const plural = (n) => `${n} creator${n === 1 ? "" : "s"}`;
+  const plural = (n) => `${n} ${audience === "LEADS" ? "lead" : "creator"}${n === 1 ? "" : "s"}`;
   const errorOf = (err, fallback) => err?.data?.message || err?.data?.detail || fallback;
 
   const handleSave = async () => {
@@ -1377,11 +1439,21 @@ function CreatorMailTab() {
     }
   };
   const handleSend = async (test) => {
-    if (!test && !window.confirm(`Send "${draft.subject}" to ${plural(recipients)}?`)) return;
+    if (!test && !window.confirm(`Send "${draft.subject}" to up to ${plural(recipients)}?`)) return;
     setFlash(null);
     try {
-      const result = await send({ templateId: draft.id, tenantIds: everyone ? [] : chosen, testEmail: test ? testEmail : null }).unwrap();
-      setFlash({ tone: "success", message: test ? `Test sent to ${testEmail}.` : `Sending to ${plural(result.recipients)}.` });
+      const result = await send(test
+        ? { templateId: draft.id, audience: "TEST", testEmail }
+        : { templateId: draft.id, audience, tenantIds: audience === "CHOSEN" ? chosen : [] }).unwrap();
+      const skipped = [
+        result.alreadyHad ? `${result.alreadyHad} already had this mail` : null,
+        result.unsubscribed ? `${result.unsubscribed} unsubscribed` : null,
+      ].filter(Boolean).join(", ");
+      setFlash({
+        tone: "success",
+        message: test ? `Test sent to ${testEmail}.`
+          : `${plural(result.recipients)} queued; up to ${overview?.dailyCap ?? "a set number of"} mails go out a day.${skipped ? ` Skipped: ${skipped}.` : ""}`,
+      });
     } catch (err) {
       setFlash({ tone: "error", message: errorOf(err, "Couldn't send") });
     }
@@ -1392,10 +1464,17 @@ function CreatorMailTab() {
   return (
     <div className="space-y-4">
       <Notice>
-        Write a mail once, keep it as a template, and send it to every active creator or the ones you pick. It goes from Dalai Llama
-        (brands@partner.dalaillama.in). Write <code>{"{name}"}</code> for the creator's first name; a blank line starts a new paragraph
-        and links become clickable. Send yourself a test first.
+        Write a mail once, keep it as a template, and send it to creators on the platform or to creator leads you uploaded. It goes
+        from Dalai Llama (brands@partner.dalaillama.in) with an unsubscribe link. Write <code>{"{name}"}</code> for the first name; a
+        blank line starts a new paragraph and links become clickable. Mails queue and go out {overview?.dailyCap ?? "a set number"} a
+        day; a template reaches each address once. Send yourself a test first.
       </Notice>
+      {overview && (
+        <p className="text-xs text-slate-400">
+          {overview.sentToday} of {overview.dailyCap} sent today · {overview.queued} waiting · {overview.creatorLeads} creator leads uploaded
+        </p>
+      )}
+      <ListUploads onFlash={setFlash} />
       {flash && <Notice tone={flash.tone}>{flash.message}</Notice>}
       <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
         <div className="creator-panel space-y-1 p-3">
@@ -1466,27 +1545,35 @@ function CreatorMailTab() {
                     Send test
                   </button>
                 </div>
-                <div className="flex flex-wrap gap-4 text-xs text-slate-300">
-                  <label className="flex items-center gap-1.5">
-                    <input type="radio" checked={everyone} onChange={() => setEveryone(true)} /> Every active creator ({creators.length})
-                  </label>
-                  <label className="flex items-center gap-1.5">
-                    <input type="radio" checked={!everyone} onChange={() => setEveryone(false)} /> Only the ones I pick ({chosen.length})
-                  </label>
+                <div className="grid gap-1.5 text-xs text-slate-300 sm:grid-cols-2">
+                  {AUDIENCES.map(([key, label]) => (
+                    <label key={key} className="flex items-center gap-1.5">
+                      <input type="radio" checked={audience === key} onChange={() => setAudience(key)} /> {label}
+                    </label>
+                  ))}
                 </div>
-                {!everyone && (
+                {audience === "CHOSEN" && (
                   <div className="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-white/10 p-2">
                     {creators.map((c) => (
                       <label key={c.tenantId} className="flex items-center gap-2 text-xs text-slate-300">
                         <input type="checkbox" checked={chosen.includes(c.tenantId)} onChange={() => toggle(c.tenantId)} />
                         {c.name} <span className="text-slate-500">{c.email}</span>
+                        <span className="text-slate-500">· {c.liveVideos ? `${c.liveVideos} video${c.liveVideos === 1 ? "" : "s"}` : "no video"}</span>
+                        {c.publicProfileUrl && (
+                          <a href={c.publicProfileUrl} target="_blank" rel="noreferrer" className="text-purple-300 hover:underline">profile</a>
+                        )}
                       </label>
                     ))}
                   </div>
                 )}
+                {audience === "LEADS" && (
+                  <p className="text-[11px] text-amber-200">
+                    These people haven't signed up, so each mail carries an unsubscribe link. Leads who already have an account are left out.
+                  </p>
+                )}
                 <button type="button" disabled={sending || recipients === 0} onClick={() => handleSend(false)}
                         className="creator-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
-                  {sending ? "Sending…" : `Send to ${plural(recipients)}`}
+                  {sending ? "Queuing…" : `Send to ${plural(recipients)}`}
                 </button>
               </>
             )}
@@ -1497,14 +1584,16 @@ function CreatorMailTab() {
         <div className="creator-panel overflow-x-auto p-4">
           <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Recent sends</p>
           <table className="w-full text-[11px]">
-            <thead><tr><Th>When</Th><Th>Subject</Th><Th>To</Th><Th>Recipients</Th></tr></thead>
+            <thead><tr><Th>When</Th><Th>Subject</Th><Th>To</Th><Th>Recipients</Th><Th>Sent</Th><Th>Waiting</Th></tr></thead>
             <tbody>
               {sends.map((s) => (
                 <tr key={s.id} className="border-t border-white/5">
                   <Td>{new Date(s.createdAt).toLocaleString()}</Td>
                   <Td>{s.subject}</Td>
-                  <Td>{s.audience === "ALL" ? "Every creator" : s.audience === "CHOSEN" ? "Picked creators" : "Test"}</Td>
+                  <Td>{SEND_AUDIENCE_LABEL[s.audience] || s.audience}</Td>
                   <Td>{s.recipients}</Td>
+                  <Td>{s.audience === "TEST" ? "-" : s.sent}</Td>
+                  <Td>{s.audience === "TEST" ? "-" : s.queued}</Td>
                 </tr>
               ))}
             </tbody>
