@@ -4609,8 +4609,9 @@ export const creatorApi = apiSlice.injectEndpoints({
       invalidatesTags: (_r, _e, { tenantId }) => [{ type: "CreatorHomeProjects", id: `admin-grant-${tenantId}` }],
     }),
     // Ops mail to creators (tenant-service): templates, the creator picker, sending and the send log.
+    // mailFor: "CREATORS" (default) or "BRANDS".
     listCreatorMailTemplates: builder.query({
-      query: () => ({ url: opsAdminUrl(`/tenants/creator-mail/templates`) }),
+      query: (mailFor) => ({ url: opsAdminUrl(`/tenants/creator-mail/templates${mailFor ? `?for=${mailFor}` : ""}`) }),
       providesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
     }),
     saveCreatorMailTemplate: builder.mutation({
@@ -4633,6 +4634,10 @@ export const creatorApi = apiSlice.injectEndpoints({
       invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
     }),
     // A draft rendered exactly as it will be mailed: { subject, html }.
+    // How many brands a brand mail with this filter reaches ({ industries, sizes, countries }).
+    countBrandMailAudience: builder.query({
+      query: (filter) => ({ url: opsAdminUrl(`/tenants/creator-mail/brands/count`), method: "POST", body: filter }),
+    }),
     previewCreatorMail: builder.mutation({
       query: (body) => ({ url: opsAdminUrl(`/tenants/creator-mail/preview`), method: "POST", body }),
     }),
@@ -4985,6 +4990,7 @@ export const {
   useGrantCreatorPlanMutation,
   useEndCreatorGrantMutation,
   useListCreatorMailTemplatesQuery,
+  useCountBrandMailAudienceQuery,
   useSaveCreatorMailTemplateMutation,
   useListCreatorMailRecipientsQuery,
   useListCreatorMailSendsQuery,

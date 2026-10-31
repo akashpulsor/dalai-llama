@@ -44,6 +44,7 @@ import {
   useGrantCreatorPlanMutation,
   useEndCreatorGrantMutation,
   useListCreatorMailTemplatesQuery,
+  useCountBrandMailAudienceQuery,
   useSaveCreatorMailTemplateMutation,
   useListCreatorMailRecipientsQuery,
   useListCreatorMailSendsQuery,
@@ -115,6 +116,7 @@ export default function AdminOpsPage() {
     { key: "grants", label: "Free plans", component: <GrantsTab /> },
     { key: "payouts", label: "Payouts", component: <PayoutsTab /> },
     { key: "creator-mail", label: "Mail creators", component: <CreatorMailTab /> },
+    { key: "brand-mail", label: "Mail brands", component: <CreatorMailTab mailFor="BRANDS" /> },
     { key: "showcase", label: "Showcase", component: <ShowcaseAdminTab /> },
     { key: "requests", label: "Requests", component: <RequestRoutingTab /> },
   ];
@@ -1365,7 +1367,9 @@ const asDraft = (t) => ({
   ideaVideos: t.ideaVideos || 0, ideaIndustry: t.ideaIndustry || "", style: t.style || "PLAIN", active: t.active,
 });
 
-const SEND_AUDIENCE_LABEL = { ALL: "Every creator", CHOSEN: "Picked creators", NO_VIDEO: "No video on profile", LEADS: "Creator leads", TEST: "Test" };
+const SEND_AUDIENCE_LABEL = { ALL: "Every creator", CHOSEN: "Picked creators", NO_VIDEO: "No video on profile", LEADS: "Creator leads",
+  BRANDS: "Brands", TEST: "Test" };
+const COMPANY_SIZES = [["SMALL", "Small"], ["MEDIUM", "Medium"], ["LARGE", "Large"], ["ENTERPRISE", "Enterprise"]];
 
 /** CSV uploads ops make: creators to invite (not on the platform yet), and the brand master list
  * creators search in Find brands. */
@@ -1405,15 +1409,20 @@ function ListUploads({ onFlash }) {
  * profile has no video yet, chosen creators, or the creator leads ops uploaded (not on the platform
  * yet); or to yourself as a test. {name} becomes the first name. Mail is queued and leaves a limited
  * number a day, each with an unsubscribe link; a template reaches an address once. */
-function CreatorMailTab() {
-  const { data: templates = [] } = useListCreatorMailTemplatesQuery();
-  const { data: creators = [] } = useListCreatorMailRecipientsQuery();
+function CreatorMailTab({ mailFor = "CREATORS" }) {
+  const forBrands = mailFor === "BRANDS";
+  const { data: templates = [] } = useListCreatorMailTemplatesQuery(forBrands ? "BRANDS" : undefined);
+  const { data: creators = [] } = useListCreatorMailRecipientsQuery(undefined, { skip: forBrands });
+  // Brand mail: which brands (an empty list doesn't narrow); the count follows the filter.
+  const [brandFilter, setBrandFilter] = useState({ industries: [], sizes: ["SMALL"], countries: ["IN"] });
+  const { data: brandAudience } = useCountBrandMailAudienceQuery(brandFilter, { skip: !forBrands });
+  const flip = (key, value) => setBrandFilter((f) => ({ ...f, [key]: f[key].includes(value) ? f[key].filter((v) => v !== value) : [...f[key], value] }));
   const { data: sends = [] } = useListCreatorMailSendsQuery();
   const { data: overview } = useGetCreatorMailOverviewQuery(undefined, { pollingInterval: 60000 });
   const [save, { isLoading: saving }] = useSaveCreatorMailTemplateMutation();
   const [send, { isLoading: sending }] = useSendCreatorMailMutation();
   const [draft, setDraft] = useState(EMPTY_TEMPLATE);
-  const [audience, setAudience] = useState("ALL");
+  const [audience, setAudience] = useState(forBrands ? "BRANDS" : "ALL");
   const [chosen, setChosen] = useState([]);
   const [testEmail, setTestEmail] = useState("");
   const [flash, setFlash] = useState(null);
@@ -1427,7 +1436,7 @@ function CreatorMailTab() {
   useEffect(() => {
     if (!draft.subject && !draft.body) return undefined;
     const timer = setTimeout(() => {
-      renderPreview({ subject: draft.subject, body: draft.body, ctaLabel: draft.ctaLabel, ctaUrl: draft.ctaUrl, ideaVideos: draft.ideaVideos, ideaIndustry: draft.ideaIndustry || null, style: draft.style });
+      renderPreview({ subject: draft.subject, body: draft.body, ctaLabel: draft.ctaLabel, ctaUrl: draft.ctaUrl, ideaVideos: draft.ideaVideos, ideaIndustry: draft.ideaIndustry || null, style: draft.style, mailFor });
     }, 500);
     return () => clearTimeout(timer);
   }, [draft.subject, draft.body, draft.ctaLabel, draft.ctaUrl, draft.ideaVideos, draft.ideaIndustry, draft.style, renderPreview]);
@@ -1438,7 +1447,8 @@ function CreatorMailTab() {
     ["CHOSEN", `Only the ones I pick (${chosen.length})`],
     ["LEADS", `Creator leads, not on the platform yet (${overview?.creatorLeads ?? 0} uploaded)`],
   ];
-  const recipients = { ALL: creators.length, NO_VIDEO: noVideo, CHOSEN: chosen.length, LEADS: overview?.creatorLeads ?? 0 }[audience];
+  const recipients = { ALL: creators.length, NO_VIDEO: noVideo, CHOSEN: chosen.length, LEADS: overview?.creatorLeads ?? 0,
+    BRANDS: brandAudience?.brands ?? 0 }[audience];
   const firstName = (creators[0]?.name || "Asha").trim().split(/\s+/)[0];
   const preview = (s) => s.split("{name}").join(firstName);
   // A subject as ops read it outside the preview: {name} differs per creator.
@@ -1453,13 +1463,13 @@ function CreatorMailTab() {
   // A stored subject with {name} shown as a placeholder chip (it differs per creator).
   const named = (s) => (s || "").split("{name}").flatMap((part, i) => (i === 0 ? [part] : [
     <span key={i} className="rounded bg-purple-500/20 px-1 text-purple-200">first name</span>, part]));
-  const plural = (n) => `${n} ${audience === "LEADS" ? "lead" : "creator"}${n === 1 ? "" : "s"}`;
+  const plural = (n) => `${n} ${{ LEADS: "lead", BRANDS: "brand" }[audience] || "creator"}${n === 1 ? "" : "s"}`;
   const errorOf = (err, fallback) => err?.data?.message || err?.data?.detail || fallback;
 
   const handleSave = async () => {
     setFlash(null);
     try {
-      const t = await save({ ...draft, ideaIndustry: draft.ideaIndustry || null }).unwrap();
+      const t = await save({ ...draft, ideaIndustry: draft.ideaIndustry || null, mailFor }).unwrap();
       setDraft(asDraft(t));
       setFlash({ tone: "success", message: "Template saved." });
     } catch (err) {
@@ -1467,7 +1477,9 @@ function CreatorMailTab() {
     }
   };
   const handleSend = async (test) => {
-    const sample = example ? `${draft.subject.split("{name}").join(firstOf(example.name))}" (as ${example.name} sees it; each gets their own name)`
+    const sample = forBrands
+      ? `${draft.subject.split("{name}").join("Asha").split("{company}").join(brandAudience?.sample?.[0] || "Hearth Foods")}" (each brand gets its own contact's name and its name)`
+      : example ? `${draft.subject.split("{name}").join(firstOf(example.name))}" (as ${example.name} sees it; each gets their own name)`
       : `${draft.subject.split("{name}").join("Asha")}" (each lead gets their own name)`;
     if (!test && !window.confirm(`Send "${sample} to up to ${plural(recipients)}?`)) return;
     setFlash(null);
@@ -1475,7 +1487,7 @@ function CreatorMailTab() {
     try {
       const result = await send(test
         ? { templateId: draft.id, audience: "TEST", testEmail }
-        : { templateId: draft.id, audience, tenantIds: audience === "CHOSEN" ? chosen : [] }).unwrap();
+        : { templateId: draft.id, audience, tenantIds: audience === "CHOSEN" ? chosen : [], brands: forBrands ? brandFilter : null }).unwrap();
       const skipped = [
         result.alreadyHad ? `${result.alreadyHad} already had this mail` : null,
         result.unsubscribed ? `${result.unsubscribed} unsubscribed` : null,
@@ -1495,7 +1507,10 @@ function CreatorMailTab() {
   return (
     <div className="space-y-4">
       <Notice>
-        Write a mail once, keep it as a template, and send it to creators on the platform or to creator leads you uploaded. It goes
+        {forBrands ? <>Write a mail for brands once, keep it as a template, and send it to the brands in the directory (the brand master
+        list you upload), picked by industry, size and country: one mail per brand, to its best contact. <code>{"{company}"}</code> is the
+        brand's name; inspiration videos come from each brand's own industry unless the template picks one. </> : null}
+        {forBrands ? null : <>Write a mail once, keep it as a template, and send it to creators on the platform or to creator leads you uploaded. </>}It goes
         from Akash (hello@partner.dalaillama.in) with an unsubscribe link. Write <code>{"{name}"}</code> for the first name; a
         blank line starts a new paragraph and links become clickable. Mails queue and go out {overview?.dailyCap ?? "a set number"} a
         day; a template reaches each address once. Send yourself a test first.
@@ -1588,7 +1603,7 @@ function CreatorMailTab() {
           </div>
           {(draft.subject || draft.body) && (
             <div className="creator-panel p-4">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Preview, as it arrives (for a creator called Asha)</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Preview, as it arrives ({forBrands ? "for Asha at Hearth Foods, a food brand" : "for a creator called Asha"})</p>
               <p className="mt-2 text-sm font-bold text-white">{rendered?.subject || preview(draft.subject)}</p>
               {rendered?.html ? (
                 <iframe title="Mail preview" srcDoc={rendered.html} sandbox="" className="mt-3 h-[560px] w-full rounded-lg border border-white/10 bg-white" />
@@ -1614,6 +1629,33 @@ function CreatorMailTab() {
                     Send test
                   </button>
                 </div>
+                {forBrands ? (
+                  <div className="space-y-2 text-xs text-slate-300">
+                    <p className="text-slate-400">Which brands (leave a row empty for all)</p>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      {INDUSTRIES.map(([code, label]) => (
+                        <label key={code} className="flex items-center gap-1">
+                          <input type="checkbox" checked={brandFilter.industries.includes(code)} onChange={() => flip("industries", code)} /> {label}
+                        </label>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      {COMPANY_SIZES.map(([code, label]) => (
+                        <label key={code} className="flex items-center gap-1">
+                          <input type="checkbox" checked={brandFilter.sizes.includes(code)} onChange={() => flip("sizes", code)} /> {label}
+                        </label>
+                      ))}
+                    </div>
+                    <label className="block text-slate-400">Countries (codes, comma-separated; empty for all)
+                      <input value={brandFilter.countries.join(", ")} className={field} placeholder="IN"
+                             onChange={(e) => setBrandFilter((f) => ({ ...f, countries: e.target.value.split(/[ ,]+/).filter(Boolean) }))} />
+                    </label>
+                    <p className="text-slate-400">
+                      {brandAudience ? `${plural(brandAudience.brands)} with an email${brandAudience.sample?.length ? `, e.g. ${brandAudience.sample.join(", ")}` : ""}.` : "Counting…"}
+                    </p>
+                  </div>
+                ) : (
+                  <>
                 <div className="grid gap-1.5 text-xs text-slate-300 sm:grid-cols-2">
                   {AUDIENCES.map(([key, label]) => (
                     <label key={key} className="flex items-center gap-1.5">
@@ -1639,6 +1681,8 @@ function CreatorMailTab() {
                   <p className="text-[11px] text-amber-200">
                     These people haven't signed up, so each mail carries an unsubscribe link. Leads who already have an account are left out.
                   </p>
+                )}
+                  </>
                 )}
                 <button type="button" disabled={sending || recipients === 0} onClick={() => handleSend(false)}
                         className="creator-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
