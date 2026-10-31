@@ -1417,6 +1417,8 @@ function CreatorMailTab() {
   const [chosen, setChosen] = useState([]);
   const [testEmail, setTestEmail] = useState("");
   const [flash, setFlash] = useState(null);
+  // The last send's outcome, shown by the send button (where ops are looking).
+  const [sendNote, setSendNote] = useState(null);
   const field = "mt-1 w-full rounded-lg border border-white/10 bg-[#0b0f19] px-3 py-2 text-sm text-white";
   const saved = templates.find((t) => t.id === draft.id);
   const dirty = !saved || JSON.stringify(asDraft(saved)) !== JSON.stringify(draft);
@@ -1469,6 +1471,7 @@ function CreatorMailTab() {
       : `${draft.subject.split("{name}").join("Asha")}" (each lead gets their own name)`;
     if (!test && !window.confirm(`Send "${sample} to up to ${plural(recipients)}?`)) return;
     setFlash(null);
+    setSendNote(null);
     try {
       const result = await send(test
         ? { templateId: draft.id, audience: "TEST", testEmail }
@@ -1477,13 +1480,13 @@ function CreatorMailTab() {
         result.alreadyHad ? `${result.alreadyHad} already had this mail` : null,
         result.unsubscribed ? `${result.unsubscribed} unsubscribed` : null,
       ].filter(Boolean).join(", ");
-      setFlash({
-        tone: "success",
-        message: test ? `Test handed to the mail server for ${testEmail}; it usually arrives within a minute. Not there? Check Spam and Promotions.`
-          : `${plural(result.recipients)} queued; up to ${overview?.dailyCap ?? "a set number of"} mails go out a day.${skipped ? ` Skipped: ${skipped}.` : ""}`,
-      });
+      setSendNote(test
+        ? { tone: "success", message: `Test handed to the mail server for ${testEmail}; it usually arrives within a minute. Not there? Check Spam and Promotions.` }
+        : result.recipients === 0
+          ? { tone: "warn", message: `Nothing sent: nobody new to send this to${skipped ? ` (${skipped})` : ""}. A template reaches each address once, so pick another template or write a new one.` }
+          : { tone: "success", message: `${plural(result.recipients)} queued; they go out within a few minutes (up to ${overview?.dailyCap ?? "a set number of"} a day).${skipped ? ` Skipped: ${skipped}.` : ""}` });
     } catch (err) {
-      setFlash({ tone: "error", message: errorOf(err, "Couldn't send") });
+      setSendNote({ tone: "error", message: errorOf(err, "Couldn't send") });
     }
   };
   const toggle = (id) => setChosen((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
@@ -1513,7 +1516,7 @@ function CreatorMailTab() {
           {templates.length === 0 && <p className="text-xs text-slate-500">No templates yet.</p>}
           {templates.map((t) => (
             <button key={t.id} type="button"
-                    onClick={() => setDraft(asDraft(t))}
+                    onClick={() => { setDraft(asDraft(t)); setSendNote(null); }}
                     className={`block w-full rounded-lg px-2 py-1.5 text-left text-xs ${draft.id === t.id ? "bg-white/10 text-white" : "text-slate-300 hover:bg-white/5"}`}>
               <span className={t.active ? "" : "line-through opacity-60"}>{t.name}</span>
               <span className="block text-[10px] text-slate-500">
@@ -1641,6 +1644,7 @@ function CreatorMailTab() {
                         className="creator-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
                   {sending ? "Queuing…" : `Send to ${plural(recipients)}`}
                 </button>
+                {sendNote && <Notice tone={sendNote.tone}>{sendNote.message}</Notice>}
               </>
             )}
           </div>
