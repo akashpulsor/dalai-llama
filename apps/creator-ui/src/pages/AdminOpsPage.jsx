@@ -1420,7 +1420,7 @@ function CreatorMailTab() {
   const saved = templates.find((t) => t.id === draft.id);
   const dirty = !saved || JSON.stringify(asDraft(saved)) !== JSON.stringify(draft);
   const [renderPreview, { data: rendered }] = usePreviewCreatorMailMutation();
-  // The real mail, styled, redrawn shortly after each edit.
+  // The real mail (a plain letter from Akash), redrawn shortly after each edit.
   useEffect(() => {
     if (!draft.subject && !draft.body) return undefined;
     const timer = setTimeout(() => {
@@ -1520,13 +1520,14 @@ function CreatorMailTab() {
             <label className="text-xs text-slate-400">Message
               <textarea rows={10} maxLength={10000} value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })}
                         className={field} placeholder={"Hi {name},\n\n..."} />
+              <span className="mt-1 block text-[11px] text-slate-500">{"{name}"} is their first name, from their account, the lead upload, or their address (asha.rao@ reads Asha). With none it reads "creator", and a subject starting "{"{name}"}," just drops it.</span>
             </label>
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-xs text-slate-400">Button text (optional)
+              <label className="text-xs text-slate-400">Link text (optional)
                 <input maxLength={40} value={draft.ctaLabel} onChange={(e) => setDraft({ ...draft, ctaLabel: e.target.value })} className={field}
-                       placeholder="Join Dalai Llama free" />
+                       placeholder="Join Dalai Llama here" />
               </label>
-              <label className="text-xs text-slate-400">Button link
+              <label className="text-xs text-slate-400">Link
                 <input maxLength={300} value={draft.ctaUrl} onChange={(e) => setDraft({ ...draft, ctaUrl: e.target.value })} className={field}
                        placeholder="https://creator.dalaillama.in" />
               </label>
@@ -1538,7 +1539,7 @@ function CreatorMailTab() {
                 <option value={2}>2 videos from the inspiration board</option>
                 <option value={3}>3 videos from the inspiration board</option>
               </select>
-              <span className="mt-1 block text-[11px] text-slate-500">Picked when each mail goes out, shown as cards after your message, credited to their makers.</span>
+              <span className="mt-1 block text-[11px] text-slate-500">Picked when each mail goes out, listed by title after your message (no pictures, to keep the mail out of Promotions), with one link to watch them.</span>
             </label>
             <div className="flex flex-wrap items-center gap-3">
               <button type="button" disabled={!canSave} onClick={handleSave}
