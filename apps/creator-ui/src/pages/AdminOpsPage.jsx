@@ -45,6 +45,7 @@ import {
   useEndCreatorGrantMutation,
   useListCreatorMailTemplatesQuery,
   useCountBrandMailAudienceQuery,
+  useAddDirectoryBrandMutation,
   useSaveCreatorMailTemplateMutation,
   useListCreatorMailRecipientsQuery,
   useListCreatorMailSendsQuery,
@@ -1373,6 +1374,77 @@ const COMPANY_SIZES = [["SMALL", "Small"], ["MEDIUM", "Medium"], ["LARGE", "Larg
 
 /** CSV uploads ops make: creators to invite (not on the platform yet), and the brand master list
  * creators search in Find brands. */
+const EMPTY_BRAND = { company: "", website: "", name: "", designation: "", email: "", phone: "", industry: "", country: "IN", size: "SMALL", category: "" };
+
+/** One brand into the brand directory, the way Marketing adds a lead: only the name and website are
+ * needed. With no email it's listed as "Email not available" (and left out of brand mail) until one is
+ * added: type the brand again with the email, and it joins the same brand. */
+function AddBrandForm() {
+  const [open, setOpen] = useState(false);
+  const [brand, setBrand] = useState(EMPTY_BRAND);
+  const [note, setNote] = useState(null);
+  const [add, { isLoading }] = useAddDirectoryBrandMutation();
+  const field = "mt-1 w-full rounded-lg border border-white/10 bg-[#0b0f19] px-3 py-2 text-sm text-white";
+  const set = (key) => (e) => setBrand({ ...brand, [key]: e.target.value });
+  const canSave = !isLoading && brand.company.trim() && (brand.website.trim() || brand.email.includes("@"));
+  const save = async (e) => {
+    e.preventDefault();
+    setNote(null);
+    try {
+      const body = Object.fromEntries(Object.entries(brand).map(([k, v]) => [k, typeof v === "string" && !v.trim() ? null : v]));
+      const r = await add(body).unwrap();
+      setNote({ tone: "success", message: r.contacts > 0
+        ? `${r.company} (${r.domain}) saved with ${r.contacts} contact${r.contacts === 1 ? "" : "s"}; it's in the brand count below.`
+        : `${r.company} (${r.domain}) saved. No email yet, so it shows as "Email not available"; add it again with the email when you find it.` });
+      setBrand(EMPTY_BRAND);
+    } catch (err) {
+      setNote({ tone: "error", message: err?.data?.message || err?.data?.detail || "Couldn't save the brand" });
+    }
+  };
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="flex items-center gap-1 text-xs font-bold text-purple-300 hover:underline">
+        <Plus size={12} /> Add a brand
+      </button>
+    );
+  }
+  return (
+    <form onSubmit={save} className="creator-panel grid gap-3 p-4 text-xs text-slate-400 sm:grid-cols-2">
+      <p className="sm:col-span-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Add a brand</p>
+      <label>Brand name *<input required maxLength={160} value={brand.company} onChange={set("company")} className={field} placeholder="Kesar Kitchen" /></label>
+      <label>Website *<input maxLength={255} value={brand.website} onChange={set("website")} className={field} placeholder="kesarkitchen.in" /></label>
+      <label>Contact name<input maxLength={120} value={brand.name} onChange={set("name")} className={field} placeholder="Anita Rao" /></label>
+      <label>Designation<input maxLength={120} value={brand.designation} onChange={set("designation")} className={field} placeholder="Founder" /></label>
+      <label>Email (if known)<input type="email" maxLength={254} value={brand.email} onChange={set("email")} className={field} placeholder="anita@kesarkitchen.in" /></label>
+      <label>Phone (if known)<input maxLength={32} value={brand.phone} onChange={set("phone")} className={field} placeholder="+91 98765 43210" /></label>
+      <label>Industry
+        <select value={brand.industry} onChange={set("industry")} className={field}>
+          <option value="">Not sure</option>
+          {INDUSTRIES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+        </select>
+      </label>
+      <label>What it sells<input maxLength={80} value={brand.category} onChange={set("category")} className={field} placeholder="Pickles, Jewellery, Pet food…" /></label>
+      <label>Size
+        <select value={brand.size} onChange={set("size")} className={field}>
+          {COMPANY_SIZES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+        </select>
+      </label>
+      <label>Country<input maxLength={60} value={brand.country} onChange={set("country")} className={field} placeholder="IN" /></label>
+      <p className="sm:col-span-2 text-[11px] text-slate-500">
+        Only the name and website are needed. "What it sells" picks the inspiration videos its mail shows. Saving a brand that's already listed
+        (same website) adds the new details and contact to it.
+      </p>
+      {note && <div className="sm:col-span-2"><Notice tone={note.tone}>{note.message}</Notice></div>}
+      <div className="sm:col-span-2 flex gap-3">
+        <button type="submit" disabled={!canSave} className="creator-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+          {isLoading ? "Saving…" : "Save brand"}
+        </button>
+        <button type="button" onClick={() => { setOpen(false); setNote(null); }} className="text-xs text-slate-400 hover:underline">Close</button>
+      </div>
+    </form>
+  );
+}
+
 function ListUploads({ onFlash }) {
   const [importLeads, leadsState] = useImportCreatorLeadsMutation();
   const [importBrands, brandsState] = useImportBrandDirectoryMutation();
@@ -1521,6 +1593,7 @@ function CreatorMailTab({ mailFor = "CREATORS" }) {
         </p>
       )}
       <ListUploads onFlash={setFlash} />
+      {forBrands && <AddBrandForm />}
       {flash && <Notice tone={flash.tone}>{flash.message}</Notice>}
       <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
         <div className="creator-panel space-y-1 p-3">

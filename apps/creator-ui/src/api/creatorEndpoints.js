@@ -4637,6 +4637,12 @@ export const creatorApi = apiSlice.injectEndpoints({
     // How many brands a brand mail with this filter reaches ({ industries, sizes, countries }).
     countBrandMailAudience: builder.query({
       query: (filter) => ({ url: opsAdminUrl(`/tenants/creator-mail/brands/count`), method: "POST", body: filter }),
+      providesTags: [{ type: "CreatorHomeProjects", id: "admin-brand-directory" }],
+    }),
+    // One brand typed in by ops: company + website needed; contact, email and phone optional.
+    addDirectoryBrand: builder.mutation({
+      query: (body) => ({ url: opsAdminUrl(`/tenants/outreach/brand-directory/brands`), method: "POST", body }),
+      invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-brand-directory" }],
     }),
     previewCreatorMail: builder.mutation({
       query: (body) => ({ url: opsAdminUrl(`/tenants/creator-mail/preview`), method: "POST", body }),
@@ -4991,6 +4997,7 @@ export const {
   useEndCreatorGrantMutation,
   useListCreatorMailTemplatesQuery,
   useCountBrandMailAudienceQuery,
+  useAddDirectoryBrandMutation,
   useSaveCreatorMailTemplateMutation,
   useListCreatorMailRecipientsQuery,
   useListCreatorMailSendsQuery,
