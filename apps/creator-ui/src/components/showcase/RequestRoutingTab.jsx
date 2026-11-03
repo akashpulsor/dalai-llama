@@ -10,10 +10,12 @@ import {
 } from "../../api/showcaseEndpoints.js";
 import { INDUSTRY_LABEL } from "./showcaseLabels.js";
 
+// The brand always pays first (your account holds the request meanwhile); once paid it's offered for
+// the matching window, and whatever nobody takes stays with you.
 const STRATEGIES = [
-  ["ROUND_ROBIN_BY_INDUSTRY", "Round robin by industry", "Each request goes straight to the next creator for its industry; the brand gets the brief to pay at once."],
-  ["OFFER_TO_ALL", "Offer to all", "Every creator on gets an email; the first to accept takes it, then the brand gets the brief."],
-  ["OPS_ASSIGNS", "Ops assigns", "Requests wait below until ops pick the creator."],
+  ["ROUND_ROBIN_BY_INDUSTRY", "Round robin by industry", "Once paid, offered to the next creator for its industry, one at a time; a pass moves it on."],
+  ["OFFER_TO_ALL", "Offer to all", "Once paid, every creator on gets an email; the first to accept takes the brief and the payment."],
+  ["OPS_ASSIGNS", "Ops assigns", "Once paid, it waits below for you to pick the creator until matching time runs out."],
 ];
 
 /** Ops controls for requests sent to Dalaillama: how they're routed, which creators take them
@@ -88,12 +90,13 @@ export default function RequestRoutingTab() {
       </div>
 
       <div className="creator-panel rounded-xl p-4">
-        <h3 className="font-bold text-white">Waiting for a creator <span className="font-normal text-slate-400">· {data.waiting.length}</span></h3>
+        <h3 className="font-bold text-white">Held by you, being matched <span className="font-normal text-slate-400">· {data.waiting.length}</span></h3>
+        <p className="mt-1 text-xs text-slate-400">The brand sees "assigning your creator". Nobody takes it in time: it's yours to make.</p>
         {data.waiting.length === 0 && <p className="mt-2 text-xs text-slate-400">Nothing waiting.</p>}
         <ul className="mt-3 space-y-3">
           {data.waiting.map((w) => <WaitingRow key={w.id} w={w} creators={data.creators} busy={busy === w.id}
                                                 onExpire={() => expireRow(w.id, w.brand)}
-                                                onAssign={(handle) => run(() => assign({ id: w.id, handle }), `Assigned to @${handle}; the brand gets the brief to pay`, w.id)} />)}
+                                                onAssign={(handle) => run(() => assign({ id: w.id, handle }), `Assigned to @${handle}; the brief and any payment moved to them`, w.id)} />)}
         </ul>
       </div>
 
@@ -132,7 +135,12 @@ function WaitingRow({ w, creators, busy, onAssign, onExpire }) {
     <li className="rounded-lg bg-white/[0.03] p-3 ring-1 ring-white/10">
       <p className="font-semibold text-white">{w.brand} <span className="font-normal text-slate-400">· {w.email}{w.industry ? ` · ${INDUSTRY_LABEL[w.industry]}` : ""}</span></p>
       <p className="mt-1 text-slate-300">“{w.message}”</p>
-      <p className="mt-1 text-xs text-slate-500">{new Date(w.createdAt).toLocaleString()} · {daysAgo(w.createdAt)}</p>
+      <p className="mt-1 text-xs text-slate-500">
+        {new Date(w.createdAt).toLocaleString()} · {daysAgo(w.createdAt)} ·{" "}
+        {w.paidAt
+          ? <span className="font-semibold text-emerald-300">Paid{w.matchingUntil ? ` · offered to creators until ${new Date(w.matchingUntil).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
+          : <span className="text-amber-300">Not paid yet</span>}
+      </p>
       <div className="mt-2 flex items-center gap-2">
         <select value={handle} onChange={(e) => setHandle(e.target.value)}
                 className="rounded-lg border border-white/15 bg-white/[0.04] p-1.5 text-xs text-white">
@@ -142,10 +150,12 @@ function WaitingRow({ w, creators, busy, onAssign, onExpire }) {
                 className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-purple-700 disabled:opacity-50">
           {busy ? "Working…" : "Assign"}
         </button>
-        <button type="button" disabled={busy} onClick={onExpire}
-                className="rounded-lg px-3 py-1.5 text-xs font-bold text-rose-300 hover:bg-rose-500/10 disabled:opacity-50">
-          Expire
-        </button>
+        {!w.paidAt && (
+          <button type="button" disabled={busy} onClick={onExpire}
+                  className="rounded-lg px-3 py-1.5 text-xs font-bold text-rose-300 hover:bg-rose-500/10 disabled:opacity-50">
+            Expire
+          </button>
+        )}
       </div>
     </li>
   );

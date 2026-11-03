@@ -170,7 +170,15 @@ function Requests({ inquiries }) {
                 <span style={{ flex: "1 1 260px", minWidth: 0 }}>
                   {q.creatorHandle
                     ? <a href={`/c/${q.creatorHandle}`} style={{ display: "block", fontWeight: 600, color: C.text, textDecoration: "none" }}>{q.creatorName}</a>
-                    : <span style={{ display: "block", fontWeight: 600, color: C.text }}>Finding a creator for you…</span>}
+                    : (
+                      // Dalaillama holds it until a creator is assigned: paid, it's being assigned (like a ride
+                      // finding its driver); unpaid, the creator is assigned the moment the brand pays.
+                      <span style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600, color: C.text }}>
+                        <style>{"@keyframes dl-assigning{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}"}</style>
+                        <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, background: "#A78BFA", animation: "dl-assigning 1.2s ease-in-out infinite" }} />
+                        {q.funded || q.matchingUntil ? "Assigning your creator…" : q.briefUrl ? "Your creator is assigned as soon as you pay" : "Assigning your creator…"}
+                      </span>
+                    )}
                   <span style={{ display: "block", fontSize: 13.5, color: C.muted }}>{details}</span>
                   {q.funded && !q.reviewUrl && (
                     <span style={{ display: "block", fontSize: 13, color: "#6EE7A8" }}>Paid. {q.creatorName || "Your creator"} will share the review here when the first cut is ready.</span>
