@@ -1554,7 +1554,7 @@ function CreatorMailTab({ mailFor = "CREATORS" }) {
   };
   const handleSend = async (test) => {
     const sample = forBrands
-      ? `${draft.subject.split("{name}").join("Asha").split("{company}").join(brandAudience?.sample?.[0] || "Hearth Foods")}" (each brand gets its own contact's name and its name)`
+      ? `${draft.subject.split("{name}").join("[first name]").split("{company}").join(brandAudience?.sample?.[0] || "[brand]")}" (each brand's mail carries its own contact's first name and brand name)`
       : example ? `${draft.subject.split("{name}").join(firstOf(example.name))}" (as ${example.name} sees it; each gets their own name)`
       : `${draft.subject.split("{name}").join("Asha")}" (each lead gets their own name)`;
     if (!test && !window.confirm(`Send "${sample} to up to ${plural(recipients)}?`)) return;
