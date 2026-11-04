@@ -81,6 +81,14 @@ function TemplateResults() {
   );
 }
 
+/** The mail as it went. Nothing in it can be clicked or run: its links are the brand's own tracked ones and
+ * its unsubscribe, so following one here would count a click for the brand or unsubscribe them. */
+function SentMailCopy({ html, title }) {
+  const lock = '<base target="_blank"><style>a{pointer-events:none}</style>';
+  const page = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (head) => head + lock) : lock + html;
+  return <iframe title={title} srcDoc={page} sandbox="" loading="lazy" className="mt-2 h-[480px] w-full rounded-lg border border-white/10 bg-white" />;
+}
+
 function BrandMails({ email }) {
   const { data, isLoading } = useGetBrandMailHistoryQuery(email);
   if (isLoading || !data) return <p className="px-3 pb-3 text-xs text-slate-500">Loading…</p>;
@@ -103,6 +111,9 @@ function BrandMails({ email }) {
             {" · "}{mail.firstClickedAt ? `Clicked ${day(mail.firstClickedAt)}` : "No click"}
           </p>
           {mail.videosFit === false && <p className="text-amber-300">No video about what this brand sells was available.</p>}
+          {mail.html
+            ? <SentMailCopy html={mail.html} title={`Mail sent: ${mail.subject}`} />
+            : <p className="mt-2 text-slate-500">This mail went before copies were kept, so only its subject, videos and links are shown.</p>}
           {videos.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
               {videos.map((v, i) => (
