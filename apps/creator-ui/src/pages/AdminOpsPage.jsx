@@ -1508,10 +1508,11 @@ function CreatorMailTab({ mailFor = "CREATORS" }) {
   useEffect(() => {
     if (!draft.subject && !draft.body) return undefined;
     const timer = setTimeout(() => {
-      renderPreview({ subject: draft.subject, body: draft.body, ctaLabel: draft.ctaLabel, ctaUrl: draft.ctaUrl, ideaVideos: draft.ideaVideos, ideaIndustry: draft.ideaIndustry || null, style: draft.style, mailFor });
+      renderPreview({ subject: draft.subject, body: draft.body, ctaLabel: draft.ctaLabel, ctaUrl: draft.ctaUrl, ideaVideos: draft.ideaVideos, ideaIndustry: draft.ideaIndustry || null, style: draft.style, mailFor,
+        brands: forBrands ? brandFilter : null });
     }, 500);
     return () => clearTimeout(timer);
-  }, [draft.subject, draft.body, draft.ctaLabel, draft.ctaUrl, draft.ideaVideos, draft.ideaIndustry, draft.style, renderPreview]);
+  }, [draft.subject, draft.body, draft.ctaLabel, draft.ctaUrl, draft.ideaVideos, draft.ideaIndustry, draft.style, forBrands, brandFilter, renderPreview]);
   const noVideo = creators.filter((c) => !c.liveVideos).length;
   const AUDIENCES = [
     ["ALL", `Every active creator (${creators.length})`],
@@ -1677,6 +1678,7 @@ function CreatorMailTab({ mailFor = "CREATORS" }) {
           {(draft.subject || draft.body) && (
             <div className="creator-panel p-4">
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Preview, as it arrives ({forBrands ? "for Asha at Hearth Foods, a food brand" : "for a creator called Asha"})</p>
+              {rendered?.to && <p className="mt-2 text-xs text-slate-400">As mailed to {rendered.to}, the first brand you picked</p>}
               <p className="mt-2 text-sm font-bold text-white">{rendered?.subject || preview(draft.subject)}</p>
               {rendered?.html ? (
                 <iframe title="Mail preview" srcDoc={rendered.html} sandbox="" className="mt-3 h-[560px] w-full rounded-lg border border-white/10 bg-white" />
