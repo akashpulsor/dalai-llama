@@ -117,8 +117,10 @@ export default function AdminOpsPage() {
     { key: "plans", label: "Plans", component: <PlansTab /> },
     { key: "grants", label: "Free plans", component: <GrantsTab /> },
     { key: "payouts", label: "Payouts", component: <PayoutsTab /> },
-    { key: "creator-mail", label: "Mail creators", component: <CreatorMailTab /> },
-    { key: "brand-mail", label: "Mail brands", component: <CreatorMailTab mailFor="BRANDS" /> },
+    // Keyed apart: the same component in the same spot would otherwise carry one tab's audience (say,
+    // two picked creators) over to the other, and a brand template would be sent to creators.
+    { key: "creator-mail", label: "Mail creators", component: <CreatorMailTab key="creators" /> },
+    { key: "brand-mail", label: "Mail brands", component: <CreatorMailTab key="brands" mailFor="BRANDS" /> },
     { key: "showcase", label: "Showcase", component: <ShowcaseAdminTab /> },
     { key: "requests", label: "Requests", component: <RequestRoutingTab /> },
   ];
@@ -1561,7 +1563,8 @@ function CreatorMailTab({ mailFor = "CREATORS" }) {
     try {
       const result = await send(test
         ? { templateId: draft.id, audience: "TEST", testEmail }
-        : { templateId: draft.id, audience, tenantIds: audience === "CHOSEN" ? chosen : [], brands: forBrands ? brandFilter : null }).unwrap();
+        : forBrands ? { templateId: draft.id, audience: "BRANDS", brands: brandFilter }
+        : { templateId: draft.id, audience, tenantIds: audience === "CHOSEN" ? chosen : [] }).unwrap();
       const skipped = [
         result.alreadyHad ? `${result.alreadyHad} already had this mail` : null,
         result.unsubscribed ? `${result.unsubscribed} unsubscribed` : null,
