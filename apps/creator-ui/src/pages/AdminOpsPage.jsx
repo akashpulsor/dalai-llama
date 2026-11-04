@@ -13,6 +13,7 @@
  */
 import ShowcaseAdminTab from "../components/showcase/ShowcaseAdminTab.jsx";
 import RequestRoutingTab from "../components/showcase/RequestRoutingTab.jsx";
+import BrandMailHistory from "../components/outreach/BrandMailHistory.jsx";
 import { INDUSTRIES } from "../components/showcase/showcaseLabels.js";
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
@@ -1789,6 +1790,7 @@ function CreatorMailTab({ mailFor = "CREATORS" }) {
           </table>
         </div>
       )}
+      {forBrands && <BrandMailHistory />}
     </div>
   );
 }

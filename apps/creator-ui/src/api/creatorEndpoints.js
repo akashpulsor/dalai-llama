@@ -4639,6 +4639,24 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: (filter) => ({ url: opsAdminUrl(`/tenants/creator-mail/brands/count`), method: "POST", body: filter }),
       providesTags: [{ type: "CreatorHomeProjects", id: "admin-brand-directory" }],
     }),
+    // Brand mail history (ops): brands mailed (search by name/address), one brand's mails with their
+    // videos, links and clicks plus its requests, each template's results, and videos per kind of brand.
+    listBrandMailHistory: builder.query({
+      query: (q) => ({ url: opsAdminUrl(`/tenants/creator-mail/history/brands`), params: q ? { q } : undefined }),
+      providesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
+    }),
+    getBrandMailHistory: builder.query({
+      query: (email) => ({ url: opsAdminUrl(`/tenants/creator-mail/history/brand`), params: { email } }),
+      providesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
+    }),
+    getBrandTemplateStats: builder.query({
+      query: () => ({ url: opsAdminUrl(`/tenants/creator-mail/history/templates`) }),
+      providesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
+    }),
+    getVideoCoverage: builder.query({
+      query: () => ({ url: opsAdminUrl(`/tenants/creator-mail/history/coverage`) }),
+      providesTags: [{ type: "CreatorHomeProjects", id: "admin-brand-directory" }],
+    }),
     // One brand typed in by ops: company + website needed; contact, email and phone optional.
     addDirectoryBrand: builder.mutation({
       query: (body) => ({ url: opsAdminUrl(`/tenants/outreach/brand-directory/brands`), method: "POST", body }),
@@ -4998,6 +5016,10 @@ export const {
   useListCreatorMailTemplatesQuery,
   useCountBrandMailAudienceQuery,
   useAddDirectoryBrandMutation,
+  useListBrandMailHistoryQuery,
+  useGetBrandMailHistoryQuery,
+  useGetBrandTemplateStatsQuery,
+  useGetVideoCoverageQuery,
   useSaveCreatorMailTemplateMutation,
   useListCreatorMailRecipientsQuery,
   useListCreatorMailSendsQuery,
