@@ -1372,7 +1372,7 @@ const asDraft = (t) => ({
 });
 
 const SEND_AUDIENCE_LABEL = { ALL: "Every creator", CHOSEN: "Picked creators", NO_VIDEO: "No video on profile", LEADS: "Creator leads",
-  BRANDS: "Brands", TEST: "Test" };
+  BRANDS: "Brands", TEST: "Test", FOLLOWUP: "Weekly follow-up" };
 const COMPANY_SIZES = [["SMALL", "Small"], ["MEDIUM", "Medium"], ["LARGE", "Large"], ["ENTERPRISE", "Enterprise"]];
 
 /** CSV uploads ops make: creators to invite (not on the platform yet), and the brand master list
@@ -1489,7 +1489,7 @@ function CreatorMailTab({ mailFor = "CREATORS" }) {
   const { data: templates = [] } = useListCreatorMailTemplatesQuery(forBrands ? "BRANDS" : undefined);
   const { data: creators = [] } = useListCreatorMailRecipientsQuery(undefined, { skip: forBrands });
   // Brand mail: which brands (an empty list doesn't narrow); the count follows the filter.
-  const [brandFilter, setBrandFilter] = useState({ industries: [], sizes: ["SMALL"], countries: ["IN"] });
+  const [brandFilter, setBrandFilter] = useState({ industries: [], sizes: ["SMALL", "MEDIUM"], countries: ["IN"] });
   const { data: brandAudience } = useCountBrandMailAudienceQuery(brandFilter, { skip: !forBrands });
   const flip = (key, value) => setBrandFilter((f) => ({ ...f, [key]: f[key].includes(value) ? f[key].filter((v) => v !== value) : [...f[key], value] }));
   const { data: sends = [] } = useListCreatorMailSendsQuery();

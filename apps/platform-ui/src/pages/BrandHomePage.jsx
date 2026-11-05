@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { getMe, getMyInquiries, isSignedIn, savePreferences, signOut, SignInRequired, unfollow } from "../showcase/brandApi.js";
+import { getMailPriorities, getMe, getMyInquiries, isSignedIn, saveMailPriorities, savePreferences, signOut, SignInRequired, unfollow } from "../showcase/brandApi.js";
 import { getFeed } from "../showcase/showcaseApi.js";
 import ShowcaseGrid from "../showcase/ShowcaseGrid.jsx";
 import BrandLogo from "../showcase/BrandLogo.jsx";
@@ -73,6 +73,8 @@ export default function BrandHomePage() {
               <h1 style={{ margin: "10px 0 0", fontSize: 32, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.15 }}>Hi {name}</h1>
               <p style={{ margin: "6px 0 0", color: C.muted }}>Your requests to creators, new films for your industry, and the creators you follow.</p>
             </section>
+
+            <MailPriorities />
 
             <Requests inquiries={inquiries} />
 
@@ -234,6 +236,67 @@ function Following({ me, onChange }) {
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+// MailThemes keys, as a brand reads them.
+const VIDEO_KINDS = [
+  ["jewellery", "Jewellery"], ["ethnic", "Ethnic wear"], ["womenswear", "Womenswear"], ["menswear", "Menswear"], ["streetwear", "Streetwear"],
+  ["footwear", "Footwear"], ["travelgear", "Bags & luggage"], ["activewear", "Activewear"], ["kids", "Kids & baby"], ["skincare", "Skincare"],
+  ["haircare", "Haircare"], ["makeup", "Makeup"], ["fragrance", "Fragrance"], ["bodycare", "Body care"], ["coffee", "Coffee"], ["tea", "Tea"],
+  ["drinks", "Drinks"], ["snacks", "Snacks"], ["sweets", "Sweets & desserts"], ["pantry", "Pantry"], ["nutrition", "Nutrition"],
+  ["wellness", "Wellness"], ["home", "Home"], ["pet", "Pet"], ["gifting", "Gifting"], ["gadgets", "Gadgets"],
+];
+
+/** What the brand wants our mail to show: kinds of video, and companies whose ads it would like to see. */
+function MailPriorities() {
+  const [themes, setThemes] = useState(null);
+  const [adsFrom, setAdsFrom] = useState("");
+  const [state, setState] = useState("idle");
+  useEffect(() => {
+    getMailPriorities().then((p) => { setThemes(p.themes); setAdsFrom(p.adsFrom || ""); }).catch(() => setThemes([]));
+  }, []);
+  if (!themes) return null;
+  const flip = (code) => { setState("idle"); setThemes(themes.includes(code) ? themes.filter((t) => t !== code) : [...themes, code]); };
+  const save = async () => {
+    setState("saving");
+    try {
+      await saveMailPriorities({ themes, adsFrom });
+      setState("saved");
+    } catch {
+      setState("error");
+    }
+  };
+  return (
+    <section aria-labelledby="priorities-h" style={{ ...panel, padding: "18px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div>
+        <h2 id="priorities-h" style={{ margin: 0, fontSize: 19, fontWeight: 700 }}>What should we find for you?</h2>
+        <p style={{ margin: "4px 0 0", color: C.muted }}>Tell us what you'd like to see and we'll find video ideas that match. It's free.</p>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {VIDEO_KINDS.map(([code, label]) => {
+          const on = themes.includes(code);
+          return (
+            <button key={code} type="button" onClick={() => flip(code)} aria-pressed={on}
+                    style={{ minHeight: 36, padding: "0 12px", borderRadius: 999, font: "inherit", fontSize: 13.5, cursor: "pointer", color: on ? "#FFFFFF" : C.soft, background: on ? "#7C3AED" : "transparent", border: `1px solid ${on ? "#7C3AED" : C.line}` }}>
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      <label htmlFor="ads-from" style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13.5, color: C.soft }}>Companies whose ads you'd like to see
+        <input id="ads-from" value={adsFrom} maxLength={500} placeholder="Nike, Mamaearth, Zomato" onChange={(e) => { setState("idle"); setAdsFrom(e.target.value); }}
+               style={{ height: 44, borderRadius: 10, border: `1px solid ${C.line}`, padding: "0 10px", font: "inherit", color: C.text, background: C.bar }} />
+      </label>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <button type="button" onClick={save} disabled={state === "saving"}
+                style={{ height: 40, padding: "0 16px", borderRadius: 10, border: 0, background: "#7C3AED", color: "#FFFFFF", font: "inherit", fontWeight: 700, cursor: "pointer" }}>
+          Save
+        </button>
+        {state === "saved" && <span style={{ fontSize: 13.5, color: "#6EE7A8" }}>Saved. We'll find videos for this.</span>}
+        {state === "error" && <span style={{ fontSize: 13.5, color: "#FDA4AF" }}>Couldn't save; try again.</span>}
+      </div>
     </section>
   );
 }

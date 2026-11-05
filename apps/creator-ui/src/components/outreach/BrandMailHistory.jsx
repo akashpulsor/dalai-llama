@@ -1,5 +1,9 @@
 import React, { useState } from "react";
 import {
+  useGetBrandFollowUpQuery,
+  useGetBrandPrioritiesQuery,
+  useSaveBrandFollowUpMutation,
+  useListCreatorMailTemplatesQuery,
   useGetVideoCoverageQuery,
   useGetBrandTemplateStatsQuery,
   useListBrandMailHistoryQuery,
@@ -74,6 +78,98 @@ function TemplateResults() {
               <span className="text-right text-slate-300">{t.clicked} · {pct(t.clicked, t.sent)}</span>
               <span className="text-right text-emerald-300">{t.requested} · {pct(t.requested, t.sent)}</span>
             </React.Fragment>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const FOLLOW_UP_STAGES = { NOT_OPENED: "Not opened", OPENED: "Opened, no click", CLICKED: "Clicked, no request" };
+const LAST_MAIL_STAGES = { LAST_NOT_OPENED: "Never opened", LAST_OPENED: "Opened or clicked" };
+
+/** The funnel, and the weekly inspiration mail it drives: which templates each stage gets, on or off. */
+function FollowUps() {
+  const { data } = useGetBrandFollowUpQuery();
+  const { data: templates = [] } = useListCreatorMailTemplatesQuery("BRANDS");
+  const [save, { isLoading: saving, error }] = useSaveBrandFollowUpMutation();
+  if (!data) return null;
+  const stagesWith = (stage, templateIds) => data.stages.map((s) => ({ stage: s.stage, templateIds: s.stage === stage ? templateIds : s.templateIds }));
+  const flip = (s, id) => save({ enabled: data.enabled, stages: stagesWith(s.stage,
+    s.templateIds.includes(id) ? s.templateIds.filter((t) => t !== id) : [...s.templateIds, id]) });
+  const usable = templates.filter((t) => t.active && t.ideaVideos > 0);
+  const hasTemplates = data.stages.some((s) => s.templateIds.length > 0);
+  return (
+    <div className="creator-panel space-y-3 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-bold text-white">Weekly inspiration mail: {data.enabled ? "running" : "stopped"}</h3>
+        <button type="button" disabled={saving || (!data.enabled && !hasTemplates)}
+                onClick={() => save({ enabled: !data.enabled, stages: data.stages.map(({ stage, templateIds }) => ({ stage, templateIds })) })}
+                className={`rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-40 ${data.enabled ? "bg-red-500/20 text-red-200" : "bg-emerald-500/20 text-emerald-200"}`}>
+          {data.enabled ? "Stop" : "Start"}
+        </button>
+      </div>
+      <p className="text-xs text-slate-400">
+        A week after a brand's last mail, it gets new video ideas in a template ticked for its stage (several take turns), at most {data.maxFollowUps} weekly mails.
+        A brand that has seen every video that fits waits until new ones are added. Checked once a day (10:00 IST); mail then joins the queue and its daily limit.
+        Stop also takes back weekly mails still queued.
+        A plain letter can't report an open, so someone who read one without clicking shows as not opened.
+      </p>
+      {!hasTemplates && <p className="text-xs text-amber-300">Tick at least one template to start. Only templates that show videos are listed.</p>}
+      {error && <p className="text-xs text-red-300">{error?.data?.message || "Couldn't save"}</p>}
+      <div className="grid gap-3 md:grid-cols-3">
+        {data.stages.map((s) => (
+          <div key={s.stage} className="rounded-lg border border-white/10 p-3 text-xs">
+            <p className="font-semibold text-slate-100">{FOLLOW_UP_STAGES[s.stage]}</p>
+            <p className="text-2xl font-bold text-white">{s.brands}</p>
+            <p className="mb-2 text-slate-400">{s.due} due this week</p>
+            {usable.map((t) => (
+              <label key={t.id} className="flex items-center gap-2 py-0.5 text-slate-300">
+                <input type="checkbox" disabled={saving} checked={s.templateIds.includes(t.id)} onChange={() => flip(s, t.id)} />
+                {t.name}
+              </label>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="rounded-lg border border-white/10 p-3 text-xs">
+        <p className="font-semibold text-slate-100">Last mail, after {data.maxFollowUps} weekly mails with no request</p>
+        <p className="mb-2 text-slate-400">Goes once, even if they opened or clicked. A brand that sent a request or gave its priorities doesn't get it.</p>
+        <div className="grid gap-3 md:grid-cols-2">
+          {data.lastMails.map((s) => (
+            <label key={s.stage} className="text-slate-300">
+              {LAST_MAIL_STAGES[s.stage]} ({s.due} due now)
+              <select value={s.templateIds[0] || ""} disabled={saving}
+                      onChange={(e) => save({ enabled: data.enabled, stages: [{ stage: s.stage, templateIds: e.target.value ? [e.target.value] : [] }] })}
+                      className="mt-1 w-full rounded-lg border border-white/10 bg-[#0b0f19] px-2 py-1.5 text-white">
+                <option value="">None (no last mail)</option>
+                {templates.filter((t) => t.active).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </label>
+          ))}
+        </div>
+      </div>
+      <p className="text-xs text-slate-500">
+        Out of the funnel: {data.requested} sent a request · {data.unsubscribed} unsubscribed · {data.badAddress} bad address · {data.finished} had every weekly mail
+      </p>
+    </div>
+  );
+}
+
+/** What brands said they want in their console, for ops to find videos by. */
+function BrandPriorities() {
+  const { data: rows = [] } = useGetBrandPrioritiesQuery();
+  return (
+    <div className="creator-panel space-y-2 p-4">
+      <h3 className="text-sm font-bold text-white">What brands asked to see</h3>
+      {rows.length === 0 ? <p className="text-xs text-slate-500">No brand has told us yet.</p> : (
+        <div className="divide-y divide-white/5 text-xs">
+          {rows.map((p) => (
+            <div key={p.email} className="py-2">
+              <p className="font-semibold text-slate-100">{p.company || p.email} <span className="ml-1 font-normal text-slate-500">{p.email} · {day(p.updatedAt)}</span></p>
+              {p.themes.length > 0 && <p className="text-slate-300">Kinds of video: {p.themes.map(themeLabel).join(", ")}</p>}
+              {p.adsFrom && <p className="text-slate-300">Ads from: {p.adsFrom}</p>}
+            </div>
           ))}
         </div>
       )}
@@ -175,6 +271,8 @@ function BrandsMailed() {
 export default function BrandMailHistory() {
   return (
     <div className="space-y-4">
+      <FollowUps />
+      <BrandPriorities />
       <div className="grid gap-4 lg:grid-cols-2">
         <Coverage />
         <TemplateResults />

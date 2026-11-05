@@ -44,6 +44,8 @@ export function signOut() {
 export const getMe = () => call("GET", "/brands/me");
 export const getMyInquiries = () => call("GET", "/brands/me/inquiries");
 export const savePreferences = (prefs) => call("PATCH", "/brands/me/preferences", prefs);
+export const getMailPriorities = () => call("GET", "/brands/me/mail-priorities");
+export const saveMailPriorities = (priorities) => call("PUT", "/brands/me/mail-priorities", priorities);
 
 export const follow = (handle) => call("PUT", `/creators/${encodeURIComponent(handle)}/follow`);
 export const unfollow = (handle) => call("DELETE", `/creators/${encodeURIComponent(handle)}/follow`);

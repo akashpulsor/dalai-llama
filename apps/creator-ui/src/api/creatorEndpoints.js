@@ -4649,6 +4649,20 @@ export const creatorApi = apiSlice.injectEndpoints({
       query: (email) => ({ url: opsAdminUrl(`/tenants/creator-mail/history/brand`), params: { email } }),
       providesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
     }),
+    // What brands asked to see in their console, for ops to find videos by.
+    getBrandPriorities: builder.query({
+      query: () => ({ url: opsAdminUrl(`/tenants/creator-mail/follow-up/priorities`) }),
+      providesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
+    }),
+    // Weekly brand follow-ups (ops): the funnel, each stage's templates, and the on/off switch.
+    getBrandFollowUp: builder.query({
+      query: () => ({ url: opsAdminUrl(`/tenants/creator-mail/follow-up`) }),
+      providesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
+    }),
+    saveBrandFollowUp: builder.mutation({
+      query: (body) => ({ url: opsAdminUrl(`/tenants/creator-mail/follow-up`), method: "PUT", body }),
+      invalidatesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
+    }),
     getBrandTemplateStats: builder.query({
       query: () => ({ url: opsAdminUrl(`/tenants/creator-mail/history/templates`) }),
       providesTags: [{ type: "CreatorHomeProjects", id: "admin-creator-mail" }],
@@ -5018,6 +5032,9 @@ export const {
   useAddDirectoryBrandMutation,
   useListBrandMailHistoryQuery,
   useGetBrandMailHistoryQuery,
+  useGetBrandPrioritiesQuery,
+  useGetBrandFollowUpQuery,
+  useSaveBrandFollowUpMutation,
   useGetBrandTemplateStatsQuery,
   useGetVideoCoverageQuery,
   useSaveCreatorMailTemplateMutation,
