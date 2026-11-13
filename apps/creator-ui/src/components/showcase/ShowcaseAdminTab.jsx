@@ -14,6 +14,7 @@ import {
   useAdminShowcaseRescoreMutation,
 } from "../../api/showcaseEndpoints.js";
 import QuotaAdminCard from "./QuotaAdminCard.jsx";
+import LandingPlacementCard from "./LandingPlacementCard.jsx";
 
 /** Ops tools for the Creator Showcase: re-score, reported videos, the kill switch, the
  * video-host health panel and the one-time onboarding backfill. No alerting by design: this
@@ -103,6 +104,8 @@ export default function ShowcaseAdminTab() {
           </button>
         </div>
       </div>
+
+      <LandingPlacementCard />
 
       <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
         <p className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">Hide or restore a profile</p>

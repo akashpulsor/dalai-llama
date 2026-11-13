@@ -7,7 +7,7 @@ import { opsAdminUrl, platformUrl } from "./creatorEndpoints.js";
 
 const showcaseBase = apiSlice.enhanceEndpoints({
   addTagTypes: ["ShowcaseProfile", "PosterFrames", "ShowcaseChannel", "ShowcaseVideos", "ShowcaseItems", "ShowcaseVisibility", "ShowcaseUpload",
-    "ShowcaseAdmin", "ShowcaseRequests", "RequestSettings", "RequestRouting", "Outreach", "EmailTemplates", "Audiences", "AudienceLeads", "YouTubeConnection", "YouTubeJobs",
+    "ShowcaseAdmin", "ShowcaseLanding", "ShowcaseRequests", "RequestSettings", "RequestRouting", "Outreach", "EmailTemplates", "Audiences", "AudienceLeads", "YouTubeConnection", "YouTubeJobs",
     "YouTubeAnalytics", "ExtensionTokens", "PlatformYouTube", "YouTubeQuota", "BrandCredits", "FilmConsent"],
 });
 
@@ -145,6 +145,14 @@ export const showcaseApi = showcaseBase.injectEndpoints({
     adminShowcaseHideItem: builder.mutation({
       query: ({ publicId, hidden }) => ({ url: opsAdminUrl(`/tenants/showcase/items/${publicId}`), method: "PATCH", body: { hidden } }),
       invalidatesTags: ["ShowcaseAdmin"],
+    }),
+    adminLandingItems: builder.query({
+      query: () => ({ url: opsAdminUrl("/tenants/showcase/landing-items") }),
+      providesTags: ["ShowcaseLanding"],
+    }),
+    adminPlaceOnLanding: builder.mutation({
+      query: ({ publicId, hidden, hero }) => ({ url: opsAdminUrl(`/tenants/showcase/landing-items/${publicId}`), method: "PATCH", body: { hidden, hero } }),
+      invalidatesTags: ["ShowcaseLanding"],
     }),
     adminShowcaseProfileStatus: builder.mutation({
       query: ({ handle, status }) => ({ url: opsAdminUrl(`/tenants/showcase/profiles/${handle}`), method: "PATCH", body: { status } }),
@@ -460,6 +468,8 @@ export const {
   useAdminShowcaseRescoreMutation,
   useAdminShowcaseReportsQuery,
   useAdminShowcaseHideItemMutation,
+  useAdminLandingItemsQuery,
+  useAdminPlaceOnLandingMutation,
   useAdminShowcaseProfileStatusMutation,
   useAdminShowcaseHealthQuery,
   useAdminShowcaseProbeMutation,
