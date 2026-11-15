@@ -109,6 +109,7 @@ export default function RequestRoutingTab() {
             <li key={u.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
               <span>
                 <span className="font-semibold text-white">{u.brand}</span> <span className="text-slate-400">· {u.email} · @{u.creatorHandle}</span>
+                <LeadContact phone={u.phone} utmSource={u.utmSource} utmCampaign={u.utmCampaign} />
                 <span className="block text-xs text-slate-500">{u.status === "CONVERTED" ? "Brief sent" : "No brief yet"} · {daysAgo(u.createdAt)}</span>
               </span>
               <button type="button" disabled={busy === u.id} onClick={() => expireRow(u.id, u.brand)}
@@ -129,11 +130,25 @@ function daysAgo(at) {
   return days === 0 ? "today" : days === 1 ? "1 day ago" : `${days} days ago`;
 }
 
+/** The brand's WhatsApp, if they gave one (a click opens a chat), and the ad that brought them. */
+function LeadContact({ phone, utmSource, utmCampaign }) {
+  if (!phone && !utmSource) return null;
+  const digits = phone ? phone.replace(/[^0-9]/g, "") : "";
+  const wa = digits.length === 10 ? `91${digits}` : digits;
+  return (
+    <span className="mt-0.5 flex flex-wrap gap-x-3 text-xs">
+      {phone && <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="font-semibold text-emerald-300">WhatsApp {phone}</a>}
+      {utmSource && <span className="text-amber-200">From ad: {utmSource}{utmCampaign ? ` · ${utmCampaign}` : ""}</span>}
+    </span>
+  );
+}
+
 function WaitingRow({ w, creators, busy, onAssign, onExpire }) {
   const [handle, setHandle] = useState(creators.find((c) => c.accepting)?.handle || creators[0]?.handle || "");
   return (
     <li className="rounded-lg bg-white/[0.03] p-3 ring-1 ring-white/10">
       <p className="font-semibold text-white">{w.brand} <span className="font-normal text-slate-400">· {w.email}{w.industry ? ` · ${INDUSTRY_LABEL[w.industry]}` : ""}</span></p>
+      <LeadContact phone={w.phone} utmSource={w.utmSource} utmCampaign={w.utmCampaign} />
       <p className="mt-1 text-slate-300">“{w.message}”</p>
       <p className="mt-1 text-xs text-slate-500">
         {new Date(w.createdAt).toLocaleString()} · {daysAgo(w.createdAt)} ·{" "}
