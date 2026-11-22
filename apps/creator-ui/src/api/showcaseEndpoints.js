@@ -224,6 +224,10 @@ export const showcaseApi = showcaseBase.injectEndpoints({
     previewOutreach: builder.mutation({
       query: (body) => ({ url: "/tenants/me/outreach/preview", method: "POST", body }),
     }),
+    // The preview mailed to the creator's own address, marked [Test]: no allowance, cooldown or tracking.
+    testSendOutreach: builder.mutation({
+      query: (body) => ({ url: "/tenants/me/outreach/test-send", method: "POST", body }),
+    }),
     sendOutreach: builder.mutation({
       query: (body) => ({ url: "/tenants/me/outreach/send", method: "POST", body }),
       invalidatesTags: ["Outreach"],
@@ -425,6 +429,11 @@ export const showcaseApi = showcaseBase.injectEndpoints({
       }),
       invalidatesTags: ["Audiences", "AudienceLeads"],
     }),
+    // Looks up emails for the audience's leads that have none, by their website (shared credits).
+    findAudienceEmails: builder.mutation({
+      query: (audienceId) => ({ url: `/tenants/me/outreach/audiences/${audienceId}/find-emails`, method: "POST" }),
+      invalidatesTags: ["Audiences", "AudienceLeads", "BrandCredits"],
+    }),
     addLeadContactPoint: builder.mutation({
       query: ({ leadId, value }) => ({ url: `/tenants/me/outreach/leads/${leadId}/contact-points`, method: "POST", body: { value } }),
       invalidatesTags: ["Audiences", "AudienceLeads"],
@@ -497,6 +506,8 @@ export const {
   useUpdateEmailTemplateMutation,
   useDeleteEmailTemplateMutation,
   useGetAudiencesQuery,
+  useTestSendOutreachMutation,
+  useFindAudienceEmailsMutation,
   useCreateAudienceMutation,
   useDeleteAudienceMutation,
   useUploadAudienceCsvMutation,

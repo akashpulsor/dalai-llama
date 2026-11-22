@@ -8,12 +8,13 @@ import YouTubePanel, { useYouTubeResultFlash } from "../components/outreach/YouT
 
 const TABS = [
   ["send", "Send"],
+  ["contacts", "Contacts"],
   ["analytics", "Analytics"],
   ["youtube", "YouTube"],
 ];
 
 /** Marketing (CREATOR_SHOWCASE.md rules 21-42): reach brands with templates only. Send (template +
- * film + audience), Audiences (CSV upload and brand search), Templates (Dalai Llama's and your
+ * film + list, with a test to yourself first), Contacts (CSV upload, people and brand search, missing emails), Templates (Dalai Llama's and your
  * own), Analytics, and YouTube (publish your films, channel analytics). Your public profile,
  * channel connection and brand requests live on the Profile page. */
 export default function MarketingPage() {
@@ -24,7 +25,8 @@ export default function MarketingPage() {
   // "Send mail to this audience" on an audience: pick it in the send panel and scroll up to it.
   const sendTo = (id) => {
     setAudienceId(id);
-    document.getElementById("send-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setTab("send");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
@@ -49,16 +51,10 @@ export default function MarketingPage() {
       </div>
 
       {tab === "send" && (
-        <div className="space-y-8">
-          <div id="send-panel" className="scroll-mt-4">
-            <TemplateOutreach templateId={templateId} onTemplateChange={setTemplateId} audienceId={audienceId} onAudienceChange={setAudienceId} />
-          </div>
-          <section aria-labelledby="audiences-h">
-            <h2 id="audiences-h" className="mb-3 text-sm font-bold uppercase tracking-normal text-slate-300">Your audiences</h2>
-            <AudiencesPanel onSendTo={sendTo} />
-          </section>
-        </div>
+        <TemplateOutreach templateId={templateId} onTemplateChange={setTemplateId} audienceId={audienceId} onAudienceChange={setAudienceId}
+                          onManageContacts={() => setTab("contacts")} />
       )}
+      {tab === "contacts" && <AudiencesPanel onSendTo={sendTo} />}
       {tab === "analytics" && <AnalyticsPanel />}
       {tab === "youtube" && <YouTubePanel />}
     </div>

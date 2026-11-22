@@ -1,7 +1,7 @@
 // @ts-nocheck
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
-import { Eye, Loader2, Send, ShoppingCart } from "lucide-react";
+import { Eye, FlaskConical, Loader2, Send, ShoppingCart } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
   useBuyMailPackMutation,
@@ -13,6 +13,7 @@ import {
   usePreviewOutreachMutation,
   useSendOutreachMutation,
   useSendToAudienceMutation,
+  useTestSendOutreachMutation,
   useUpdateEmailTemplateMutation,
 } from "../../api/showcaseEndpoints.js";
 import { errorMessage } from "../showcase/showcaseLabels.js";
@@ -46,7 +47,7 @@ function parseRecipients(text) {
 /** Send tab, one flow: pick a template (Dalai Llama's or your own), edit its subject and opening line
  * right here (saved as your own template when you send), pick the film and the audience, send. Only films made on Dalai Llama that the client fully paid for and agreed to
  * marketing use of can be sent; each brand gets at most one email a day. */
-export default function TemplateOutreach({ templateId, onTemplateChange, audienceId, onAudienceChange }) {
+export default function TemplateOutreach({ templateId, onTemplateChange, audienceId, onAudienceChange, onManageContacts }) {
   const dispatch = useDispatch();
   const { data: overview, isLoading } = useGetOutreachOverviewQuery();
   const { data: templates = [] } = useGetEmailTemplatesQuery();
@@ -56,6 +57,8 @@ export default function TemplateOutreach({ templateId, onTemplateChange, audienc
   const [send, sendState] = useSendOutreachMutation();
   const [sendToAudience, audienceState] = useSendToAudienceMutation();
   const [buyPack, buyState] = useBuyMailPackMutation();
+  const [testSend, testState] = useTestSendOutreachMutation();
+  const [testResult, setTestResult] = useState(null);
   const [createTemplate] = useCreateEmailTemplateMutation();
   const [updateTemplate] = useUpdateEmailTemplateMutation();
   const [draft, setDraft] = useState({ subject: "", intro: "" });
@@ -123,7 +126,7 @@ export default function TemplateOutreach({ templateId, onTemplateChange, audienc
     setAudienceResult(null);
     try {
       if (mode === "audience") {
-        if (!window.confirm(`Email up to ${audience.reachable} brands in "${audience.name}"?`)) return;
+        if (!window.confirm(`Email up to ${audience.reachable} brands in "${audience.name}"? Tip: use "Email me a test" first to see it in your inbox.`)) return;
         const id = await templateToSend();
         setAudienceResult(await sendToAudience({ ...body, templateId: id, audienceId: audience.id }).unwrap());
       } else {
@@ -132,6 +135,14 @@ export default function TemplateOutreach({ templateId, onTemplateChange, audienc
         setRecipientsText("");
       }
     } catch (e) { fail(e, "Couldn't send"); }
+  };
+  /** The exact mail a brand would get, to the creator's own address; costs no mail. */
+  const doTest = async () => {
+    setTestResult(null);
+    try {
+      const id = await templateToSend();
+      setTestResult(await testSend({ ...body, templateId: id, recipientName: recipients[0]?.name || null }).unwrap());
+    } catch (e) { fail(e, "Couldn't send the test"); }
   };
   const doBuy = async () => {
     if (!window.confirm(`Buy ${pack.quantity} more mails for ${pack.currency} ${pack.price} from your wallet?`)) return;
@@ -212,6 +223,12 @@ export default function TemplateOutreach({ templateId, onTemplateChange, audienc
           Nothing to send yet. Only films made on Dalai Llama that your client fully paid for, and agreed to marketing use of, can be
           emailed. Publish one from the film bar ("Publish to my profile") once it's paid. Until then, send
           "Video ideas for your brand": videos brands in your industry are running, credited to their makers, with a button to request one from you.
+          {templates.some((t) => t.layout === "INSPIRATION") && (
+            <button type="button" onClick={() => onTemplateChange(templates.find((t) => t.layout === "INSPIRATION").id)}
+                    className="creator-primary mt-3 block px-3 py-2 text-xs font-bold text-white">
+              Use the video ideas mail
+            </button>
+          )}
         </p>
       ) : (
         <div className="space-y-4">
@@ -238,7 +255,7 @@ export default function TemplateOutreach({ templateId, onTemplateChange, audienc
           <div>
             <span className={label}>4 · Send to</span>
             <div className="mb-2 flex gap-2" role="radiogroup" aria-label="Recipients">
-              {[["audience", "An audience"], ["typed", "Type addresses"]].map(([id, text]) => (
+              {[["audience", "A list"], ["typed", "Type addresses"]].map(([id, text]) => (
                 <button key={id} type="button" role="radio" aria-checked={mode === id} onClick={() => setMode(id)}
                         className={`rounded-lg px-3 py-1.5 text-xs font-bold ${mode === id ? "bg-purple-600 text-white" : "text-slate-400 hover:bg-white/5"}`}>
                   {text}
@@ -247,16 +264,25 @@ export default function TemplateOutreach({ templateId, onTemplateChange, audienc
             </div>
             {mode === "audience" ? (
               audiences.length === 0 ? (
-                <QuickAudience onCreated={setAudienceId} />
+                <>
+                  <QuickAudience onCreated={setAudienceId} />
+                  {onManageContacts && (
+                    <button type="button" onClick={onManageContacts} className="mt-2 text-xs font-bold text-purple-200 hover:text-white">
+                      Or upload your own contacts (CSV) →
+                    </button>
+                  )}
+                </>
               ) : (
                 <>
                   <select value={audience?.id || ""} onChange={(e) => setAudienceId(e.target.value)} className={control}>
                     {audiences.map((a) => <option key={a.id} value={a.id}>{a.name} · {a.reachable} reachable of {a.leads}</option>)}
                   </select>
                   <span className="mt-1 block text-[11px] text-slate-500">
-                    One email per lead, to their best address. Queued mail goes out within a couple of minutes.
+                    One email per contact, to their best address. Queued mail goes out within a couple of minutes.
+                    {onManageContacts && (
+                      <button type="button" onClick={onManageContacts} className="ml-1 font-bold text-purple-200 hover:text-white">Add or check contacts →</button>
+                    )}
                   </span>
-                  <QuickAudience onCreated={setAudienceId} />
                 </>
               )
             ) : (
@@ -276,11 +302,21 @@ export default function TemplateOutreach({ templateId, onTemplateChange, audienc
                     className="creator-control flex items-center gap-1.5 px-4 py-2.5 text-sm font-bold text-slate-200 disabled:opacity-50">
               <Eye size={15} /> Refresh preview
             </button>
+            <button type="button" onClick={doTest} disabled={testState.isLoading || !template || (needsFilm && !film)}
+                    title="Get this exact mail at your own email first. It doesn't use a mail."
+                    className="creator-control flex items-center gap-1.5 px-4 py-2.5 text-sm font-bold text-slate-200 disabled:opacity-50">
+              {testState.isLoading ? <Loader2 size={15} className="animate-spin" /> : <FlaskConical size={15} />} Email me a test
+            </button>
             <button type="button" onClick={doSend} disabled={sending || !canSend}
                     className="creator-primary flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
               {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Send
             </button>
           </div>
+          {testResult && (
+            <p className="rounded-lg border border-emerald-400/25 bg-emerald-500/[0.06] px-3 py-2 text-xs text-emerald-100" role="status">
+              Test sent to {testResult.sentTo}. It's marked [Test] and didn't use a mail. {testResult.leftToday} more tests today.
+            </p>
+          )}
           {audienceResult && (
             <dl className="grid grid-cols-2 gap-2 rounded-lg border border-white/10 p-3 text-xs sm:grid-cols-3">
               {[["Queued", audienceResult.queued], ["Emailed recently", audienceResult.cooldown],

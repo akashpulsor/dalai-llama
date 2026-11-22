@@ -1,172 +1,235 @@
 // @ts-nocheck
-import React, { useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
-import { Loader2, Plus, Send, Trash2, Upload, X } from "lucide-react";
+import { Building2, FileUp, Loader2, MailSearch, Plus, Send, Trash2, UserPlus, Users, X } from "lucide-react";
 import { showFlash } from "@dalaillama/shared-store";
 import {
-  useCreateAudienceMutation,
-  useDeleteAudienceMutation,
   useAddLeadContactPointMutation,
   useAddLeadToAudienceMutation,
+  useCreateAudienceMutation,
+  useDeleteAudienceMutation,
   useDiscardContactPointMutation,
-  useGetDirectoriesQuery,
+  useFindAudienceEmailsMutation,
   useGetAudienceLeadsQuery,
   useGetAudiencesQuery,
+  useGetDirectoriesQuery,
   useRemoveLeadFromAudienceMutation,
-  useUploadAudienceCsvMutation,
 } from "../../api/showcaseEndpoints.js";
 import { errorMessage, INDUSTRIES, INDUSTRY_LABEL } from "../showcase/showcaseLabels.js";
 import { CONTACT_STATUS } from "./outreachLabels.js";
 import { COMPANY_SIZES, NoEmailFlag, SizeBadge } from "./CompanySize.jsx";
 import BrandFinder from "./BrandFinder.jsx";
+import CsvImport from "./CsvImport.jsx";
 import PeopleFinder from "./PeopleFinder.jsx";
 
-/** Audiences tab (rules 21–25): upload a CSV into a named audience; rows for the same person (any
- * shared email or phone) become one lead. Contact points are checked continuously: once one is
- * validated only validated ones show, otherwise every unchecked one does. */
+const ADD_WAYS = [
+  ["csv", "Upload CSV", FileUp],
+  ["people", "Find people", Users],
+  ["brands", "Find brands", Building2],
+  ["manual", "Add one", UserPlus],
+];
+
+/** Contacts (rules 21–25, 42, 44): lists of brand contacts on the left, the open list on the right.
+ * One "Add contacts" control holds every way in: upload a CSV (checked and previewed first), find
+ * people or brands, or type one. Contacts without an email can be filled in automatically from
+ * their website ("Find missing emails") or by hand. */
 export default function AudiencesPanel({ onSendTo }) {
   const dispatch = useDispatch();
   const { data: audiences = [], isLoading } = useGetAudiencesQuery();
-  const { data: directories } = useGetDirectoriesQuery();
-  const [create, createState] = useCreateAudienceMutation();
-  const [remove] = useDeleteAudienceMutation();
-  const [name, setName] = useState("");
   const [openId, setOpenId] = useState(null);
   const fail = (e, fallback) => dispatch(showFlash({ message: errorMessage(e, fallback), type: "error" }));
+  const open = audiences.find((a) => a.id === openId) || audiences[0];
 
+  if (isLoading) return <p className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={14} className="animate-spin" /> Loading…</p>;
+  if (audiences.length === 0) return <FirstContacts onCreated={setOpenId} onFail={fail} />;
+
+  return (
+    <div className="grid items-start gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <Lists audiences={audiences} openId={open?.id} onOpen={setOpenId} onFail={fail} />
+      {open && <ListDetail key={open.id} audience={open} onFail={fail} onSendTo={onSendTo} onDeleted={() => setOpenId(null)} />}
+    </div>
+  );
+}
+
+/** No lists yet: the three ways to start, the CSV one open. */
+function FirstContacts({ onCreated, onFail }) {
+  const dispatch = useDispatch();
+  const [way, setWay] = useState("csv");
+  const { data: directories } = useGetDirectoriesQuery();
+  const [create, createState] = useCreateAudienceMutation();
+  const startManual = async () => {
+    try { onCreated((await create("My contacts").unwrap()).id); } catch (e) { onFail(e, "Couldn't create the list"); }
+  };
+  return (
+    <section className="creator-panel p-5">
+      <h2 className="text-lg font-bold text-white">Add the brands you want to reach</h2>
+      <p className="mt-1 text-sm text-slate-400">Bring your own list, or find brand contacts here. You can add more anytime.</p>
+      <WayPicker way={way} onPick={(w) => (w === "manual" ? startManual() : setWay(w))} directories={directories} busy={createState.isLoading} />
+      <div className="mt-5">
+        {way === "csv" && <CsvImport audienceId={null} onImported={(id, r) => {
+          dispatch(showFlash({ message: `${r.rowsImported} contacts imported${r.leadsWithoutEmail ? `, ${r.leadsWithoutEmail} without email` : ""}`, type: "success" }));
+          onCreated(id);
+        }} />}
+        {way === "people" && <PeopleFinder />}
+        {way === "brands" && <BrandFinder />}
+      </div>
+    </section>
+  );
+}
+
+function WayPicker({ way, onPick, directories, busy }) {
+  const ways = ADD_WAYS.filter(([id]) => (id === "people" ? directories?.people : id === "brands" ? directories?.companies : true));
+  return (
+    <div role="tablist" aria-label="Ways to add contacts" className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {ways.map(([id, text, Icon]) => (
+        <button key={id} type="button" role="tab" aria-selected={way === id} onClick={() => onPick(id)} disabled={busy}
+                className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-bold ${way === id ? "border-purple-400 bg-purple-500/15 text-white" : "border-white/10 text-slate-300 hover:border-white/25"}`}>
+          <Icon size={15} /> {text}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Lists({ audiences, openId, onOpen, onFail }) {
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const [create, createState] = useCreateAudienceMutation();
   const add = async (event) => {
     event.preventDefault();
     try {
       const created = await create(name.trim()).unwrap();
       setName("");
-      setOpenId(created.id);
-    } catch (e) { fail(e, "Couldn't create the audience"); }
+      setCreating(false);
+      onOpen(created.id);
+    } catch (e) { onFail(e, "Couldn't create the list"); }
   };
-  const del = async (a) => {
-    if (!window.confirm(`Delete the audience "${a.name}"? The leads stay in your other audiences.`)) return;
-    try { await remove(a.id).unwrap(); if (openId === a.id) setOpenId(null); } catch (e) { fail(e, "Couldn't delete"); }
-  };
-
   return (
-    <div className="space-y-6">
-      <section className="creator-panel p-5">
-        <h2 className="text-sm font-bold uppercase tracking-normal text-slate-300">Audiences</h2>
-        <p className="mt-1 text-xs text-slate-400">
-          Upload the brand contacts you want to reach as a CSV file (up to 5,000 rows), or find brands below.
-        </p>
-        <CsvFormat />
-        <form onSubmit={add} className="mt-4 flex flex-wrap gap-2">
-          <label htmlFor="new-audience" className="sr-only">New audience name</label>
-          <input id="new-audience" required maxLength={80} value={name} onChange={(e) => setName(e.target.value)}
-                 placeholder="e.g. Food brands, Mumbai"
-                 className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-white outline-none focus:border-purple-400/60" />
-          <button type="submit" disabled={createState.isLoading} className="creator-control flex items-center gap-1 px-3 py-2 text-xs font-bold text-slate-200 disabled:opacity-50">
-            <Plus size={13} /> Create audience
-          </button>
+    <aside className="creator-panel p-3">
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-xs font-bold uppercase tracking-normal text-slate-400">Your lists</h2>
+        <button type="button" onClick={() => setCreating(!creating)} className="flex items-center gap-1 text-xs font-bold text-purple-200 hover:text-white">
+          <Plus size={13} /> New list
+        </button>
+      </div>
+      {creating && (
+        <form onSubmit={add} className="mt-2 flex gap-1.5">
+          <label htmlFor="new-list" className="sr-only">New list name</label>
+          <input id="new-list" autoFocus required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Food brands, Mumbai"
+                 className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-sm text-white" />
+          <button type="submit" disabled={createState.isLoading} className="creator-primary px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-50">Create</button>
         </form>
-        {isLoading ? <p className="mt-3 text-sm text-slate-400">Loading…</p> : (
-          <ul className="mt-4 divide-y divide-white/10 rounded-lg border border-white/10">
-            {audiences.length === 0 && <li className="p-3 text-xs text-slate-400">No audiences yet.</li>}
-            {audiences.map((a) => (
-              <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
-                <button type="button" onClick={() => setOpenId(openId === a.id ? null : a.id)} className="text-left">
-                  <span className="block font-bold text-white">{a.name}</span>
-                  <span className="block text-xs text-slate-400">
-                    {a.leads} leads · {a.reachable} reachable
-                    {a.leads > a.reachable && <span className="text-amber-200"> · {a.leads - a.reachable} can't be emailed</span>}
-                  </span>
-                </button>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => setOpenId(openId === a.id ? null : a.id)}
-                          className="creator-control px-3 py-1.5 text-xs font-bold text-slate-200">{openId === a.id ? "Close" : "Open"}</button>
-                  <button type="button" onClick={() => del(a)} aria-label={`Delete ${a.name}`} className="creator-control px-2 py-1.5 text-rose-300">
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      {directories?.people && <PeopleFinder />}
-      {directories?.companies && <BrandFinder />}
-      {directories && !directories.people && !directories.companies && (
-        <p className="creator-panel p-5 text-xs text-slate-400">Brand search isn't switched on yet. Upload a CSV meanwhile.</p>
       )}
-      {openId && <AudienceDetail audience={audiences.find((a) => a.id === openId)} onFail={fail} onSendTo={onSendTo} />}
-    </div>
+      <ul className="mt-2 space-y-1">
+        {audiences.map((a) => {
+          const missing = a.leads - a.reachable;
+          return (
+            <li key={a.id}>
+              <button type="button" onClick={() => onOpen(a.id)} aria-current={a.id === openId}
+                      className={`w-full rounded-lg px-3 py-2 text-left ${a.id === openId ? "bg-purple-500/15 ring-1 ring-purple-400/50" : "hover:bg-white/5"}`}>
+                <span className="block truncate text-sm font-bold text-white">{a.name}</span>
+                <span className="block text-[11px] text-slate-400">
+                  {a.leads} contacts{missing > 0 && <span className="text-amber-200"> · {missing} need email</span>}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </aside>
   );
 }
 
-function AudienceDetail({ audience, onFail, onSendTo }) {
+function ListDetail({ audience, onFail, onSendTo, onDeleted }) {
   const dispatch = useDispatch();
-  const fileRef = useRef(null);
-  const [adding, setAdding] = useState(false);
+  const { data: directories } = useGetDirectoriesQuery();
+  const [adding, setAdding] = useState(audience.leads === 0 ? "csv" : null);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(0);
-  const [report, setReport] = useState(null);
-  const { data, isFetching } = useGetAudienceLeadsQuery({ audienceId: audience?.id, q, page }, { skip: !audience });
-  const [upload, uploadState] = useUploadAudienceCsvMutation();
+  const [found, setFound] = useState(null);
+  const { data, isFetching } = useGetAudienceLeadsQuery({ audienceId: audience.id, q, page });
+  const [findEmails, findState] = useFindAudienceEmailsMutation();
+  const [remove] = useDeleteAudienceMutation();
   const [removeLead] = useRemoveLeadFromAudienceMutation();
   const [discard] = useDiscardContactPointMutation();
-  if (!audience) return null;
-
-  const onFile = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    try {
-      setReport(await upload({ audienceId: audience.id, file }).unwrap());
-      dispatch(showFlash({ message: "Upload finished", type: "success" }));
-    } catch (e) { onFail(e, "Couldn't read that file"); }
-  };
+  const missing = audience.leads - audience.reachable;
   const pages = data ? Math.max(1, Math.ceil(data.total / data.size)) : 1;
+  useEffect(() => { if (audience.leads === 0) setAdding((a) => a || "csv"); }, [audience.leads]);
+
+  const runFind = async () => {
+    try { setFound(await findEmails(audience.id).unwrap()); } catch (e) { onFail(e, "Couldn't look up emails"); }
+  };
+  const del = async () => {
+    if (!window.confirm(`Delete the list "${audience.name}"? Its contacts stay in your other lists.`)) return;
+    try { await remove(audience.id).unwrap(); onDeleted(); } catch (e) { onFail(e, "Couldn't delete"); }
+  };
 
   return (
     <section className="creator-panel p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-bold uppercase tracking-normal text-slate-300">{audience.name}</h2>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="truncate text-lg font-bold text-white">{audience.name}</h2>
+          <p className="text-xs text-slate-400">
+            {audience.leads} contacts · <span className="text-emerald-200">{audience.reachable} can be emailed</span>
+            {missing > 0 && <span className="text-amber-200"> · {missing} missing email</span>}
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
           {onSendTo && (
             <button type="button" onClick={() => onSendTo(audience.id)} disabled={audience.reachable === 0}
-                    title={audience.reachable === 0 ? "Add a lead with an email first" : undefined}
+                    title={audience.reachable === 0 ? "Add a contact with an email first" : undefined}
                     className="creator-primary flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
-              <Send size={13} /> Send mail to this audience
+              <Send size={13} /> Send mail to this list
             </button>
           )}
-          <button type="button" onClick={() => setAdding(!adding)}
-                  className="creator-control flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-200">
-            <Plus size={13} /> Add a lead
-          </button>
-          <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onFile} className="hidden" />
-          <button type="button" onClick={() => fileRef.current?.click()} disabled={uploadState.isLoading}
-                  className="creator-primary flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
-            {uploadState.isLoading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Upload CSV
+          <button type="button" onClick={del} aria-label={`Delete ${audience.name}`} title="Delete list" className="creator-control px-2.5 py-2 text-rose-300">
+            <Trash2 size={13} />
           </button>
         </div>
       </div>
-      {adding && <AddLeadForm audienceId={audience.id} onDone={() => setAdding(false)} onFail={onFail} />}
-      {report && (
-        <p className="mt-3 rounded-lg border border-white/10 bg-white/[0.04] p-3 text-xs text-slate-300">
-          {report.rowsImported} of {report.rowsTotal} rows imported · {report.leadsCreated} new leads · {report.leadsMerged} rows joined
-          an existing lead · {report.contactPointsAdded} new emails/phones · {report.rowsRejected} rows skipped (no email, phone, name or
-          company) · audience now has {report.audienceSize} leads
-          {report.leadsWithoutEmail > 0 && (
-            <span className="mt-2 block text-amber-200">
-              {report.leadsWithoutEmail} lead{report.leadsWithoutEmail === 1 ? " has" : "s have"} no email: they're kept and marked
-              "Email not available". Add an email on each to send to them.
-            </span>
-          )}
-        </p>
+
+      <div className="mt-5 rounded-xl border border-white/10 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-bold uppercase tracking-normal text-slate-400">Add contacts</p>
+          {adding && <button type="button" onClick={() => setAdding(null)} aria-label="Close" className="text-slate-500 hover:text-white"><X size={15} /></button>}
+        </div>
+        <WayPicker way={adding} onPick={(w) => setAdding(adding === w ? null : w)} directories={directories} />
+        {adding && (
+          <div className="mt-4">
+            {adding === "csv" && <CsvImport audienceId={audience.id} onFindEmails={runFind} />}
+            {adding === "people" && <PeopleFinder audienceId={audience.id} />}
+            {adding === "brands" && <BrandFinder audienceId={audience.id} />}
+            {adding === "manual" && <AddLeadForm audienceId={audience.id} onDone={() => setAdding(null)} onFail={onFail} />}
+          </div>
+        )}
+      </div>
+
+      {(missing > 0 || found) && (
+        <div className="mt-4 rounded-xl border border-amber-400/25 bg-amber-500/[0.06] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-amber-50">
+              {missing > 0 ? <><span className="font-bold">{missing} {missing === 1 ? "contact has" : "contacts have"} no email.</span> We can look for one at each contact's website, or you can add it below.</>
+                : "Every contact in this list has an email."}
+            </p>
+            {missing > 0 && (
+              <button type="button" onClick={runFind} disabled={findState.isLoading}
+                      className="creator-primary flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                {findState.isLoading ? <Loader2 size={13} className="animate-spin" /> : <MailSearch size={13} />} Find missing emails
+              </button>
+            )}
+          </div>
+          {found && <p className="mt-2 text-xs text-slate-200" role="status">{findSummary(found)}</p>}
+        </div>
       )}
-      <label htmlFor="lead-search" className="sr-only">Search leads</label>
+
+      <label htmlFor="lead-search" className="sr-only">Search contacts</label>
       <input id="lead-search" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} placeholder="Search name, company or email"
-             className="mt-4 w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-white outline-none focus:border-purple-400/60" />
+             className="mt-5 w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-white outline-none focus:border-purple-400/60" />
       {isFetching && !data && <p className="mt-3 text-sm text-slate-400">Loading…</p>}
       {data && (
         <>
           <ul className="mt-3 divide-y divide-white/10">
-            {data.leads.length === 0 && <li className="py-3 text-xs text-slate-400">No leads here yet. Upload a CSV.</li>}
+            {data.leads.length === 0 && <li className="py-3 text-xs text-slate-400">{q ? "No contacts match." : "No contacts yet. Add some above."}</li>}
             {data.leads.map((l) => (
               <li key={l.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
                 <div className="min-w-0 flex-1">
@@ -177,17 +240,18 @@ function AudienceDetail({ audience, onFail, onSendTo }) {
                     {l.industry && <span className="font-normal text-slate-500"> · {INDUSTRY_LABEL[l.industry]}</span>}
                     {l.size && <span className="ml-2 align-middle"><SizeBadge size={l.size} /></span>}
                   </p>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {l.website && <p className="truncate text-[11px] text-slate-500">{l.website}</p>}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     {[...l.emails, ...l.phones].map((c) => (
                       <ContactChip key={c.id} c={c} onDiscard={() => discard({ leadId: l.id, contactPointId: c.id }).unwrap().catch((e) => onFail(e, "Couldn't remove"))} />
                     ))}
                     {l.emails.length === 0 && <NoEmailFlag />}
-                    {l.emails.length === 0 && <AddContact leadId={l.id} onFail={onFail} />}
-                    {l.discarded > 0 && <span className="text-[11px] text-slate-500">{l.discarded} discarded</span>}
+                    {l.emails.length === 0 && <AddContact leadId={l.id} onFail={onFail} onAdded={() => dispatch(showFlash({ message: "Email added", type: "success" }))} />}
+                    {l.discarded > 0 && <span className="text-[11px] text-slate-500">{l.discarded} invalid removed</span>}
                   </div>
                 </div>
                 <button type="button" onClick={() => removeLead({ audienceId: audience.id, leadId: l.id }).unwrap().catch((e) => onFail(e, "Couldn't remove"))}
-                        className="text-xs font-bold text-slate-400 hover:text-rose-300">Remove from audience</button>
+                        className="text-xs font-bold text-slate-500 hover:text-rose-300">Remove</button>
               </li>
             ))}
           </ul>
@@ -204,13 +268,26 @@ function AudienceDetail({ audience, onFail, onSendTo }) {
   );
 }
 
+/** What "Find missing emails" did, in one sentence per outcome. */
+export function findSummary(r) {
+  if (r.checked === 0) return "Every contact already has an email.";
+  const parts = [];
+  parts.push(r.found > 0 ? `Found emails for ${r.found} ${r.found === 1 ? "contact" : "contacts"}.` : "No new emails found.");
+  if (r.noWebsite > 0) parts.push(`${r.noWebsite} ${r.noWebsite === 1 ? "has" : "have"} no website to search by: add the email by hand, or re-upload with a website column.`);
+  if (r.notFound > 0) parts.push(`${r.notFound}: nobody found at their website.`);
+  if (r.outOfCredits > 0) parts.push(`${r.outOfCredits} weren't searched: this month's free lookups are used up.`);
+  if (!r.configured && r.found === 0 && r.noWebsite < r.checked) parts.push("Automatic email search isn't switched on yet, so only emails we already know are added.");
+  if (r.checked >= 25) parts.push("Run it again for the next 25.");
+  return parts.join(" ");
+}
+
 function ContactChip({ c, onDiscard }) {
-  const [text, tone] = c.unsubscribed ? ["Unsubscribed", "bg-rose-500/15 text-rose-300"] : CONTACT_STATUS[c.status];
+  const [text, tone] = c.unsubscribed ? ["Unsubscribed", "bg-rose-500/15 text-rose-300"] : CONTACT_STATUS[c.status] || ["", ""];
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 py-0.5 pl-2.5 pr-1 text-xs text-slate-200">
       {c.value}
-      <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${tone}`}>{text}</span>
-      <button type="button" onClick={onDiscard} aria-label={`Remove ${c.value}`} title="Wrong for this lead"
+      {text && <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${tone}`}>{text}</span>}
+      <button type="button" onClick={onDiscard} aria-label={`Remove ${c.value}`} title="Wrong for this contact"
               className="rounded-full p-0.5 text-slate-500 hover:bg-white/10 hover:text-rose-300">
         <X size={11} />
       </button>
@@ -218,54 +295,9 @@ function ContactChip({ c, onDiscard }) {
   );
 }
 
-const SAMPLE_CSV = [
-  "name,designation,company,email,email2,phone,industry,website,size",
-  "Asha Rao,Marketing Head,Hearth Foods,asha@hearthfoods.in,marketing@hearthfoods.in,+91 98765 43210,FOOD_BEVERAGE,https://hearthfoods.in,Small",
-  "Vikram Shah,Brand Manager,Bolt Motors,vikram@boltmotors.in,,+91 91234 56789,AUTOMOTIVE,https://boltmotors.in,Medium",
-].join("\r\n");
-
-/** The CSV columns, with a sample to download. Rows for the same person (any shared email or
- * phone) become one lead. */
-function CsvFormat() {
-  const download = () => {
-    const url = URL.createObjectURL(new Blob([SAMPLE_CSV + "\r\n"], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "dalai-llama-audience-sample.csv";
-    a.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
-  const cols = [
-    ["name", "Contact's full name (or first name + last name columns)"],
-    ["designation", "Their role, e.g. Marketing Head (also: title, position, role)"],
-    ["company", "Brand or company name"],
-    ["email", "Work email. More in email2, email3… or several separated by ;"],
-    ["phone", "With country code, e.g. +91 98765 43210"],
-    ["industry", "Optional: FASHION, BEAUTY, FOOD_BEVERAGE, TECH, FINANCE, …"],
-    ["website", "Optional, starting with https://"],
-    ["size", "Optional: Small, Medium, Large or Enterprise (or a headcount like 11-50)"],
-  ];
-  return (
-    <details className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs text-slate-300">
-      <summary className="cursor-pointer font-bold text-slate-200">CSV format</summary>
-      <p className="mt-2 text-slate-400">First row must be the column names. A row without an email is still kept (marked "Email not available") if it has a name or company; add the email later.</p>
-      <table className="mt-2 w-full text-left">
-        <tbody>
-          {cols.map(([c, d]) => (
-            <tr key={c} className="border-t border-white/5"><td className="py-1 pr-3 font-mono text-purple-200">{c}</td><td className="py-1 text-slate-400">{d}</td></tr>
-          ))}
-        </tbody>
-      </table>
-      <button type="button" onClick={download} className="creator-control mt-3 px-3 py-1.5 text-xs font-bold text-slate-200">Download sample CSV</button>
-    </details>
-  );
-}
-
-/** No email yet (Apollo's free lookups ran out, or none was found): the creator adds one they found. */
 const EMPTY_LEAD = { name: "", designation: "", company: "", email: "", phone: "", industry: "", website: "", size: "" };
 
-/** One lead typed in: the CSV's columns as fields. Only a company, name or email is needed; with no
- * email the lead is kept and marked "Email not available". */
+/** One contact typed in: the CSV's columns as fields. A company, name or email is enough. */
 function AddLeadForm({ audienceId, onDone, onFail }) {
   const dispatch = useDispatch();
   const [lead, setLead] = useState(EMPTY_LEAD);
@@ -278,18 +310,18 @@ function AddLeadForm({ audienceId, onDone, onFail }) {
     event.preventDefault();
     try {
       const result = await add({ audienceId, ...lead, industry: lead.industry || null, size: lead.size || null }).unwrap();
-      dispatch(showFlash({ message: result.merged ? "Added to a lead you already had" : "Lead added", type: "success" }));
+      dispatch(showFlash({ message: result.merged ? "Added to a contact you already had" : "Contact added", type: "success" }));
       setLead(EMPTY_LEAD);
-    } catch (e) { onFail(e, "Couldn't add that lead"); }
+    } catch (e) { onFail(e, "Couldn't add that contact"); }
   };
   return (
-    <form onSubmit={save} className="mt-4 grid gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-4 sm:grid-cols-2">
+    <form onSubmit={save} className="grid gap-3 sm:grid-cols-2">
       <label className="text-[11px] font-bold text-slate-400">Company<input value={lead.company} onChange={set("company")} maxLength={160} className={input} placeholder="Hearth Foods" /></label>
-      <label className="text-[11px] font-bold text-slate-400">Email<input value={lead.email} onChange={set("email")} maxLength={254} className={input} placeholder="asha@hearthfoods.in (leave empty if you don't have it)" /></label>
+      <label className="text-[11px] font-bold text-slate-400">Email<input value={lead.email} onChange={set("email")} maxLength={254} className={input} placeholder="asha@hearthfoods.in (optional)" /></label>
       <label className="text-[11px] font-bold text-slate-400">Name<input value={lead.name} onChange={set("name")} maxLength={120} className={input} placeholder="Asha Rao" /></label>
+      <label className="text-[11px] font-bold text-slate-400">Website<input value={lead.website} onChange={set("website")} maxLength={255} className={input} placeholder="hearthfoods.in (helps find the email)" /></label>
       <label className="text-[11px] font-bold text-slate-400">Designation<input value={lead.designation} onChange={set("designation")} maxLength={120} className={input} placeholder="Founder" /></label>
       <label className="text-[11px] font-bold text-slate-400">Phone<input value={lead.phone} onChange={set("phone")} maxLength={40} className={input} placeholder="+91 98765 43210" /></label>
-      <label className="text-[11px] font-bold text-slate-400">Website<input value={lead.website} onChange={set("website")} maxLength={255} className={input} placeholder="hearthfoods.in" /></label>
       <label className="text-[11px] font-bold text-slate-400">Industry
         <select value={lead.industry} onChange={set("industry")} className={input}>
           <option value="">—</option>
@@ -302,28 +334,28 @@ function AddLeadForm({ audienceId, onDone, onFail }) {
           {COMPANY_SIZES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
         </select>
       </label>
-      <div className="flex items-center gap-3 sm:col-span-2">
+      <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
         <button type="submit" disabled={!ready || state.isLoading} className="creator-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
-          {state.isLoading ? "Adding…" : "Add lead"}
+          {state.isLoading ? "Adding…" : "Add contact"}
         </button>
         <button type="button" onClick={onDone} className="text-xs font-bold text-slate-400 hover:text-white">Done</button>
-        <span className="text-[11px] text-slate-500">Company, name or email is enough. No email? It's kept and marked so you can add it later.</span>
+        <span className="text-[11px] text-slate-500">A company, name or email is enough.</span>
       </div>
     </form>
   );
 }
 
-function AddContact({ leadId, onFail }) {
+function AddContact({ leadId, onFail, onAdded }) {
   const [value, setValue] = useState("");
   const [add, state] = useAddLeadContactPointMutation();
   const save = async (event) => {
     event.preventDefault();
-    try { await add({ leadId, value: value.trim() }).unwrap(); setValue(""); } catch (e) { onFail(e, "Couldn't add that"); }
+    try { await add({ leadId, value: value.trim() }).unwrap(); setValue(""); onAdded?.(); } catch (e) { onFail(e, "Couldn't add that"); }
   };
   return (
     <form onSubmit={save} className="flex items-center gap-1.5">
-      <input value={value} onChange={(e) => setValue(e.target.value)} maxLength={254} placeholder="Add email or phone"
-             aria-label="Add email or phone" className="w-48 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-xs text-white" />
+      <input value={value} onChange={(e) => setValue(e.target.value)} maxLength={254} placeholder="Add email"
+             aria-label="Add email or phone" className="w-44 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-xs text-white" />
       <button type="submit" disabled={!value.trim() || state.isLoading} className="creator-control px-2 py-1 text-xs font-bold text-slate-200 disabled:opacity-40">Add</button>
     </form>
   );

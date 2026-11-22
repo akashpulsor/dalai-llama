@@ -18,7 +18,7 @@ const NEW_AUDIENCE = "__new__";
 
 /** Rule 42: find brands in a shared directory (filled from Hunter.io and reused by every creator),
  * then add them to one of your audiences. Their emails are looked up once and kept. */
-export default function BrandFinder() {
+export default function BrandFinder({ audienceId: listId, onAdded }) {
   const dispatch = useDispatch();
   const { data: audiences = [] } = useGetAudiencesQuery();
   const [search, { data, isFetching, error }] = useLazySearchBrandsQuery();
@@ -29,8 +29,9 @@ export default function BrandFinder() {
   const [selected, setSelected] = useState([]);
   const [audienceId, setAudienceId] = useState("");
   const [report, setReport] = useState(null);
-  const creatingNew = audienceId === NEW_AUDIENCE || audiences.length === 0;
-  const target = audiences.find((a) => a.id === audienceId) || audiences[0];
+  // Opened from a list: adds go straight into it, no picker.
+  const creatingNew = !listId && (audienceId === NEW_AUDIENCE || audiences.length === 0);
+  const target = listId ? { id: listId } : audiences.find((a) => a.id === audienceId) || audiences[0];
 
   const run = (event) => {
     event.preventDefault();
@@ -43,7 +44,7 @@ export default function BrandFinder() {
     try {
       let id = target?.id;
       if (creatingNew) {
-        if (!newName.trim()) { dispatch(showFlash({ message: "Name the new audience", type: "error" })); return; }
+        if (!newName.trim()) { dispatch(showFlash({ message: "Name the new list", type: "error" })); return; }
         id = (await createAudience(newName.trim()).unwrap()).id;
         setAudienceId(id);
         setNewName("");
@@ -51,12 +52,13 @@ export default function BrandFinder() {
       setReport(await add({ audienceId: id, companyIds: selected }).unwrap());
       setSelected([]);
       dispatch(showFlash({ message: "Added to your audience", type: "success" }));
+      onAdded?.();
     } catch (e) { dispatch(showFlash({ message: errorMessage(e, "Couldn't add those brands"), type: "error" })); }
   };
   const credits = data?.credits || report?.credits;
 
   return (
-    <section className="creator-panel p-5">
+    <section className={listId ? "" : "creator-panel p-5"}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-bold uppercase tracking-normal text-slate-300">Find brands</h2>
@@ -121,19 +123,19 @@ export default function BrandFinder() {
           {data.companies.length > 0 && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <>
-                  {audiences.length > 0 && (
+                  {!listId && audiences.length > 0 && (
                     <select value={creatingNew ? NEW_AUDIENCE : target?.id || ""} onChange={(e) => setAudienceId(e.target.value)} className={control} aria-label="Audience">
                       {audiences.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                      <option value={NEW_AUDIENCE}>+ New audience…</option>
+                      <option value={NEW_AUDIENCE}>+ New list…</option>
                     </select>
                   )}
                   {creatingNew && (
-                    <input value={newName} maxLength={80} onChange={(e) => setNewName(e.target.value)} placeholder="New audience name"
-                           aria-label="New audience name" className={control} />
+                    <input value={newName} maxLength={80} onChange={(e) => setNewName(e.target.value)} placeholder="New list name"
+                           aria-label="New list name" className={control} />
                   )}
                   <button type="button" onClick={addSelected} disabled={selected.length === 0 || addState.isLoading || createState.isLoading}
                           className="creator-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
-                    {addState.isLoading ? "Adding…" : `Add ${selected.length || ""} to audience`}
+                    {addState.isLoading ? "Adding…" : `Add ${selected.length || ""} to ${listId ? "this list" : "a list"}`}
                   </button>
                   <span className="text-[11px] text-slate-500">Up to 25 at a time</span>
               </>
@@ -144,7 +146,7 @@ export default function BrandFinder() {
       {report && (
         <p className="mt-3 rounded-lg border border-white/10 bg-white/[0.04] p-3 text-xs text-slate-300">
           {report.companiesAdded} brands added · {report.contactsAdded} new contacts
-          {report.companiesWithoutContacts > 0 ? ` · ${report.companiesWithoutContacts} need a contact email: open the audience and add it on each lead` : ""}
+          {report.companiesWithoutContacts > 0 ? ` · ${report.companiesWithoutContacts} need a contact email: use Find missing emails on the list, or add it on each contact` : ""}
         </p>
       )}
     </section>
