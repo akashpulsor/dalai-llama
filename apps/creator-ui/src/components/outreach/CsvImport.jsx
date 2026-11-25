@@ -145,15 +145,16 @@ export default function CsvImport({ audienceId, onImported, onFindEmails }) {
         </div>
       )}
 
-      <CsvFormat open={Boolean(check && !check.ok)} />
+      {!check?.ok && <CsvFormat />}
     </div>
   );
 }
 
 const Dash = () => <span className="text-slate-600">—</span>;
 
-/** The expected format, with a sample to download. Always visible beside the upload. */
-export function CsvFormat({ open = false }) {
+/** The expected format, shown open beside the upload: the sample as a small sheet (what the file
+ * should look like), what each column means, and the sample to download and fill in. */
+export function CsvFormat() {
   const download = () => {
     const url = URL.createObjectURL(new Blob([SAMPLE_CSV + "\r\n"], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
@@ -162,24 +163,39 @@ export function CsvFormat({ open = false }) {
     a.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
+  const [header, ...rows] = SAMPLE_CSV.split("\r\n").map((line) => line.split(","));
   return (
-    <details open={open} className="rounded-xl border border-white/10 bg-white/[0.02] p-3 text-xs text-slate-300">
-      <summary className="cursor-pointer font-bold text-slate-200">CSV format</summary>
-      <p className="mt-2 text-slate-400">
-        The first row names the columns. Only one of email, phone, name, company or website is needed per contact; other columns are optional and
-        any column we don't know is ignored.
-      </p>
-      <pre className="mt-2 overflow-x-auto rounded-lg bg-black/40 p-2 font-mono text-[11px] text-purple-100">{SAMPLE_CSV.split("\r\n").slice(0, 2).join("\n")}</pre>
-      <table className="mt-2 w-full text-left">
-        <tbody>
-          {CSV_COLUMNS.map(([c, d]) => (
-            <tr key={c} className="border-t border-white/5"><td className="py-1 pr-3 font-mono text-purple-200">{c}</td><td className="py-1 text-slate-400">{d}</td></tr>
-          ))}
-        </tbody>
-      </table>
-      <button type="button" onClick={download} className="creator-control mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-200">
-        <Download size={12} /> Download sample CSV
-      </button>
-    </details>
+    <section aria-labelledby="csv-format-h" className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-xs text-slate-300">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h3 id="csv-format-h" className="text-sm font-bold text-white">Your file should look like this</h3>
+          <p className="mt-0.5 text-slate-400">
+            First row = column names. Each contact needs at least one of <b className="text-slate-200">email, phone, name, company or website</b>.
+            Other columns are optional; columns we don't know are ignored.
+          </p>
+        </div>
+        <button type="button" onClick={download} className="creator-control inline-flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-200">
+          <Download size={12} /> Download sample CSV
+        </button>
+      </div>
+      <div className="mt-3 overflow-x-auto rounded-lg border border-white/10">
+        <table className="w-full min-w-[640px] text-left font-mono text-[11px]" aria-label="Sample CSV">
+          <thead className="bg-purple-500/10 text-purple-100">
+            <tr>{header.map((h) => <th key={h} className="px-2.5 py-1.5 font-bold">{h}</th>)}</tr>
+          </thead>
+          <tbody className="divide-y divide-white/5 text-slate-300">
+            {rows.map((row, i) => (
+              <tr key={i}>{header.map((h, j) => <td key={h} className="whitespace-nowrap px-2.5 py-1.5">{row[j] || <span className="text-slate-600">(empty)</span>}</td>)}</tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <dl className="mt-3 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+        {CSV_COLUMNS.map(([c, d]) => (
+          <div key={c} className="flex gap-2"><dt className="w-20 shrink-0 font-mono text-purple-200">{c}</dt><dd className="text-slate-400">{d}</dd></div>
+        ))}
+      </dl>
+      <p className="mt-3 text-slate-500">Made in Excel or Google Sheets? Save or download it as <b className="text-slate-300">CSV (comma separated)</b>, not .xlsx.</p>
+    </section>
   );
 }

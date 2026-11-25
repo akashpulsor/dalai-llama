@@ -16,8 +16,7 @@ import {
   useRemoveLeadFromAudienceMutation,
 } from "../../api/showcaseEndpoints.js";
 import { errorMessage, INDUSTRIES, INDUSTRY_LABEL } from "../showcase/showcaseLabels.js";
-import { CONTACT_STATUS } from "./outreachLabels.js";
-import { COMPANY_SIZES, NoEmailFlag, SizeBadge } from "./CompanySize.jsx";
+import { COMPANY_SIZES } from "./CompanySize.jsx";
 import BrandFinder from "./BrandFinder.jsx";
 import CsvImport from "./CsvImport.jsx";
 import PeopleFinder from "./PeopleFinder.jsx";
@@ -228,33 +227,23 @@ function ListDetail({ audience, onFail, onSendTo, onDeleted }) {
       {isFetching && !data && <p className="mt-3 text-sm text-slate-400">Loading…</p>}
       {data && (
         <>
-          <ul className="mt-3 divide-y divide-white/10">
-            {data.leads.length === 0 && <li className="py-3 text-xs text-slate-400">{q ? "No contacts match." : "No contacts yet. Add some above."}</li>}
-            {data.leads.map((l) => (
-              <li key={l.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-white">
-                    {l.name || l.company || "Unnamed"}
-                    {l.name && l.designation && <span className="font-normal text-slate-400"> · {l.designation}</span>}
-                    {l.name && l.company && <span className="font-normal text-slate-400"> · {l.company}</span>}
-                    {l.industry && <span className="font-normal text-slate-500"> · {INDUSTRY_LABEL[l.industry]}</span>}
-                    {l.size && <span className="ml-2 align-middle"><SizeBadge size={l.size} /></span>}
-                  </p>
-                  {l.website && <p className="truncate text-[11px] text-slate-500">{l.website}</p>}
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    {[...l.emails, ...l.phones].map((c) => (
-                      <ContactChip key={c.id} c={c} onDiscard={() => discard({ leadId: l.id, contactPointId: c.id }).unwrap().catch((e) => onFail(e, "Couldn't remove"))} />
-                    ))}
-                    {l.emails.length === 0 && <NoEmailFlag />}
-                    {l.emails.length === 0 && <AddContact leadId={l.id} onFail={onFail} onAdded={() => dispatch(showFlash({ message: "Email added", type: "success" }))} />}
-                    {l.discarded > 0 && <span className="text-[11px] text-slate-500">{l.discarded} invalid removed</span>}
-                  </div>
-                </div>
-                <button type="button" onClick={() => removeLead({ audienceId: audience.id, leadId: l.id }).unwrap().catch((e) => onFail(e, "Couldn't remove"))}
-                        className="text-xs font-bold text-slate-500 hover:text-rose-300">Remove</button>
-              </li>
-            ))}
-          </ul>
+          {data.leads.length === 0 ? (
+            <p className="mt-3 py-3 text-xs text-slate-400">{q ? "No contacts match." : "No contacts yet. Add some above."}</p>
+          ) : (
+            <div className="mt-3 overflow-hidden rounded-xl border border-white/10">
+              <div className="hidden grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)_auto] gap-4 bg-white/[0.04] px-4 py-2 text-[10px] font-bold uppercase tracking-normal text-slate-500 sm:grid">
+                <span>Brand / contact</span><span>Email we'll send to</span><span className="sr-only">Actions</span>
+              </div>
+              <ul className="divide-y divide-white/10">
+                {data.leads.map((l) => (
+                  <ContactRow key={l.id} lead={l} onFail={onFail}
+                              onDiscard={(c) => discard({ leadId: l.id, contactPointId: c.id }).unwrap().catch((e) => onFail(e, "Couldn't remove"))}
+                              onAdded={() => dispatch(showFlash({ message: "Email added", type: "success" }))}
+                              onRemove={() => removeLead({ audienceId: audience.id, leadId: l.id }).unwrap().catch((e) => onFail(e, "Couldn't remove"))} />
+                ))}
+              </ul>
+            </div>
+          )}
           {pages > 1 && (
             <div className="mt-3 flex items-center justify-end gap-2 text-xs text-slate-400">
               <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)} className="creator-control px-2 py-1 disabled:opacity-40">Previous</button>
@@ -281,17 +270,67 @@ export function findSummary(r) {
   return parts.join(" ");
 }
 
-function ContactChip({ c, onDiscard }) {
-  const [text, tone] = c.unsubscribed ? ["Unsubscribed", "bg-rose-500/15 text-rose-300"] : CONTACT_STATUS[c.status] || ["", ""];
+const EMAIL_STATUS = {
+  VERIFIED: ["Verified", "bg-emerald-400", "text-emerald-200", "Checked: this address receives mail."],
+  LIKELY_VALID: ["Likely valid", "bg-sky-400", "text-sky-200", "The address looks real, but it hasn't been fully checked."],
+  UNVERIFIED: ["Not checked yet", "bg-slate-400", "text-slate-300", "We'll check this address before and while sending."],
+};
+
+/** "https://www.bunka.in/" -> "bunka.in" */
+const domain = (url) => url.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
+
+/** One contact: who (brand, person, industry, size, site), the email we'd send to with its status in
+ * words, and a labelled way to remove them from this list. */
+function ContactRow({ lead: l, onDiscard, onAdded, onRemove, onFail }) {
+  const title = l.company || l.name || "Unnamed";
+  const person = l.company && l.name ? [l.name, l.designation].filter(Boolean).join(", ") : l.designation;
+  const facts = [l.industry && INDUSTRY_LABEL[l.industry], l.size && `${COMPANY_SIZES.find(([c]) => c === l.size)?.[1] || l.size} brand`].filter(Boolean);
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 py-0.5 pl-2.5 pr-1 text-xs text-slate-200">
-      {c.value}
-      {text && <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${tone}`}>{text}</span>}
-      <button type="button" onClick={onDiscard} aria-label={`Remove ${c.value}`} title="Wrong for this contact"
-              className="rounded-full p-0.5 text-slate-500 hover:bg-white/10 hover:text-rose-300">
-        <X size={11} />
-      </button>
-    </span>
+    <li className="grid gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)_auto] sm:gap-4">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-bold text-white">{title}</p>
+        {person && <p className="truncate text-xs text-slate-300">{person}</p>}
+        <p className="mt-0.5 flex flex-wrap gap-x-1.5 text-[11px] text-slate-500">
+          {[...facts.map((f) => <span key={f}>{f}</span>),
+            l.website && <a key="site" href={l.website} target="_blank" rel="noreferrer noopener" className="text-purple-200 hover:underline">{domain(l.website)}</a>,
+            ...l.phones.map((p) => <span key={p.id}>{p.value}</span>)]
+            .filter(Boolean)
+            .flatMap((item, i) => (i === 0 ? [item] : [<span key={`dot${i}`} aria-hidden="true">·</span>, item]))}
+        </p>
+      </div>
+      <div className="min-w-0">
+        {l.emails.length > 0 ? (
+          <ul className="space-y-1.5">
+            {l.emails.map((c) => {
+              const [text, dot, tone, help] = c.unsubscribed
+                ? ["Unsubscribed: won't be emailed", "bg-rose-400", "text-rose-200", "This person asked not to get mail."]
+                : EMAIL_STATUS[c.status] || EMAIL_STATUS.UNVERIFIED;
+              return (
+                <li key={c.id} className="min-w-0">
+                  <p className="truncate text-sm text-white">{c.value}</p>
+                  <p className="flex flex-wrap items-center gap-x-2 text-[11px]">
+                    <span className={`inline-flex items-center gap-1 ${tone}`} title={help}><span className={`h-1.5 w-1.5 rounded-full ${dot}`} />{text}</span>
+                    <button type="button" onClick={() => onDiscard(c)} className="text-slate-500 hover:text-rose-300">Wrong email? Remove it</button>
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div>
+            <p className="text-xs font-bold text-amber-200">No email yet: this contact won't get mail</p>
+            <div className="mt-1.5"><AddContact leadId={l.id} onFail={onFail} onAdded={onAdded} /></div>
+          </div>
+        )}
+        {l.discarded > 0 && <p className="mt-1 text-[11px] text-slate-500">{l.discarded} invalid {l.discarded === 1 ? "address" : "addresses"} ignored</p>}
+      </div>
+      <div className="sm:text-right">
+        <button type="button" onClick={onRemove} title="Takes them off this list only; they stay in your other lists"
+                className="inline-flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-rose-300">
+          <Trash2 size={12} /> Remove from list
+        </button>
+      </div>
+    </li>
   );
 }
 
@@ -354,9 +393,9 @@ function AddContact({ leadId, onFail, onAdded }) {
   };
   return (
     <form onSubmit={save} className="flex items-center gap-1.5">
-      <input value={value} onChange={(e) => setValue(e.target.value)} maxLength={254} placeholder="Add email"
-             aria-label="Add email or phone" className="w-44 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-xs text-white" />
-      <button type="submit" disabled={!value.trim() || state.isLoading} className="creator-control px-2 py-1 text-xs font-bold text-slate-200 disabled:opacity-40">Add</button>
+      <input value={value} onChange={(e) => setValue(e.target.value)} maxLength={254} placeholder="name@brand.com"
+             aria-label="Add email" className="w-44 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-xs text-white" />
+      <button type="submit" disabled={!value.trim() || state.isLoading} className="creator-control px-2 py-1 text-xs font-bold text-slate-200 disabled:opacity-40">Add email</button>
     </form>
   );
 }
