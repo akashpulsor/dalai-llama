@@ -16,7 +16,7 @@ import CreatorPublicPage from "./pages/CreatorPublicPage.jsx";
 import BrandSignInPage, { BrandCallbackPage } from "./pages/BrandSignInPage.jsx";
 import BrandHomePage from "./pages/BrandHomePage.jsx";
 import UnsubscribePage from "./pages/UnsubscribePage.jsx";
-import { PrivacyPage, TermsPage } from "./pages/LegalPage.jsx";
+import { PrivacyPage, RefundPage, TermsPage } from "./pages/LegalPage.jsx";
 
 /* ------------------------------------------------------------
  * OAuth Callback Handler
@@ -100,6 +100,7 @@ function AppRoutes() {
         <Route path="/unsubscribe/:token" element={<UnsubscribePage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
+        <Route path="/refunds" element={<RefundPage />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path={R.LOGIN} element={<AuthCallback />} />
         <Route path={R.PLATFORM} element={<div>Platform Home</div>} />

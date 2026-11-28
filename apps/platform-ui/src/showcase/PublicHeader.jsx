@@ -43,6 +43,7 @@ export function PublicFooter() {
         <a href="/creators">Creators</a>
         <a href="/privacy">Privacy</a>
         <a href="/terms">Terms</a>
+        <a href="/refunds">Refunds</a>
       </footer>
     </div>
   );

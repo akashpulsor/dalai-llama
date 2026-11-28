@@ -5,7 +5,20 @@ import PublicHeader, { PublicFooter } from "../showcase/PublicHeader.jsx";
 
 // Legal text for Google OAuth verification (YouTube API Services). Review before relying on it.
 const CONTACT = "admin@dalaillama.in";
-const UPDATED = "11 October 2026";
+const UPDATED = "28 November 2026";
+// The legal entity behind Dalai Llama, as registered with the Ministry of Corporate Affairs (Form 16).
+const OPERATOR = "Dazaalai Technologies LLP";
+const LLPIN = "ACP-0528";
+const ADDRESS = "128/D 41 A Block, Yashoda Nagar, Kanpur Nagar 208011, Uttar Pradesh, India";
+
+/** Who runs the service and how to reach them: on every legal page. */
+function Operator() {
+  return (
+    <p>
+      Dalai Llama (dalaillama.in) is operated by <b>{OPERATOR}</b> (LLPIN {LLPIN}), registered at {ADDRESS}. Email: {CONTACT}.
+    </p>
+  );
+}
 
 const ext = (href, label) => <a href={href} target="_blank" rel="noreferrer" className="font-semibold text-purple-300 underline">{label}</a>;
 
@@ -22,7 +35,9 @@ function Shell({ title, children }) {
           </div>
           <p className="mt-10 border-t border-slate-100 pt-4 text-xs text-slate-500">
             <Link to="/privacy" className="underline">Privacy Policy</Link> · <Link to="/terms" className="underline">Terms of Service</Link>
+            {" "}· <Link to="/refunds" className="underline">Refund &amp; Cancellation Policy</Link>
           </p>
+          <p className="mt-2 text-xs text-slate-500">{OPERATOR} · {ADDRESS}</p>
         </article>
       </main>
       <PublicFooter />
@@ -34,7 +49,7 @@ export function PrivacyPage() {
   return (
     <Shell title="Privacy Policy">
       <p>
-        Dalai Llama ("we", "us") runs dalaillama.in, a platform where creators make films for brands, show their work on public
+        Dalai Llama ("we", "us"), operated by {OPERATOR}, runs dalaillama.in, a platform where creators make films for brands, show their work on public
         profiles and reach brands by email. This policy explains what we collect, why, and the choices you have.
       </p>
       <section>
@@ -107,6 +122,7 @@ export function PrivacyPage() {
       <section>
         <h2>Contact</h2>
         <p>Questions about this policy: {CONTACT}.</p>
+        <Operator />
       </section>
     </Shell>
   );
@@ -115,7 +131,9 @@ export function PrivacyPage() {
 export function TermsPage() {
   return (
     <Shell title="Terms of Service">
-      <p>These terms apply to your use of dalaillama.in. By using the service you accept them.</p>
+      <p>
+        These terms apply to your use of dalaillama.in, operated by {OPERATOR}. By using the service you accept them.
+      </p>
       <section>
         <h2>Accounts</h2>
         <p>Keep your sign-in details safe. You are responsible for what happens under your account.</p>
@@ -144,6 +162,10 @@ export function TermsPage() {
       <section>
         <h2>Payments</h2>
         <p>Paid features are charged as shown when you buy them. Wallet credits are not refundable unless the law requires it.</p>
+        <p>
+          Brands pay for a video in two parts: a share upfront to start, and the rest when they approve the final video. Cancellations and
+          refunds follow our <Link to="/refunds" className="font-semibold text-purple-300 underline">Refund &amp; Cancellation Policy</Link>.
+        </p>
       </section>
       <section>
         <h2>Acceptable use</h2>
@@ -158,7 +180,64 @@ export function TermsPage() {
       </section>
       <section>
         <h2>Contact</h2>
-        <p>{CONTACT}</p>
+        <Operator />
+      </section>
+    </Shell>
+  );
+}
+
+/** Brand payments: a share upfront to start, the rest on approval of the final video. */
+export function RefundPage() {
+  return (
+    <Shell title="Refund & Cancellation Policy">
+      <p>
+        This policy covers videos brands order on dalaillama.in. You pay in two parts: a share of the price upfront to start, and the rest
+        only when you approve the final video. You also approve the storyboard before the video is made.
+      </p>
+      <section>
+        <h2>Cancelling before you approve the storyboard</h2>
+        <p>
+          You can cancel at any time before you approve the storyboard. We refund your upfront share in full.
+        </p>
+      </section>
+      <section>
+        <h2>Cancelling after you approve the storyboard</h2>
+        <p>
+          Once you approve the storyboard, the creator starts making your video, so the upfront share is not refundable. If you cancel at
+          this stage, you are not charged anything more.
+        </p>
+      </section>
+      <section>
+        <h2>If the creator can't deliver</h2>
+        <p>
+          If the creator can't deliver the video you approved in the storyboard, we refund everything you paid for that video. We may
+          first offer to have another creator make it; you can always choose the refund instead.
+        </p>
+      </section>
+      <section>
+        <h2>The final payment</h2>
+        <p>
+          The rest of the price is charged only when you approve the final video, so you never pay it for a video you haven't accepted.
+          Once you approve the final video, the order is complete and the payment is not refundable.
+        </p>
+      </section>
+      <section>
+        <h2>How refunds are paid</h2>
+        <p>
+          Refunds go back to the payment method you used, usually within 5 to 7 business days after we approve them. Your bank or card
+          provider may take a few more days to show it.
+        </p>
+      </section>
+      <section>
+        <h2>Creator wallet credits</h2>
+        <p>Credits creators add to their Dalai Llama wallet are not refundable unless the law requires it.</p>
+      </section>
+      <section>
+        <h2>How to ask for a refund</h2>
+        <p>
+          Email {CONTACT} with your order details. We reply within 2 business days.
+        </p>
+        <Operator />
       </section>
     </Shell>
   );
