@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import PublicHeader, { PublicFooter } from "../showcase/PublicHeader.jsx";
 
 // Legal text for Google OAuth verification (YouTube API Services). Review before relying on it.
-const CONTACT = "admin@dalaillama.in";
+const CONTACT = "outreach@dalaillama.in";
 const UPDATED = "28 November 2026";
 // The legal entity behind Dalai Llama, as registered with the Ministry of Corporate Affairs (Form 16).
 const OPERATOR = "Dazaalai Technologies LLP";
